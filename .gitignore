@@ -1,0 +1,24 @@
+# Project place file (wird mit "rojo build" erzeugt)
+/RBL.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+/*.rbxl
+/*.rbxl.bak
+
+sourcemap.json
+
+# Altlasten und lokale Arbeitsdateien (bleiben auf dem PC, nicht im Repo)
+/Loesch/
+/Claude outputs/
+/cleanup.ps1
+
+# Claude Code lokal
+/.claude/settings.local.json
+
+# Windows / Editoren
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

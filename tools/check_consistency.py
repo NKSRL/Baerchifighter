@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""
+Konsistenz-Pruefung fuer das RBL-Projekt.
+
+Prueft die Dinge, die Roblox erst beim Start bemerkt und die Luau selbst
+nicht sieht, weil sie ueber mehrere Dateien verteilt sind:
+
+  1. Gebaeude-IDs muessen in ALLEN acht Listen identisch sein.
+  2. Bei RateLimiter.connect muessen Remote-Objekt und Cooldown-Schluessel
+     denselben Namen tragen.
+  3. Jedes verbundene Remote sollte einen eigenen Cooldown haben.
+  4. Jedes Modul in der GameManager-Boot-Liste muss als Datei existieren.
+  5. Jeder Service mit init() muss in der Boot-Liste stehen.
+
+Aufruf:  python3 tools/check_consistency.py [pfad/zu/src]
+"""
+import re, sys
+from pathlib import Path
+
+ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent / "src"
+
+def strip_comments(text: str) -> str:
+    out, i, n = [], 0, len(text)
+    while i < n:
+        if text.startswith("--[[", i):
+            j = text.find("]]", i); i = n if j < 0 else j + 2
+        elif text.startswith("--", i):
+            j = text.find("\n", i); i = n if j < 0 else j
+        else:
+            out.append(text[i]); i += 1
+    return "".join(out)
+
+def read(rel: str) -> str:
+    return strip_comments((ROOT / rel).read_text(encoding="utf-8", errors="replace"))
+
+def block(src: str, pattern: str) -> str | None:
+    m = re.search(pattern, src, re.S)
+    return m.group(1) if m else None
+
+issues: list[str] = []
+
+# ---------- 1. Gebaeude-IDs ----------
+types_src = read("shared/Network/Types.luau")
+m = re.search(r"export type BuildingId\s*=(.*?)\n\s*\n", types_src, re.S)
+canonical = set(re.findall(r'\|\s*"(\w+)"', m.group(1))) if m else set()
+print(f"Kanonische Gebaeude-IDs (Types.BuildingId): {sorted(canonical)}\n")
+
+def keys_of(body):
+    """Nur die Schluessel der AEUSSERSTEN Ebene — verschachtelte Felder wie
+    `offset` oder `color` gehoeren nicht dazu."""
+    found, depth = set(), 0
+    for m in re.finditer(r"[{}]|(\w+)\s*=", body):
+        tok = m.group(0)
+        if tok == "{":
+            depth += 1
+        elif tok == "}":
+            depth -= 1
+        elif depth == 0 and m.group(1):
+            found.add(m.group(1))
+    return found
+def quoted(body):  return set(re.findall(r'"(\w+)"', body))
+def ids_of(body):  return set(re.findall(r'id\s*=\s*"(\w+)"', body))
+
+checks = [
+    ("MapConfig.BUILDING_OFFSETS",   read("shared/Config/MapConfig.luau"),
+     r"local BUILDING_OFFSETS[^=]*=\s*\{(.*?)\n\}", keys_of),
+    ("MapConfig.BUILDING_ORDER",     read("shared/Config/MapConfig.luau"),
+     r"local BUILDING_ORDER[^=]*=\s*\{(.*?)\}", quoted),
+    # Die Ausbau-Tabellen sind mit v7 von EconomyConfig nach BuildingBehavior
+    # gewandert: ihr Effekt-Text beschreibt die Mechanik des jeweiligen
+    # Gebaeudes, und die kennt nur BuildingBehavior.
+    ("BuildingBehavior.BUILDING_UPGRADES", read("shared/Config/BuildingBehavior.luau"),
+     r"local BUILDING_UPGRADES[^=]*=\s*\{(.*?)\n\}", keys_of),
+    ("BuildingBehavior.BEHAVIORS", read("shared/Config/BuildingBehavior.luau"),
+     r"local BEHAVIORS[^=]*=\s*\{(.*?)\n\}", keys_of),
+    ("Theme.BUILDING_COLORS", read("client/UI/Theme.luau"),
+     r"local BUILDING_COLORS[^=]*=\s*\{(.*?)\n\}", keys_of),
+    ("IslandService.VALID_BUILDINGS", read("server/Services/IslandService.luau"),
+     r"local VALID_BUILDINGS[^=]*=\s*\{(.*?)\}", keys_of),
+    ("WorldController.BUILDING_NAMES", read("client/Controllers/WorldController.luau"),
+     r"local BUILDING_NAMES[^=]*=\s*\{(.*?)\}", keys_of),
+    ("BuildingPanel.BUILDINGS",       read("client/UI/BuildingPanel.luau"),
+     r"local BUILDINGS[^=]*=\s*\{(.*?)\n\}", ids_of),
+    ("Types.createDefaultPlayerData", types_src,
+     r"buildings = \{(.*?)\n\t\t\t\}", ids_of),
+]
+
+for label, src, pattern, extract in checks:
+    body = block(src, pattern)
+    if body is None:
+        issues.append(f"{label}: Block nicht gefunden — Pruefung nicht moeglich")
+        continue
+    found = extract(body)
+    if found != canonical:
+        issues.append(
+            f"Gebaeude-IDs weichen ab in {label}:\n"
+            f"      gefunden: {sorted(found)}\n"
+            f"      erwartet: {sorted(canonical)}"
+        )
+
+# ---------- 2./3. Remotes ----------
+connected = set()
+for f in sorted(ROOT.rglob("*.luau")):
+    src = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
+    for mm in re.finditer(r'RateLimiter\.connect(?:Function)?\(\s*Remotes\.(\w+)\s*,\s*"(\w+)"', src):
+        connected.add(mm.group(1))
+        if mm.group(1) != mm.group(2):
+            issues.append(
+                f'RateLimiter-Schluessel passt nicht zum Remote:\n'
+                f'      {f.relative_to(ROOT)}: Remotes.{mm.group(1)} mit "{mm.group(2)}"'
+            )
+
+cooldowns = set(re.findall(r"^\s*(\w+)\s*=\s*[\d.]+", read("shared/Config/NetworkConfig.luau"), re.M))
+missing = connected - cooldowns
+if missing:
+    issues.append(f"Remotes ohne eigenen Cooldown (nutzen den Default): {sorted(missing)}")
+
+# ---------- 4./5. Boot-Liste ----------
+gm = read("server/Core/GameManager.server.luau")
+listed = set()
+for mm in re.finditer(r"module\s*=\s*ServerScriptService\.(\w+)\.(\w+)", gm):
+    folder, name = mm.group(1), mm.group(2)
+    listed.add(name)
+    if not (ROOT / "server" / folder / f"{name}.luau").exists():
+        issues.append(f"GameManager verweist auf fehlendes Modul: server/{folder}/{name}.luau")
+
+for f in sorted((ROOT / "server" / "Services").glob("*.luau")):
+    src = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
+    if re.search(r"function \w+\.init\(", src) and f.stem not in listed:
+        issues.append(f"Service hat init(), steht aber nicht in der Boot-Liste: {f.stem}")
+
+print("=" * 62)
+if issues:
+    print(f"{len(issues)} Befund(e):\n")
+    for i in issues:
+        print("  - " + i + "\n")
+    sys.exit(1)
+print("Alles konsistent.")

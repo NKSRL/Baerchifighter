@@ -1,0 +1,194 @@
+--!strict
+-- EconomyService.luau
+-- ServerScriptService/Services/EconomyService.luau
+--
+-- Einzige Zustaendigkeit:
+--   - Gummies und GoldGummies aendern
+--   - Alle Transaktionen validieren (nie ins Minus gehen)
+--   - Kosten-Transaktionen fuer Gebaeude- und PIT-Upgrades
+--   - Kein anderer Service aendert Waehrungen direkt
+--
+-- rebirthMult wird GENAU HIER angewendet (awardGummies) und nirgendwo sonst.
+-- Wer einen Betrag schon multipliziert hat, benutzt awardGummiesFlat.
+
+local ReplicatedStorage   = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
+local Types            = require(ReplicatedStorage.Network.Types)
+
+local PlayerService = require(ServerScriptService.Services.PlayerService)
+
+local EconomyService = {}
+
+-- Interne Hilfsfunktion — validiert und bucht ab
+local function charge(player: Player, field: "gummies" | "goldGummies", amount: number): (boolean, string)
+	assert(amount > 0, "[EconomyService] Betrag muss positiv sein")
+
+	local data = PlayerService.getData(player)
+	if not data then return false, "Spieler nicht geladen" end
+
+	local wallet = data :: any
+	if wallet[field] < amount then
+		return false, "Nicht genug " .. field .. " (hat " .. wallet[field] .. ", braucht " .. amount .. ")"
+	end
+
+	wallet[field] -= amount
+	PlayerService.markDirty(player)
+	return true, ""
+end
+
+local function credit(player: Player, field: "gummies" | "goldGummies", amount: number)
+	assert(amount > 0, "[EconomyService] Betrag muss positiv sein")
+
+	local data = PlayerService.getData(player)
+	if not data then return end
+
+	local wallet = data :: any
+	wallet[field] += amount
+	PlayerService.markDirty(player)
+end
+
+-- ============================================================
+-- Oeffentliche API — Waehrung
+-- ============================================================
+
+function EconomyService.spendGummies(player: Player, amount: number): (boolean, string)
+	return charge(player, "gummies", amount)
+end
+
+function EconomyService.spendGoldGummies(player: Player, amount: number): (boolean, string)
+	return charge(player, "goldGummies", amount)
+end
+
+-- Gutschrift MIT rebirthMult. Gibt den tatsaechlich gutgeschriebenen
+-- Betrag zurueck — Aufrufer melden diesen Wert an den Client, nicht den Basiswert.
+function EconomyService.awardGummies(player: Player, baseAmount: number): number
+	local data = PlayerService.getData(player)
+	if not data then return 0 end
+	if baseAmount <= 0 then return 0 end
+
+	local final = math.max(1, math.floor(baseAmount * data.rebirthMult))
+	credit(player, "gummies", final)
+
+	data.stats.totalGummiesEarned += final
+	return final
+end
+
+-- Gutschrift OHNE rebirthMult.
+-- Fuer Betraege die kein Einkommen sind, sondern ein Gegenwert:
+-- Recycling gibt den Wert eines Baerchis zurueck — ein Rebirth-Multiplikator
+-- darauf wuerde eine Endlosschleife aus Kaufen und Verwerten oeffnen.
+function EconomyService.awardGummiesFlat(player: Player, amount: number): number
+	if amount <= 0 then return 0 end
+
+	local data = PlayerService.getData(player)
+	if not data then return 0 end
+
+	local final = math.floor(amount)
+	credit(player, "gummies", final)
+
+	data.stats.totalGummiesEarned += final
+	return final
+end
+
+function EconomyService.awardGoldGummies(player: Player, amount: number): number
+	if amount <= 0 then return 0 end
+
+	local final = math.floor(amount)
+	if final <= 0 then return 0 end
+
+	credit(player, "goldGummies", final)
+	return final
+end
+
+-- Setzt Gummies fest auf einen Wert statt einen Betrag zu verrechnen — nur
+-- fuer den Rebirth-Reset gedacht, wo "danach hast du genau X" gemeint ist,
+-- nicht "zieh X ab" oder "gib X dazu". Bleibt trotzdem die einzige Stelle,
+-- die das Feld anfasst: RebirthService darf `data.gummies` selbst nicht
+-- direkt schreiben.
+function EconomyService.resetGummies(player: Player, amount: number)
+	local data = PlayerService.getData(player)
+	if not data then return end
+
+	data.gummies = math.max(0, amount)
+	PlayerService.markDirty(player)
+end
+
+-- ============================================================
+-- Oeffentliche API — Kosten-Transaktionen
+-- ============================================================
+
+-- Gebaeude upgraden (prueft Kosten, zieht ab, erhoeht Level)
+function EconomyService.upgradeBuilding(player: Player, buildingId: Types.BuildingId): (boolean, string)
+	local data = PlayerService.getData(player)
+	if not data then return false, "Spieler nicht geladen" end
+
+	local building = data.island.buildings[buildingId]
+	if not building then return false, "Gebaeude nicht vorhanden" end
+
+	local nextLevel  = building.level + 1
+	local upgradeDef = BuildingBehavior.getUpgrade(buildingId, nextLevel)
+	if not upgradeDef then return false, "Maximales Level erreicht" end
+
+	-- Erst pruefen, dann buchen: sonst kann der erste Teilbetrag abgezogen
+	-- werden obwohl der zweite scheitert.
+	if upgradeDef.costGummies > 0 and data.gummies < upgradeDef.costGummies then
+		return false, "Nicht genug Gummies"
+	end
+	if upgradeDef.costGoldGummies > 0 and data.goldGummies < upgradeDef.costGoldGummies then
+		return false, "Nicht genug GoldGummies"
+	end
+
+	if upgradeDef.costGummies > 0 then
+		local ok, reason = EconomyService.spendGummies(player, upgradeDef.costGummies)
+		if not ok then return false, reason end
+	end
+	if upgradeDef.costGoldGummies > 0 then
+		local ok, reason = EconomyService.spendGoldGummies(player, upgradeDef.costGoldGummies)
+		if not ok then return false, reason end
+	end
+
+	building.level = nextLevel
+	PlayerService.markDirty(player)
+
+	return true, ""
+end
+
+-- PIT-Level kaufen (prueft Kosten, zieht ab, erhoeht island.pitLevel).
+-- Der visuelle Neuaufbau der Plattform passiert NICHT hier — das macht
+-- IslandService ueber MapService.updatePitLevel.
+function EconomyService.upgradePit(player: Player): (boolean, string, number)
+	local data = PlayerService.getData(player)
+	if not data then return false, "Spieler nicht geladen", 0 end
+
+	local currentLevel = data.island.pitLevel
+	local nextLevel    = currentLevel + 1
+
+	if nextLevel > EconomyConfig.MAX_PIT_LEVEL then
+		return false, "Maximales PIT-Level erreicht", currentLevel
+	end
+
+	local cost = EconomyConfig.getPitUpgradeCost(nextLevel)
+	if not cost then
+		return false, "Keine Kosten fuer PIT-Level " .. nextLevel, currentLevel
+	end
+
+	local ok, reason = EconomyService.spendGummies(player, cost)
+	if not ok then return false, reason, currentLevel end
+
+	data.island.pitLevel = nextLevel
+	if nextLevel > data.stats.highestPitLevel then
+		data.stats.highestPitLevel = nextLevel
+	end
+
+	PlayerService.markDirty(player)
+	return true, "", nextLevel
+end
+
+function EconomyService.init()
+	print("[EconomyService] Initialisiert")
+end
+
+return EconomyService
