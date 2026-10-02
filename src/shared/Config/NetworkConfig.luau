@@ -51,6 +51,10 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- Alle auf einmal: eine Anfrage statt zwoelf, darf entsprechend traeger sein.
 	RequestCollectAllEggs  = 0.50,
 
+	-- Reines Umschalten einer Einstellung. Kein Spam-Risiko fuer Spielwerte,
+	-- aber jeder Wechsel stoesst ein Daten-Update an — daher nicht null.
+	RequestSetLanguage     = 1.00,
+
 	GetPlayerData          = 1.00,
 }
 

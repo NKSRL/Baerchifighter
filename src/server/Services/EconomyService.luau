@@ -17,26 +17,27 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc              = require(ReplicatedStorage.Localization.Loc)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 
 local EconomyService = {}
 
 -- Interne Hilfsfunktion — validiert und bucht ab
-local function charge(player: Player, field: "gummies" | "goldGummies", amount: number): (boolean, string)
+local function charge(player: Player, field: "gummies" | "goldGummies", amount: number): (boolean, Types.LocMsg?)
 	assert(amount > 0, "[EconomyService] Betrag muss positiv sein")
 
 	local data = PlayerService.getData(player)
-	if not data then return false, "Spieler nicht geladen" end
+	if not data then return false, Loc.msg("err.player_not_loaded") end
 
 	local wallet = data :: any
 	if wallet[field] < amount then
-		return false, "Nicht genug " .. field .. " (hat " .. wallet[field] .. ", braucht " .. amount .. ")"
+		return false, Loc.msg(if field == "gummies" then "err.not_enough_gummies" else "err.not_enough_gold_gummies", { have = wallet[field], need = amount })
 	end
 
 	wallet[field] -= amount
 	PlayerService.markDirty(player)
-	return true, ""
+	return true
 end
 
 local function credit(player: Player, field: "gummies" | "goldGummies", amount: number)
@@ -54,11 +55,11 @@ end
 -- Oeffentliche API — Waehrung
 -- ============================================================
 
-function EconomyService.spendGummies(player: Player, amount: number): (boolean, string)
+function EconomyService.spendGummies(player: Player, amount: number): (boolean, Types.LocMsg?)
 	return charge(player, "gummies", amount)
 end
 
-function EconomyService.spendGoldGummies(player: Player, amount: number): (boolean, string)
+function EconomyService.spendGoldGummies(player: Player, amount: number): (boolean, Types.LocMsg?)
 	return charge(player, "goldGummies", amount)
 end
 
@@ -121,24 +122,24 @@ end
 -- ============================================================
 
 -- Gebaeude upgraden (prueft Kosten, zieht ab, erhoeht Level)
-function EconomyService.upgradeBuilding(player: Player, buildingId: Types.BuildingId): (boolean, string)
+function EconomyService.upgradeBuilding(player: Player, buildingId: Types.BuildingId): (boolean, Types.LocMsg?)
 	local data = PlayerService.getData(player)
-	if not data then return false, "Spieler nicht geladen" end
+	if not data then return false, Loc.msg("err.player_not_loaded") end
 
 	local building = data.island.buildings[buildingId]
-	if not building then return false, "Gebaeude nicht vorhanden" end
+	if not building then return false, Loc.msg("err.building_missing") end
 
 	local nextLevel  = building.level + 1
 	local upgradeDef = BuildingBehavior.getUpgrade(buildingId, nextLevel)
-	if not upgradeDef then return false, "Maximales Level erreicht" end
+	if not upgradeDef then return false, Loc.msg("err.max_level") end
 
 	-- Erst pruefen, dann buchen: sonst kann der erste Teilbetrag abgezogen
 	-- werden obwohl der zweite scheitert.
 	if upgradeDef.costGummies > 0 and data.gummies < upgradeDef.costGummies then
-		return false, "Nicht genug Gummies"
+		return false, Loc.msg("err.not_enough_gummies", { have = data.gummies, need = upgradeDef.costGummies })
 	end
 	if upgradeDef.costGoldGummies > 0 and data.goldGummies < upgradeDef.costGoldGummies then
-		return false, "Nicht genug GoldGummies"
+		return false, Loc.msg("err.not_enough_gold_gummies", { have = data.goldGummies, need = upgradeDef.costGoldGummies })
 	end
 
 	if upgradeDef.costGummies > 0 then
@@ -153,26 +154,26 @@ function EconomyService.upgradeBuilding(player: Player, buildingId: Types.Buildi
 	building.level = nextLevel
 	PlayerService.markDirty(player)
 
-	return true, ""
+	return true
 end
 
 -- PIT-Level kaufen (prueft Kosten, zieht ab, erhoeht island.pitLevel).
 -- Der visuelle Neuaufbau der Plattform passiert NICHT hier — das macht
 -- IslandService ueber MapService.updatePitLevel.
-function EconomyService.upgradePit(player: Player): (boolean, string, number)
+function EconomyService.upgradePit(player: Player): (boolean, Types.LocMsg?, number)
 	local data = PlayerService.getData(player)
-	if not data then return false, "Spieler nicht geladen", 0 end
+	if not data then return false, Loc.msg("err.player_not_loaded"), 0 end
 
 	local currentLevel = data.island.pitLevel
 	local nextLevel    = currentLevel + 1
 
 	if nextLevel > EconomyConfig.MAX_PIT_LEVEL then
-		return false, "Maximales PIT-Level erreicht", currentLevel
+		return false, Loc.msg("err.max_pit_level"), currentLevel
 	end
 
 	local cost = EconomyConfig.getPitUpgradeCost(nextLevel)
 	if not cost then
-		return false, "Keine Kosten fuer PIT-Level " .. nextLevel, currentLevel
+		return false, Loc.msg("err.no_pit_cost", { level = nextLevel }), currentLevel
 	end
 
 	local ok, reason = EconomyService.spendGummies(player, cost)
@@ -184,7 +185,7 @@ function EconomyService.upgradePit(player: Player): (boolean, string, number)
 	end
 
 	PlayerService.markDirty(player)
-	return true, "", nextLevel
+	return true, nil, nextLevel
 end
 
 function EconomyService.init()

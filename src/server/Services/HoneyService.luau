@@ -43,6 +43,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
@@ -61,8 +62,8 @@ local LEVEL_UP_CELEBRATE_COLOR = Color3.fromRGB(255, 196, 60)
 
 local HoneyService = {}
 
-local function fail(player: Player, reason: string)
-	Remotes.ActionFailed:FireClient(player, "RequestFeedHoney", reason)
+local function fail(player: Player, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, "RequestFeedHoney", reason or Loc.msg("err.unknown"))
 end
 
 --------------------------------------------------------------------------------
@@ -244,14 +245,14 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, "Baerchi nicht gefunden")
+		fail(player, Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
 	local def = BaerchiConfig.getById(baerchi.configId)
 	if not def then
 		warn("[HoneyService] Unbekannter configId:", baerchi.configId)
-		fail(player, "Baerchi-Daten defekt")
+		fail(player, Loc.msg("err.baerchi_data_corrupt"))
 		return
 	end
 
@@ -268,9 +269,7 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 		else pickAutoBuilding(data, hpRatio)
 
 	if not chosen then
-		fail(player, if buildingId
-			then "In diesem Gebaeude ist gerade kein Honig"
-			else "Kein Honig da — die Gebaeude produzieren noch")
+		fail(player, Loc.msg(if buildingId then "err.feed_building_empty" else "err.feed_no_honey"))
 		return
 	end
 
@@ -419,7 +418,7 @@ function HoneyService.init()
 		-- verfuettert ein Tippfehler im Client den falschen Honig.
 		if typeof(buildingId) ~= "string" then return end
 		if not BuildingBehavior.isValidId(buildingId) then
-			fail(player, "Unbekanntes Gebaeude")
+			fail(player, Loc.msg("err.building_unknown"))
 			return
 		end
 

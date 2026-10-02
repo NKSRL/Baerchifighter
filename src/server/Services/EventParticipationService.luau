@@ -48,6 +48,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
@@ -135,8 +136,8 @@ local _walking: { [Player]: boolean } = {}
 -- Hilfen
 --------------------------------------------------------------------------------
 
-local function fail(player: Player, action: string, reason: string)
-	Remotes.ActionFailed:FireClient(player, action, reason)
+local function fail(player: Player, action: string, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, action, reason or Loc.msg("err.unknown"))
 end
 
 local function notifyPresence(player: Player, atEvent: boolean, baerchiUid: string?)
@@ -206,19 +207,19 @@ function EventParticipationService.sendToEvent(player: Player)
 	if not data then return end
 
 	if _present[player] or _walking[player] then
-		fail(player, "RequestSendToEvent", "Dein Baerchi ist schon unterwegs")
+		fail(player, "RequestSendToEvent", Loc.msg("err.event_already_away"))
 		return
 	end
 
 	local uid = data.island.equippedUid
 	if not uid or not data.island.baerchis[uid] then
-		fail(player, "RequestSendToEvent", "Kein Baerchi ausgeruestet")
+		fail(player, "RequestSendToEvent", Loc.msg("err.event_no_equipped"))
 		return
 	end
 
 	local figure = MapService.getBaerchiModel(player, uid)
 	if not figure then
-		fail(player, "RequestSendToEvent", "Der Baerchi steht gerade nicht auf dem Plot")
+		fail(player, "RequestSendToEvent", Loc.msg("err.event_not_on_plot"))
 		return
 	end
 
@@ -226,7 +227,7 @@ function EventParticipationService.sendToEvent(player: Player)
 	-- das Schloss NICHT weg (kein forceAcquire), sondern sagen es dem Spieler.
 	-- Der Autopilot gibt es nach ein paar Sekunden von selbst wieder frei.
 	if not ActivityLock.tryAcquire(player, LOCK_HOLDER) then
-		fail(player, "RequestSendToEvent", "Der Baerchi ist gerade unterwegs — kurz warten")
+		fail(player, "RequestSendToEvent", Loc.msg("err.baerchi_busy"))
 		return
 	end
 
@@ -292,7 +293,7 @@ end
 function EventParticipationService.recall(player: Player)
 	local presence = _present[player]
 	if not presence then
-		fail(player, "RequestRecallFromEvent", "Dein Baerchi ist nicht am Event")
+		fail(player, "RequestRecallFromEvent", Loc.msg("err.event_not_at_event"))
 		return
 	end
 

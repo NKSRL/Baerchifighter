@@ -19,8 +19,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types   = require(ReplicatedStorage.Network.Types)
 local Remotes = require(ReplicatedStorage.Network.Remotes)
+local Loc     = require(ReplicatedStorage.Localization.Loc)
 
-local Theme = require(script.Parent.Parent.UI.Theme)
 local Toast = require(script.Parent.Parent.UI.Toast)
 
 local ResultFeed = {}
@@ -30,12 +30,12 @@ function ResultFeed.init()
 		if typeof(result) ~= "table" then return end
 		local typed = result :: Types.RecycleResult
 
-		local message = "Verwertet: +" .. Theme.formatNumber(typed.gummiesGained) .. " Gummies"
+		-- Zahlen formatiert Loc selbst (Trenner je nach Sprache)
 		if typed.goldGummiesGained > 0 then
-			message ..= "  und  +" .. Theme.formatNumber(typed.goldGummiesGained) .. " GoldGummies"
+			Toast.success(Loc.t("msg.recycled_gold", { gummies = typed.gummiesGained, gold = typed.goldGummiesGained }))
+		else
+			Toast.success(Loc.t("msg.recycled", { gummies = typed.gummiesGained }))
 		end
-
-		Toast.success(message)
 	end)
 
 	Remotes.OfflineReportReceived.OnClientEvent:Connect(function(report: any)
@@ -46,11 +46,10 @@ function ResultFeed.init()
 		-- oder die Lager waren schon voll.
 		if typed.secondsAway <= 0 or typed.honeyGained <= 0 then return end
 
-		Toast.success(string.format(
-			"Waehrend du weg warst (%s): +%d Honig",
-			Theme.formatDuration(typed.secondsAway),
-			typed.honeyGained
-		))
+		Toast.success(Loc.t("msg.offline_honey", {
+			time  = Loc.formatDuration(typed.secondsAway),
+			honey = typed.honeyGained,
+		}))
 	end)
 
 	Remotes.FeedResultReceived.OnClientEvent:Connect(function(result: any)
@@ -62,7 +61,7 @@ function ResultFeed.init()
 		-- ist ein Moment, den man nicht verpassen soll.
 		if not typed.leveledUp then return end
 
-		Toast.success("Level Up!  Jetzt Level " .. typed.newLevel)
+		Toast.success(Loc.t("msg.level_up", { level = typed.newLevel }))
 	end)
 
 	print("[ResultFeed] Initialisiert")

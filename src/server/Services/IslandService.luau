@@ -21,6 +21,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
@@ -39,8 +40,8 @@ local VALID_BUILDINGS: { [string]: boolean } = {
 	HoneyPress = true,
 }
 
-local function fail(player: Player, action: string, reason: string)
-	Remotes.ActionFailed:FireClient(player, action, reason)
+local function fail(player: Player, action: string, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, action, reason or Loc.msg("err.unknown"))
 end
 
 --------------------------------------------------------------------------------
@@ -122,7 +123,7 @@ function IslandService.equipBaerchi(player: Player, baerchiUid: string)
 	if not data then return end
 
 	if not data.island.baerchis[baerchiUid] then
-		fail(player, "RequestEquipBaerchi", "Baerchi nicht gefunden")
+		fail(player, "RequestEquipBaerchi", Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
@@ -140,7 +141,7 @@ function IslandService.equipBaerchi(player: Player, baerchiUid: string)
 	-- Bewegung laeuft. Ohne ausgeruesteten Baerchi laeuft auch keine, das
 	-- Schloss ist dann frei und der erste Equip geht wie bisher sofort durch.
 	if not ActivityLock.isFree(player) then
-		fail(player, "RequestEquipBaerchi", "Der Baerchi ist gerade unterwegs — kurz warten")
+		fail(player, "RequestEquipBaerchi", Loc.msg("err.baerchi_busy"))
 		return
 	end
 
@@ -163,7 +164,7 @@ function IslandService.init()
 	RateLimiter.connect(Remotes.RequestUpgradeBuilding, "RequestUpgradeBuilding", function(player, buildingId: any)
 		if typeof(buildingId) ~= "string" then return end
 		if not VALID_BUILDINGS[buildingId] then
-			fail(player, "RequestUpgradeBuilding", "Unbekanntes Gebaeude")
+			fail(player, "RequestUpgradeBuilding", Loc.msg("err.building_unknown"))
 			return
 		end
 		IslandService.upgradeBuilding(player, buildingId :: Types.BuildingId)

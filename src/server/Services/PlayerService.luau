@@ -169,6 +169,10 @@ local function applyDefaults(data: Types.PlayerData): Types.PlayerData
 	if island.baerchis  == nil then island.baerchis  = {} end
 	if island.eggStock  == nil then island.eggStock  = { BasicEgg = 3 } end
 
+	-- language: kein Nachruesten noetig — nil bedeutet "automatisch" (die
+	-- Roblox-Sprache des Clients), und genau das soll ein alter Spielstand
+	-- bekommen. Kein Versions-Sprung. Siehe SettingsService.
+	--
 	-- v6: equippedUid. Kein Nachruesten noetig — ein fehlendes Feld liest
 	-- sich in Lua ohnehin als nil, und IslandService.autoEquipIfNone laeuft
 	-- bei jedem Join (onDataLoaded) und ruestet automatisch den ersten
@@ -547,6 +551,7 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		rebirthCount = data.rebirthCount,
 		rebirthMult  = data.rebirthMult,
 		rank         = data.rank,
+		language     = data.language,
 		island       = data.island,
 	}
 end

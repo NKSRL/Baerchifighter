@@ -102,3 +102,21 @@ Mit `--svg` schreibt das Werkzeug stattdessen die drei nackten SVGs in einen
 Ordner — praktisch, wenn man sie weiterverarbeiten oder in ein PNG wandeln will:
 
     python3 tools/render_map.py --svg vorschau/
+
+## 5. `check_loc.py` — Übersetzungen
+
+Prüft das Lokalisierungssystem (`src/shared/Localization`): hat jede Sprache
+alle Schlüssel, stimmen die `{platzhalter}` überein, sind alle im Code
+verwendeten Schlüssel vorhanden? Meldet außerdem, wie viele Textstellen noch
+fest im Code stehen (`--todo` zeigt jede einzelne).
+
+    python3 tools/check_loc.py
+    python3 tools/check_loc.py --todo
+
+Exit-Code 1 bei Fehlern — taugt als letzter Schritt vor dem Commit.
+
+## 6. `luau-tests/` — Tests ohne Studio
+
+Führt Luau-Code mit dem echten Compiler aus (Syntax aller Dateien, Tests für
+`Loc`, Rauchtest der Client-UI). Braucht Node.js, siehe
+`tools/luau-tests/README.md`.

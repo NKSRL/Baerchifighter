@@ -28,6 +28,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types          = require(ReplicatedStorage.Network.Types)
 local Remotes        = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EggConfig      = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig  = require(ReplicatedStorage.Config.BaerchiConfig)
 local EconomyConfig  = require(ReplicatedStorage.Config.EconomyConfig)
@@ -41,8 +42,8 @@ local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
 
 local EggService = {}
 
-local function fail(player: Player, action: string, reason: string)
-	Remotes.ActionFailed:FireClient(player, action, reason)
+local function fail(player: Player, action: string, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, action, reason or Loc.msg("err.unknown"))
 end
 
 -- Laufender Zaehler fuer Ei-uids. Gleiches Muster wie BaerchiFactory.newUid:
@@ -80,19 +81,19 @@ end
 -- Reihenfolge: Lagerbestand zuerst, dann Gummies, dann GoldGummies.
 -- Dadurch funktionieren AscensionEggs (nicht kaufbar, nur aus Rebirth)
 -- ohne Sonderweg, und geschenkte Eier werden nicht doppelt bezahlt.
-local function chargeForEgg(player: Player, eggType: Types.EggType): (boolean, string)
+local function chargeForEgg(player: Player, eggType: Types.EggType): (boolean, Types.LocMsg?)
 	local def = EggConfig.data[eggType]
 	if not def then
-		return false, "Unbekannter Egg-Typ"
+		return false, Loc.msg("err.egg_unknown_type")
 	end
 
 	local data = PlayerService.getData(player)
-	if not data then return false, "Spieler nicht geladen" end
+	if not data then return false, Loc.msg("err.player_not_loaded") end
 
 	local stock = data.island.eggStock[eggType] or 0
 	if stock > 0 then
 		data.island.eggStock[eggType] = stock - 1
-		return true, ""
+		return true
 	end
 
 	if def.costGummies > 0 then
@@ -103,7 +104,7 @@ local function chargeForEgg(player: Player, eggType: Types.EggType): (boolean, s
 		return EconomyService.spendGoldGummies(player, def.costGoldGummies)
 	end
 
-	return false, "Kein " .. eggType .. " im Lager (nicht kaufbar)"
+	return false, Loc.msg("err.egg_not_buyable", { egg = Loc.msg("egg." .. eggType .. ".name") })
 end
 
 --------------------------------------------------------------------------------
@@ -116,7 +117,7 @@ function EggService.startHatch(player: Player, eggType: Types.EggType)
 
 	local slots = EggService.getSlotCount(data)
 	if #data.island.hatchingEggs >= slots then
-		fail(player, "RequestHatchEgg", "Alle " .. slots .. " Brut-Slots sind belegt")
+		fail(player, "RequestHatchEgg", Loc.msg("err.egg_slots_full", { slots = slots }))
 		return
 	end
 
@@ -163,13 +164,13 @@ function EggService.claimEgg(player: Player, eggUid: string)
 
 	local entry = if slotIndex then data.island.hatchingEggs[slotIndex] else nil
 	if not entry or not slotIndex then
-		fail(player, "RequestClaimEgg", "Dieses Ei gibt es nicht mehr")
+		fail(player, "RequestClaimEgg", Loc.msg("err.egg_gone"))
 		return
 	end
 
 	local remaining = entry.readyAt - os.time()
 	if remaining > 0 then
-		fail(player, "RequestClaimEgg", "Noch " .. remaining .. "s bis das Ei fertig ist")
+		fail(player, "RequestClaimEgg", Loc.msg("err.egg_wait", { seconds = remaining }))
 		return
 	end
 
@@ -194,7 +195,7 @@ function EggService.claimEgg(player: Player, eggUid: string)
 		PlayerService.markDirty(player)
 		PlayerService.saveNow(player)
 
-		fail(player, "RequestClaimEgg", "Diesen Ei-Typ gibt es nicht mehr — du bekommst ein BasicEgg dafuer")
+		fail(player, "RequestClaimEgg", Loc.msg("err.egg_type_gone", { egg = Loc.msg("egg.BasicEgg.name") }))
 		return
 	end
 
@@ -225,7 +226,7 @@ function EggService.claimEgg(player: Player, eggUid: string)
 	-- das Ei bei einem Config-Tippfehler ersatzlos verloren.
 	local newBaerchi = BaerchiFactory.create(wonConfigId, { mutation = mutation })
 	if not newBaerchi then
-		fail(player, "RequestClaimEgg", "Interner Fehler beim Ausbrueten")
+		fail(player, "RequestClaimEgg", Loc.msg("err.egg_internal"))
 		return
 	end
 
@@ -272,7 +273,7 @@ function EggService.init()
 		-- Typ-Validierung (Client-Input immer misstrauen)
 		if typeof(eggType) ~= "string" then return end
 		if not EggConfig.data[eggType :: Types.EggType] then
-			fail(player, "RequestHatchEgg", "Unbekannter Egg-Typ")
+			fail(player, "RequestHatchEgg", Loc.msg("err.egg_unknown_type"))
 			return
 		end
 

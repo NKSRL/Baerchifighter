@@ -26,6 +26,10 @@
 --   7. WorldController zuletzt — er braucht Panel und PanelManager.
 --   8. EggTimerController — unabhaengig von allen anderen, braucht nur
 --      ClientState (schon initialisiert) und die Figuren in der Welt.
+--
+-- Davor, ganz am Anfang: LanguageController. Er legt die Sprache fest, bevor
+-- irgendein Text gebaut wird (er braucht ClientState erst, wenn es dort
+-- Daten gibt — onChanged meldet den aktuellen Stand sofort nach).
 
 local Players = game:GetService("Players")
 
@@ -38,6 +42,7 @@ local Controllers = root:WaitForChild("Controllers")
 local UI          = root:WaitForChild("UI")
 
 local ClientState        = require(Controllers:WaitForChild("ClientState"))
+local LanguageController = require(Controllers:WaitForChild("LanguageController"))
 local ResultFeed         = require(Controllers:WaitForChild("ResultFeed"))
 local WorldController    = require(Controllers:WaitForChild("WorldController"))
 local EggTimerController = require(Controllers:WaitForChild("EggTimerController"))
@@ -53,6 +58,7 @@ local BuildingPanel    = require(UI:WaitForChild("BuildingPanel"))
 local FusionPanel      = require(UI:WaitForChild("FusionPanel"))
 local CharmPanel       = require(UI:WaitForChild("CharmPanel"))
 local RebirthDialog    = require(UI:WaitForChild("RebirthDialog"))
+local LanguagePanel    = require(UI:WaitForChild("LanguagePanel"))
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -69,6 +75,11 @@ screenGui.Parent           = playerGui
 -- Start
 --------------------------------------------------------------------------------
 
+-- Sprache ALLERERSTES: ab hier liefert Loc den Text in der Roblox-Sprache des
+-- Spielers. Ohne das haetten Toast und alle Beschriftungen, die beim Aufbau
+-- gesetzt werden, einen Moment lang die Standardsprache.
+LanguageController.init()
+
 Toast.init(screenGui)
 ClientState.init()
 
@@ -84,6 +95,7 @@ FusionPanel.init(screenGui)
 -- hier soll den Aufrufweg widerspiegeln.
 CharmPanel.init(screenGui)
 RebirthDialog.init(screenGui)
+LanguagePanel.init(screenGui)
 
 Hud.init(screenGui)
 MenuBar.init(screenGui)

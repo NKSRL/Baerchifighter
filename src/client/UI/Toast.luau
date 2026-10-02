@@ -13,7 +13,9 @@
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Types   = require(ReplicatedStorage.Network.Types)
 local Remotes = require(ReplicatedStorage.Network.Remotes)
+local Loc     = require(ReplicatedStorage.Localization.Loc)
 local Theme   = require(script.Parent.Theme)
 
 local Toast = {}
@@ -41,9 +43,15 @@ local function removeToast(toast: Frame)
 	toast:Destroy()
 end
 
-function Toast.show(message: string, color: Color3?)
+-- `message` ist entweder ein fertiger String (Texte, die der Client selbst
+-- baut) oder eine LocMsg vom Server. Aufgeloest wird HIER, im Moment der
+-- Anzeige — so erscheint auch eine Meldung, die noch vor dem Sprachwechsel
+-- gesendet wurde, in der aktuellen Sprache.
+function Toast.show(message: string | Types.LocMsg, color: Color3?)
 	local container = _container
 	if not container then return end
+
+	local text = Loc.resolve(message)
 
 	-- Aelteste rauswerfen wenn der Stapel voll ist
 	while #_active >= MAX_STACK do
@@ -66,7 +74,7 @@ function Toast.show(message: string, color: Color3?)
 	accent.Parent            = toast
 	Theme.corner(accent, 3)
 
-	local label = Theme.label("Text", toast, message)
+	local label = Theme.label("Text", toast, text)
 	label.Position   = UDim2.new(0, 22, 0, 4)
 	label.Size       = UDim2.new(1, -30, 1, -8)
 	label.TextColor3 = Theme.COLORS.text
@@ -89,11 +97,11 @@ function Toast.show(message: string, color: Color3?)
 	end)
 end
 
-function Toast.success(message: string)
+function Toast.success(message: string | Types.LocMsg)
 	Toast.show(message, Theme.COLORS.good)
 end
 
-function Toast.info(message: string)
+function Toast.info(message: string | Types.LocMsg)
 	Toast.show(message, Theme.COLORS.accent)
 end
 
@@ -124,8 +132,10 @@ function Toast.init(screenGui: ScreenGui)
 	_container = container
 
 	-- Der eigentliche Grund fuer dieses Modul
+	-- `reason` ist eine LocMsg (Schluessel + Zahlen) — oder, bei Altlasten, ein
+	-- fertiger String. Loc.resolve nimmt beides.
 	Remotes.ActionFailed.OnClientEvent:Connect(function(action: any, reason: any)
-		Toast.show(tostring(reason), Theme.COLORS.bad)
+		Toast.show(Loc.resolve(reason), Theme.COLORS.bad)
 	end)
 
 	print("[Toast] Initialisiert")

@@ -152,7 +152,10 @@ local EggCollectedReceived = getOrCreateEvent("EggCollectedReceived")
 local OfflineEggReportReceived = getOrCreateEvent("OfflineEggReportReceived")
 
 -- Eine Anfrage wurde serverseitig abgelehnt — Client zeigt Toast/Fehlertext.
--- Args: action: string, reason: string
+-- Args: action: string, reason: Types.LocMsg  (Schluessel + Zahlen, KEIN fertiger
+--       Satz: der Client baut den Text in der Sprache des Spielers, siehe
+--       Localization/Loc. Ein einfacher String wird als Altlast unveraendert
+--       angezeigt.)
 local ActionFailed = getOrCreateEvent("ActionFailed")
 
 -- ============================================================
@@ -245,6 +248,10 @@ local RequestEquipBaerchi = getOrCreateEvent("RequestEquipBaerchi")
 -- Args: (keine)
 local RequestRebirth = getOrCreateEvent("RequestRebirth")
 
+-- Spieler waehlt seine Sprache. nil/"auto" = zurueck auf die Roblox-Sprache.
+-- Args: language: string?   ("de" | "en" | "fr" | "es")
+local RequestSetLanguage = getOrCreateEvent("RequestSetLanguage")
+
 -- ============================================================
 -- Client → Server Functions (brauchen eine Antwort)
 -- ============================================================
@@ -283,6 +290,7 @@ return {
 	RequestFeedHoney       = RequestFeedHoney,
 	RequestEquipBaerchi    = RequestEquipBaerchi,
 	RequestRebirth         = RequestRebirth,
+	RequestSetLanguage     = RequestSetLanguage,
 	RequestPromoteBaerchi  = RequestPromoteBaerchi,
 	RequestRollCharms      = RequestRollCharms,
 	RequestToggleCharmLock = RequestToggleCharmLock,

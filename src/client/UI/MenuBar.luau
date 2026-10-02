@@ -39,6 +39,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc              = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
@@ -62,7 +63,9 @@ type Live = (Types.PlayerDataUpdate) -> (string, boolean)
 
 type Entry = {
 	panel  : string,
-	text   : string,
+	-- Beschriftung unter der Kachel. Eine Funktion statt eines Strings, weil
+	-- sie bei jedem Sprachwechsel neu ausgewertet wird.
+	title  : () -> string,
 	color  : Color3,
 	symbol : string,
 	live   : Live?,
@@ -74,6 +77,7 @@ type Tile = {
 	-- eigenes Label darueber wuerde die Klicks abfangen.
 	tile  : TextButton,
 	alert : Frame,
+	label : TextLabel,
 }
 
 local _tiles: { Tile } = {}
@@ -127,9 +131,9 @@ end
 -- irgendwann von den anderen abweicht.
 local function buildEntries(): { Entry }
 	local entries: { Entry } = {
-		{ panel = "Hatch",     text = "Eier",     color = Theme.COLORS.gummy,  symbol = "EI" },
-		{ panel = "Inventory", text = "Baerchis", color = Theme.COLORS.accent, symbol = "BA" },
-		{ panel = "Combat",    text = "Kampf",    color = Theme.COLORS.bad,    symbol = "VS" },
+		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI" },
+		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA" },
+		{ panel = "Combat",    title = function() return Loc.t("ui.menu.fight") end,    color = Theme.COLORS.bad,    symbol = "VS" },
 	}
 
 	for _, id in MapConfig.BUILDING_ORDER do
@@ -137,7 +141,11 @@ local function buildEntries(): { Entry }
 
 		table.insert(entries, {
 			panel  = PanelManager.buildingPanelName(id),
-			text   = if config then config.shortName else id,
+			-- shortName aus MapConfig bleibt als Rueckfall, solange ein neues
+			-- Gebaeude noch keinen Eintrag in den Sprachdateien hat.
+			title  = function()
+				return Loc.name("building." .. id .. ".short", if config then config.shortName else id)
+			end,
 			color  = Theme.buildingColor(id),
 			symbol = "0",
 			live   = buildingLive(id :: Types.BuildingId),
@@ -146,7 +154,7 @@ local function buildEntries(): { Entry }
 
 	table.insert(entries, {
 		panel  = PanelManager.ARENA_PANEL,
-		text   = "Arena",
+		title  = function() return Loc.t("ui.menu.arena") end,
 		color  = Theme.COLORS.goldGummy,
 		symbol = "1",
 		live   = arenaLive,
@@ -190,7 +198,7 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	bang.TextXAlignment = Enum.TextXAlignment.Center
 	bang.ZIndex         = 4
 
-	local label = Theme.label("Name", slot, entry.text)
+	local label = Theme.label("Name", slot, entry.title())
 	label.Position       = UDim2.new(0, 0, 0, TILE + 1)
 	label.Size           = UDim2.new(1, 0, 0, LABEL)
 	label.TextXAlignment = Enum.TextXAlignment.Center
@@ -198,7 +206,7 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	label.TextSize       = 13
 	Theme.outlineText(label)
 
-	return { entry = entry, tile = button, alert = alert }
+	return { entry = entry, tile = button, alert = alert, label = label }
 end
 
 --------------------------------------------------------------------------------
@@ -247,6 +255,14 @@ function MenuBar.init(screenGui: ScreenGui)
 	end
 
 	ClientState.onChanged(refresh)
+
+	-- Sprachwechsel: nur die Beschriftungen neu setzen (die Zahlen in den
+	-- Kacheln sind sprachunabhaengig)
+	Loc.onChanged(function()
+		for _, tile in _tiles do
+			tile.label.Text = tile.entry.title()
+		end
+	end)
 
 	print("[MenuBar] Initialisiert |", #entries, "Kacheln")
 end

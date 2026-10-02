@@ -100,6 +100,11 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- anfasst, soll das andere direkt daneben sehen.
 	{ name = "EventParticipationService", module = ServerScriptService.Services.EventParticipationService },
 
+	-- Spieler-Einstellungen (aktuell: Sprache). Aendert nur ein Feld in den
+	-- Spielerdaten und verbindet ein Remote — Reihenfolge zu PlayerService
+	-- unkritisch (der Handler laeuft erst, wenn ein Spieler etwas anklickt).
+	{ name = "SettingsService", module = ServerScriptService.Services.SettingsService },
+
 	{ name = "PlayerService",  module = ServerScriptService.Services.PlayerService },  -- letzter Spiel-Service!
 
 	-- Kein Spiel-Service: baut nur die Studio-Test-Schnittstelle.

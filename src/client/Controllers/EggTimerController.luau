@@ -36,6 +36,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local EggCalculator = require(ReplicatedStorage.Modules.EggCalculator)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local ClientState = require(script.Parent.ClientState)
 
@@ -119,7 +120,7 @@ local function refresh()
 	end
 
 	if #data.island.laidEggs >= EggConfig.MAX_UNCOLLECTED_EGGS then
-		label.Text = "Lager voll — erst einsammeln!"
+		label.Text = Loc.t("ui.egg.full")
 		return
 	end
 
@@ -135,8 +136,8 @@ local function refresh()
 	local secondsLeft = nextAt - os.time()
 
 	label.Text = if secondsLeft <= 0
-		then "Naechstes Ei: gleich!"
-		else "Naechstes Ei: " .. formatSeconds(secondsLeft)
+		then Loc.t("ui.egg.soon")
+		else Loc.t("ui.egg.next", { time = formatSeconds(secondsLeft) })
 end
 
 --------------------------------------------------------------------------------
@@ -182,6 +183,12 @@ function EggTimerController.init()
 	-- Die Figuren werden bei jedem Struktur-Neuaufbau ersetzt (siehe
 	-- PlotDisplayService) — also staendig neu einhaengen.
 	Workspace.DescendantAdded:Connect(hook)
+
+	-- Bei einem Sprachwechsel sofort neu beschriften statt bis zum naechsten
+	-- Sekunden-Tick zu warten.
+	Loc.onChanged(function()
+		refresh()
+	end)
 
 	task.spawn(function()
 		while true do

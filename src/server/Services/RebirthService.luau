@@ -35,6 +35,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
@@ -50,8 +51,8 @@ local REBIRTH_CELEBRATE_COLOR = Color3.fromRGB(255, 255, 255)
 
 local RebirthService = {}
 
-local function fail(player: Player, reason: string)
-	Remotes.ActionFailed:FireClient(player, "RequestRebirth", reason)
+local function fail(player: Player, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, "RequestRebirth", reason or Loc.msg("err.unknown"))
 end
 
 -- Setzt Level und XP eines Baerchis auf den Werkszustand zurueck und heilt
@@ -83,7 +84,7 @@ function RebirthService.rebirth(player: Player)
 
 	local cost = EconomyConfig.getRebirthCost(data.rebirthCount)
 	if data.gummies < cost then
-		fail(player, "Rebirth kostet " .. cost .. " Gummies (du hast " .. data.gummies .. ")")
+		fail(player, Loc.msg("err.rebirth_cost", { cost = cost, have = data.gummies }))
 		return
 	end
 

@@ -251,6 +251,24 @@ export type IslandData = {
 }
 
 --------------------------------------------------------------------------------
+-- Lokalisierte Nachrichten (Server → Client)
+--------------------------------------------------------------------------------
+
+-- Der Server formuliert nie einen Satz. Er schickt einen Schluessel plus Zahlen
+-- bzw. Namen, der Client baut daraus den Text in der Sprache des Spielers
+-- (siehe Localization/Loc). Ein Argument darf selbst wieder eine LocMsg sein,
+-- damit z.B. ein Eiername in der Sprache des Spielers eingesetzt wird.
+--
+-- Konvention fuer Schluessel: "err.*" fuer abgelehnte Aktionen, "msg.*" fuer
+-- Meldungen, "ui.*" fuer feste Beschriftungen. Die Texte stehen ausschliesslich
+-- in Localization/Strings/<sprache>.luau.
+export type LocArg = string | number | LocMsg
+export type LocMsg = {
+	k : string,                      -- Schluessel
+	a : { [string]: LocArg }?,       -- Platzhalter-Werte
+}
+
+--------------------------------------------------------------------------------
 -- Spieler-Rang
 --------------------------------------------------------------------------------
 
@@ -278,6 +296,12 @@ export type PlayerData = {
 	rebirthCount : number,   -- Anzahl Rebirths
 	rebirthMult  : number,   -- Earnings-Multiplikator (1.0 → 1.5 → 2.25 ...)
 	rank         : Rank,
+
+	-- Gewaehlte Sprache ("de" | "en" | "fr" | "es"). nil = der Spieler hat nie
+	-- gewaehlt, es gilt die Roblox-Sprache seines Clients. Bewusst OHNE
+	-- Versions-Sprung: ein fehlendes Feld liest sich in Lua ohnehin als nil
+	-- und bedeutet genau "automatisch" (wie equippedUid in v6).
+	language     : string?,
 
 	-- Insel
 	island : IslandData,
@@ -307,6 +331,7 @@ export type PlayerDataUpdate = {
 	rebirthCount : number,
 	rebirthMult  : number,
 	rank         : Rank,
+	language     : string?,
 	island       : IslandData,
 }
 

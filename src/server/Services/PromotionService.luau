@@ -46,6 +46,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local PromotionConfig  = require(ReplicatedStorage.Config.PromotionConfig)
 local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
@@ -63,8 +64,8 @@ local PROMOTION_CELEBRATE_COLOR = Color3.fromRGB(178, 148, 255)
 
 local PromotionService = {}
 
-local function fail(player: Player, reason: string)
-	Remotes.ActionFailed:FireClient(player, "RequestPromoteBaerchi", reason)
+local function fail(player: Player, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, "RequestPromoteBaerchi", reason or Loc.msg("err.unknown"))
 end
 
 --------------------------------------------------------------------------------
@@ -117,13 +118,13 @@ function PromotionService.promote(player: Player, baerchiUid: string)
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, "Baerchi nicht gefunden")
+		fail(player, Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
 	local current = baerchi.promotionLevel or 0
 	if current >= PromotionConfig.MAX_PROMOTION then
-		fail(player, "Schon voll befoerdert")
+		fail(player, Loc.msg("err.promo_maxed"))
 		return
 	end
 
@@ -132,13 +133,12 @@ function PromotionService.promote(player: Player, baerchiUid: string)
 	local materials = PromotionService.getMaterials(data, baerchi)
 
 	if #materials < cost then
-		local def  = BaerchiConfig.getById(baerchi.configId)
-		local name = if def then def.displayName else baerchi.configId
-
-		fail(player, string.format(
-			"Du brauchst %d x %s als Material (du hast %d)",
-			cost, name, #materials
-		))
+		-- Der Name geht als Nachricht mit: der Client setzt ihn in SEINER Sprache ein
+		fail(player, Loc.msg("err.promo_need_material", {
+			cost = cost,
+			name = Loc.msg("baerchi." .. baerchi.configId .. ".name"),
+			have = #materials,
+		}))
 		return
 	end
 

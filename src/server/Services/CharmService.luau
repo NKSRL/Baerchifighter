@@ -42,6 +42,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types       = require(ReplicatedStorage.Network.Types)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local CharmConfig = require(ReplicatedStorage.Config.CharmConfig)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
@@ -50,8 +51,8 @@ local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
 
 local CharmService = {}
 
-local function fail(player: Player, action: string, reason: string)
-	Remotes.ActionFailed:FireClient(player, action, reason)
+local function fail(player: Player, action: string, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, action, reason or Loc.msg("err.unknown"))
 end
 
 --------------------------------------------------------------------------------
@@ -112,7 +113,7 @@ function CharmService.rollCharms(player: Player, baerchiUid: string, requestedRo
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, "RequestRollCharms", "Baerchi nicht gefunden")
+		fail(player, "RequestRollCharms", Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
@@ -122,16 +123,14 @@ function CharmService.rollCharms(player: Player, baerchiUid: string, requestedRo
 	local rolls = math.clamp(math.floor(requestedRolls or 1), 1, CharmConfig.AUTO_ROLL_COUNT)
 
 	if #CharmService.getRollableSlots(baerchi) == 0 then
-		fail(player, "RequestRollCharms", "Kein freier Slot zum Wuerfeln — alles gesperrt oder noch nicht freigeschaltet")
+		fail(player, "RequestRollCharms", Loc.msg("err.charm_no_free_slot"))
 		return
 	end
 
 	local cost = CharmConfig.ROLL_COST_GOLD_GUMMIES
 
 	if data.goldGummies < cost then
-		fail(player, "RequestRollCharms", string.format(
-			"Ein Wurf kostet %d GoldGummies (du hast %d)", cost, data.goldGummies
-		))
+		fail(player, "RequestRollCharms", Loc.msg("err.charm_roll_cost", { cost = cost, have = data.goldGummies }))
 		return
 	end
 
@@ -163,7 +162,7 @@ function CharmService.rollCharms(player: Player, baerchiUid: string, requestedRo
 	if done == 0 then
 		-- Kann nur passieren, wenn EconomyService den ersten Abzug ablehnt
 		-- (Zustand hat sich zwischen Pruefung und Buchung geaendert).
-		fail(player, "RequestRollCharms", "Wurf konnte nicht abgerechnet werden")
+		fail(player, "RequestRollCharms", Loc.msg("err.charm_roll_failed"))
 		return
 	end
 
@@ -194,7 +193,7 @@ function CharmService.toggleLock(player: Player, baerchiUid: string, slot: numbe
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, "RequestToggleCharmLock", "Baerchi nicht gefunden")
+		fail(player, "RequestToggleCharmLock", Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
@@ -204,7 +203,7 @@ function CharmService.toggleLock(player: Player, baerchiUid: string, slot: numbe
 
 	local charm = findCharm(baerchi, slot)
 	if not charm then
-		fail(player, "RequestToggleCharmLock", "In diesem Slot sitzt noch kein Charm")
+		fail(player, "RequestToggleCharmLock", Loc.msg("err.charm_slot_empty"))
 		return
 	end
 

@@ -40,6 +40,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local EggCalculator = require(ReplicatedStorage.Modules.EggCalculator)
 
@@ -222,8 +223,8 @@ end
 -- Einsammeln
 --------------------------------------------------------------------------------
 
-local function fail(player: Player, action: string, reason: string)
-	Remotes.ActionFailed:FireClient(player, action, reason)
+local function fail(player: Player, action: string, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, action, reason or Loc.msg("err.unknown"))
 end
 
 -- Nimmt EIN Ei aus der Liste und schreibt es dem Lager gut.
@@ -274,7 +275,7 @@ function EggLayService.collectAll(player: Player)
 
 	local eggs = data.island.laidEggs
 	if #eggs == 0 then
-		fail(player, "RequestCollectAllEggs", "Es liegt gerade kein Ei herum")
+		fail(player, "RequestCollectAllEggs", Loc.msg("err.egg_none_lying"))
 		return
 	end
 

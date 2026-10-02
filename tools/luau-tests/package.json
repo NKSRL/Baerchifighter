@@ -1,0 +1,9 @@
+{
+  "name": "rbl-luau-tests",
+  "private": true,
+  "type": "module",
+  "description": "Luau-Tests fuer das Baerchi-Fighter-Projekt (laufen ohne Roblox Studio)",
+  "dependencies": {
+    "luau-web": "^1.4.0"
+  }
+}

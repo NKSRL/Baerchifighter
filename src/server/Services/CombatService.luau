@@ -24,6 +24,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatConfig     = require(ReplicatedStorage.Config.CombatConfig)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
@@ -36,8 +37,8 @@ local RateLimiter     = require(ServerScriptService.Util.RateLimiter)
 
 local CombatService = {}
 
-local function fail(player: Player, reason: string)
-	Remotes.ActionFailed:FireClient(player, "RequestStartCombat", reason)
+local function fail(player: Player, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, "RequestStartCombat", reason or Loc.msg("err.unknown"))
 end
 
 -- Gegner-Snapshot fuer eine Stage. Die Werte selbst kommen komplett aus
@@ -60,7 +61,7 @@ function CombatService.startPitRun(player: Player, baerchiUid: string)
 	-- mitten in den ersten Lauf hineinstarten und der Figur buchstaeblich die
 	-- Fuesse unter dem Koerper wegziehen.
 	if PitArenaService.isRunning(player) then
-		fail(player, "Der Baerchi kaempft noch im PIT")
+		fail(player, Loc.msg("err.combat_busy"))
 		return
 	end
 
@@ -69,14 +70,14 @@ function CombatService.startPitRun(player: Player, baerchiUid: string)
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, "Baerchi nicht gefunden")
+		fail(player, Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
 	local def = BaerchiConfig.getById(baerchi.configId)
 	if not def then
 		warn("[CombatService] Unbekannter configId:", baerchi.configId)
-		fail(player, "Baerchi-Daten defekt")
+		fail(player, Loc.msg("err.baerchi_data_corrupt"))
 		return
 	end
 
@@ -86,7 +87,7 @@ function CombatService.startPitRun(player: Player, baerchiUid: string)
 	-- letzten Lauf ein Level gestiegen ist — deshalb immer klemmen.
 	local hp = math.clamp(baerchi.currentHp, 0, stats.maxHp)
 	if hp <= 0 then
-		fail(player, "Der Baerchi ist erschoepft — fuettere ihn erst mit Honig")
+		fail(player, Loc.msg("err.combat_exhausted"))
 		return
 	end
 

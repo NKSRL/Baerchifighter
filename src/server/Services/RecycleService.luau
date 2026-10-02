@@ -22,6 +22,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
@@ -32,8 +33,8 @@ local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
 
 local RecycleService = {}
 
-local function fail(player: Player, reason: string)
-	Remotes.ActionFailed:FireClient(player, "RequestRecycleBaerchi", reason)
+local function fail(player: Player, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, "RequestRecycleBaerchi", reason or Loc.msg("err.unknown"))
 end
 
 -- Wie viele Gummies dieser Baerchi beim Verwerten bringt.
@@ -49,7 +50,7 @@ function RecycleService.recycle(player: Player, baerchiUid: string)
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, "Baerchi nicht gefunden")
+		fail(player, Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
@@ -64,7 +65,7 @@ function RecycleService.recycle(player: Player, baerchiUid: string)
 	-- jederzeit verwertet werden, auch waehrend der ausgeruestete unterwegs
 	-- ist. Deshalb die uid-Pruefung und nicht nur ActivityLock.isFree.
 	if data.island.equippedUid == baerchiUid and not ActivityLock.isFree(player) then
-		fail(player, "Der Baerchi ist gerade unterwegs — kurz warten")
+		fail(player, Loc.msg("err.baerchi_busy"))
 		return
 	end
 

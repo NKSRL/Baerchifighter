@@ -98,6 +98,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local EconomyConfig   = require(ReplicatedStorage.Config.EconomyConfig)
 local PromotionConfig = require(ReplicatedStorage.Config.PromotionConfig)
@@ -112,33 +113,33 @@ local FusionService = {}
 export type LockedProperty = "ability" | "level" | "eggs"
 export type LockedFrom     = "A" | "B"
 
-local function fail(player: Player, reason: string)
-	Remotes.ActionFailed:FireClient(player, "RequestFuseBaerchis", reason)
+local function fail(player: Player, reason: Types.LocMsg?)
+	Remotes.ActionFailed:FireClient(player, "RequestFuseBaerchis", reason or Loc.msg("err.unknown"))
 end
 
 -- Waehlt den configId des Ergebnisses.
 -- Gibt nil + Grund zurueck wenn die Kombination nicht erlaubt ist.
-local function pickResultConfigId(rarity: Types.Rarity): (string?, string)
+local function pickResultConfigId(rarity: Types.Rarity): (string?, Types.LocMsg?)
 	if rarity == "Mythic" then
-		return nil, "Mythic laesst sich nicht weiter fusionieren"
+		return nil, Loc.msg("err.fuse_mythic")
 	end
 
 	local nextRarity = BaerchiConfig.getNextRarity(rarity)
 	if not nextRarity then
-		return nil, "Keine hoehere Rarity vorhanden"
+		return nil, Loc.msg("err.fuse_no_higher")
 	end
 
 	-- Sonderfall: Legendary + Legendary → der eine Mythic
 	if nextRarity == "Mythic" then
-		return BaerchiConfig.FUSION_MYTHIC_RESULT, ""
+		return BaerchiConfig.FUSION_MYTHIC_RESULT, nil
 	end
 
 	local candidates = BaerchiConfig.getByRarity(nextRarity)
 	if #candidates == 0 then
-		return nil, "Keine Baerchis der Rarity " .. nextRarity .. " definiert"
+		return nil, Loc.msg("err.fuse_none_defined", { rarity = Loc.msg("rarity." .. nextRarity) })
 	end
 
-	return candidates[math.random(1, #candidates)].id, ""
+	return candidates[math.random(1, #candidates)].id, nil
 end
 
 --------------------------------------------------------------------------------
@@ -231,19 +232,19 @@ function FusionService.fuse(
 	if not data then return end
 
 	if uidA == uidB then
-		fail(player, "Ein Baerchi kann nicht mit sich selbst fusioniert werden")
+		fail(player, Loc.msg("err.fuse_self"))
 		return
 	end
 
 	local a = data.island.baerchis[uidA]
 	local b = data.island.baerchis[uidB]
 	if not a or not b then
-		fail(player, "Baerchi nicht gefunden")
+		fail(player, Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
 	if a.rarity ~= b.rarity then
-		fail(player, "Beide Baerchis muessen dieselbe Rarity haben")
+		fail(player, Loc.msg("err.fuse_rarity_mismatch"))
 		return
 	end
 
@@ -263,7 +264,7 @@ function FusionService.fuse(
 
 	local resultDef = BaerchiConfig.getById(resultConfigId)
 	if not resultDef then
-		fail(player, "Fusions-Ergebnis konnte nicht erzeugt werden")
+		fail(player, Loc.msg("err.fuse_result_failed"))
 		return
 	end
 
@@ -301,7 +302,7 @@ function FusionService.fuse(
 	})
 
 	if not newBaerchi then
-		fail(player, "Fusions-Ergebnis konnte nicht erzeugt werden")
+		fail(player, Loc.msg("err.fuse_result_failed"))
 		return
 	end
 

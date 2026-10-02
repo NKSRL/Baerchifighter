@@ -19,6 +19,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Network.Types)
+local Loc   = require(ReplicatedStorage.Localization.Loc)
 
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
@@ -31,6 +32,7 @@ local _gummyLabel: TextLabel?     = nil
 local _goldLabel: TextLabel?      = nil
 local _rankLabel: TextLabel?      = nil
 local _multLabel: TextLabel?      = nil
+local _languageButton: TextButton? = nil
 
 --------------------------------------------------------------------------------
 -- Bausteine
@@ -77,10 +79,27 @@ local function refresh(data: Types.PlayerDataUpdate)
 		_goldLabel.Text = Theme.formatNumber(data.goldGummies)
 	end
 	if _rankLabel then
-		_rankLabel.Text = data.rank.name
+		-- Der Rang-NAME steht im Spielstand (englisch, als er vergeben wurde);
+		-- angezeigt wird der uebersetzte Name zur Stufe, der gespeicherte nur
+		-- als Rueckfall.
+		_rankLabel.Text = Loc.name("rank." .. data.rank.tier, data.rank.name)
 	end
 	if _multLabel then
-		_multLabel.Text = string.format("x%.2f  (%d)", data.rebirthMult, data.rebirthCount)
+		_multLabel.Text = string.format("x%s  (%s)", Loc.formatDecimal(data.rebirthMult, 2), Loc.formatNumber(data.rebirthCount))
+	end
+end
+
+-- Sprachwechsel: alles, was aus dem Spielstand gebaut wird, neu schreiben
+-- und das Kuerzel auf dem Sprach-Knopf nachziehen.
+local function onLanguageChanged()
+	local data = ClientState.get()
+	if data then
+		refresh(data)
+	end
+
+	local button = _languageButton
+	if button then
+		button.Text = string.upper(Loc.getLanguage())
 	end
 end
 
@@ -139,8 +158,21 @@ function Hud.init(screenGui: ScreenGui)
 		PanelManager.toggle("Rebirth")
 	end)
 
+	-- Sprach-Knopf: direkt unter den Waehrungs-Pillen, klein und unauffaellig.
+	-- Zeigt das Kuerzel der aktiven Sprache und oeffnet die Auswahl.
+	local languageButton = Theme.button("Language", screenGui, string.upper(Loc.getLanguage()), Theme.COLORS.panelLight)
+	languageButton.AnchorPoint = Vector2.new(0, 0)
+	languageButton.Position    = UDim2.new(0.012, 0, 0, 100)
+	languageButton.Size        = UDim2.new(0, 56, 0, 28)
+	languageButton.TextColor3  = Theme.COLORS.text
+	languageButton.Activated:Connect(function()
+		PanelManager.toggle("Language")
+	end)
+	_languageButton = languageButton
+
 	-- Sofort mit dem aktuellen Stand fuellen, danach bei jeder Aenderung
 	ClientState.onChanged(refresh)
+	Loc.onChanged(onLanguageChanged)
 
 	print("[Hud] Initialisiert")
 end

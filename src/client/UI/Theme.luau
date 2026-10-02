@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local Types         = require(ReplicatedStorage.Network.Types)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local Theme = {}
 
@@ -406,25 +407,18 @@ end
 -- Formatierung
 --------------------------------------------------------------------------------
 
--- Grosse Zahlen lesbar machen: 1234567 → "1.234.567"
+-- Grosse Zahlen lesbar machen: 1234567 → "1.234.567" (de/es), "1,234,567" (en),
+-- "1 234 567" (fr). Das Trennzeichen kommt aus der Sprache des Spielers — die
+-- Logik steht in Loc, damit Server-Texte und UI dieselbe Formatierung teilen.
+-- Bleibt als Theme-Funktion bestehen, damit kein UI-Modul umgeschrieben werden
+-- muss, das schon formatNumber benutzt.
 function Theme.formatNumber(value: number): string
-	local rounded = tostring(math.floor(value))
-	local formatted = rounded:reverse():gsub("(%d%d%d)", "%1."):reverse()
-	formatted = formatted:gsub("^%.", "")
-	return formatted
+	return Loc.formatNumber(value)
 end
 
--- Restzeiten: "45s", "2m 05s", "1h 12m"
+-- Restzeiten: "45s", "2m 05s", "1h 12m" (Einheiten je nach Sprache)
 function Theme.formatDuration(seconds: number): string
-	local total = math.max(0, math.floor(seconds))
-
-	if total >= 3600 then
-		return string.format("%dh %02dm", math.floor(total / 3600), math.floor((total % 3600) / 60))
-	end
-	if total >= 60 then
-		return string.format("%dm %02ds", math.floor(total / 60), total % 60)
-	end
-	return total .. "s"
+	return Loc.formatDuration(seconds)
 end
 
 return Theme
