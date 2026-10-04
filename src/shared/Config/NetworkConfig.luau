@@ -12,9 +12,16 @@
 -- Sekunden die zwischen zwei Aufrufen desselben Remotes vom selben
 -- Spieler mindestens vergehen muessen.
 local REMOTE_COOLDOWNS: { [string]: number } = {
-	RequestHatchEgg        = 0.50,
-	RequestClaimEgg        = 0.25,
-	RequestStartCombat     = 1.00,
+	-- Seit v12 oeffnet das sofort ein Ei. Kurz genug fuer mehrere Eier
+	-- hintereinander (die Animation stellt sie in eine Warteschlange).
+	RequestHatchEgg        = 0.35,
+
+	-- v12: Pet-Leiste (Event/Fight). Startet sichtbare Laufwege, deshalb wie
+	-- SendToEvent nicht im Sekundentakt.
+	RequestPetMode         = 0.60,
+
+	-- v13: Quest-Belohnung abholen. Zahlt aus, deshalb nicht im Sekundentakt.
+	RequestClaimQuest      = 0.50,
 	RequestUpgradeBuilding = 0.50,
 	RequestUpgradePit      = 0.50,
 	RequestFuseBaerchis    = 1.00,
@@ -37,11 +44,6 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- Reines Umschalten eines Schlosses, kostet nichts — darf schnell gehen.
 	RequestToggleCharmLock = 0.15,
 
-	-- Beides startet eine sichtbare Laufbewegung quer ueber die Karte. Kurz
-	-- genug, dass ein versehentlicher Klick korrigierbar ist, lang genug, dass
-	-- niemand die Figur im Sekundentakt hin und her schickt.
-	RequestSendToEvent     = 1.00,
-	RequestRecallFromEvent = 1.00,
 
 	-- Eier einsammeln ist die haeufigste Weltaktion ueberhaupt: bis zu zwoelf
 	-- liegen gleichzeitig herum, und man klickt sie nacheinander weg. Deshalb
@@ -50,6 +52,8 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 
 	-- Alle auf einmal: eine Anfrage statt zwoelf, darf entsprechend traeger sein.
 	RequestCollectAllEggs  = 0.50,
+	RequestPressEggs       = 0.40,   -- v14
+	RequestUseBlueprint    = 1.00,   -- v14
 
 	-- Reines Umschalten einer Einstellung. Kein Spam-Risiko fuer Spielwerte,
 	-- aber jeder Wechsel stoesst ein Daten-Update an — daher nicht null.

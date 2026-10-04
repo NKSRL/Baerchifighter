@@ -33,6 +33,17 @@
 -- Das ist exakt dasselbe Verhalten wie beim vollen Honig-Lager (siehe
 -- HoneyService): laenger wegbleiben bringt nichts zusaetzlich. Wer mehr will,
 -- kommt oefter vorbei und sammelt ein.
+--
+-- ============================================================
+-- SEIT v12: GELEGT WIRD NUR AUF DEM PLOT
+-- ============================================================
+-- Ist der Baerchi am Event oder im PIT (oder auf dem Weg dorthin bzw.
+-- zurueck), PAUSIERT der Lege-Timer: island.lastEggAt wird in jedem Tick um
+-- die vergangene Zeit nach vorne geschoben. Kommt er heim, laeuft der Timer
+-- von dort weiter, der bisherige Fortschritt bleibt — und es entsteht kein
+-- Nachholen fuer die Zeit unterwegs. Der Weg zum Honig-Teich zaehlt als zu
+-- Hause (PetModeService.isHome). Ist die Figur gerade nicht sichtbar (Neubau),
+-- wird in dem Tick nicht gelegt; faellige Eier kommen im naechsten.
 
 local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
@@ -43,10 +54,14 @@ local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local EggCalculator = require(ReplicatedStorage.Modules.EggCalculator)
+local EggTree       = require(ReplicatedStorage.Modules.EggTree)
+local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService    = require(ServerScriptService.Services.MapService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
+-- v12: nur fuer "ist der Baerchi zu Hause?"
+local PetModeService = require(ServerScriptService.Services.PetModeService)
 
 local EggLayService = {}
 
@@ -63,6 +78,11 @@ local CHECK_INTERVAL = 5
 -- Laufender Zaehler fuer die Ei-uid. os.time() allein reicht nicht: bei einem
 -- Offline-Nachholen entstehen mehrere Eier in derselben Sekunde.
 local _eggCounter = 0
+
+-- v12: Zeitpunkt des letzten Ticks pro Spieler (fuer die Pause) und ob der
+-- Baerchi im letzten Tick unterwegs war (fuer den einen Sync bei der Rueckkehr).
+local _lastTick: { [Player]: number } = {}
+local _wasAway: { [Player]: boolean } = {}
 
 local function newEggUid(): string
 	_eggCounter += 1
@@ -140,9 +160,35 @@ local function layOne(player: Player, data: Types.PlayerData, baerchi: Types.Bae
 		return false
 	end
 
-	local eggType = EggCalculator.rollEggType(baerchi)
-	if not eggType then
+	local rolled = EggCalculator.rollEggType(baerchi)
+	if not rolled then
 		return false
+	end
+
+	-- v14: gesperrtes Ei -> naechster freier Vorgaenger im selben Pfad
+	-- (EggTree.resolveLaid). Nichts geht verloren, nichts wird uebersprungen.
+	local eggType = EggTree.resolveLaid(data.eggTree, rolled)
+
+	-- v14: Void-Identitaet — mit layUpgradeChance steigt das Ei eine Stufe
+	-- auf, falls die naechste Stufe schon frei ist.
+	local def = BaerchiConfig.getById(baerchi.configId)
+	if def and def.layUpgradeChance and def.layUpgradeChance > 0 and math.random() < def.layUpgradeChance then
+		local up = EggTree.upgradeTarget(data.eggTree, eggType, def.path)
+		if up then
+			eggType = up
+			-- Sichtbar machen: das Omen des Phantoms (volle Show nur beim
+			-- Phantom selbst, sonst ein kurzes Echo).
+			local figure = MapService.getBaerchiModel(player, baerchi.uid)
+			if figure then
+				Remotes.SkillFXPlay:FireAllClients({
+					owner    = player.UserId,
+					skillId  = "PhantomOmen",
+					full     = baerchi.skillId == "PhantomOmen",
+					attacker = figure,
+					target   = nil,
+				})
+			end
+		end
 	end
 
 	local position = pickDropPosition(player, baerchi.uid)
@@ -352,6 +398,32 @@ local function tick()
 		local data = PlayerService.getData(player)
 		if not data then continue end
 
+		local now = os.time()
+		local dt  = now - (_lastTick[player] or now)
+		_lastTick[player] = now
+
+		-- v12: unterwegs (Event/PIT) -> Timer einfrieren.
+		if not PetModeService.isHome(player) then
+			if dt > 0 then
+				data.island.lastEggAt = math.min(now, (data.island.lastEggAt or now) + dt)
+			end
+			_wasAway[player] = true
+			continue
+		end
+
+		-- Gerade heimgekommen: einmal syncen, damit die Countdown-Anzeige
+		-- (EggTimerController) die verschobene Zeitmarke bekommt.
+		if _wasAway[player] then
+			_wasAway[player] = nil
+			PlayerService.markDirty(player)
+		end
+
+		-- Nur legen, wenn die Figur wirklich auf dem Plot steht.
+		local uid = data.island.equippedUid
+		if uid and not MapService.getBaerchiModel(player, uid) then
+			continue
+		end
+
 		local laid = catchUp(player, data, false)
 		if laid > 0 then
 			-- markDirty zieht die sichtbaren Eier ueber PlotDisplayService nach.
@@ -377,6 +449,11 @@ function EggLayService.init()
 
 	RateLimiter.connect(Remotes.RequestCollectAllEggs, "RequestCollectAllEggs", function(player)
 		EggLayService.collectAll(player)
+	end)
+
+	Players.PlayerRemoving:Connect(function(player)
+		_lastTick[player] = nil
+		_wasAway[player]  = nil
 	end)
 
 	-- Offline-Nachholen beim Join. Muss VOR PlayerService.init() angemeldet

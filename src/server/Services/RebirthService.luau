@@ -13,9 +13,13 @@
 --                Baerchi-LEVEL und -XP (siehe unten)
 --   Behalten   : alle Baerchis SELBST (inkl. wer gerade ausgeruestet ist,
 --                Rarity, Skill, Fusion-Bonus), GoldGummies, Rang,
---                Statistiken, bereits verdiente AscensionEggs
---   Gewonnen   : hoeherer rebirthMult + ggf. AscensionEggs
---                (EconomyConfig.REBIRTH_ASCENSION_MILESTONES)
+--                Statistiken, der Ei-Baum (v14) und ALLE Eier im Lager
+--                (v14 — vorher nur die Ascensions-Eier; seit kein Ei mehr
+--                kaufbar ist, waere jedes andere Ei ein echter Verlust).
+--                Herumliegende Eier wandern beim Rebirth ins Lager.
+--   Gewonnen   : hoeherer rebirthMult + ggf. Meilenstein-Eier
+--                (EconomyConfig.REBIRTH_MILESTONES, v14: alle vier
+--                Ascensions-Eier, teils mit Freischaltung im Ei-Baum)
 --
 -- GoldGummies bleiben bewusst erhalten: sie sind die "harte" Waehrung fuer
 -- die spaeten Gebaeude-Level und wuerden sonst jeden Rebirth entwerten.
@@ -44,6 +48,7 @@ local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
 local MapService     = require(ServerScriptService.Services.MapService)
 local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
+local EggTreeService = require(ServerScriptService.Services.EggTreeService)
 
 -- Feier-Farbe fuer einen Rebirth (siehe MapService.celebrateBaerchi) — Weiss,
 -- fuer den "frischer Neustart"-Blitz statt einer Rarity- oder Rollen-Farbe.
@@ -95,9 +100,16 @@ function RebirthService.rebirth(player: Player)
 		return
 	end
 
-	-- Bereits verdiente AscensionEggs ueberleben den Reset —
-	-- sie sind Belohnung frueherer Rebirths, nicht Fortschritt dieses Laufs.
-	local keptAscensionEggs = data.island.eggStock.AscensionEgg or 0
+	-- v14: ALLE Eier ueberleben den Reset (vorher nur Ascension). Seit kein
+	-- Ei mehr kaufbar ist, waere jedes andere ein echter Verlust. Was noch
+	-- auf dem Plot liegt, wandert mit ins Lager.
+	local keptStock: { [Types.EggType]: number } = {}
+	for eggType, count in data.island.eggStock do
+		keptStock[eggType] = count
+	end
+	for _, egg in data.island.laidEggs do
+		keptStock[egg.eggType] = (keptStock[egg.eggType] or 0) + 1
+	end
 
 	-- Baerchis (und wer davon gerade ausgeruestet ist) ueberleben den Reset
 	-- ebenfalls — siehe Kopf-Kommentar. `equippedUid` einfach mit
@@ -118,7 +130,8 @@ function RebirthService.rebirth(player: Player)
 
 	-- Insel auf Werkszustand
 	local freshIsland = PlayerService.buildDefaultIsland()
-	freshIsland.eggStock.AscensionEgg = keptAscensionEggs
+	-- Die 3 Start-Basis-Eier gibt es nur fuer neue Spieler, nicht pro Rebirth.
+	freshIsland.eggStock = keptStock
 	freshIsland.baerchis    = keptBaerchis
 	freshIsland.equippedUid = keptEquippedUid
 	data.island = freshIsland
@@ -132,12 +145,23 @@ function RebirthService.rebirth(player: Player)
 	-- der darf Waehrungen anfassen, auch beim Zuruecksetzen auf einen Fixwert.
 	EconomyService.resetGummies(player, EconomyConfig.REBIRTH_START_GUMMIES)
 
-	-- Meilenstein-Belohnung
-	local eggReward = EconomyConfig.getAscensionEggReward(data.rebirthCount)
-	if eggReward > 0 then
-		local stock = data.island.eggStock.AscensionEgg or 0
-		data.island.eggStock.AscensionEgg = stock + eggReward
+	-- Meilenstein-Belohnung (v14: alle vier Ascensions-Eier)
+	local eggReward = 0
+	local milestoneEggs: { { eggType: Types.EggType, count: number } } = {}
+	local milestone = EconomyConfig.getRebirthMilestone(data.rebirthCount)
+	if milestone then
+		for _, entry in milestone.eggs do
+			local stock = data.island.eggStock[entry.eggType] or 0
+			data.island.eggStock[entry.eggType] = stock + entry.count
+			eggReward += entry.count
+			table.insert(milestoneEggs, { eggType = entry.eggType, count = entry.count })
+		end
+		for _, eggType in (milestone.unlock or {}) do
+			EggTreeService.forceUnlock(player, data, eggType, "rebirth")
+		end
 	end
+	-- Rebirth-Gates im Baum (Sonnen-Ei ab Rebirth 3 usw.)
+	EggTreeService.check(player, data, "rebirth")
 
 	-- Sichtbare Insel neu aufbauen (Gebaeude auf Level 1, PIT wieder Level 1).
 	-- rebuildIsland behaelt den Insel-Slot — der Spieler soll nach dem Rebirth
@@ -156,6 +180,7 @@ function RebirthService.rebirth(player: Player)
 		newRebirthCount = data.rebirthCount,
 		newMultiplier   = data.rebirthMult,
 		ascensionEggs   = eggReward,
+		milestoneEggs   = milestoneEggs,
 	}
 
 	Remotes.RebirthResultReceived:FireClient(player, result)
@@ -167,7 +192,7 @@ function RebirthService.rebirth(player: Player)
 		"| Rebirth #", data.rebirthCount,
 		"| Kosten:", cost,
 		"| neuer Multi:", data.rebirthMult,
-		"| AscensionEggs:", eggReward
+		"| Meilenstein-Eier:", eggReward
 	)
 end
 

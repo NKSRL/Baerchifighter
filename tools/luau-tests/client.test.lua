@@ -76,7 +76,7 @@ check("lang button text", langBtn.Text, "FR")
 local names = byName("Name", "TextLabel")
 local labels = {}
 for _, n in names do table.insert(labels, n.Text) end
-check("menu fr", table.concat(labels, "|"), "Oeufs|Baerchis|Combat|Ruche|Pot|Presse|Arène")
+check("menu fr", table.concat(labels, "|"), "Oeufs|Baerchis|Arbre")
 
 -- Sprachwechsel per Auswahl: en
 local PM = require(CL.UI.PanelManager)
@@ -93,7 +93,7 @@ check("hud gummies en", vals[1].Text, "1,234,567")
 check("lang button en", langBtn.Text, "EN")
 labels = {}
 for _, n in byName("Name", "TextLabel") do table.insert(labels, n.Text) end
-check("menu en", table.concat(labels, "|"), "Eggs|Baerchis|Fight|Hive|Pot|Press|Arena")
+check("menu en", table.concat(labels, "|"), "Eggs|Baerchis|Egg Tree")
 
 -- Veralteter Server-Stand darf die Wahl nicht zurueckdrehen (pending)
 data.language = nil
@@ -110,7 +110,7 @@ pushData(data)
 check("server-wechsel es", Loc.getLanguage(), "es")
 labels = {}
 for _, n in byName("Name", "TextLabel") do table.insert(labels, n.Text) end
-check("menu es", table.concat(labels, "|"), "Huevos|Baerchis|Combate|Colmena|Tarro|Prensa|Arena")
+check("menu es", table.concat(labels, "|"), "Huevos|Baerchis|Árbol")
 
 -- Automatisch → zurueck auf Roblox-Sprache (fr-fr)
 byName("Lang_auto", "TextButton")[1].Activated._handlers[1]()

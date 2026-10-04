@@ -38,15 +38,68 @@ local REBIRTH_MULTIPLIERS: { number } = {
 -- Bewusst identisch mit dem Startwert eines neuen Spielers.
 local REBIRTH_START_GUMMIES = 100
 
--- Bei welchem rebirthCount (NACH dem Rebirth) es ein AscensionEgg gibt.
--- AscensionEggs sind nicht kaufbar — das hier ist ihre einzige Quelle.
-local REBIRTH_ASCENSION_MILESTONES: { [number]: number } = {
-	[1]  = 1,   -- erster Rebirth: 1 Ei
-	[3]  = 1,
-	[5]  = 2,
-	[10] = 3,
-	[20] = 5,
+-- ============================================================
+-- v14: REBIRTH-KURVE BIS 100
+-- ============================================================
+-- Bis v13 waren die Kosten ab Rebirth 5 flach (1 Mio) und der Multiplikator
+-- stoppte bei x8. Fuer die Ascensions-Eier bei Rebirth 50 bis 100 geht die
+-- Kurve jetzt weiter:
+--
+--   Kosten  Rebirth n (n >= 6) = 1 Mio x REBIRTH_COST_GROWTH ^ (n - 5)
+--   Multi   nach Rebirth n (n >= 6) = 8 x REBIRTH_MULT_GROWTH ^ (n - 5)
+--
+-- Die Rebirths 1 bis 5 bleiben exakt wie bisher (bestehende Spielstaende).
+--
+-- Warum diese beiden Zahlen: die Zeit fuer einen Rebirth ist ungefaehr
+-- Kosten / (Einkommen x Multiplikator). Waechst die Kosten-Kurve nur ein
+-- kleines Stueck schneller als der Multiplikator (1.13 gegen 1.12), wird
+-- jeder Rebirth nur knapp 1% laenger als der vorige: Rebirth 100 dauert
+-- etwa 2,3-mal so lange wie Rebirth 6. Gerechnet in tools/sim/rebirth_curve.lua
+-- (Tabelle im Bericht MEGA_EGG_TREE_UMGESETZT).
+--
+-- Gerundet wird auf drei gueltige Stellen, damit im UI "1.130.000" steht und
+-- nicht "1.129.999".
+local REBIRTH_COST_GROWTH = 1.13
+local REBIRTH_MULT_GROWTH = 1.12
+
+-- v14: REBIRTH-MEILENSTEINE. Bei welchem rebirthCount (NACH dem Rebirth) es
+-- welche Eier gibt. `unlock` = dieser Meilenstein schaltet den Knoten des
+-- Eis im Ei-Baum frei (zusaetzlich zur normalen Rebirth-Bedingung, die bei
+-- derselben Zahl liegt — doppelt haelt besser, falls jemand eine der beiden
+-- Zahlen verschiebt).
+--
+-- Die Ascensions-Eier sind nicht kaufbar und werden fast nie gelegt — das
+-- hier ist ihre Hauptquelle. Transzendenz, Ewigkeit und Omega gibt es NUR hier.
+export type RebirthMilestone = {
+	eggs   : { { eggType: Types.EggType, count: number } },
+	unlock : { Types.EggType }?,
 }
+
+local REBIRTH_MILESTONES: { [number]: RebirthMilestone } = {
+	[1]   = { eggs = { { eggType = "AscensionEgg", count = 1 } } },
+	[3]   = { eggs = { { eggType = "AscensionEgg", count = 1 } } },
+	[5]   = { eggs = { { eggType = "AscensionEgg", count = 2 } } },
+	[10]  = { eggs = { { eggType = "AscensionEgg", count = 3 } } },
+	[15]  = { eggs = { { eggType = "TranscendenceEgg", count = 1 } }, unlock = { "TranscendenceEgg" } },
+	[20]  = { eggs = { { eggType = "AscensionEgg", count = 5 } } },
+	[25]  = { eggs = { { eggType = "TranscendenceEgg", count = 2 } } },
+	[30]  = { eggs = { { eggType = "EternityEgg", count = 1 } }, unlock = { "EternityEgg" } },
+	[40]  = { eggs = { { eggType = "TranscendenceEgg", count = 3 }, { eggType = "EternityEgg", count = 1 } } },
+	[50]  = { eggs = { { eggType = "OmegaEgg", count = 1 }, { eggType = "EternityEgg", count = 2 } }, unlock = { "OmegaEgg" } },
+	[75]  = { eggs = { { eggType = "OmegaEgg", count = 2 } } },
+	[100] = { eggs = { { eggType = "OmegaEgg", count = 3 } } },
+}
+
+-- Fuer alte Stellen, die nur die Ascensions-Eier kennen (wird von
+-- getAscensionEggReward weiter gelesen).
+local REBIRTH_ASCENSION_MILESTONES: { [number]: number } = {}
+for n, milestone in REBIRTH_MILESTONES do
+	for _, entry in milestone.eggs do
+		if entry.eggType == "AscensionEgg" then
+			REBIRTH_ASCENSION_MILESTONES[n] = (REBIRTH_ASCENSION_MILESTONES[n] or 0) + entry.count
+		end
+	end
+end
 
 --------------------------------------------------------------------------------
 -- Honig (Gebaeude-Produktion und Fuetterung)
@@ -145,9 +198,7 @@ local HONEY_UPGRADE_COSTS: { [number]: { gummies: number, goldGummies: number } 
 -- Feste Werte fuer die Funktionen die kein Gebaeude mehr haben
 --------------------------------------------------------------------------------
 
--- Ei-Bruetung laeuft seit v4 rein ueber das GUI: feste Anzahl Brut-Slots,
--- volle Brutdauer aus EggConfig (kein Hatchery-Level mehr, das es reduziert).
-local HATCH_SLOTS = 2
+-- (v12: HATCH_SLOTS ist entfallen — Eier werden sofort geoeffnet.)
 
 -- Recycling laeuft ebenfalls ueber das GUI: fester Anteil des Baerchi-Werts,
 -- der als Gummies zurueckkommt (frueher Recycler-Level-abhaengig).
@@ -162,6 +213,12 @@ local RECYCLE_BASE_VALUE: { [Types.Rarity]: number } = {
 	Epic      = 500,
 	Legendary = 2_000,
 	Mythic    = 8_000,
+	Divine    = 20_000,
+	Cosmic    = 50_000,
+	Secret    = 120_000,
+	Godly     = 300_000,
+	Eternal   = 750_000,
+	Omega     = 2_000_000,
 }
 
 -- Wertzuwachs pro Baerchi-Level: value * (1 + (level-1) * RECYCLE_LEVEL_BONUS)
@@ -225,6 +282,25 @@ local PIT_STAGE_REWARD_GROWTH = 0.15
 local PIT_GOLD_EVERY_STAGES = 5
 local PIT_GOLD_AMOUNT       = 1
 
+-- ============================================================
+-- PIT-FORTSETZUNG (v12, PET_STEUERUNG_UND_EI_ANIMATION_KONZEPT Abschnitt 4b)
+-- ============================================================
+-- Vor einem PIT-Lauf darf der Spieler gegen Gummies weiter oben einsteigen:
+-- bei 65 % der Stage-Tiefe seines letzten Laufs oder direkt bei der letzten
+-- erreichten Stage.
+--
+-- Kosten = Anteil der Belohnungen, die die UEBERSPRUNGENEN Stages gebracht
+-- haetten. Das skaliert automatisch mit dem PIT-Level (die Belohnungen tun
+-- es) und mit rebirthMult (das Einkommen tut es auch — ohne ihn waere das
+-- Ueberspringen nach ein paar Rebirths praktisch umsonst).
+--
+-- 0,35 ist ein PLATZHALTER aus dem Konzept: zu billig, und jeder startet
+-- immer oben; zu teuer, und niemand nutzt es. Muss im Playtest geprueft werden.
+local PIT_RESUME_COST_FACTOR = 0.35
+
+-- "65 %" = 65 % der STAGE-TIEFE des letzten Laufs (nicht der HP).
+local PIT_RESUME_PERCENT = 0.65
+
 --------------------------------------------------------------------------------
 -- Rang-Schwellwerte (Arena PvP)
 --------------------------------------------------------------------------------
@@ -255,19 +331,47 @@ local function clampBuildingLevel(level: number): number
 	return math.clamp(math.floor(level), 1, MAX_BUILDING_LEVEL)
 end
 
-local function getRebirthCost(rebirthCount: number): number
-	local idx = math.min(rebirthCount + 1, #REBIRTH_COST_GUMMIES)
-	return REBIRTH_COST_GUMMIES[idx]
+-- Auf drei gueltige Stellen runden (1129999 -> 1130000).
+local function roundSignificant(value: number): number
+	if value < 1000 then return math.floor(value + 0.5) end
+	local digits = math.floor(math.log10(value)) + 1
+	local factor = 10 ^ (digits - 3)
+	return math.floor(value / factor + 0.5) * factor
 end
 
+-- Kosten fuer den NAECHSTEN Rebirth (rebirthCount = bisherige Anzahl).
+local function getRebirthCost(rebirthCount: number): number
+	local n = rebirthCount + 1
+	if n <= #REBIRTH_COST_GUMMIES then
+		return REBIRTH_COST_GUMMIES[n]
+	end
+	local last = REBIRTH_COST_GUMMIES[#REBIRTH_COST_GUMMIES]
+	return roundSignificant(last * REBIRTH_COST_GROWTH ^ (n - #REBIRTH_COST_GUMMIES))
+end
+
+-- Multiplikator NACH `rebirthCount` Rebirths.
 local function getRebirthMult(rebirthCount: number): number
-	local idx = math.min(rebirthCount + 1, #REBIRTH_MULTIPLIERS)
-	return REBIRTH_MULTIPLIERS[idx]
+	local idx = rebirthCount + 1
+	if idx <= #REBIRTH_MULTIPLIERS then
+		return REBIRTH_MULTIPLIERS[idx]
+	end
+	local last = REBIRTH_MULTIPLIERS[#REBIRTH_MULTIPLIERS]
+	local raw = last * REBIRTH_MULT_GROWTH ^ (idx - #REBIRTH_MULTIPLIERS)
+	-- Zwei Nachkommastellen reichen fuer die Anzeige "x8,96".
+	if raw < 100 then
+		return math.floor(raw * 100 + 0.5) / 100
+	end
+	return roundSignificant(raw)
 end
 
 -- Wie viele AscensionEggs es fuer das Erreichen dieses rebirthCount gibt
 local function getAscensionEggReward(rebirthCount: number): number
 	return REBIRTH_ASCENSION_MILESTONES[rebirthCount] or 0
+end
+
+-- v14: der komplette Meilenstein (alle Ei-Sorten) oder nil.
+local function getRebirthMilestone(rebirthCount: number): RebirthMilestone?
+	return REBIRTH_MILESTONES[rebirthCount]
 end
 
 -- XP die ein Honig aus einem Gebaeude dieses Levels gibt
@@ -317,6 +421,28 @@ local function getPitGoldReward(stagesCleared: number, pitLevel: number): number
 	return milestones * PIT_GOLD_AMOUNT * level
 end
 
+-- Startstage fuer "ab 65 %" bei einem letzten Lauf bis reachedStage.
+local function getPitResumePercentStage(reachedStage: number): number
+	return math.max(1, math.floor(PIT_RESUME_PERCENT * reachedStage))
+end
+
+-- Gummy-Kosten, um bei `startStage` einzusteigen (Stage 1 = kostenlos).
+-- Summe der Basis-Belohnungen aller uebersprungenen Stages, mal Faktor, mal
+-- rebirthMult. Server (CombatService) und Client (PitResumeDialog) rechnen
+-- beide hiermit — dieselbe Zahl im Dialog und beim Abbuchen.
+local function getPitResumeCost(pitLevel: number, startStage: number, rebirthMult: number): number
+	if startStage <= 1 then
+		return 0
+	end
+
+	local skipped = 0
+	for stage = 1, startStage - 1 do
+		skipped += getPitStageReward(pitLevel, stage)
+	end
+
+	return math.floor(PIT_RESUME_COST_FACTOR * skipped * math.max(rebirthMult, 1))
+end
+
 -- Fester Wert seit v3 (siehe FUSION_STAT_BONUS oben) — keine Level-Eingabe
 -- mehr noetig. Als Funktion belassen statt die Konstante direkt zu lesen,
 -- damit FusionService/FusionPanel nicht wissen muessen OB es ein fester
@@ -346,6 +472,10 @@ return {
 	REBIRTH_MULTIPLIERS          = REBIRTH_MULTIPLIERS,
 	REBIRTH_START_GUMMIES        = REBIRTH_START_GUMMIES,
 	REBIRTH_ASCENSION_MILESTONES = REBIRTH_ASCENSION_MILESTONES,
+	REBIRTH_MILESTONES           = REBIRTH_MILESTONES,
+	REBIRTH_COST_GROWTH          = REBIRTH_COST_GROWTH,
+	REBIRTH_MULT_GROWTH          = REBIRTH_MULT_GROWTH,
+	getRebirthMilestone          = getRebirthMilestone,
 
 	HONEY_INTERVAL_SECONDS   = HONEY_INTERVAL_SECONDS,
 	HONEY_CAPACITY           = HONEY_CAPACITY,
@@ -356,7 +486,6 @@ return {
 	HONEY_UPGRADE_COSTS = HONEY_UPGRADE_COSTS,
 	MAX_BUILDING_LEVEL  = MAX_BUILDING_LEVEL,
 
-	HATCH_SLOTS         = HATCH_SLOTS,
 	RECYCLE_RETURN      = RECYCLE_RETURN,
 	RECYCLE_BASE_VALUE  = RECYCLE_BASE_VALUE,
 	RECYCLE_LEVEL_BONUS = RECYCLE_LEVEL_BONUS,
@@ -369,6 +498,8 @@ return {
 	PIT_STAGE_REWARD_GROWTH = PIT_STAGE_REWARD_GROWTH,
 	PIT_GOLD_EVERY_STAGES   = PIT_GOLD_EVERY_STAGES,
 	PIT_GOLD_AMOUNT         = PIT_GOLD_AMOUNT,
+	PIT_RESUME_COST_FACTOR  = PIT_RESUME_COST_FACTOR,
+	PIT_RESUME_PERCENT      = PIT_RESUME_PERCENT,
 
 	RANK_TIERS = RANK_TIERS,
 
@@ -382,6 +513,8 @@ return {
 	getPitReward          = getPitReward,
 	getPitUpgradeCost     = getPitUpgradeCost,
 	getPitGoldReward      = getPitGoldReward,
+	getPitResumePercentStage = getPitResumePercentStage,
+	getPitResumeCost      = getPitResumeCost,
 	getFusionStatBonus    = getFusionStatBonus,
 	getBaerchiBaseValue   = getBaerchiBaseValue,
 	getRankForPoints      = getRankForPoints,

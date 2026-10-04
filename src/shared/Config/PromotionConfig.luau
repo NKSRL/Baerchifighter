@@ -81,6 +81,12 @@ local DUPLICATE_COST: { [Types.Rarity]: { first: number, last: number } } = {
 	Epic      = { first = 1, last = 4 },
 	Legendary = { first = 1, last = 3 },
 	Mythic    = { first = 1, last = 2 },
+	Divine    = { first = 1, last = 2 },
+	Cosmic    = { first = 1, last = 2 },
+	Secret    = { first = 1, last = 1 },
+	Godly     = { first = 1, last = 1 },
+	Eternal   = { first = 1, last = 1 },
+	Omega     = { first = 1, last = 1 },
 }
 
 --------------------------------------------------------------------------------
@@ -97,6 +103,12 @@ local STAT_CAP: { [Types.Rarity]: number } = {
 	Epic      = 20,
 	Legendary = 24,
 	Mythic    = 28,
+	Divine    = 32,
+	Cosmic    = 36,
+	Secret    = 40,
+	Godly     = 46,
+	Eternal   = 52,
+	Omega     = 60,
 }
 
 -- Die Stats, die durch Event-Teilnahme wachsen koennen — die Zufallsauswahl

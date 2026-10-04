@@ -812,6 +812,19 @@ local PIT_TOWER_RADIUS = PIT_RADIUS
 -- Die Farben wechseln der Reihe nach durch, eine pro Etage — gedeckte,
 -- erdige Toene, die als aufgeschichtete Baender lesbar bleiben, auch wenn der
 -- Turm mal zwanzig Etagen hoch wird.
+-- v12: FORTSETZUNG — DER TURM WAECHST BEIM EINSTIEG HOCH
+-- Steigt der Baerchi bei Stage 30 ein, wachsen nach seiner Ankunft in der
+-- Arena erst alle 29 Etagen darunter sichtbar hoch, und er faehrt oben mit.
+-- Der Spieler soll sehen, wie weit oben er schon ist. Pro Etage
+-- PIT_TOWER_RISE_SECONDS_PER_LEVEL, insgesamt hoechstens
+-- PIT_TOWER_RISE_MAX_SECONDS (bei sehr hohen Tuermen wachsen mehrere Etagen
+-- pro Schritt). Nach dem Lauf faehrt er in PIT_TOWER_FALL_SECONDS wieder
+-- nach unten, bevor er heimlaeuft — sonst liefe er auf Turmhoehe durch die
+-- Luft zum Plot.
+local PIT_TOWER_RISE_SECONDS_PER_LEVEL = 0.07
+local PIT_TOWER_RISE_MAX_SECONDS       = 3.0
+local PIT_TOWER_FALL_SECONDS           = 0.8
+
 local PIT_TOWER_COLORS: { Color3 } = {
 	Color3.fromRGB(196, 168,  62),   -- Ocker
 	Color3.fromRGB(140, 108,  58),   -- Braun
@@ -854,11 +867,8 @@ local PIT_BANNER_LOSS     = Color3.fromRGB(245, 145, 135)
 -- Abstand der beiden Kaempfer zur Arena-Mitte (sie stehen sich gegenueber)
 local FIGHT_SPACING = 9
 
--- Ziel-Gesamtdauer der Wiedergabe. Ein Lauf ueber 40 Stages darf nicht 40
--- Sekunden dauern — die Zeit pro Stage wird daraus errechnet und geklemmt.
-local FIGHT_TOTAL_SECONDS     = 3.2
-local FIGHT_MIN_STAGE_SECONDS = 0.16
-local FIGHT_MAX_STAGE_SECONDS = 0.60
+-- (Die Dauer der Wiedergabe steht seit v15 unten im Abschnitt
+-- KAMPF-CHOREOGRAFIE: FIGHT_RUN_TARGET_SECONDS und folgende.)
 
 -- Wie lange die Figuren nach der letzten Stage noch stehen bleiben
 local FIGHT_LINGER_SECONDS = 1.6
@@ -878,20 +888,57 @@ local FIGHT_BAR_BACK_COLOR   = Color3.fromRGB(30, 28, 32)
 local FIGHT_BAR_SELF_COLOR   = Color3.fromRGB(90, 220, 120)
 local FIGHT_BAR_ENEMY_COLOR  = Color3.fromRGB(235, 90, 90)
 
--- Bewegung waehrend der Stages (FigureFX).
---
--- Wer die Stage gewinnt, macht einen kurzen Ausfallschritt; wer sie verliert,
--- leuchtet kurz auf. Die Dauer muss deutlich unter einer Stage bleiben — bei
--- vielen Stages ist eine Stage nur FIGHT_MIN_STAGE_SECONDS lang, und
--- PitArenaService klemmt den Ausfallschritt zusaetzlich auf die halbe
--- Stage-Zeit, damit sich zwei Treffer nie ueberlappen koennen.
-local FIGHT_LUNGE_DISTANCE = 1.7    -- Studs nach vorne
-local FIGHT_LUNGE_SECONDS  = 0.22
+-- Bewegung waehrend der Stages: seit v15 Zusammenprall statt Ausfallschritt
+-- (siehe KAMPF-CHOREOGRAFIE weiter unten).
 
--- Treffer-Blitz auf dem Verlierer der Stage. Warmes Weiss statt Rot: Rot ist
+-- Treffer-Blitz auf dem Getroffenen. Warmes Weiss statt Rot: Rot ist
 -- in dieser Szene schon die Farbe des gegnerischen HP-Balkens.
 local FIGHT_HIT_FLASH_SECONDS = 0.22
 local FIGHT_HIT_FLASH_COLOR   = Color3.fromRGB(255, 238, 200)
+
+-- ============================================================
+-- v15: KAMPF-CHOREOGRAFIE (Stoesse und Faehigkeiten)
+-- ============================================================
+-- Seit v15 wird jede Stage ZUG FUER ZUG gezeigt: die Baerchis rennen
+-- aufeinander zu, springen sich an und stossen sich zurueck (FigureFX.clash).
+-- Jeder eigene Stoss fuellt die Ladeleiste unter dem HP-Balken; ist sie voll,
+-- kommt die Faehigkeit mit ihrer Show (SkillFX).
+--
+-- Damit ein Lauf ueber viele Stages nicht ewig dauert, gibt es ein
+-- Zeitbudget: FIGHT_RUN_TARGET_SECONDS fuer den ganzen Lauf (ohne die
+-- Faehigkeiten-Shows), daraus die Zeit pro Stage, geklemmt. Passen nicht
+-- alle Zuege einer Stage hinein, werden Stoesse ausgelassen (die Leisten
+-- springen dann etwas weiter) — Faehigkeiten und der letzte Zug werden nie
+-- ausgelassen. Wer welche Zuege zeigt, rechnet Modules/FightTimeline.
+--
+-- Reicht das Budget nicht einmal fuer die Pflicht-Zuege, laeuft die Stage
+-- schneller (Tempo bis FIGHT_MIN_TEMPO, also hoechstens gut doppelt so
+-- schnell) — bei 60 Stages wird der Lauf so zur schnellen Montage statt
+-- zu einer Minute Pflichtprogramm.
+local FIGHT_RUN_TARGET_SECONDS  = 30
+local FIGHT_STAGE_MIN_SECONDS   = 0.5
+local FIGHT_STAGE_MAX_SECONDS   = 6.0
+local FIGHT_MIN_TEMPO           = 0.45
+local FIGHT_BEAT_SECONDS        = 0.55   -- ein Stoss (Anlauf, Aufprall, zurueck)
+local FIGHT_SKILL_BEAT_SECONDS  = 0.75   -- der Stoss nach einer Faehigkeit (wuchtiger)
+local FIGHT_ENEMY_INTRO_SECONDS = 0.35   -- kurz stehen, wenn ein neuer Gegner erscheint
+local FIGHT_KO_SECONDS          = 0.35   -- besiegter Gegner kippt, bevor der naechste kommt
+local FIGHT_CONTACT_GAP         = 2.4    -- Abstand der Fusspunkte beim Aufprall (Studs)
+local FIGHT_HOP_HEIGHT          = 1.6    -- Hoehe des Ansprungs
+local FIGHT_KNOCKBACK           = 1.3    -- wie weit der Getroffene zurueckgestossen wird
+local FIGHT_SKILL_KNOCKBACK     = 3.2    -- ... nach einer Faehigkeit
+local FIGHT_ENEMY_STEP_SHARE    = 0.18   -- der Getroffene kommt dem Angreifer ein Stueck entgegen
+
+-- Ladeleiste (unter dem HP-Balken des eigenen Baerchis)
+local FIGHT_CHARGE_BAR_HEIGHT   = 0.35
+local FIGHT_CHARGE_COLOR        = Color3.fromRGB(120, 200, 255)
+local FIGHT_CHARGE_FULL_COLOR   = Color3.fromRGB(255, 214, 70)
+
+-- Aufprall: ein leiser, dumpfer Ton (Lautstaerke bewusst niedrig, er kommt
+-- zweimal pro Sekunde) und ein kleiner Funkenstoss.
+local FIGHT_BUMP_SOUND          = "rbxasset://sounds/action_jump_land.mp3"
+local FIGHT_BUMP_VOLUME         = 0.25
+local FIGHT_BUMP_SPARKS         = 6
 
 -- Wie lange der Verlierer der LETZTEN Stage zum Umkippen braucht. Laeuft
 -- innerhalb der Nachlauf-Pause (FIGHT_LINGER_SECONDS) ab, verlaengert die
@@ -930,6 +977,12 @@ local RARITY_AURA_MIN_SPARKLE: { [string]: boolean } = {
 	Epic      = true,
 	Legendary = true,
 	Mythic    = true,
+	Divine    = true,
+	Cosmic    = true,
+	Secret    = true,
+	Godly     = true,
+	Eternal   = true,
+	Omega     = true,
 }
 local RARITY_AURA_MIN_LIGHT: { [string]: boolean } = {
 	Common    = false,
@@ -938,6 +991,12 @@ local RARITY_AURA_MIN_LIGHT: { [string]: boolean } = {
 	Epic      = true,
 	Legendary = true,
 	Mythic    = true,
+	Divine    = true,
+	Cosmic    = true,
+	Secret    = true,
+	Godly     = true,
+	Eternal   = true,
+	Omega     = true,
 }
 local RARITY_AURA_PARTICLE_RATE   = 6    -- Partikel/Sekunde, dezenter Dauer-Effekt
 local RARITY_AURA_LIGHT_RANGE     = 10
@@ -1098,6 +1157,9 @@ return {
 	PIT_TOWER_STEP_HEIGHT = PIT_TOWER_STEP_HEIGHT,
 	PIT_TOWER_RADIUS      = PIT_TOWER_RADIUS,
 	PIT_TOWER_COLORS      = PIT_TOWER_COLORS,
+	PIT_TOWER_RISE_SECONDS_PER_LEVEL = PIT_TOWER_RISE_SECONDS_PER_LEVEL,
+	PIT_TOWER_RISE_MAX_SECONDS       = PIT_TOWER_RISE_MAX_SECONDS,
+	PIT_TOWER_FALL_SECONDS           = PIT_TOWER_FALL_SECONDS,
 
 	PIT_FENCE_COUNT       = PIT_FENCE_COUNT,
 	PIT_FENCE_SIZE        = PIT_FENCE_SIZE,
@@ -1113,9 +1175,6 @@ return {
 	PIT_BANNER_LOSS     = PIT_BANNER_LOSS,
 
 	FIGHT_SPACING             = FIGHT_SPACING,
-	FIGHT_TOTAL_SECONDS       = FIGHT_TOTAL_SECONDS,
-	FIGHT_MIN_STAGE_SECONDS   = FIGHT_MIN_STAGE_SECONDS,
-	FIGHT_MAX_STAGE_SECONDS   = FIGHT_MAX_STAGE_SECONDS,
 	FIGHT_LINGER_SECONDS      = FIGHT_LINGER_SECONDS,
 	FIGHT_ENEMY_COLOR         = FIGHT_ENEMY_COLOR,
 	FIGHT_BAR_WIDTH           = FIGHT_BAR_WIDTH,
@@ -1124,11 +1183,30 @@ return {
 	FIGHT_BAR_BACK_COLOR      = FIGHT_BAR_BACK_COLOR,
 	FIGHT_BAR_SELF_COLOR      = FIGHT_BAR_SELF_COLOR,
 	FIGHT_BAR_ENEMY_COLOR     = FIGHT_BAR_ENEMY_COLOR,
-	FIGHT_LUNGE_DISTANCE      = FIGHT_LUNGE_DISTANCE,
-	FIGHT_LUNGE_SECONDS       = FIGHT_LUNGE_SECONDS,
 	FIGHT_HIT_FLASH_SECONDS   = FIGHT_HIT_FLASH_SECONDS,
 	FIGHT_HIT_FLASH_COLOR     = FIGHT_HIT_FLASH_COLOR,
 	FIGHT_COLLAPSE_SECONDS    = FIGHT_COLLAPSE_SECONDS,
+
+	-- v15
+	FIGHT_RUN_TARGET_SECONDS  = FIGHT_RUN_TARGET_SECONDS,
+	FIGHT_STAGE_MIN_SECONDS   = FIGHT_STAGE_MIN_SECONDS,
+	FIGHT_STAGE_MAX_SECONDS   = FIGHT_STAGE_MAX_SECONDS,
+	FIGHT_MIN_TEMPO           = FIGHT_MIN_TEMPO,
+	FIGHT_KO_SECONDS          = FIGHT_KO_SECONDS,
+	FIGHT_BEAT_SECONDS        = FIGHT_BEAT_SECONDS,
+	FIGHT_SKILL_BEAT_SECONDS  = FIGHT_SKILL_BEAT_SECONDS,
+	FIGHT_ENEMY_INTRO_SECONDS = FIGHT_ENEMY_INTRO_SECONDS,
+	FIGHT_CONTACT_GAP         = FIGHT_CONTACT_GAP,
+	FIGHT_HOP_HEIGHT          = FIGHT_HOP_HEIGHT,
+	FIGHT_KNOCKBACK           = FIGHT_KNOCKBACK,
+	FIGHT_SKILL_KNOCKBACK     = FIGHT_SKILL_KNOCKBACK,
+	FIGHT_ENEMY_STEP_SHARE    = FIGHT_ENEMY_STEP_SHARE,
+	FIGHT_CHARGE_BAR_HEIGHT   = FIGHT_CHARGE_BAR_HEIGHT,
+	FIGHT_CHARGE_COLOR        = FIGHT_CHARGE_COLOR,
+	FIGHT_CHARGE_FULL_COLOR   = FIGHT_CHARGE_FULL_COLOR,
+	FIGHT_BUMP_SOUND          = FIGHT_BUMP_SOUND,
+	FIGHT_BUMP_VOLUME         = FIGHT_BUMP_VOLUME,
+	FIGHT_BUMP_SPARKS         = FIGHT_BUMP_SPARKS,
 
 	LIGHTING_CLOCK_TIME        = LIGHTING_CLOCK_TIME,
 	LIGHTING_BLOOM_INTENSITY   = LIGHTING_BLOOM_INTENSITY,

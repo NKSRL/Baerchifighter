@@ -22,3 +22,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Sicherungskopien vor grossen Umbauten (nur lokal)
+/_backup_*/

@@ -17,13 +17,47 @@ export type Rarity =
 	| "Epic"
 	| "Legendary"
 	| "Mythic"
+	| "Divine"
+	| "Cosmic"
+	| "Secret"
+	| "Godly"
+	| "Eternal"
+	| "Omega"
 
+-- v14 (Mega Egg Tree): 20 Eier in einem Freischalt-Baum. Welches Ei zu
+-- welchem Pfad gehoert und wie es frei wird, steht in EggConfig (TREE).
 export type EggType =
+	-- Stamm
 	| "BasicEgg"
 	| "SugarEgg"
+	-- Gold-Pfad
 	| "GoldenEgg"
+	| "PlatinumEgg"
+	| "SunEgg"
+	| "ZenithEgg"
+	-- Kristall-Pfad
 	| "CrystalEgg"
+	| "PrismEgg"
+	| "AuroraEgg"
+	-- Void-Pfad
+	| "MistEgg"
+	| "VoidEgg"
+	| "ShadowEgg"
+	| "AbyssEgg"
+	-- Kosmos-Pfad
+	| "CometEgg"
+	| "NovaEgg"
+	| "GalaxyEgg"
+	-- Ascensions-Pfad (nur Rebirth)
 	| "AscensionEgg"
+	| "TranscendenceEgg"
+	| "EternityEgg"
+	| "OmegaEgg"
+
+-- v14: die Pfade des Ei-Baums. Ein Pfad ist kein Upgrade, sondern ein
+-- Spielziel (Gold = stark, Kristall = schnell, Void = selten, Kosmos =
+-- Allrounder, Ascension = Rebirth). Siehe BaerchiConfig.PATHS.
+export type PathId = "Stamm" | "Gold" | "Kristall" | "Void" | "Kosmos" | "Ascension"
 
 -- v11: MUTATION-SYSTEM (ersetzt das binaere isInverted-Feld).
 --
@@ -63,8 +97,9 @@ export type BuildingId =
 	| "HoneyPress"   -- Honig-Presse
 -- Fusion ist seit v3 kein Gebaeude mehr — sie laeuft rein ueber GUI
 -- (FusionPanel/BaerchiInventory) und ist von Anfang an freigeschaltet.
--- Ei-Bruetung und Recycling sind seit v4 ebenfalls reine GUI-Funktionen
--- mit festen Werten (EconomyConfig.HATCH_SLOTS / RECYCLE_RETURN).
+-- Recycling ist seit v4 ebenfalls eine reine GUI-Funktion mit festem Wert
+-- (EconomyConfig.RECYCLE_RETURN). Eier werden seit v12 sofort geoeffnet,
+-- es gibt keine Brut-Slots mehr.
 
 export type SkillId = string  -- "SugarRush", "GummySmash", "BearHug", etc.
                                -- String damit neue Skills nur Config-Eintraege sind
@@ -186,20 +221,21 @@ export type Building = {
 	lastProducedAt : number,
 }
 
--- Ein Ei das gerade ausgebruetet wird.
--- readyAt ist ein absoluter os.time()-Timestamp — dadurch laeuft der Timer
--- auch waehrend der Spieler offline ist weiter und braucht keinen Server-Loop.
+-- v12: Brut-Slots (HatchingEgg, island.hatchingEggs) sind entfallen. Ein Ei
+-- aus dem Lager wird per Klick sofort geoeffnet (EggService.openEgg). Die
+-- Migration in PlayerService legt laufende Bruten alter Spielstaende zurueck
+-- ins Lager.
+
+-- v12: Stand des letzten PIT-Laufs fuer die Fortsetzungs-Frage.
 --
--- Die uid gibt es, weil der Client sonst ueber den Listen-INDEX claimen
--- muesste. Zwei schnelle Klicks hintereinander wuerden dann das falsche Ei
--- treffen: nach dem ersten table.remove rutscht alles eine Position hoch,
--- und der zweite Klick auf "Slot 2" landet auf einem Ei, das der Spieler
--- gar nicht gemeint hat. Mit einer uid ist der Bezug eindeutig.
-export type HatchingEgg = {
-	uid       : string,   -- stabil, siehe Kommentar oben
-	eggType   : EggType,
-	startedAt : number,   -- os.time() beim Kauf (fuer UI-Fortschrittsbalken)
-	readyAt   : number,   -- os.time() ab dem geclaimt werden darf
+-- reachedStage ist die letzte Stage, in die der Baerchi EINGETRETEN ist
+-- (verloren oder beim Zurueckholen die gerade gespielte). Gilt nur fuer das
+-- PIT-Level, auf dem der Lauf stattfand: auf einem anderen Level stehen
+-- andere Gegner in denselben Stage-Nummern. Ein PIT-Ausbau oder Rebirth
+-- loescht den Eintrag.
+export type PitProgress = {
+	pitLevel     : number,
+	reachedStage : number,
 }
 
 -- Ein GELEGTES Ei: liegt sichtbar in der Welt und wartet darauf, angeklickt zu
@@ -227,8 +263,7 @@ export type IslandData = {
 	pitLevel     : number,                    -- Schichtanzahl der Kampfplattform
 	buildings    : { [BuildingId]: Building },
 	baerchis     : { [string]: Baerchi },     -- key = Baerchi.uid
-	eggStock     : { [EggType]: number },     -- Eier im Lager (aus Rebirth-Meilensteinen)
-	hatchingEggs : { HatchingEgg },           -- laufende Brut-Slots, Reihenfolge = Anzeigereihenfolge
+	eggStock     : { [EggType]: number },     -- Eier im Lager (Legen, Events, Rebirth, Haendler)
 
 	-- Der EINE Baerchi, der auf dem Plot steht: laeuft selbststaendig zum
 	-- Honig-Teich, in den PIT und wieder zurueck. Alle anderen bleiben reiner
@@ -248,6 +283,10 @@ export type IslandData = {
 	-- Baerchi auch waehrend der Spieler offline ist weiter (langsamer, siehe
 	-- EggConfig.OFFLINE_SLOWDOWN) und es braucht keinen Server-Loop dafuer.
 	lastEggAt : number,
+
+	-- v12: letzter PIT-Lauf (Fortsetzungs-Frage). nil = kein Lauf auf diesem
+	-- PIT-Level gespeichert, der Dialog erscheint dann nicht.
+	pitProgress : PitProgress?,
 }
 
 --------------------------------------------------------------------------------
@@ -266,6 +305,74 @@ export type LocArg = string | number | LocMsg
 export type LocMsg = {
 	k : string,                      -- Schluessel
 	a : { [string]: LocArg }?,       -- Platzhalter-Werte
+}
+
+--------------------------------------------------------------------------------
+-- Quests und Index (v13)
+--------------------------------------------------------------------------------
+
+-- Gespeicherter Quest-Stand. Gespeichert wird bewusst NUR, was sich nicht aus
+-- den Spielzaehlern ableiten laesst: wie viele Kettenquests schon abgeholt
+-- wurden, und der Tagesstand. Den Fortschritt selbst rechnet QuestProgress
+-- jedes Mal frisch aus data.stats / island — so gibt es keine zweite Wahrheit,
+-- die auseinanderlaufen kann, und kein anderer Service muss Quests kennen.
+export type QuestBaseline = {
+	hatched     : number,
+	fightsWon   : number,
+	gummies     : number,
+}
+
+export type QuestState = {
+	chainClaimed : number,                    -- Kettenquests, die schon abgeholt sind
+	day          : number,                    -- Tagesnummer (UTC), siehe QuestConfig.dayOf
+	baseline     : QuestBaseline,             -- Zaehlerstand zu Tagesbeginn
+	dailyClaimed : { [string]: boolean },     -- abgeholte Tages-Quests von `day`
+}
+
+-- Eine Zeile in der Quest-Anzeige (Server -> Client). Keine Texte: der Client
+-- baut sie aus der id (Schluessel "quest.<id>.title").
+export type QuestEntry = {
+	id       : string,
+	kind     : string,   -- "chain" | "daily"
+	progress : number,   -- schon auf `target` gedeckelt
+	target   : number,
+	claimed  : boolean,
+}
+
+export type QuestView = {
+	chain      : QuestEntry?,   -- aktuelle Kettenquest, nil = Kette komplett
+	chainDone  : number,        -- wie viele der Kette erledigt sind
+	chainTotal : number,
+	daily      : { QuestEntry },
+	dailyResetIn : number,      -- Sekunden bis zum naechsten Tageswechsel
+}
+
+-- Belohnungs-Meldung (Server -> Client), fuer den Toast.
+export type QuestReward = {
+	questId : string,
+	gummies : number,
+	eggType : EggType?,
+}
+
+--------------------------------------------------------------------------------
+-- Ei-Baum (v14)
+--------------------------------------------------------------------------------
+
+-- Fortschritt im Ei-Baum. Liegt bewusst AUSSERHALB von island: ein Rebirth
+-- setzt die Insel zurueck, den Baum aber nicht — er ist der lange Grind.
+--
+--   unlocked   Eier, deren Knoten frei ist (einmal frei, immer frei)
+--   hatched    wie oft jedes Ei schon geoeffnet wurde (Freischalt-Bedingung)
+--   pressed    wie oft jedes Ei in der Ei-Presse entstanden ist (Statistik)
+--   blueprints Blaupausen aus Events, noch nicht eingesetzt
+--   bypass     Knoten, deren Hatch- und Index-Bedingung eine Blaupause
+--              ersetzt hat (das Rebirth-Gate gilt trotzdem)
+export type EggTreeState = {
+	unlocked   : { [string]: boolean },
+	hatched    : { [string]: number },
+	pressed    : { [string]: number },
+	blueprints : number,
+	bypass     : { [string]: boolean },
 }
 
 --------------------------------------------------------------------------------
@@ -316,7 +423,18 @@ export type PlayerData = {
 		totalRecycled       : number,
 		highestPitLevel     : number,
 		highestTowerFloor   : number,
+		totalHatched        : number,   -- v13: geoeffnete Eier (Quest-Zaehler)
 	},
+
+	-- v13: Index. Jede configId, die der Spieler je besessen hat (auch nach
+	-- Recycling/Fusion/Rebirth). Wird nie geleert.
+	discovered : { [string]: boolean },
+
+	-- v13: Quest-Stand
+	quests : QuestState,
+
+	-- v14: Ei-Baum (ueberlebt Rebirths)
+	eggTree : EggTreeState,
 }
 
 --------------------------------------------------------------------------------
@@ -333,17 +451,49 @@ export type PlayerDataUpdate = {
 	rank         : Rank,
 	language     : string?,
 	island       : IslandData,
+	discovered   : { [string]: boolean },
+	quests       : QuestView,
+	eggTree      : EggTreeState,   -- v14
 }
 
--- Eine einzelne Kampfrunde. Bleibt serverseitig in CombatCalculator, wird
--- aber NICHT mehr an den Client geschickt: ein PIT-Lauf hat inzwischen viele
--- Stages, das komplette Rundenprotokoll waere ein Vielfaches der Nutzlast.
--- Der Client bekommt stattdessen die Stage-Zusammenfassungen unten.
+-- Eine einzelne Kampf-AKTION (v14: Runden-Log). Bleibt serverseitig in
+-- CombatCalculator und wird NICHT komplett an den Client geschickt: ein
+-- PIT-Lauf hat viele Stages, das ganze Protokoll waere ein Vielfaches der
+-- Nutzlast. Der Client bekommt pro Stage nur die Zusammenfassung
+-- (PitStageResult.skillUses / firstSkillRound) — genug fuer die SkillFX.
+--
+-- Seit v14 handelt jeder Kaempfer nach seiner SPD (siehe CombatCalculator),
+-- ein Eintrag ist deshalb EINE Aktion von A oder B, nicht mehr eine
+-- Doppelrunde.
 export type RoundLogEntry = {
-	attackerHpAfter : number,
-	defenderHpAfter : number,
+	roundNumber     : number,     -- wievielte Aktion von A (der Baerchi)
+	actor           : string,     -- "A" | "B"
+	-- v15: was in diesem Zug passiert ist: "hit" (Stoss), "skill"
+	-- (Faehigkeit), "burst" (Feuerstoss nach Letzter Chance), "stunned"
+	kind            : string,
+	chargeA         : number,     -- v15: Ladestand von A nach dem Zug (0..1)
 	skillUsed       : boolean,
-	roundNumber     : number,
+	skillId         : string?,
+	damage          : number,     -- wirklich abgezogene HP beim Ziel
+	heal            : number,
+	absorbed        : number,     -- vom Schild abgefangen
+	effects         : { string }?, -- "stun", "slow", "dot", "burn:12", "laststand" ...
+	attackerHpAfter : number,     -- HP von A nach der Aktion
+	defenderHpAfter : number,     -- HP von B nach der Aktion
+}
+
+-- v15: ein Zug fuer die WIEDERGABE in der Arena (aus RoundLogEntry
+-- verdichtet). Bleibt serverseitig: CombatService baut die Liste,
+-- PitArenaService spielt sie ab (Stoesse, Faehigkeiten, Lebens- und
+-- Ladeleisten). HP und Ladung als Anteil 0..1, damit die Leisten direkt
+-- gesetzt werden koennen.
+export type FightBeat = {
+	actor   : string,    -- "A" = der Baerchi, "B" = der Gegner
+	kind    : string,    -- "hit" | "skill" | "burst" | "stunned"
+	selfHp  : number,    -- HP des Baerchis nach dem Zug (0..1)
+	enemyHp : number,    -- HP des Gegners nach dem Zug (0..1)
+	charge  : number,    -- Ladestand der Faehigkeit des Baerchis (0..1)
+	skillId : string?,   -- bei "skill"/"burst"
 }
 
 -- Eine bestandene (oder verlorene) Stage innerhalb eines PIT-Laufs.
@@ -353,6 +503,9 @@ export type PitStageResult = {
 	rounds     : number,
 	hpAfter    : number,   -- HP des Baerchis NACH dieser Stage
 	gummiesWon : number,
+	-- v14: fuer die Fähigkeiten-Animation (SkillFX)
+	skillUses       : number?,   -- wie oft der Skill in dieser Stage kam
+	firstSkillRound : number?,   -- erste Aktion mit Skill (nil = keiner)
 }
 
 -- Ergebnis eines kompletten PIT-Laufs.
@@ -364,6 +517,9 @@ export type PitStageResult = {
 -- hochgefuettert werden.
 export type PitRunResult = {
 	baerchiUid    : string,
+	startStage    : number,           -- v12: erste gespielte Stage (1 = von vorn, sonst Fortsetzung)
+	recalled      : boolean,          -- v12: true = vom Spieler nach einer Stage zurueckgeholt
+	corrected     : boolean?,         -- v12: true = nachgeschicktes, gekuerztes Ergebnis nach dem Zurueckholen
 	stagesCleared : number,           -- wie viele Stages gewonnen wurden
 	stages        : { PitStageResult },
 	gummiesWon    : number,           -- Summe ueber alle Stages, bereits mit rebirthMult
@@ -474,12 +630,34 @@ export type EventStatGain = {
 	-- bekommen hat — der seltenste Ausgang im ganzen Event-System, deshalb als
 	-- eigenes Feld statt nur im Text: der Client faerbt den Hinweis damit ein.
 	mutation   : MutationId?,
+
+	-- true: Zwischenmeldung WAEHREND eines Events (UFO-Kampf, Fund, Entfuehrung)
+	-- statt Abschlussmeldung. Der Client zeigt dann nur `bonusText`.
+	midEvent   : boolean?,
+
+	-- Neue Rarity, falls das UFO den Baerchi aufsteigen liess.
+	rarityUp   : string?,
 }
 
 export type RebirthResult = {
 	newRebirthCount : number,
 	newMultiplier   : number,
-	ascensionEggs   : number,   -- wie viele AscensionEggs es dafuer gab (0 = keine)
+	ascensionEggs   : number,   -- Summe aller Meilenstein-Eier (0 = keine), fuer alte Anzeigen
+	-- v14: Meilenstein-Eier nach Sorte (Ascension, Transzendenz, Ewigkeit, Omega)
+	milestoneEggs   : { { eggType: EggType, count: number } }?,
+}
+
+-- v14: ein Knoten im Ei-Baum ist frei geworden (fuer den Toast).
+export type EggUnlockResult = {
+	eggType : EggType,
+	reason  : string,    -- "tree" | "blueprint" | "rebirth" | "migration"
+}
+
+-- v14: Ergebnis der Ei-Presse.
+export type EggPressResult = {
+	fromEgg : EggType,
+	toEgg   : EggType,
+	used    : number,
 }
 
 -- Offline-Ertrag beim Join (Server → Client, direkt nach dem ersten Sync).
@@ -526,7 +704,13 @@ local function createDefaultPlayerData(): PlayerData
 		-- trotzdem, weil die zugehoerige Migration in PlayerService einen Wert
 		-- UMRECHNET (die Presse erbt einmalig das hoechste Gebaeude-Level) und
 		-- deshalb genau einmal laufen darf.
-		version    = 11,  -- v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v13: Quests + Index. Neu: discovered, quests, stats.totalHatched. Die
+		-- Migration seedet discovered aus den vorhandenen Baerchis und setzt
+		-- totalHatched auf deren Anzahl, damit Veteranen nicht bei null starten.
+		-- v12: Brut-Slots entfallen (Eier werden sofort geoeffnet), die
+		-- Migration legt laufende Bruten zurueck ins Lager und ENTFERNT
+		-- island.hatchingEggs. Neu: island.pitProgress (optional).
+		version    = 14,  -- v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -555,7 +739,6 @@ local function createDefaultPlayerData(): PlayerData
 			eggStock     = {
 				BasicEgg = 3,  -- Starter-Eier fuer den ersten Join
 			},
-			hatchingEggs = {},
 			equippedUid  = nil,   -- noch kein Baerchi da, der ausgeruestet sein koennte
 
 			laidEggs  = {},
@@ -571,6 +754,24 @@ local function createDefaultPlayerData(): PlayerData
 			totalRecycled       = 0,
 			highestPitLevel     = 1,
 			highestTowerFloor   = 0,
+			totalHatched        = 0,
+		},
+
+		discovered = {},
+
+		eggTree = {
+			unlocked   = { BasicEgg = true, SugarEgg = true },
+			hatched    = {},
+			pressed    = {},
+			blueprints = 0,
+			bypass     = {},
+		},
+
+		quests = {
+			chainClaimed = 0,
+			day          = 0,   -- 0 = noch nie gesetzt; QuestService setzt beim Join den Tag
+			baseline     = { hatched = 0, fightsWon = 0, gummies = 0 },
+			dailyClaimed = {},
 		},
 	}
 end

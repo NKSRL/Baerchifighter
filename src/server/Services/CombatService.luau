@@ -3,28 +3,50 @@
 -- ServerScriptService/Services/CombatService.luau
 --
 -- Einzige Zustaendigkeit:
---   - Einen PIT-LAUF validieren, durchsimulieren und abrechnen
+--   - Einen PIT-LAUF validieren, durchsimulieren und (am Ende der Wiedergabe)
+--     abrechnen
 --
--- Ein Lauf ist kein einzelner Kampf mehr: der Baerchi kaempft Stage fuer
--- Stage weiter, solange er gewinnt, und seine HP werden zwischen den Stages
--- NICHT zurueckgesetzt. Der Lauf endet wenn er verliert oder bei 0 HP
--- ankommt — danach steht er erschoepft auf dem Plot und muss mit Honig
--- hochgefuettert werden (siehe HoneyService).
+-- Ein Lauf ist kein einzelner Kampf: der Baerchi kaempft Stage fuer Stage
+-- weiter, solange er gewinnt, und seine HP werden zwischen den Stages NICHT
+-- zurueckgesetzt. Kaempfe geben KEINE XP (die kommt nur aus Honig).
 --
--- WICHTIG: Kaempfe geben KEINE XP mehr. XP kommt seit v4 ausschliesslich aus
--- verfuettertem Honig. Dieser Service fasst `xp` und `level` deshalb nicht an.
+-- ============================================================
+-- SEIT v12: SIMULATION SOFORT, ABRECHNUNG SPAETER
+-- ============================================================
+-- Der Lauf wird weiterhin KOMPLETT im Voraus simuliert. Der Server kennt das
+-- Ergebnis also, bevor die Figur losgeht — der Client kann am Ausgang nichts
+-- drehen. Neu ist nur, WANN abgerechnet wird: nicht mehr vor der Wiedergabe,
+-- sondern erst, wenn PitArenaService weiss, wie viele Stages tatsaechlich
+-- gespielt wurden. Der Spieler kann den Baerchi naemlich zurueckholen
+-- (PetBar, Knopf "Fight" nochmal): dann endet der Lauf nach der aktuellen
+-- Stage, und es zaehlen nur die bis dahin geschafften.
 --
--- Gegner-Werte kommen aus CombatConfig, Belohnungen aus EconomyConfig,
--- die Simulation aus CombatCalculator. rebirthMult wird ausschliesslich von
--- EconomyService.awardGummies angewendet — dieser Service rechnet mit
--- Basiswerten.
+-- Dafuer bekommt PitArenaService eine Abrechnungs-Funktion (settle) mit. Sie
+-- laeuft genau einmal — am Ende der Wiedergabe, beim Zurueckholen, bei einem
+-- Abbruch oder, wenn der Spieler mitten im Lauf geht, ueber
+-- PlayerService.onPlayerLeaving (dann so, als waere die aktuelle Stage zu Ende
+-- gespielt).
+--
+-- ============================================================
+-- FORTSETZUNG (v12)
+-- ============================================================
+-- Vor dem Lauf kann der Spieler weiter oben einsteigen (PitResumeDialog):
+--   "Fresh"   Stage 1, kostenlos
+--   "Percent" bei 65 % der Stage-Tiefe seines letzten Laufs
+--   "Last"    bei der letzten erreichten Stage
+-- Kosten und Startstage rechnet EconomyConfig (dieselben Funktionen nutzt der
+-- Client fuer die Anzeige). Der letzte Lauf steht in island.pitProgress und
+-- gilt nur auf demselben PIT-Level.
+--
+-- Gegner-Werte kommen aus CombatConfig, Belohnungen aus EconomyConfig, die
+-- Simulation aus CombatCalculator. rebirthMult wendet ausschliesslich
+-- EconomyService.awardGummies an.
 
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
-local Loc           = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatConfig     = require(ReplicatedStorage.Config.CombatConfig)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
@@ -33,12 +55,14 @@ local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local PlayerService   = require(ServerScriptService.Services.PlayerService)
 local EconomyService  = require(ServerScriptService.Services.EconomyService)
 local PitArenaService = require(ServerScriptService.Services.PitArenaService)
-local RateLimiter     = require(ServerScriptService.Util.RateLimiter)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local CombatService = {}
 
-local function fail(player: Player, reason: Types.LocMsg?)
-	Remotes.ActionFailed:FireClient(player, "RequestStartCombat", reason or Loc.msg("err.unknown"))
+export type ResumeChoice = "Fresh" | "Percent" | "Last"
+
+local function fail(player: Player, reason: Types.LocMsg | string)
+	Remotes.ActionFailed:FireClient(player, "RequestPetMode", reason)
 end
 
 -- Gegner-Snapshot fuer eine Stage. Die Werte selbst kommen komplett aus
@@ -47,38 +71,66 @@ local function buildEnemySnapshot(pitLevel: number, stage: number): CombatCalcul
 	local stats = CombatConfig.getEnemyStats(pitLevel, stage)
 
 	return {
-		uid           = string.format("enemy_p%d_s%d", pitLevel, stage),
-		stats         = stats,
-		hp            = stats.maxHp,
-		skillCooldown = 0,
+		uid    = string.format("enemy_p%d_s%d", pitLevel, stage),
+		stats  = stats,
+		hp     = stats.maxHp,
+		charge = 0,
 	}
 end
 
-function CombatService.startPitRun(player: Player, baerchiUid: string)
-	-- Der Cooldown auf RequestStartCombat (1s, NetworkConfig) ist kuerzer als
-	-- eine volle PIT-Wiedergabe (Hinlauf + Stages + Nachlauf + Ruecklauf,
-	-- leicht mehrere Sekunden). Ohne diese Sperre koennte ein zweiter Klick
-	-- mitten in den ersten Lauf hineinstarten und der Figur buchstaeblich die
-	-- Fuesse unter dem Koerper wegziehen.
+-- Der gespeicherte letzte Lauf, sofern er fuer das AKTUELLE PIT-Level gilt.
+function CombatService.getProgress(data: Types.PlayerData): Types.PitProgress?
+	local progress = data.island.pitProgress
+	if progress and progress.pitLevel == data.island.pitLevel and progress.reachedStage >= 1 then
+		return progress
+	end
+	return nil
+end
+
+-- Startstage und Kosten fuer eine Fortsetzungs-Wahl. nil = Wahl ungueltig
+-- (kein letzter Lauf auf diesem Level).
+function CombatService.getResumeOffer(data: Types.PlayerData, choice: ResumeChoice): (number?, number)
+	if choice == "Fresh" then
+		return 1, 0
+	end
+
+	local progress = CombatService.getProgress(data)
+	if not progress then
+		return nil, 0
+	end
+
+	local startStage = if choice == "Last"
+		then progress.reachedStage
+		else EconomyConfig.getPitResumePercentStage(progress.reachedStage)
+
+	startStage = math.clamp(startStage, 1, CombatConfig.MAX_STAGES_PER_RUN)
+	return startStage, EconomyConfig.getPitResumeCost(data.island.pitLevel, startStage, data.rebirthMult)
+end
+
+-- Startet einen PIT-Lauf. Gibt true zurueck, wenn er losgeht — sonst hat der
+-- Spieler bereits ein ActionFailed mit dem Grund bekommen.
+function CombatService.startPitRun(player: Player, baerchiUid: string, choice: ResumeChoice?): boolean
+	-- Ein zweiter Lauf darf nie in einen laufenden hineinstarten (die Figur
+	-- wuerde sonst mitten in der Wiedergabe weggezogen).
 	if PitArenaService.isRunning(player) then
 		fail(player, Loc.msg("err.combat_busy"))
-		return
+		return false
 	end
 
 	local data = PlayerService.getData(player)
-	if not data then return end
+	if not data then return false end
 
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
 		fail(player, Loc.msg("err.baerchi_not_found"))
-		return
+		return false
 	end
 
 	local def = BaerchiConfig.getById(baerchi.configId)
 	if not def then
 		warn("[CombatService] Unbekannter configId:", baerchi.configId)
 		fail(player, Loc.msg("err.baerchi_data_corrupt"))
-		return
+		return false
 	end
 
 	local stats = CombatCalculator.getEffectiveStats(baerchi, def.baseStats)
@@ -88,46 +140,78 @@ function CombatService.startPitRun(player: Player, baerchiUid: string)
 	local hp = math.clamp(baerchi.currentHp, 0, stats.maxHp)
 	if hp <= 0 then
 		fail(player, Loc.msg("err.combat_exhausted"))
-		return
+		return false
 	end
 
 	local pitLevel = data.island.pitLevel
+	local startStage, cost = CombatService.getResumeOffer(data, choice or "Fresh")
+	if not startStage then
+		fail(player, Loc.msg("err.combat_no_last_run"))
+		return false
+	end
+
+	if cost > 0 then
+		local ok, reason = EconomyService.spendGummies(player, cost)
+		if not ok then
+			fail(player, reason)
+			return false
+		end
+	end
+
 	local hpBefore = hp
 
+	-- ============================================================
+	-- SIMULATION (komplett im Voraus)
+	-- ============================================================
 	local stages: { Types.PitStageResult } = {}
-	local stagesCleared = 0
-	local baseGummies   = 0
+	-- v15: pro Stage die einzelnen Zuege fuer die Wiedergabe (Stoesse,
+	-- Faehigkeiten). Bleibt auf dem Server — PitArenaService spielt sie ab,
+	-- der Client sieht nur das Ergebnis in der Welt.
+	local beats: { { Types.FightBeat } } = {}
+	local lastStage = startStage + CombatConfig.MAX_STAGES_PER_RUN - 1
 
-	for stage = 1, CombatConfig.MAX_STAGES_PER_RUN do
-		-- CombatCalculator.simulate veraendert die Snapshots die es bekommt —
-		-- nach dem Aufruf steht in playerSnapshot.hp die Rest-HP des Baerchis.
+	-- v15: die Aufladung der Faehigkeit bleibt ueber die Stages erhalten.
+	local charge = 0
+
+	for stage = startStage, lastStage do
 		local playerSnapshot: CombatCalculator.CombatSnapshot = {
-			uid           = baerchi.uid,
-			stats         = stats,
-			hp            = hp,
-			skillCooldown = 0,
+			uid    = baerchi.uid,
+			stats  = stats,
+			hp     = hp,
+			charge = charge,
 		}
+		local enemySnapshot = buildEnemySnapshot(pitLevel, stage)
+		local enemyMax = math.max(1, enemySnapshot.stats.maxHp)
 
-		local result = CombatCalculator.simulate(playerSnapshot, buildEnemySnapshot(pitLevel, stage))
+		local result = CombatCalculator.simulate(playerSnapshot, enemySnapshot, true)
 		local won    = result.winnerUid == baerchi.uid
 
 		hp = math.clamp(playerSnapshot.hp, 0, stats.maxHp)
+		charge = playerSnapshot.charge or 0
 
-		-- Basiswert: der rebirthMult kommt erst ganz am Ende einmal drauf
-		-- (siehe awardGummies weiter unten).
-		local stageGummies = 0
-		if won then
-			stagesCleared += 1
-			stageGummies = EconomyConfig.getPitStageReward(pitLevel, stage)
-			baseGummies += stageGummies
+		local stageBeats: { Types.FightBeat } = {}
+		for _, entry in result.log do
+			table.insert(stageBeats, {
+				actor   = entry.actor,
+				kind    = entry.kind,
+				selfHp  = math.clamp(entry.attackerHpAfter / math.max(1, stats.maxHp), 0, 1),
+				enemyHp = math.clamp(entry.defenderHpAfter / enemyMax, 0, 1),
+				charge  = entry.chargeA,
+				skillId = entry.skillId,
+			})
 		end
+		table.insert(beats, stageBeats)
 
 		table.insert(stages, {
 			stage      = stage,
 			won        = won,
 			rounds     = result.rounds,
 			hpAfter    = hp,
-			gummiesWon = stageGummies,
+			-- Basiswert ohne rebirthMult; ausgezahlt wird erst in settle.
+			gummiesWon = if won then EconomyConfig.getPitStageReward(pitLevel, stage) else 0,
+			-- v14: fuer die Faehigkeiten-Show (PitArenaService -> SkillFX)
+			skillUses       = result.skillUses,
+			firstSkillRound = result.firstSkillRound,
 		})
 
 		-- Ein Sieg mit 0 HP kann vorkommen (bei Rundenlimit entscheidet der
@@ -137,76 +221,151 @@ function CombatService.startPitRun(player: Player, baerchiUid: string)
 		end
 	end
 
-	-- Erschoepfungszustand festhalten: DAS ist die Verbindung zum Fuettern.
-	baerchi.currentHp = hp
-
-	local gummiesWon = 0
-	if baseGummies > 0 then
-		gummiesWon = EconomyService.awardGummies(player, baseGummies)
-	end
-
-	local goldGummiesWon = 0
-	local goldReward = EconomyConfig.getPitGoldReward(stagesCleared, pitLevel)
-	if goldReward > 0 then
-		goldGummiesWon = EconomyService.awardGoldGummies(player, goldReward)
-	end
-
-	if stagesCleared > 0 then
-		data.stats.totalFightsWon += stagesCleared
-		if pitLevel > data.stats.highestPitLevel then
-			data.stats.highestPitLevel = pitLevel
-		end
-	end
-	-- Ein Lauf endet immer mit genau einer verlorenen Stage — ausser der
-	-- Baerchi hat das Stage-Limit erreicht, dann gab es keine Niederlage.
-	if #stages > 0 and not stages[#stages].won then
-		data.stats.totalFightsLost += 1
-	end
-
-	local runResult: Types.PitRunResult = {
+	local fullRun: Types.PitRunResult = {
 		baerchiUid     = baerchiUid,
-		stagesCleared  = stagesCleared,
+		startStage     = startStage,
+		recalled       = false,
+		stagesCleared  = 0,
 		stages         = stages,
-		gummiesWon     = gummiesWon,
-		goldGummiesWon = goldGummiesWon,
+		gummiesWon     = 0,
+		goldGummiesWon = 0,
 		hpBefore       = hpBefore,
-		hpAfter        = hp,
+		hpAfter        = hpBefore,
 		maxHp          = stats.maxHp,
 	}
 
-	-- Den Client informiert NICHT dieser Service, sondern PitArenaService —
-	-- und zwar erst, wenn der Baerchi sichtbar am Kampf-Spot angekommen ist.
-	-- Wuerde hier sofort gefeuert, liefe CombatPanels Kampf-UI schon los,
-	-- waehrend er noch zur Arena unterwegs waere.
-	--
-	-- Bewusst VOR markDirty: die Wiedergabe uebernimmt damit die Figur, bevor
-	-- die Anzeige-Aktualisierung sie auf den Endzustand setzen wuerde. Sonst
-	-- staende der Baerchi schon erschoepft in der Arena, bevor der Kampf
-	-- ueberhaupt zu sehen war.
-	PitArenaService.play(player, runResult)
+	-- ============================================================
+	-- ABRECHNUNG (laeuft genau einmal, aufgerufen von PitArenaService)
+	-- ============================================================
+	-- played = wie viele Stages tatsaechlich gespielt wurden (0..#stages).
+	-- recalled = der Spieler hat zurueckgeholt.
+	local settled: Types.PitRunResult? = nil
 
-	-- Immer syncen: HP und Statistik haben sich geaendert, und awardGummies
-	-- kennt diese Aenderungen nicht.
-	PlayerService.markDirty(player)
-	PlayerService.saveNow(player)
+	local function settle(played: number, recalled: boolean): Types.PitRunResult
+		if settled then
+			return settled
+		end
 
-	print(
-		"[CombatService]", player.Name,
-		"| Baerchi:", baerchi.configId, "Lv.", baerchi.level,
-		"| PIT-Level:", pitLevel,
-		"| Stages geschafft:", stagesCleared,
-		"| Rest-HP:", hp, "/", stats.maxHp,
-		"| Gummies:", gummiesWon,
-		"| GoldGummies:", goldGummiesWon
-	)
+		played = math.clamp(math.floor(played), 0, #stages)
+
+		local playedStages: { Types.PitStageResult } = {}
+		local cleared     = 0
+		local baseGummies = 0
+		for index = 1, played do
+			local stage = stages[index]
+			table.insert(playedStages, stage)
+			if stage.won then
+				cleared += 1
+				baseGummies += stage.gummiesWon
+			end
+		end
+
+		local hpAfter = if played > 0 then playedStages[played].hpAfter else hpBefore
+
+		-- Den aktuellen Spielstand holen: der Spieler kann waehrenddessen
+		-- gegangen sein (dann laeuft das hier aus onPlayerLeaving, die Daten
+		-- sind noch da).
+		local current = PlayerService.getData(player)
+		local result: Types.PitRunResult = {
+			baerchiUid     = baerchiUid,
+			startStage     = startStage,
+			recalled       = recalled,
+			corrected      = played < #stages,
+			stagesCleared  = cleared,
+			stages         = playedStages,
+			gummiesWon     = 0,
+			goldGummiesWon = 0,
+			hpBefore       = hpBefore,
+			hpAfter        = hpAfter,
+			maxHp          = stats.maxHp,
+		}
+
+		if not current then
+			settled = result
+			return result
+		end
+
+		if played == 0 then
+			-- Zurueckgeholt, bevor die erste Stage begann: nichts passiert.
+			-- Eine bezahlte Fortsetzung wird erstattet — der Spieler hat
+			-- nichts davon gehabt.
+			if cost > 0 then
+				EconomyService.awardGummiesFlat(player, cost)
+			end
+		else
+			local fighter = current.island.baerchis[baerchiUid]
+			if fighter then
+				-- Erschoepfungszustand festhalten: DAS ist die Verbindung zum
+				-- Fuettern.
+				fighter.currentHp = hpAfter
+			end
+
+			if baseGummies > 0 then
+				result.gummiesWon = EconomyService.awardGummies(player, baseGummies)
+			end
+
+			local goldReward = EconomyConfig.getPitGoldReward(cleared, pitLevel)
+			if goldReward > 0 then
+				result.goldGummiesWon = EconomyService.awardGoldGummies(player, goldReward)
+			end
+
+			if cleared > 0 then
+				current.stats.totalFightsWon += cleared
+				if pitLevel > current.stats.highestPitLevel then
+					current.stats.highestPitLevel = pitLevel
+				end
+			end
+			if not playedStages[played].won then
+				current.stats.totalFightsLost += 1
+			end
+
+			-- Fuer die Fortsetzungs-Frage: die letzte Stage, in die er
+			-- eingetreten ist. Nur wenn das PIT-Level noch dasselbe ist — ein
+			-- Ausbau mitten im Lauf macht den Eintrag sinnlos.
+			if current.island.pitLevel == pitLevel then
+				current.island.pitProgress = {
+					pitLevel     = pitLevel,
+					reachedStage = playedStages[played].stage,
+				}
+			end
+		end
+
+		PlayerService.markDirty(player)
+		PlayerService.saveNow(player)
+
+		print(
+			"[CombatService]", player.Name,
+			"| PIT", pitLevel, "ab Stage", startStage,
+			"| gespielt:", played, "/", #stages,
+			if recalled then "(zurueckgeholt)" else "",
+			"| geschafft:", cleared,
+			"| HP:", hpAfter, "/", stats.maxHp,
+			"| Gummies:", result.gummiesWon,
+			"| Gold:", result.goldGummiesWon
+		)
+
+		settled = result
+		return result
+	end
+
+	-- Den Client informiert NICHT dieser Service, sondern PitArenaService — am
+	-- Ende der Wiedergabe mit dem abgerechneten Ergebnis.
+	PitArenaService.play(player, fullRun, settle, beats)
+
+	-- Kosten sind schon abgezogen: syncen, damit die Anzeige stimmt.
+	if cost > 0 then
+		PlayerService.markDirty(player)
+	end
+
+	print("[CombatService]", player.Name, "| PIT-Lauf startet: PIT", pitLevel,
+		"| ab Stage", startStage, "| Kosten:", cost, "| simuliert:", #stages, "Stages")
+
+	return true
 end
 
 function CombatService.init()
-	RateLimiter.connect(Remotes.RequestStartCombat, "RequestStartCombat", function(player, baerchiUid: any)
-		if typeof(baerchiUid) ~= "string" then return end
-		CombatService.startPitRun(player, baerchiUid)
-	end)
-
+	-- Seit v12 kein eigener Remote mehr: gestartet wird ueber die Pet-Leiste
+	-- (PetModeService.RequestPetMode).
 	print("[CombatService] Initialisiert")
 end
 

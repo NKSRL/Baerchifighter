@@ -51,6 +51,8 @@ local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService     = require(ServerScriptService.Services.MapService)
+-- v12: nur fuer die Frage "kaempft der gerade?" (siehe feed)
+local PitArenaService = require(ServerScriptService.Services.PitArenaService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
 
 -- Feier-Farbe fuer einen Level-Up (siehe MapService.celebrateBaerchi) — Gold,
@@ -253,6 +255,14 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 	if not def then
 		warn("[HoneyService] Unbekannter configId:", baerchi.configId)
 		fail(player, Loc.msg("err.baerchi_data_corrupt"))
+		return
+	end
+
+	-- v12: ein PIT-Lauf wird erst am Ende abgerechnet und setzt die HP dann
+	-- auf den Wert nach der letzten Stage. Eine Heilung mittendrin waere
+	-- danach einfach weg — also lieber gleich ablehnen.
+	if PitArenaService.isFighting(player, baerchiUid) then
+		fail(player, Loc.msg("err.honey_in_pit"))
 		return
 	end
 

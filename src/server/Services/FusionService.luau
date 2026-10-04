@@ -14,15 +14,17 @@
 -- (FusionPanel/BaerchiInventory) und von Anfang an voll freigeschaltet —
 -- kein Unlock-Level, kein Mythic-Level, Skill-Transfer immer an.
 --   1. Es werden genau ZWEI verschiedene Baerchis derselben Rarity verbraucht.
---   2. Ergebnis ist ein zufaelliger Baerchi der naechsthoeheren Rarity
---      (BaerchiConfig.RARITY_ORDER), gleichverteilt unter allen Eintraegen
---      dieser Rarity.
---   3. Sonderfall Legendary + Legendary → BaerchiConfig.FUSION_MYTHIC_RESULT
---      ("CosmicBaerchi"). Das ist die EINZIGE Quelle fuer Mythic.
---   4. Mythic selbst ist nicht weiter fusionierbar (Ende der Kette).
+--   2. v14: Die Rarity steigt NICHT mehr. Fusion fasst nur die Stats zusammen
+--      (Wunsch des Projektinhabers: "Fusionen sollen nicht einfach Rarities
+--      hochfliegen lassen, die sollen nur die Stats mergen"). Das Ergebnis
+--      ist ein Baerchi DERSELBEN Rarity mit der Art (configId) des
+--      levelhoeheren Inputs (bei Gleichstand: A). Hoehere Rarities kommen
+--      ausschliesslich aus dem Ei-Baum.
+--   3. (entfallen seit v14: Legendary + Legendary -> fester Mythic)
+--   4. v14: Jede Rarity ist fusionierbar, auch Mythic bis Omega.
 --   5. Ergebnis bekommt fusionBonus = EconomyConfig.getFusionStatBonus()
 --      (fester Wert) und isFusionResult = true.
---
+
 -- ============================================================
 -- NEU (v8): "DAS BESSERE GEWINNT — STAT FUER STAT"
 -- ============================================================
@@ -105,6 +107,7 @@ local PromotionConfig = require(ReplicatedStorage.Config.PromotionConfig)
 local BaerchiFactory  = require(ReplicatedStorage.Modules.BaerchiFactory)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
+local ActivityLock   = require(ServerScriptService.Util.ActivityLock)
 local IslandService = require(ServerScriptService.Services.IslandService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
 
@@ -117,29 +120,13 @@ local function fail(player: Player, reason: Types.LocMsg?)
 	Remotes.ActionFailed:FireClient(player, "RequestFuseBaerchis", reason or Loc.msg("err.unknown"))
 end
 
--- Waehlt den configId des Ergebnisses.
--- Gibt nil + Grund zurueck wenn die Kombination nicht erlaubt ist.
-local function pickResultConfigId(rarity: Types.Rarity): (string?, Types.LocMsg?)
-	if rarity == "Mythic" then
-		return nil, Loc.msg("err.fuse_mythic")
+-- v14: Die Art des Ergebnisses — die des levelhoeheren Inputs, bei
+-- Gleichstand A. Die Rarity bleibt dieselbe (Regel 2).
+local function pickResultConfigId(a: Types.Baerchi, b: Types.Baerchi): string
+	if b.level > a.level then
+		return b.configId
 	end
-
-	local nextRarity = BaerchiConfig.getNextRarity(rarity)
-	if not nextRarity then
-		return nil, Loc.msg("err.fuse_no_higher")
-	end
-
-	-- Sonderfall: Legendary + Legendary → der eine Mythic
-	if nextRarity == "Mythic" then
-		return BaerchiConfig.FUSION_MYTHIC_RESULT, nil
-	end
-
-	local candidates = BaerchiConfig.getByRarity(nextRarity)
-	if #candidates == 0 then
-		return nil, Loc.msg("err.fuse_none_defined", { rarity = Loc.msg("rarity." .. nextRarity) })
-	end
-
-	return candidates[math.random(1, #candidates)].id, nil
+	return a.configId
 end
 
 --------------------------------------------------------------------------------
@@ -248,6 +235,16 @@ function FusionService.fuse(
 		return
 	end
 
+	-- v12: den ausgeruesteten Baerchi nicht wegfusionieren, waehrend er
+	-- unterwegs ist (PIT, Event, Honig-Teich) — die Figur wuerde mitten im
+	-- Lauf verschwinden, und ein PIT-Lauf koennte nicht mehr sauber
+	-- abgerechnet werden.
+	local equipped = data.island.equippedUid
+	if (equipped == uidA or equipped == uidB) and not ActivityLock.isFree(player) then
+		fail(player, Loc.msg("err.fuse_equipped_away"))
+		return
+	end
+
 	-- Eine Sperre ohne Quelle (oder umgekehrt) ist keine gueltige Auswahl —
 	-- beides zusammen oder gar nichts. Sonst muesste jede Regel unten einen
 	-- dritten Fall behandeln.
@@ -256,11 +253,7 @@ function FusionService.fuse(
 		lockedFrom     = nil
 	end
 
-	local resultConfigId, reason = pickResultConfigId(a.rarity)
-	if not resultConfigId then
-		fail(player, reason)
-		return
-	end
+	local resultConfigId = pickResultConfigId(a, b)
 
 	local resultDef = BaerchiConfig.getById(resultConfigId)
 	if not resultDef then
@@ -289,12 +282,15 @@ function FusionService.fuse(
 		skillId = if a.level >= b.level then a.skillId else b.skillId
 	end
 
+	-- Die Rarity des Ergebnisses ist die der Inputs (beide gleich). Sie kann
+	-- von der Config-Rarity abweichen, wenn das UFO einen Input schon
+	-- aufgewertet hat — dann bleibt die hoehere erhalten.
 	local newBaerchi = BaerchiFactory.create(resultConfigId, {
 		level            = resultLevel,
 		skillId          = skillId,
 		isFusionResult   = true,
 		fusionBonus      = EconomyConfig.getFusionStatBonus(),
-		statLevels       = mergeStatLevels(a, b, resultDef.rarity, lockedProperty, lockedFrom),
+		statLevels       = mergeStatLevels(a, b, a.rarity, lockedProperty, lockedFrom),
 		baseStatOverride = mergeBaseStats(a, b, resultConfigId),
 
 		-- Regel E: die hoehere Stufe gewinnt.
@@ -305,6 +301,7 @@ function FusionService.fuse(
 		fail(player, Loc.msg("err.fuse_result_failed"))
 		return
 	end
+	newBaerchi.rarity = a.rarity
 
 	-- War einer der beiden Inputs der ausgeruestete Baerchi, uebernimmt das
 	-- Ergebnis automatisch seinen Platz — sonst staende der Plot nach der

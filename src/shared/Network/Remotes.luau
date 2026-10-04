@@ -151,30 +151,51 @@ local EggCollectedReceived = getOrCreateEvent("EggCollectedReceived")
 -- Args: OfflineEggReport
 local OfflineEggReportReceived = getOrCreateEvent("OfflineEggReportReceived")
 
+-- v12: Zustand des ausgeruesteten Baerchis fuer die untere Pet-Leiste
+-- (PetBar). Die Wahrheit liegt ausschliesslich in PetModeService, dieser
+-- Event teilt sie nur mit.
+-- Args: state: string  ("Home" | "ToEvent" | "AtEvent" | "ToPit" | "InPit" | "Returning"),
+--       pending: string? ("Event" | "Fight" — vorgemerktes Ziel beim Wechsel),
+--       info: { stage: number? }?  (laufende Stage im PIT, fuer die Beschriftung)
+local PetModeChanged = getOrCreateEvent("PetModeChanged")
+
 -- Eine Anfrage wurde serverseitig abgelehnt — Client zeigt Toast/Fehlertext.
 -- Args: action: string, reason: Types.LocMsg  (Schluessel + Zahlen, KEIN fertiger
 --       Satz: der Client baut den Text in der Sprache des Spielers, siehe
 --       Localization/Loc. Ein einfacher String wird als Altlast unveraendert
 --       angezeigt.)
+-- v13: Quest-Belohnung wurde ausgezahlt (Toast). Args: reward: Types.QuestReward
+local QuestRewardReceived = getOrCreateEvent("QuestRewardReceived")
+
 local ActionFailed = getOrCreateEvent("ActionFailed")
+
+-- v14 (Mega Egg Tree): Ei-Baum, Ei-Presse, Blaupausen, Faehigkeiten-Show
+local EggTreeUnlocked        = getOrCreateEvent("EggTreeUnlocked")        -- S->C (Types.EggUnlockResult)
+local EggPressResultReceived = getOrCreateEvent("EggPressResultReceived") -- S->C (Types.EggPressResult)
+local SkillFXPlay            = getOrCreateEvent("SkillFXPlay")            -- S->C (alle Clients, siehe PitArenaService)
+local RequestPressEggs       = getOrCreateEvent("RequestPressEggs")       -- C->S (eggType, path?)
+local RequestUseBlueprint    = getOrCreateEvent("RequestUseBlueprint")    -- C->S (eggType)
 
 -- ============================================================
 -- Client → Server Events (Anfragen)
 -- ============================================================
 
--- Spieler will ein Ei kaufen und in einen Brut-Slot legen
+-- Spieler oeffnet ein Ei aus seinem Lager (seit v12 sofort, ohne Brutzeit
+-- und ohne Kauf). Ergebnis kommt ueber HatchResultReceived.
 -- Args: eggType: string
 local RequestHatchEgg = getOrCreateEvent("RequestHatchEgg")
 
--- Spieler will ein fertig gebruetetes Ei abholen
--- Args: eggUid: string  (Types.HatchingEgg.uid — NICHT der Slot-Index. Siehe
---       den Kommentar dort: nach dem ersten table.remove verschiebt sich die
---       Liste, und ein zweiter Klick auf einen Index traefe das falsche Ei.)
-local RequestClaimEgg = getOrCreateEvent("RequestClaimEgg")
+-- v13: Quest-Belohnung abholen. Der Server prueft selbst, ob die Quest erledigt ist.
+-- Args: kind: "chain" | "daily", questId: string
+local RequestClaimQuest = getOrCreateEvent("RequestClaimQuest")
 
--- Spieler will PIT-Kampf starten
--- Args: baerchiUid: string
-local RequestStartCombat = getOrCreateEvent("RequestStartCombat")
+-- v12: Pet-Leiste. Der Client sagt nur, welcher Knopf gedrueckt wurde — was
+-- daraus folgt (hinschicken, zurueckholen, wechseln), entscheidet
+-- PetModeService.
+-- Args: mode: "Event" | "Fight" | "Home",
+--       resume: ("Fresh" | "Percent" | "Last")?  (nur bei "Fight": Wahl aus der
+--               Fortsetzungs-Frage; nil = von vorn)
+local RequestPetMode = getOrCreateEvent("RequestPetMode")
 
 -- Spieler will ein Gebaeude upgraden
 -- Args: buildingId: string
@@ -209,16 +230,6 @@ local RequestRollCharms = getOrCreateEvent("RequestRollCharms")
 -- Spieler will einen Charm-Slot gegen erneutes Wuerfeln sperren/freigeben
 -- Args: baerchiUid: string, slot: number
 local RequestToggleCharmLock = getOrCreateEvent("RequestToggleCharmLock")
-
--- Spieler schickt seinen ausgeruesteten Baerchi in die Event-Area in der
--- Weltmitte. Nimmt bewusst KEINE uid entgegen: nur der ausgeruestete Baerchi
--- hat ueberhaupt eine Figur in der Welt, die dorthin laufen koennte.
--- Args: (keine)
-local RequestSendToEvent = getOrCreateEvent("RequestSendToEvent")
-
--- Spieler holt seinen Baerchi vom Event zurueck auf den Plot
--- Args: (keine)
-local RequestRecallFromEvent = getOrCreateEvent("RequestRecallFromEvent")
 
 -- Spieler sammelt ein gelegtes Ei auf, das in der Welt liegt.
 -- Args: eggUid: string  (Types.LaidEgg.uid — NICHT die Position: die aendert
@@ -277,12 +288,20 @@ return {
 	EventPhaseChanged       = EventPhaseChanged,
 	EggCollectedReceived    = EggCollectedReceived,
 	OfflineEggReportReceived = OfflineEggReportReceived,
+	PetModeChanged          = PetModeChanged,
+	QuestRewardReceived     = QuestRewardReceived,
 	ActionFailed          = ActionFailed,
+
+	EggTreeUnlocked        = EggTreeUnlocked,
+	EggPressResultReceived = EggPressResultReceived,
+	SkillFXPlay            = SkillFXPlay,
+	RequestPressEggs       = RequestPressEggs,
+	RequestUseBlueprint    = RequestUseBlueprint,
 
 	-- Client → Server
 	RequestHatchEgg        = RequestHatchEgg,
-	RequestClaimEgg        = RequestClaimEgg,
-	RequestStartCombat     = RequestStartCombat,
+	RequestClaimQuest      = RequestClaimQuest,
+	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,
 	RequestUpgradePit      = RequestUpgradePit,
 	RequestFuseBaerchis    = RequestFuseBaerchis,
@@ -294,8 +313,6 @@ return {
 	RequestPromoteBaerchi  = RequestPromoteBaerchi,
 	RequestRollCharms      = RequestRollCharms,
 	RequestToggleCharmLock = RequestToggleCharmLock,
-	RequestSendToEvent     = RequestSendToEvent,
-	RequestRecallFromEvent = RequestRecallFromEvent,
 	RequestCollectEgg      = RequestCollectEgg,
 	RequestCollectAllEggs  = RequestCollectAllEggs,
 

@@ -1,0 +1,168 @@
+--!strict
+-- PitResumeDialog.luau
+-- StarterPlayerScripts/UI/PitResumeDialog.luau
+--
+-- Einzige Zustaendigkeit:
+--   - Vor einem PIT-Lauf fragen, wo eingestiegen wird: von vorn, ab 65 % des
+--     letzten Laufs oder ab der letzten erreichten Stage (gegen Gummies).
+--
+-- Erscheint nur, wenn es auf dem AKTUELLEN PIT-Level einen gespeicherten
+-- letzten Lauf gibt (island.pitProgress), auch nach einer Niederlage oder
+-- einem Zurueckholen. Startstage und Kosten rechnet EconomyConfig — dieselben
+-- Funktionen benutzt der Server beim Abbuchen. Nicht bezahlbare Optionen sind
+-- sichtbar, aber nicht klickbar. Abbrechen schliesst den Dialog, der Baerchi
+-- bleibt zu Hause.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Types            = require(ReplicatedStorage.Network.Types)
+local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local CombatConfig     = require(ReplicatedStorage.Config.CombatConfig)
+local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
+local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+
+local Theme       = require(script.Parent.Theme)
+local ClientState = require(script.Parent.Parent.Controllers.ClientState)
+
+local PitResumeDialog = {}
+
+export type Choice = "Fresh" | "Percent" | "Last"
+
+local _root: Frame? = nil
+local _hpLabel: TextLabel? = nil
+local _options: { [Choice]: TextButton } = {}
+local _onChoose: ((Choice) -> ())? = nil
+
+-- Der letzte Lauf, wenn er fuer das aktuelle PIT-Level gilt.
+function PitResumeDialog.getProgress(data: Types.PlayerDataUpdate): Types.PitProgress?
+	local progress = data.island.pitProgress
+	if progress and progress.pitLevel == data.island.pitLevel and progress.reachedStage >= 1 then
+		return progress
+	end
+	return nil
+end
+
+local function offer(data: Types.PlayerDataUpdate, choice: Choice): (number, number)
+	if choice == "Fresh" then
+		return 1, 0
+	end
+	local progress = PitResumeDialog.getProgress(data)
+	if not progress then
+		return 1, 0
+	end
+	local stage = if choice == "Last"
+		then progress.reachedStage
+		else EconomyConfig.getPitResumePercentStage(progress.reachedStage)
+	stage = math.clamp(stage, 1, CombatConfig.MAX_STAGES_PER_RUN)
+	return stage, EconomyConfig.getPitResumeCost(data.island.pitLevel, stage, data.rebirthMult)
+end
+
+local LABELS: { [Choice]: string } = {
+	Fresh   = "Von vorn",
+	Percent = "Ab 65 % des letzten Laufs",
+	Last    = "Ab der letzten Stufe",
+}
+
+local function fill()
+	local data = ClientState.get()
+	if not data then return end
+
+	for choice, button in _options do
+		local stage, cost = offer(data, choice)
+		local affordable = cost <= data.gummies
+
+		button.Text = string.format("%s  —  Stage %d  —  %s",
+			LABELS[choice], stage,
+			if cost > 0 then Theme.formatNumber(cost) .. " Gummies" else "kostenlos")
+		Theme.setEnabled(button, affordable)
+	end
+
+	local hpLabel = _hpLabel
+	if hpLabel then
+		local uid = data.island.equippedUid
+		local baerchi = if uid then data.island.baerchis[uid] else nil
+		local def = if baerchi then BaerchiConfig.getById(baerchi.configId) else nil
+		local progress = PitResumeDialog.getProgress(data)
+		if baerchi and def then
+			local maxHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
+			local hp = math.clamp(baerchi.currentHp or maxHp, 0, maxHp)
+			hpLabel.Text = string.format("Letzter Lauf: Stage %d  •  HP %d / %d (%d%%)",
+				if progress then progress.reachedStage else 0,
+				hp, maxHp, math.floor(hp / math.max(1, maxHp) * 100 + 0.5))
+		end
+	end
+end
+
+function PitResumeDialog.close()
+	_onChoose = nil
+	local root = _root
+	if root then root.Visible = false end
+end
+
+-- Oeffnet den Dialog. `onChoose` bekommt die gewaehlte Option.
+function PitResumeDialog.open(onChoose: (Choice) -> ())
+	local root = _root
+	if not root then return end
+	_onChoose = onChoose
+	fill()
+	root.Visible = true
+end
+
+function PitResumeDialog.isOpen(): boolean
+	return _root ~= nil and (_root :: Frame).Visible
+end
+
+function PitResumeDialog.init(screenGui: ScreenGui)
+	local root = Theme.dialog(
+		"PitResumeDialog", screenGui,
+		Vector2.new(0.46, 0.42),
+		Vector2.new(300, 280),
+		Vector2.new(520, 340)
+	)
+	root.ZIndex = 20
+	_root = root
+
+	Theme.dialogHeader(root, "Wo soll er einsteigen?", PitResumeDialog.close)
+
+	local body = Theme.dialogBody(root)
+	local layout = Theme.listLayout(body, 8)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+	local hp = Theme.bodyText("Hp", body, "")
+	hp.Size        = UDim2.new(1, 0, 0, 20)
+	hp.LayoutOrder = 0
+	_hpLabel = hp
+
+	local colors: { [Choice]: Color3 } = {
+		Fresh   = Theme.COLORS.accent,
+		Percent = Theme.COLORS.goldGummy,
+		Last    = Theme.COLORS.bad,
+	}
+
+	for order, choice in { "Fresh", "Percent", "Last" } :: { Choice } do
+		local button = Theme.bigButton("Option_" .. choice, body, LABELS[choice], colors[choice])
+		button.Size        = UDim2.new(1, 0, 0, 44)
+		button.LayoutOrder = order
+		button.Activated:Connect(function()
+			if not button.Active then return end
+			local callback = _onChoose
+			PitResumeDialog.close()
+			if callback then callback(choice) end
+		end)
+		_options[choice] = button
+	end
+
+	local cancel = Theme.button("Cancel", body, "Abbrechen", Theme.COLORS.panelLight)
+	cancel.Size        = UDim2.new(1, 0, 0, 34)
+	cancel.LayoutOrder = 10
+	cancel.TextColor3  = Theme.COLORS.text
+	cancel.Activated:Connect(PitResumeDialog.close)
+
+	ClientState.onChanged(function()
+		if PitResumeDialog.isOpen() then fill() end
+	end)
+
+	print("[PitResumeDialog] Initialisiert")
+end
+
+return PitResumeDialog

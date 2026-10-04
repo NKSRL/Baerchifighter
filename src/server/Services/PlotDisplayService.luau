@@ -90,7 +90,7 @@ local _signatures: { [Player]: Signatures } = {}
 local function structureSignature(data: Types.PlayerData): string
 	local parts: { string } = {}
 	for uid, baerchi in data.island.baerchis do
-		table.insert(parts, string.format("%s:%d:%s", uid, baerchi.level, baerchi.mutation or "-"))
+		table.insert(parts, string.format("%s:%d:%s:%s", uid, baerchi.level, baerchi.mutation or "-", baerchi.rarity))
 	end
 	table.sort(parts)
 	table.insert(parts, "equipped:" .. (data.island.equippedUid or ""))

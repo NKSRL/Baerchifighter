@@ -3,36 +3,19 @@
 -- StarterPlayerScripts/UI/MenuBar.luau
 --
 -- Einzige Zustaendigkeit:
---   - Der Zugang zu ALLEN Menues: eine Kachelleiste am rechten Bildschirmrand
+--   - Die schmale Kachelleiste am rechten Bildschirmrand: Eier und Baerchis
 --
 -- ============================================================
--- WARUM RECHTS, UND WARUM FUER JEDES GEBAEUDE EINE EIGENE KACHEL
+-- WARUM NUR ZWEI KACHELN
 -- ============================================================
--- Vorher standen hier vier Knoepfe links, und die drei Gebaeude teilten sich
--- einen davon. Wer den Honigtopf ausbauen wollte, musste ueber den Plot laufen
--- oder sich durch eine Liste scrollen. Seit jedes Gebaeude eine eigene Rolle
--- und ein eigenes Menue hat, bekommt jedes auch eine eigene Kachel: alles, was
--- der Spieler regelmaessig tut, ist damit von jeder Stelle der Karte aus
--- erreichbar, ohne einen Schritt zu gehen.
---
--- Die Leiste steht rechts, weil links oben die Waehrungs-Pillen sitzen und
--- unten in der Mitte der Toast-Stapel — das ist die einzige Kante, an der eine
--- Spalte aus sieben Kacheln niemandem im Weg steht. Es ist ausserdem die
--- Anordnung, die Spieler aus diesem Genre kennen.
---
--- Fusion und Rebirth haben bewusst KEINE Kachel:
---   - Fusion wird aus dem Inventar geoeffnet, weil sie ohne zwei ausgewaehlte
---     Baerchis sinnlos ist.
---   - Rebirth haengt an der Rebirth-Pille rechts oben im HUD.
---
--- ============================================================
--- LEBENDE KACHELN
--- ============================================================
--- Dieses Modul war frueher ein reiner Ausloeser ohne Datenzugriff. Das reicht
--- nicht mehr: eine Kachel, die den Honig-Bestand zeigt und aufleuchtet, sobald
--- ein Ausbau bezahlbar ist, erspart genau das Herumklicken, das die Leiste
--- abschaffen soll. Sie liest deshalb mit — aber nur lesend, ueber ClientState,
--- und rechnet nichts selbst aus.
+-- Vorher standen hier sieben Kacheln (Eier, Baerchis, Kampf, drei Gebaeude,
+-- Arena). Fuer einen neuen Spieler war das eine Wand aus Knoepfen ohne Antwort
+-- auf "was mache ich jetzt?". Drei Dinge sind weggefallen:
+--   - Gebaeude und Arena: Man oeffnet sie, indem man am Gebaeude selbst den
+--     Prompt benutzt (WorldController). Eine zweite Tuer dorthin ist ueberfluessig.
+--   - Kampf: Die PetBar unten ist der bessere Kampf-Knopf.
+-- Uebrig bleiben die zwei Dinge, die man von ueberall aus braucht: Eier
+-- (zum Schluepfen) und Baerchis (Sammlung, Fusion und der Index).
 --
 -- Welches Panel offen ist, weiss weiterhin ausschliesslich der PanelManager.
 
@@ -40,9 +23,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
-local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
-local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
-local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
@@ -83,84 +63,20 @@ type Tile = {
 local _tiles: { Tile } = {}
 
 --------------------------------------------------------------------------------
--- Was auf den Kacheln steht
+-- Die Eintraege
 --------------------------------------------------------------------------------
 
--- Gebaeude-Kachel: die Zahl ist der eingelagerte Honig — das ist der Wert, den
--- man im Vorbeigehen sucht ("kann ich fuettern?"). Das Ausrufezeichen kommt,
--- wenn es etwas zu TUN gibt: Ausbau bezahlbar, oder Lager voll (dann steht die
--- Produktion still und jeder weitere Honig verfaellt).
-local function buildingLive(buildingId: Types.BuildingId): Live
-	return function(data: Types.PlayerDataUpdate): (string, boolean)
-		local building = data.island.buildings[buildingId]
-		if not building then
-			return "-", false
-		end
-
-		local honey    = building.honey or 0
-		local capacity = BuildingBehavior.getCapacity(buildingId, building.level)
-		local next_    = BuildingBehavior.getUpgrade(buildingId, building.level + 1)
-
-		local affordable = next_ ~= nil
-			and data.gummies >= next_.costGummies
-			and data.goldGummies >= next_.costGoldGummies
-
-		return tostring(honey), affordable or honey >= capacity
-	end
-end
-
--- Arena-Kachel: die Zahl ist die Stufe, das Ausrufezeichen kommt bei
--- bezahlbarem Ausbau.
-local function arenaLive(data: Types.PlayerDataUpdate): (string, boolean)
-	-- `or 1` wie ueberall sonst im Client: ein Datenpaket von einem aelteren
-	-- Serverstand haette das Feld nicht, und die Kachel soll dann Stufe 1
-	-- zeigen statt beim Rechnen abzubrechen.
-	local level = data.island.pitLevel or 1
-	local cost  = if level + 1 <= EconomyConfig.MAX_PIT_LEVEL
-		then EconomyConfig.getPitUpgradeCost(level + 1)
-		else nil
-
-	return tostring(level), cost ~= nil and data.gummies >= cost
-end
-
--- Reihenfolge = Spielablauf: erst Eier, dann Baerchis, dann Kampf, dann die
--- drei Gebaeude, zuletzt die Arena.
---
--- Die Gebaeude-Eintraege werden aus MapConfig.BUILDING_ORDER erzeugt, nicht von
--- Hand aufgezaehlt: sonst waere das die naechste Liste von Gebaeude-Ids, die
--- irgendwann von den anderen abweicht.
 local function buildEntries(): { Entry }
-	local entries: { Entry } = {
+	return {
 		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI" },
 		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA" },
-		{ panel = "Combat",    title = function() return Loc.t("ui.menu.fight") end,    color = Theme.COLORS.bad,    symbol = "VS" },
+		-- v14: Ei-Baum. Das "!" zeigt eine ungenutzte Blaupause an.
+		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM",
+			live = function(data: Types.PlayerDataUpdate)
+				local bp = if data.eggTree then data.eggTree.blueprints or 0 else 0
+				return "BAUM", bp > 0
+			end },
 	}
-
-	for _, id in MapConfig.BUILDING_ORDER do
-		local config = MapConfig.BUILDING_OFFSETS[id]
-
-		table.insert(entries, {
-			panel  = PanelManager.buildingPanelName(id),
-			-- shortName aus MapConfig bleibt als Rueckfall, solange ein neues
-			-- Gebaeude noch keinen Eintrag in den Sprachdateien hat.
-			title  = function()
-				return Loc.name("building." .. id .. ".short", if config then config.shortName else id)
-			end,
-			color  = Theme.buildingColor(id),
-			symbol = "0",
-			live   = buildingLive(id :: Types.BuildingId),
-		})
-	end
-
-	table.insert(entries, {
-		panel  = PanelManager.ARENA_PANEL,
-		title  = function() return Loc.t("ui.menu.arena") end,
-		color  = Theme.COLORS.goldGummy,
-		symbol = "1",
-		live   = arenaLive,
-	})
-
-	return entries
 end
 
 --------------------------------------------------------------------------------

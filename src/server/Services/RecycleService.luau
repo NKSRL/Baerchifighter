@@ -27,8 +27,6 @@ local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
-local IslandService  = require(ServerScriptService.Services.IslandService)
-local ActivityLock   = require(ServerScriptService.Util.ActivityLock)
 local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
 
 local RecycleService = {}
@@ -54,18 +52,14 @@ function RecycleService.recycle(player: Player, baerchiUid: string)
 		return
 	end
 
-	-- Nur der AUSGERUESTETE Baerchi steht sichtbar in der Welt und kann
-	-- deshalb mitten in einer Bewegung stecken (Kampf-Lauf in die Arena oder
-	-- Weg zum Honig-Teich). Ihn dabei zu verwerten wuerde die laufende Figur
-	-- einfach unter der Animation wegziehen — kein Absturz (FigureWalker und
-	-- PitArenaService pruefen das), aber ein sichtbares Verschwinden mitten im
-	-- Schritt statt eines sauberen Abbruchs.
-	--
-	-- Ein Baerchi aus dem Inventar hat keine Figur in der Welt: der darf
-	-- jederzeit verwertet werden, auch waehrend der ausgeruestete unterwegs
-	-- ist. Deshalb die uid-Pruefung und nicht nur ActivityLock.isFree.
-	if data.island.equippedUid == baerchiUid and not ActivityLock.isFree(player) then
-		fail(player, Loc.msg("err.baerchi_busy"))
+	-- Pet-Regel seit v12 (Ei-Baum-Konzept, Abschnitt 5a): der AUSGERUESTETE
+	-- Baerchi kann nie verwertet werden. Er ist der, der Eier legt — und weil
+	-- Eier nicht mehr kaufbar sind, wuerde ein Spieler ohne ihn im
+	-- schlimmsten Fall ohne Nachschub dastehen. Tauschen geht ueber
+	-- "Ausruesten" bei einem anderen Baerchi. Diese Pruefung ist die
+	-- eigentliche Regel; das Ausgrauen im BaerchiPanel ist nur Komfort.
+	if data.island.equippedUid == baerchiUid then
+		fail(player, Loc.msg("err.recycle_equipped"))
 		return
 	end
 
@@ -75,18 +69,9 @@ function RecycleService.recycle(player: Player, baerchiUid: string)
 	-- markDirty aus, der Client soll die Liste schon ohne ihn sehen.
 	local configId = baerchi.configId
 	local rarity   = baerchi.rarity
-	local wasEquipped = data.island.equippedUid == baerchiUid
 
 	data.island.baerchis[baerchiUid] = nil
 	data.stats.totalRecycled += 1
-
-	-- War er ausgeruestet, uebernimmt automatisch ein anderer seinen Platz
-	-- (falls noch welche da sind) — sonst bliebe der Plot leer, obwohl
-	-- vielleicht noch Baerchis im Inventar sind.
-	if wasEquipped then
-		data.island.equippedUid = nil
-		IslandService.autoEquipIfNone(data)
-	end
 
 	local gummiesGained = EconomyService.awardGummiesFlat(player, gummies)
 

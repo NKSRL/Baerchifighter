@@ -5,6 +5,7 @@
 -- Einzige Zustaendigkeit:
 --   - Alle Baerchis des Spielers als scrollbare Liste zeigen
 --   - Die Zwei-Slot-Auswahl fuer die Fusion verwalten
+--   - Die zwei Reiter: "Meine Baerchis" (diese Liste) und "Index" (IndexView)
 --
 -- Die Liste kommt fertig sortiert aus ClientState.getBaerchiList()
 -- (Rarity absteigend, dann Level) — hier wird nichts nachsortiert.
@@ -21,12 +22,14 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc              = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
+local IndexView    = require(script.Parent.IndexView)
 
 local BaerchiInventory = {}
 
@@ -34,6 +37,7 @@ local PANEL_NAME  = "Inventory"
 local ROW_HEIGHT  = 48
 local TOOLBAR_H   = 32
 local FOOTER_H    = 64
+local TAB_H       = 32
 
 local _root: Frame?               = nil
 local _title: TextLabel?          = nil
@@ -43,6 +47,9 @@ local _footer: Frame?             = nil
 local _slotLabels: { TextLabel }  = {}
 local _fuseButton: TextButton?    = nil
 local _modeButton: TextButton?    = nil
+local _listPage: Frame?           = nil
+local _tabButtons: { [string]: TextButton } = {}
+local _tab = "Pets"   -- "Pets" | "Index"
 
 local _fusionMode = false
 local _selection: { string } = {}
@@ -269,17 +276,43 @@ end
 -- Oeffnen / Schliessen
 --------------------------------------------------------------------------------
 
+local function applyTab()
+	local listPage = _listPage
+	if listPage then
+		listPage.Visible = _tab == "Pets"
+	end
+	IndexView.setVisible(_tab == "Index" and _root ~= nil and _root.Visible)
+
+	for tab, button in _tabButtons do
+		local active = tab == _tab
+		button.BackgroundColor3 = if active then Theme.COLORS.accent else Theme.COLORS.panelLight
+		button.TextColor3       = if active then Theme.COLORS.outline else Theme.COLORS.text
+	end
+
+	if _tab == "Pets" then
+		BaerchiInventory.refresh()
+	end
+end
+
 local function openInternal(...: any)
 	local root = _root
 	if not root then return end
 
+	-- PanelManager.open("Inventory", "Index") springt direkt in den Index
+	-- (zum Beispiel aus einer Quest heraus).
+	local wanted = ...
+	if wanted == "Index" or wanted == "Pets" then
+		_tab = wanted
+	end
+
 	root.Visible = true
-	BaerchiInventory.refresh()
+	applyTab()
 end
 
 local function closeInternal()
 	local root = _root
 	if root then root.Visible = false end
+	IndexView.setVisible(false)
 end
 
 function BaerchiInventory.show()
@@ -304,8 +337,39 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 
 	local body = Theme.dialogBody(root)
 
+	-- Reiter-Leiste: "Meine Baerchis" | "Index"
+	local tabBar = Theme.container("Tabs", body)
+	tabBar.Size = UDim2.new(1, 0, 0, TAB_H)
+	local tabLayout = Theme.listLayout(tabBar, 8, true)
+	tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+	local function addTab(tab: string, key: string, order: number)
+		local button = Theme.button("Tab_" .. tab, tabBar, "", Theme.COLORS.panelLight)
+		button.Size        = UDim2.new(0, 150, 1, 0)
+		button.LayoutOrder = order
+		Loc.bind(button, key)
+		button.Activated:Connect(function()
+			_tab = tab
+			applyTab()
+		end)
+		_tabButtons[tab] = button
+	end
+	addTab("Pets",  "ui.inventory.tab_pets",  1)
+	addTab("Index", "ui.inventory.tab_index", 2)
+
+	-- Beide Seiten teilen sich die Flaeche unter den Reitern.
+	local pages = Theme.container("Pages", body)
+	pages.Position = UDim2.new(0, 0, 0, TAB_H + 8)
+	pages.Size     = UDim2.new(1, 0, 1, -(TAB_H + 8))
+
+	local listPage = Theme.container("ListPage", pages)
+	listPage.Size = UDim2.fromScale(1, 1)
+	_listPage = listPage
+
+	IndexView.build(pages, root)
+
 	-- Werkzeugleiste: Fusions-Modus an/aus
-	local toolbar = Theme.container("Toolbar", body)
+	local toolbar = Theme.container("Toolbar", listPage)
 	toolbar.Size = UDim2.new(1, 0, 0, TOOLBAR_H)
 
 	local modeButton = Theme.button("FusionMode", toolbar, "Fusion: aus", Theme.COLORS.gummy)
@@ -329,7 +393,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	end)
 
 	-- Liste
-	local scroller = Theme.scroller("List", body)
+	local scroller = Theme.scroller("List", listPage)
 	scroller.Position = UDim2.new(0, 0, 0, TOOLBAR_H + 6)
 	scroller.Size     = UDim2.new(1, 0, 1, -(TOOLBAR_H + 6))
 	_scroller = scroller
@@ -337,14 +401,14 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	local layout = Theme.listLayout(scroller, 6)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-	local empty = Theme.bodyText("Empty", body, "Noch keine Baerchis. Leg im Eier-Menue ein Ei in die Brueterei.")
+	local empty = Theme.bodyText("Empty", listPage, "Noch keine Baerchis. Leg im Eier-Menue ein Ei in die Brueterei.")
 	empty.Position = UDim2.new(0, 4, 0, TOOLBAR_H + 16)
 	empty.Size     = UDim2.new(1, -8, 0, 40)
 	empty.Visible  = false
 	_empty = empty
 
 	-- Fussleiste fuer die Fusions-Auswahl
-	local footer = Theme.panel("FusionFooter", body, Theme.COLORS.panel)
+	local footer = Theme.panel("FusionFooter", listPage, Theme.COLORS.panel)
 	footer.AnchorPoint = Vector2.new(0, 1)
 	footer.Position    = UDim2.new(0, 0, 1, 0)
 	footer.Size        = UDim2.new(1, -8, 0, FOOTER_H)

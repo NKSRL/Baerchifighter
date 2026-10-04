@@ -30,8 +30,11 @@
 --   D:Invoke("recycle", uid)
 --   D:Invoke("building", "Beehive", 5)
 --   D:Invoke("pit", 5)
---   D:Invoke("hatch", "BasicEgg")   -- legt ein Ei und macht es sofort fertig
---   D:Invoke("claim")               -- holt das erste fertige Ei
+--   D:Invoke("hatch", "BasicEgg")   -- legt ein Ei ins Lager und oeffnet es sofort (v12)
+--   D:Invoke("egg", "GoldenEgg", 5) -- 5 Eier ins Lager legen (ohne zu oeffnen)
+--   D:Invoke("pitprogress", 12)     -- letzten PIT-Lauf auf Stage 12 setzen (Fortsetzungs-Test)
+--   D:Invoke("petmode")             -- aktueller Zustand der Pet-Leiste
+--   D:Invoke("pm", "Fight", "Last")  -- wie ein Klick auf die Pet-Leiste
 --   D:Invoke("honey")               -- alle Honig-Lager sofort voll
 --   D:Invoke("feed", uid, 20)       -- 20x fuettern (heilt + gibt XP)
 --   D:Invoke("fight", uid)          -- kompletter PIT-Lauf ueber alle Stages
@@ -52,6 +55,18 @@
 --   D:Invoke("lay", 5)          -- 5 Eier sofort legen (ohne aufs Intervall zu warten)
 --   D:Invoke("collect")         -- alles einsammeln
 --   D:Invoke("eggtime", 60)     -- Zeitmarke 60 Minuten zurueck, Tick legt nach
+--
+-- v14 (Mega Egg Tree):
+--   D:Invoke("tree")                 -- alle 20 Knoten mit Bedingungen und Stand
+--   D:Invoke("unlock", "SunEgg")     -- einen Knoten freischalten ("all" = alle)
+--   D:Invoke("hatched", "SugarEgg", 15) -- Hatch-Zaehler setzen (Freischalt-Test)
+--   D:Invoke("blueprint", 1)         -- Blaupausen gutschreiben
+--   D:Invoke("useblueprint", "PlatinumEgg")
+--   D:Invoke("press", "SugarEgg", "Void") -- 5 Zucker-Eier -> 1 Nebel-Ei
+--   D:Invoke("setrebirth", 10)       -- Rebirth-Zaehler setzen (ohne Reset)
+--   D:Invoke("skilltest", "OmegaBaerchi", 30) -- einen Kampf mit Runden-Log
+--   D:Invoke("snapshot")             -- Spielstand merken (fuer Tests)
+--   D:Invoke("restore")              -- gemerkten Spielstand zurueckschreiben
 --
 -- Ein kompletter Event-Durchlauf ohne acht Minuten Wartezeit:
 --   D:Invoke("skipevent")   → Pause endet, Event laeuft
@@ -96,6 +111,15 @@ local EventParticipationService = require(ServerScriptService.Services.EventPart
 
 -- v10
 local EggLayService             = require(ServerScriptService.Services.EggLayService)
+
+-- v14
+local EggTreeService            = require(ServerScriptService.Services.EggTreeService)
+local EggTree                   = require(ReplicatedStorage.Modules.EggTree)
+local CombatConfig              = require(ReplicatedStorage.Config.CombatConfig)
+
+-- v12
+local PetModeService            = require(ServerScriptService.Services.PetModeService)
+local PitArenaService           = require(ServerScriptService.Services.PitArenaService)
 
 local DebugService = {}
 
@@ -150,8 +174,7 @@ commands.info = function(player, data)
 		rebirthMult  = data.rebirthMult,
 		pitLevel     = data.island.pitLevel,
 		baerchis     = countBaerchis(data),
-		hatching     = #data.island.hatchingEggs,
-		hatchSlots   = EggService.getSlotCount(data),
+		pitProgress  = data.island.pitProgress,
 		buildings    = buildings,
 		eggStock     = data.island.eggStock,
 	}
@@ -279,57 +302,69 @@ commands.pit = function(player, data, level: any)
 	return { pitLevel = data.island.pitLevel }
 end
 
--- Ei in einen Brut-Slot legen und den Timer sofort ablaufen lassen
+-- v12: Ei ins Lager legen und sofort oeffnen (es gibt keine Brut mehr)
 commands.hatch = function(player, data, eggType: any)
 	local egg = tostring(eggType or "BasicEgg")
 	if not EggConfig.data[egg :: Types.EggType] then
 		return { error = "Unbekannter Egg-Typ: " .. egg }
 	end
 
-	-- Bestand aufstocken damit der Kauf nie an Gummies scheitert
 	data.island.eggStock[egg :: Types.EggType] = (data.island.eggStock[egg :: Types.EggType] or 0) + 1
-
-	-- Vorher merken wie viele Eier drin lagen. startHatch legt bei vollen
-	-- Slots naemlich gar nichts an — ohne diesen Vergleich wuerde die Zeile
-	-- unten das LETZTE bereits bruetende Ei sofort fertig machen, also ein
-	-- fremdes Ei kaputt testen.
-	local before = #data.island.hatchingEggs
-	EggService.startHatch(player, egg :: Types.EggType)
-
-	if #data.island.hatchingEggs == before then
-		return { error = "Alle Brut-Slots belegt — erst 'claim' aufrufen" }
-	end
-
-	local slot = data.island.hatchingEggs[#data.island.hatchingEggs]
-	if slot then
-		slot.readyAt = os.time() - 1   -- sofort abholbereit
-		PlayerService.markDirty(player)
+	local result = EggService.openEgg(player, egg :: Types.EggType)
+	if not result then
+		return { error = "Oeffnen fehlgeschlagen" }
 	end
 
 	return {
-		slots   = #data.island.hatchingEggs,
-		hinweis = "jetzt 'claim' aufrufen — ohne Argument wird das aelteste fertige Ei geholt",
+		configId = result.baerchi.configId,
+		rarity   = result.baerchi.rarity,
+		mutation = result.baerchi.mutation,
+		neu      = result.isNew,
 	}
 end
 
--- Ohne Argument: das ERSTE fertige Ei. Der Debug-Befehl soll bequem sein, und
--- ueber eine uid abzutippen waere er das nicht. Mit Argument geht auch die uid,
--- damit sich ein konkreter Slot gezielt testen laesst.
-commands.claim = function(player, data, eggUid: any)
-	if eggUid ~= nil then
-		EggService.claimEgg(player, tostring(eggUid))
-		return commands.list(player, PlayerService.getDataOrError(player))
+-- v12: Eier ins Lager legen, ohne sie zu oeffnen (fuer Tests im Ei-Menue)
+commands.egg = function(player, data, eggType: any, count: any)
+	local egg = tostring(eggType or "BasicEgg")
+	if not EggConfig.data[egg :: Types.EggType] then
+		return { error = "Unbekannter Egg-Typ: " .. egg }
 	end
 
-	local now = os.time()
-	for _, egg in data.island.hatchingEggs do
-		if now >= egg.readyAt then
-			EggService.claimEgg(player, egg.uid)
-			return commands.list(player, PlayerService.getDataOrError(player))
-		end
-	end
+	local amount = math.clamp(tonumber(count) or 1, 1, 100)
+	data.island.eggStock[egg :: Types.EggType] = (data.island.eggStock[egg :: Types.EggType] or 0) + amount
+	PlayerService.markDirty(player)
+	return { lager = data.island.eggStock }
+end
 
-	return { error = "Kein fertiges Ei da — erst 'hatch' aufrufen" }
+-- v12: gespeicherten letzten PIT-Lauf setzen (0 = loeschen)
+commands.pitprogress = function(player, data, stage: any)
+	local reached = math.floor(tonumber(stage) or 0)
+	if reached <= 0 then
+		data.island.pitProgress = nil
+	else
+		data.island.pitProgress = { pitLevel = data.island.pitLevel, reachedStage = reached }
+	end
+	PlayerService.markDirty(player)
+	return { pitProgress = data.island.pitProgress }
+end
+
+commands.petmode = function(player, data)
+	local pitPhase, stage = PitArenaService.getPhase(player)
+	return {
+		zuHause     = PetModeService.isHome(player),
+		pit         = pitPhase,
+		stage       = stage,
+		event       = EventParticipationService.getPhase(player),
+		pitProgress = data.island.pitProgress,
+		eggStock    = data.island.eggStock,
+		gummies     = data.gummies,
+		lastEggAt   = data.island.lastEggAt,
+	}
+end
+
+commands.pm = function(player, data, mode: any, resume: any)
+	PetModeService.request(player, tostring(mode or "Home"), if resume then tostring(resume) :: any else nil)
+	return commands.petmode(player, data)
 end
 
 commands.fight = function(player, _data, uid: any)
@@ -559,8 +594,8 @@ commands.events = function(_player, _data)
 		restSekunden = EventService.getRemainingSeconds(),
 		naechstes    = EventService.getNext().displayName,
 		takt         = string.format(
-			"%ds Event / %ds Pause",
-			EventConfig.EVENT_DURATION_SECONDS, EventConfig.EVENT_GAP_SECONDS
+			"individuelle Dauer je Event / %ds Pause",
+			EventConfig.EVENT_GAP_SECONDS
 		),
 		katalog      = katalog,
 	}
@@ -607,12 +642,119 @@ commands.rebirth = function(player, _data)
 	return commands.info(player, PlayerService.getDataOrError(player))
 end
 
+--------------------------------------------------------------------------------
+-- v14: Ei-Baum
+--------------------------------------------------------------------------------
+
+commands.tree = function(_player, data)
+	local out = { blueprints = data.eggTree.blueprints, rebirths = data.rebirthCount }
+	for _, eggId in EggConfig.getOrderedIds() do
+		local p = EggTree.getProgress(data, eggId)
+		local parts = {}
+		for _, c in p.conditions do
+			local label = c.kind .. (if c.egg then ":" .. c.egg elseif c.rarity then ":" .. c.rarity else "")
+			table.insert(parts, string.format("%s %d/%d%s", label, c.have, c.need, if c.done then " ok" else ""))
+		end
+		out[string.format("%02d %s", EggConfig.data[eggId].sortOrder, eggId)] = string.format("%s | hatched %d | lager %d | %s",
+			if p.unlocked then "FREI" else "zu", data.eggTree.hatched[eggId] or 0,
+			data.island.eggStock[eggId] or 0, table.concat(parts, ", "))
+	end
+	return out
+end
+
+commands.unlock = function(player, data, eggType: any)
+	if eggType == "all" then
+		for _, eggId in EggConfig.getOrderedIds() do
+			EggTreeService.forceUnlock(player, data, eggId, "debug")
+		end
+	elseif typeof(eggType) == "string" and EggConfig.data[eggType :: Types.EggType] then
+		EggTreeService.forceUnlock(player, data, eggType :: Types.EggType, "debug")
+	else
+		return { error = "Unbekanntes Ei: " .. tostring(eggType) }
+	end
+	PlayerService.markDirty(player)
+	return commands.tree(player, data)
+end
+
+commands.hatched = function(player, data, eggType: any, count: any)
+	if typeof(eggType) ~= "string" or not EggConfig.data[eggType :: Types.EggType] then
+		return { error = "Unbekanntes Ei: " .. tostring(eggType) }
+	end
+	data.eggTree.hatched[eggType] = math.max(0, math.floor(tonumber(count) or 0))
+	PlayerService.markDirty(player)
+	return commands.tree(player, data)
+end
+
+commands.blueprint = function(player, data, amount: any)
+	EggTreeService.grantBlueprint(player, data, tonumber(amount) or 1)
+	PlayerService.markDirty(player)
+	return { blueprints = data.eggTree.blueprints }
+end
+
+commands.useblueprint = function(player, data, eggType: any)
+	local ok = EggTreeService.useBlueprint(player, eggType)
+	return { ok = ok, tree = commands.tree(player, data) }
+end
+
+commands.press = function(player, data, eggType: any, path: any)
+	local result = EggTreeService.press(player, eggType, path)
+	return { result = result, stock = data.island.eggStock }
+end
+
+commands.setrebirth = function(player, data, count: any)
+	data.rebirthCount = math.max(0, math.floor(tonumber(count) or 0))
+	data.rebirthMult  = EconomyConfig.getRebirthMult(data.rebirthCount)
+	PlayerService.markDirty(player)
+	return commands.tree(player, data)
+end
+
+-- Spielstand fuer Tests sichern und zuruecksetzen. Die Kopie liegt nur im
+-- Speicher dieses Servers (nicht im DataStore).
+local HttpService = game:GetService("HttpService")
+local _snapshot: string? = nil
+
+commands.snapshot = function(_player, data)
+	_snapshot = HttpService:JSONEncode(data)
+	return { ok = true, bytes = #(_snapshot :: string) }
+end
+
+commands.restore = function(player, data)
+	if not _snapshot then return { error = "Kein Snapshot" } end
+	local saved = HttpService:JSONDecode(_snapshot :: string)
+	for k in data :: any do (data :: any)[k] = nil end
+	for k, v in saved do (data :: any)[k] = v end
+	MapService.rebuildIsland(player, data.island)
+	PlayerService.markDirty(player)
+	PlayerService.saveNow(player)
+	return { ok = true }
+end
+
+-- Ein einzelner Kampf mit Runden-Log (Faehigkeiten pruefen).
+commands.skilltest = function(_player, _data, configId: any, stage: any)
+	local b = BaerchiFactory.create(tostring(configId), { level = 20 })
+	if not b then return { error = "Unbekannter Baerchi" } end
+	local def = BaerchiConfig.getById(b.configId)
+	local stats = CombatCalculator.getEffectiveStats(b, (def :: any).baseStats)
+	local es = CombatConfig.getEnemyStats(1, tonumber(stage) or 20)
+	local me = { uid = "me", stats = stats, hp = stats.maxHp, charge = 0 }
+	local en = { uid = "en", stats = es, hp = es.maxHp, charge = 0 }
+	local r = CombatCalculator.simulate(me, en)
+	local lines = {}
+	for i, e in r.log do
+		if i > 40 then break end
+		table.insert(lines, string.format("%s r%d %s dmg %d heal %d abs %d | A %d B %d %s",
+			e.actor, e.roundNumber, e.skillId or "-", e.damage, e.heal, e.absorbed,
+			e.attackerHpAfter, e.defenderHpAfter, if e.effects then table.concat(e.effects, ",") else ""))
+	end
+	return { winner = r.winnerUid, rounds = r.rounds, skillUses = r.skillUses, log = lines }
+end
+
 commands.help = function()
 	return {
 		"info", "give <gummies> <gold>", "list",
 		"add <configId> <level> [mutation]", "stats <uid>",
 		"building <id> <level>", "pit <level>",
-		"hatch <eggType>", "claim [eggUid]", "honey", "feed <uid> <times>",
+		"hatch <eggType>", "egg <eggType> [anzahl]", "pitprogress <stage>", "honey", "feed <uid> <times>",
 		"fight <uid>",
 		"fuse <uidA> <uidB> [ability|level|eggs] [A|B]",
 		"recycle <uid>", "upgrade <buildingId>", "rebirth",
@@ -623,6 +765,14 @@ commands.help = function()
 
 		-- v10
 		"eggs", "lay [anzahl]", "collect", "eggtime <minuten>",
+
+		-- v12
+		"petmode", "pm <Event|Fight|Home> [Fresh|Percent|Last]",
+
+		-- v14
+		"tree", "unlock <eggType|all>", "hatched <eggType> <n>", "blueprint [n]",
+		"useblueprint <eggType>", "press <eggType> [Gold|Kristall|Void]", "setrebirth <n>",
+		"skilltest <configId> [stage]", "snapshot", "restore",
 	}
 end
 

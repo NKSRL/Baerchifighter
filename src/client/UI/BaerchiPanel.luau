@@ -5,8 +5,12 @@
 -- Einzige Zustaendigkeit:
 --   - Detailkarte eines einzelnen Baerchis anzeigen
 --   - Die Aktionen die genau diesen Baerchi betreffen ausloesen: ausruesten,
---     befoerdern, zum Event schicken, in den PIT schicken, mit Honig fuettern
---     und verwerten
+--     befoerdern, mit Honig fuettern und verwerten
+--
+-- SEIT v12 laufen "Zum Event" und "In den PIT" NICHT mehr ueber diese Karte,
+-- sondern ueber die untere Pet-Leiste (PetBar). Der ausgeruestete Baerchi kann
+-- ausserdem nicht mehr verwertet werden (Ei-Baum-Konzept, Pet-Regeln): der
+-- Knopf ist bei ihm gesperrt, der Server lehnt es zusaetzlich ab.
 --
 -- FUETTERN IST SEIT v7 EINE ENTSCHEIDUNG, kein einzelner Knopf mehr: die drei
 -- Gebaeude liefern unterschiedlichen Honig (siehe Config/BuildingBehavior).
@@ -74,8 +78,8 @@ local _accentBar: Frame?       = nil
 local _fusionBadge: Frame?         = nil
 local _mutationBadge: Frame?       = nil
 local _mutationBadgeText: TextLabel? = nil
-local _fightButton: TextButton? = nil
 local _equipButton: TextButton? = nil
+local _recycleButton: TextButton? = nil
 
 -- v8: Promotion, Stat-Level, Charms
 local _stars: { Frame }            = {}
@@ -87,8 +91,6 @@ type CharmTile = {
 }
 local _charmSlots: { CharmTile }   = {}
 local _charmButton: TextButton?    = nil
-local _eventButton: TextButton?    = nil
-local _eventHint: TextLabel?       = nil
 
 -- v10: Eier legen
 local _eggRateLabel: TextLabel?    = nil
@@ -102,18 +104,6 @@ type StatRow = {
 	text : TextLabel,
 }
 local _statRows: { StatRow } = {}
-
--- Wer gerade am Event steht — kommt ausschliesslich vom Server
--- (EventPresenceChanged). Der Client raet das nicht selbst: nur der Server
--- weiss, ob die Figur tatsaechlich angekommen ist.
-local _eventUid: string? = nil
-
--- Welches Event gerade laeuft (nil = Pause) und welches als naechstes kommt —
--- ebenfalls ausschliesslich vom Server (EventPhaseChanged). Der Client kennt
--- den Katalog selbst (EventConfig liegt in ReplicatedStorage) und schlaegt die
--- Belohnung dort nach; uebertragen werden nur die beiden ids.
-local _activeEventId: string? = nil
-local _nextEventId: string?   = nil
 
 -- Ein Fuetter-Knopf pro Gebaeude, key = BuildingId. Text und Verfuegbarkeit
 -- ziehen bei jedem Datenwechsel nach (siehe fill).
@@ -309,55 +299,6 @@ local function fillEgg(baerchi: Types.Baerchi)
 	end
 end
 
-local function fillEvent(baerchi: Types.Baerchi)
-	local data     = ClientState.get()
-	local equipped = data ~= nil and data.island.equippedUid == baerchi.uid
-	local atEvent  = _eventUid == baerchi.uid
-
-	if _eventButton then
-		_eventButton.Text = if atEvent then "Vom Event holen" else "Zum Event schicken"
-		-- Nur der ausgeruestete Baerchi hat ueberhaupt eine Figur in der Welt,
-		-- die irgendwohin laufen koennte — bei allen anderen waere der Knopf
-		-- eine Einladung zu einer Ablehnung.
-		Theme.setEnabled(_eventButton, equipped)
-	end
-
-	-- Der Hinweis nennt IMMER die konkrete Belohnung: seit es zehn Events mit
-	-- unterschiedlichem Ertrag gibt (EventConfig), ist "es steigt ein Stat"
-	-- keine Entscheidungsgrundlage mehr. Waehrend der Pause steht deshalb da,
-	-- was als naechstes kommt — der Weg in die Mitte dauert selbst ein paar
-	-- Sekunden, die Entscheidung faellt also VOR dem Start.
-	if _eventHint then
-		local activeId  = _activeEventId
-		local nextId    = _nextEventId
-		local activeDef = if activeId then EventConfig.getById(activeId) else nil
-		local nextDef   = if nextId   then EventConfig.getById(nextId)   else nil
-
-		if not equipped then
-			_eventHint.Text = "Nur der ausgeruestete Baerchi kann zum Event."
-
-		elseif activeDef then
-			_eventHint.Text = string.format(
-				"%s: %s\nBis zum Ende dableiben: %s",
-				if atEvent then "Er ist beim laufenden Event" else "Laeuft gerade",
-				activeDef.displayName,
-				EventConfig.describeReward(activeDef)
-			)
-
-		elseif nextDef then
-			_eventHint.Text = string.format(
-				"%s Naechstes Event: %s\n%s",
-				if atEvent then "Er wartet schon am Pit." else "Gerade Pause.",
-				nextDef.displayName,
-				EventConfig.describeReward(nextDef)
-			)
-
-		else
-			_eventHint.Text = "Am Event teilnehmen — dafuer isst er dort keinen Honig."
-		end
-	end
-end
-
 local function fill(baerchi: Types.Baerchi)
 	local def = BaerchiConfig.getById(baerchi.configId)
 	local color = Theme.rarityColor(baerchi.rarity)
@@ -419,16 +360,6 @@ local function fill(baerchi: Types.Baerchi)
 			else string.format("%d / %d HP", hp, stats.maxHp)
 	end
 
-	-- Mit 0 HP lehnt der Server den Lauf ohnehin ab. Das schon am Knopf zu
-	-- zeigen erspart den Klick ins Leere und beantwortet die Frage "warum
-	-- passiert nichts?" bevor sie entsteht.
-	if _fightButton and stats then
-		local ready = math.clamp(baerchi.currentHp or stats.maxHp, 0, stats.maxHp) > 0
-
-		_fightButton.Text = if ready then "In den PIT" else "Zu erschoepft"
-		Theme.setEnabled(_fightButton, ready)
-	end
-
 	if _skillLabel then
 		local skill = SkillConfig.getById(baerchi.skillId)
 		_skillLabel.Text = skill and (skill.displayName .. " — " .. skill.description)
@@ -461,6 +392,18 @@ local function fill(baerchi: Types.Baerchi)
 		_valueLabel.Text = "Verwerten bringt: " .. Theme.formatNumber(value) .. " Gummies"
 	end
 
+	-- Pet-Regel (v12): der ausgeruestete Baerchi ist der, der Eier legt — er
+	-- darf nicht verwertet werden, sonst stuende der Spieler ohne Leger da.
+	-- Tauschen geht ueber "Ausruesten" bei einem anderen. Der Server lehnt es
+	-- ohnehin ab, das Ausgrauen spart nur den Klick ins Leere.
+	if _recycleButton then
+		local data     = ClientState.get()
+		local equipped = data ~= nil and data.island.equippedUid == baerchi.uid
+
+		_recycleButton.Text = if equipped then "Ausgeruestet — nicht verwertbar" else "Verwerten"
+		Theme.setEnabled(_recycleButton, not equipped)
+	end
+
 	if _fusionBadge then
 		_fusionBadge.Visible = baerchi.isFusionResult
 	end
@@ -480,7 +423,6 @@ local function fill(baerchi: Types.Baerchi)
 	fillStatLevels(baerchi)
 	fillCharms(baerchi)
 	fillEgg(baerchi)
-	fillEvent(baerchi)
 
 	-- Fuetter-Knoepfe: jeder zeigt seinen EIGENEN Bestand und ist nur
 	-- anklickbar, wenn dort auch etwas liegt. Leere Lager auszugrauen erspart
@@ -807,33 +749,6 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		Remotes.RequestCollectAllEggs:FireServer()
 	end)
 
-	-- ------------------------------------------------------------------ Event
-	section("Event")
-
-	-- Zwei Zeilen hoch: der Hinweis nennt jetzt Event UND Belohnung (siehe
-	-- fillEvent), das passt nicht mehr in eine Zeile.
-	local eventHintRow = row(42)
-	_eventHint = Theme.bodyText("EventHint", eventHintRow, "")
-	_eventHint.Size = UDim2.fromScale(1, 1)
-
-	local eventRow = row(32)
-	local event = Theme.button("Event", eventRow, "Zum Event schicken", Theme.COLORS.accent)
-	event.Size = UDim2.new(1, 0, 1, 0)
-	_eventButton = event
-	event.Activated:Connect(function()
-		local uid = _openUid
-		if not uid then return end
-
-		-- Zwei Remotes statt eines Umschalters: der Server soll nie raten
-		-- muessen, was gemeint war. Welcher der beiden dran ist, entscheidet
-		-- der zuletzt vom Server gemeldete Zustand.
-		if _eventUid == uid then
-			Remotes.RequestRecallFromEvent:FireServer()
-		else
-			Remotes.RequestSendToEvent:FireServer()
-		end
-	end)
-
 	-- ----------------------------------------------------------------- Aktionen
 	section("Aktionen")
 
@@ -842,19 +757,6 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	_valueLabel = Theme.label("Value", valueRow, "—")
 	_valueLabel.Size       = UDim2.fromScale(1, 1)
 	_valueLabel.TextColor3 = Theme.COLORS.textDim
-
-	-- Die beiden Aktionen des Kern-Loops: kaempfen bis erschoepft,
-	-- dann mit Honig wieder hochfuettern.
-	local actionRow = row(36)
-
-	local fight = Theme.button("Fight", actionRow, "In den PIT", Theme.COLORS.bad)
-	fight.Size = UDim2.new(1, 0, 1, 0)
-	_fightButton = fight
-	fight.Activated:Connect(function()
-		local uid = _openUid
-		if not uid then return end
-		Remotes.RequestStartCombat:FireServer(uid)
-	end)
 
 	-- Ein Fuetter-Knopf pro Gebaeude statt eines einzigen: die drei liefern
 	-- unterschiedlichen Honig, und welchen man verfuettert, ist seit v7 eine
@@ -890,6 +792,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	local recycle = Theme.button("Recycle", exitRow, "Verwerten", Theme.COLORS.panelLight)
 	recycle.Size       = UDim2.new(1, 0, 1, 0)
 	recycle.TextColor3 = Theme.COLORS.text
+	_recycleButton = recycle
 	recycle.Activated:Connect(function()
 		local uid = _openUid
 		if not uid then return end
@@ -930,38 +833,6 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		end
 	end)
 
-	-- Wer am Event steht, weiss nur der Server (die Figur muss dort erst
-	-- angekommen sein). Der Client merkt sich ausschliesslich die letzte
-	-- Meldung und rechnet nichts selbst dazu.
-	Remotes.EventPresenceChanged.OnClientEvent:Connect(function(atEvent: any, uid: any)
-		_eventUid = if atEvent == true and typeof(uid) == "string" then uid else nil
-
-		local open = _openUid
-		if not open then return end
-
-		local baerchi = ClientState.getBaerchi(open)
-		if baerchi then
-			fill(baerchi)
-		end
-	end)
-
-	-- Welches Event laeuft und welches als naechstes kommt. Kommt beim Join
-	-- einmal gezielt und danach bei jedem Phasenwechsel (EventService) — die
-	-- Restzeit wird bewusst NICHT mitgezaehlt: die steht auf der Tafel in der
-	-- Weltmitte, hier geht es nur darum, WAS es zu holen gibt.
-	Remotes.EventPhaseChanged.OnClientEvent:Connect(function(eventId: any, _remaining: any, nextEventId: any)
-		_activeEventId = if typeof(eventId)     == "string" then eventId     else nil
-		_nextEventId   = if typeof(nextEventId) == "string" then nextEventId else nil
-
-		local open = _openUid
-		if not open then return end
-
-		local baerchi = ClientState.getBaerchi(open)
-		if baerchi then
-			fill(baerchi)
-		end
-	end)
-
 	Remotes.PromotionResultReceived.OnClientEvent:Connect(function(result: any)
 		if typeof(result) ~= "table" then return end
 		local typed = result :: Types.PromotionResult
@@ -992,7 +863,11 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		-- Leere eggUid heisst "alles auf einmal" (siehe EggLayService.collectAll):
 		-- dann steht in inStock die ANZAHL der eingesammelten Eier, nicht der
 		-- Lagerbestand einer Sorte.
-		if typed.eggUid == "" then
+		if typed.eggUid == "merchant" then
+			-- Kauf beim versteckten Haendler (EggMerchantService)
+			Toast.success(string.format("%s gekauft — liegt im Lager",
+				if def then def.displayName else typed.eggType))
+		elseif typed.eggUid == "" then
 			Toast.success(string.format("%d Eier eingesammelt", typed.inStock))
 		else
 			Toast.success(string.format(
@@ -1017,6 +892,16 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	Remotes.EventStatGained.OnClientEvent:Connect(function(gain: any)
 		if typeof(gain) ~= "table" then return end
 		local typed = gain :: Types.EventStatGain
+
+		-- Zwischenmeldung waehrend eines Events: nur der Text, kein "vorbei".
+		if typed.midEvent then
+			if typed.rarityUp then
+				Toast.success(typed.bonusText or "")
+			elseif typed.bonusText then
+				Toast.info(typed.bonusText)
+			end
+			return
+		end
 
 		-- Die Meldung wird aus bis zu zwei Teilen zusammengesetzt: Stat-Stufe
 		-- und Bonus. Beide koennen einzeln fehlen — `statKey` ist nil, wenn

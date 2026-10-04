@@ -44,6 +44,10 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "IslandService",  module = ServerScriptService.Services.IslandService },
 	{ name = "EggService",     module = ServerScriptService.Services.EggService },
 
+	-- v12: der versteckte Basis-Ei-Haendler (einzige Kaufmoeglichkeit). Baut
+	-- seinen Stand selbst in die Welt und nutzt EggService zum Abrechnen.
+	{ name = "EggMerchantService", module = ServerScriptService.Services.EggMerchantService },
+
 	-- Reine Darstellung des PIT-Laufs in der Arena. Muss vor CombatService
 	-- stehen, weil der sie am Ende eines Laufs aufruft.
 	{ name = "PitArenaService", module = ServerScriptService.Services.PitArenaService },
@@ -100,10 +104,25 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- anfasst, soll das andere direkt daneben sehen.
 	{ name = "EventParticipationService", module = ServerScriptService.Services.EventParticipationService },
 
+	-- v13: Quests + Index. Liest nur Spielerdaten, zahlt ueber EconomyService
+	-- aus und haengt sich per onDataChanged an PlayerService — steht deshalb
+	-- nach EconomyService und vor PlayerService.
+	{ name = "QuestService", module = ServerScriptService.Services.QuestService },
+
+	-- v14: Ei-Baum (Freischaltung, Ei-Presse, Blaupausen). Haengt sich wie
+	-- QuestService per onDataChanged an — und zwar NACH ihm, damit der Index
+	-- (den QuestService nachtraegt) beim Pruefen schon aktuell ist.
+	{ name = "EggTreeService", module = ServerScriptService.Services.EggTreeService },
+
 	-- Spieler-Einstellungen (aktuell: Sprache). Aendert nur ein Feld in den
 	-- Spielerdaten und verbindet ein Remote — Reihenfolge zu PlayerService
 	-- unkritisch (der Handler laeuft erst, wenn ein Spieler etwas anklickt).
 	{ name = "SettingsService", module = ServerScriptService.Services.SettingsService },
+
+	-- v12: die untere Pet-Leiste (Event / Fight). Liest den Zustand aus
+	-- EventParticipationService und PitArenaService und startet ueber
+	-- CombatService — muss deshalb nach allen dreien stehen.
+	{ name = "PetModeService", module = ServerScriptService.Services.PetModeService },
 
 	{ name = "PlayerService",  module = ServerScriptService.Services.PlayerService },  -- letzter Spiel-Service!
 

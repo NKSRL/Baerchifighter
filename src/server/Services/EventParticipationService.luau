@@ -48,7 +48,6 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
-local Loc           = require(ReplicatedStorage.Localization.Loc)
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
@@ -56,6 +55,7 @@ local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local PromotionConfig  = require(ReplicatedStorage.Config.PromotionConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local EggTree          = require(ReplicatedStorage.Modules.EggTree)
 
 local FigureWalker    = require(ServerScriptService.Util.FigureWalker)
 local FigurePlacement = require(ServerScriptService.Util.FigurePlacement)
@@ -66,6 +66,9 @@ local PlayerService   = require(ServerScriptService.Services.PlayerService)
 local EconomyService  = require(ServerScriptService.Services.EconomyService)
 local MapService      = require(ServerScriptService.Services.MapService)
 local EventService    = require(ServerScriptService.Services.EventService)
+local EventHandlers   = require(ServerScriptService.Services.EventHandlers)
+local EggTreeService  = require(ServerScriptService.Services.EggTreeService)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local EventParticipationService = {}
 
@@ -123,6 +126,13 @@ type Presence = {
 	homeFoot   : Vector3,   -- wohin zurueckgelaufen wird
 	standFoot  : Vector3,   -- wo auf dem Podest gestanden wird
 	arrivedAt  : number,    -- os.time(), nur fuers Log
+
+	-- Von Event-Handlern genutzt (siehe buildApi):
+	player     : Player?,
+	figure     : Model?,
+	busy       : boolean?,        -- Figur laeuft gerade (walkTo)
+	cancelWalk : boolean?,        -- laufende Bewegung abbrechen
+	abducting  : boolean?,        -- UFO hat die Figur gerade
 }
 
 -- Spieler, deren Baerchi gerade AM Event steht (fertig angekommen).
@@ -132,12 +142,26 @@ local _present: { [Player]: Presence } = {}
 -- zwei Laufbewegungen gleichzeitig an derselben Figur ziehen.
 local _walking: { [Player]: boolean } = {}
 
+-- Laufender Event-Handler (siehe Services/EventHandlers) samt Token. Der Token
+-- steigt bei jedem Start/Ende; api.running() vergleicht damit.
+local _session: any = nil
+local _sessionToken = 0
+
+-- Spieler, die waehrend einer Handler-Bewegung "zurueck" gedrueckt haben.
+local _recallPending: { [Player]: boolean } = {}
+
+-- v12: Richtung des laufenden Wegs ("to" = zum Event, "back" = heim) fuer die
+-- Pet-Leiste, und der Wunsch, einen Hinweg abzubrechen (Zurueckholen, bevor
+-- der Baerchi angekommen ist).
+local _walkDir: { [Player]: string } = {}
+local _cancelTo: { [Player]: boolean } = {}
+
 --------------------------------------------------------------------------------
 -- Hilfen
 --------------------------------------------------------------------------------
 
-local function fail(player: Player, action: string, reason: Types.LocMsg?)
-	Remotes.ActionFailed:FireClient(player, action, reason or Loc.msg("err.unknown"))
+local function fail(player: Player, action: string, reason: Types.LocMsg | string)
+	Remotes.ActionFailed:FireClient(player, action, reason)
 end
 
 local function notifyPresence(player: Player, atEvent: boolean, baerchiUid: string?)
@@ -202,36 +226,43 @@ end
 -- Hin und zurueck
 --------------------------------------------------------------------------------
 
-function EventParticipationService.sendToEvent(player: Player)
+-- Gibt true zurueck, wenn der Baerchi losgeht.
+function EventParticipationService.sendToEvent(player: Player): boolean
 	local data = PlayerService.getData(player)
-	if not data then return end
+	if not data then return false end
 
 	if _present[player] or _walking[player] then
-		fail(player, "RequestSendToEvent", Loc.msg("err.event_already_away"))
-		return
+		fail(player, "RequestPetMode", Loc.msg("err.event_already_away"))
+		return false
 	end
 
 	local uid = data.island.equippedUid
 	if not uid or not data.island.baerchis[uid] then
-		fail(player, "RequestSendToEvent", Loc.msg("err.event_no_equipped"))
-		return
+		fail(player, "RequestPetMode", Loc.msg("err.event_no_equipped"))
+		return false
 	end
 
 	local figure = MapService.getBaerchiModel(player, uid)
 	if not figure then
-		fail(player, "RequestSendToEvent", Loc.msg("err.event_not_on_plot"))
-		return
+		fail(player, "RequestPetMode", Loc.msg("err.event_not_on_plot"))
+		return false
 	end
 
-	-- Ein laufender Kampf oder ein Weg zum Honig-Teich hat Vorrang: wir nehmen
-	-- das Schloss NICHT weg (kein forceAcquire), sondern sagen es dem Spieler.
-	-- Der Autopilot gibt es nach ein paar Sekunden von selbst wieder frei.
-	if not ActivityLock.tryAcquire(player, LOCK_HOLDER) then
-		fail(player, "RequestSendToEvent", Loc.msg("err.baerchi_busy"))
-		return
+	-- v12: ein vom Spieler ausgeloester Weg zum Event hat Vorrang vor dem
+	-- Honig-Autopilot (wie der Kampf). Dem Autopilot wird das Schloss
+	-- abgenommen — er bemerkt das selbst und bricht sauber ab. Haelt es
+	-- jemand anderes (Kampf), wird weiter abgelehnt; die Reihenfolge regelt
+	-- dann PetModeService.
+	if ActivityLock.owner(player) == "Autopilot" then
+		ActivityLock.forceAcquire(player, LOCK_HOLDER)
+	elseif not ActivityLock.tryAcquire(player, LOCK_HOLDER) then
+		fail(player, "RequestPetMode", Loc.msg("err.baerchi_busy"))
+		return false
 	end
 
-	_walking[player] = true
+	_walking[player]  = true
+	_walkDir[player]  = "to"
+	_cancelTo[player] = nil
 
 	task.spawn(function()
 		local ok, err = pcall(function()
@@ -249,10 +280,30 @@ function EventParticipationService.sendToEvent(player: Player)
 
 			FigureWalker.walk(figure, homeFoot, standFoot, {
 				speed       = EVENT_WALK_SPEED,
-				isCancelled = cancelled,
+				isCancelled = function(): boolean
+					return cancelled() or _cancelTo[player] == true
+				end,
 			})
 
 			if cancelled() then
+				return
+			end
+
+			-- v12: auf dem Hinweg zurueckgeholt — von hier aus umkehren.
+			if _cancelTo[player] then
+				_cancelTo[player] = nil
+				_walkDir[player]  = "back"
+				FigureWalker.walk(figure, footPosOf(figure), homeFoot, {
+					speed       = EVENT_WALK_SPEED,
+					isCancelled = cancelled,
+				})
+				if not cancelled() then
+					FigurePlacement.place(figure, homeFoot, figure:GetPivot().Rotation)
+					FigureFX.idleBob(figure, {
+						height = MapConfig.IDLE_BOB_HEIGHT,
+						rate   = MapConfig.IDLE_BOB_RATE,
+					})
+				end
 				return
 			end
 
@@ -263,6 +314,7 @@ function EventParticipationService.sendToEvent(player: Player)
 			FigurePlacement.placeLookingAt(figure, standFoot, MapService.getEventPitPosition())
 
 			_present[player] = {
+				player     = player,
 				baerchiUid = uid,
 				homeFoot   = homeFoot,
 				standFoot  = standFoot,
@@ -275,7 +327,10 @@ function EventParticipationService.sendToEvent(player: Player)
 			print("[EventParticipationService]", player.Name, "| am Event:", uid)
 		end)
 
-		_walking[player] = nil
+
+		_walking[player]  = nil
+		_walkDir[player]  = nil
+		_cancelTo[player] = nil
 
 		if not ok then
 			warn("[EventParticipationService] Hinweg fehlgeschlagen:", err)
@@ -288,17 +343,37 @@ function EventParticipationService.sendToEvent(player: Player)
 			notifyPresence(player, false, nil)
 		end
 	end)
+
+	return true
 end
 
-function EventParticipationService.recall(player: Player)
+-- Gibt true zurueck, wenn der Rueckweg angestossen wurde (oder schon laeuft).
+function EventParticipationService.recall(player: Player): boolean
 	local presence = _present[player]
 	if not presence then
-		fail(player, "RequestRecallFromEvent", Loc.msg("err.event_not_at_event"))
-		return
+		-- v12: noch auf dem Hinweg — umkehren lassen.
+		if _walking[player] and _walkDir[player] == "to" then
+			_cancelTo[player] = true
+			return true
+		end
+		return _walking[player] == true
+	end
+
+	if presence.abducting then
+		fail(player, "RequestPetMode", Loc.msg("err.event_ufo"))
+		return false
+	end
+
+	-- Ein Event-Handler bewegt die Figur gerade: Bewegung abbrechen, der
+	-- Rueckweg startet direkt danach (siehe walkTo in buildApi).
+	if presence.busy then
+		_recallPending[player] = true
+		presence.cancelWalk = true
+		return true
 	end
 
 	if _walking[player] then
-		return   -- laeuft schon zurueck
+		return true   -- laeuft schon zurueck
 	end
 
 	local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
@@ -309,10 +384,11 @@ function EventParticipationService.recall(player: Player)
 		_present[player] = nil
 		ActivityLock.release(player, LOCK_HOLDER)
 		notifyPresence(player, false, nil)
-		return
+		return true
 	end
 
 	_walking[player]  = true
+	_walkDir[player]  = "back"
 	_present[player]  = nil
 	notifyPresence(player, false, presence.baerchiUid)
 
@@ -326,7 +402,7 @@ function EventParticipationService.recall(player: Player)
 					or figure.Parent == nil
 			end
 
-			FigureWalker.walk(figure, presence.standFoot, presence.homeFoot, {
+			FigureWalker.walk(figure, footPosOf(figure), presence.homeFoot, {
 				speed       = EVENT_WALK_SPEED,
 				isCancelled = cancelled,
 			})
@@ -343,12 +419,15 @@ function EventParticipationService.recall(player: Player)
 		end)
 
 		_walking[player] = nil
+		_walkDir[player] = nil
 		ActivityLock.release(player, LOCK_HOLDER)
 
 		if not ok then
 			warn("[EventParticipationService] Rueckweg fehlgeschlagen:", err)
 		end
 	end)
+
+	return true
 end
 
 --------------------------------------------------------------------------------
@@ -458,11 +537,41 @@ local function awardBonus(
 			return nil, nil
 		end
 
-		local eggType = bonus.eggType or "BasicEgg"
+		-- v14 (WP10): Sorte nach dem Ei-Baum des Spielers waehlen.
+		local eggType: Types.EggType = bonus.eggType or "BasicEgg"
+		local isJump = false
+		if bonus.eggPick == "jump" then
+			local jump = EggTree.pickJumpEgg(data.eggTree)
+			if jump then
+				eggType = jump
+				isJump = true
+			else
+				eggType = EggTree.highestUnlocked(data.eggTree)
+			end
+		elseif bonus.eggPick == "highest" then
+			eggType = EggTree.highestUnlocked(data.eggTree)
+		end
 		data.island.eggStock[eggType] = (data.island.eggStock[eggType] or 0) + amount
 
 		local eggDef = EggConfig.data[eggType]
-		return string.format("+%dx %s", amount, if eggDef then eggDef.displayName else eggType), nil
+		local text = string.format("+%dx %s", amount, if eggDef then eggDef.displayName else eggType)
+		if isJump then
+			text ..= " (Sprung-Ei!)"
+		end
+
+		-- Blaupause (Koenigshuegel, Schatzgraeber mit 5 Funden)
+		if (bonus.blueprintChance or 0) > 0 and math.random() < (bonus.blueprintChance :: number) then
+			EggTreeService.grantBlueprint(player, data, 1)
+			text ..= "  +1 Blaupause!"
+		end
+
+		-- Notfall-Ei (zusaetzlich, siehe EventConfig.EMERGENCY_BASIC_EGG_CHANCE)
+		if math.random() < EventConfig.EMERGENCY_BASIC_EGG_CHANCE then
+			data.island.eggStock.BasicEgg = (data.island.eggStock.BasicEgg or 0) + 1
+			text ..= "  +1 Basis-Ei"
+		end
+
+		return text, nil
 	end
 
 	-- WAEHRUNG immer ueber EconomyService: der rebirthMult gehoert dorthin und
@@ -489,7 +598,9 @@ local function awardBonus(
 	-- rollMutationTier und NICHT rollMutation: sonst waere das Ergebnis auch
 	-- nach einem Treffer noch in 98.5% der Faelle "keine Mutation".
 	if bonus.kind == "mutation" then
-		if math.random() >= (bonus.chance or 0) then
+		-- Die Chance sinkt mit der Rarity (EventConfig.MUTATION_RARITY_FACTOR).
+		local chance = (bonus.chance or 0) * EventConfig.getMutationFactor(baerchi.rarity)
+		if math.random() >= chance then
 			return nil, nil   -- daneben — der Normalfall, kein Text noetig
 		end
 
@@ -517,6 +628,19 @@ local function awardBonus(
 end
 
 local function onEventEnded(finished: EventConfig.EventDef)
+	-- Handler zuerst beenden: er liefert, wer was bekommt.
+	local results: any = {}
+	if _session then
+		local ok, res = pcall(_session.stop)
+		if ok and res then
+			results = res
+		else
+			warn("[EventParticipationService] Handler-stop fehlgeschlagen:", res)
+		end
+		_session = nil
+	end
+	_sessionToken += 1
+
 	for player, presence in _present do
 		local data = PlayerService.getData(player)
 		if not data then continue end
@@ -546,8 +670,22 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		local def      = BaerchiConfig.getById(baerchi.configId)
 		local beforeHp = if def then CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp else 0
 
-		local key                 = awardStatLevel(baerchi, finished.statFocus)
-		local bonusText, mutation = awardBonus(player, data, baerchi, finished.bonus)
+		-- Nur wer im Handler-Ergebnis steht, bekommt etwas (Stat-Stufen gibt es
+		-- nur beim UFO, und dort sofort beim Absetzen, nicht hier).
+		local result = results[player]
+		if not result then
+			continue
+		end
+
+		local bonus: EventConfig.EventBonus? = nil
+		if result.egg then
+			bonus = result.egg
+		elseif result.mutationRoll then
+			bonus = finished.bonus
+		end
+
+		local key: string? = nil
+		local bonusText, mutation = awardBonus(player, data, baerchi, bonus)
 
 		-- Weder eine Stufe (alles am Rarity-Cap) noch ein Bonus: dann gibt es
 		-- auch nichts zu melden und nichts zu speichern.
@@ -597,7 +735,7 @@ local function onEventEnded(finished: EventConfig.EventDef)
 			)
 		end
 
-		local statText = "keine Stufe (alles am Cap)"
+		local statText = "keine Stat-Stufe (nur das UFO gibt welche)"
 		if key then
 			statText = string.format("%s Stufe %d/%d", key, gain.newLevel, gain.cap)
 		end
@@ -618,6 +756,262 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		if figure then
 			playEventMotion(figure)
 		end
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Schnittstelle fuer die Event-Handler (Services/EventHandlers)
+--------------------------------------------------------------------------------
+
+-- Meldung an den Spieler waehrend eines Events (Toast beim Client).
+local function toast(player: Player, text: string)
+	if player.Parent == nil then
+		return
+	end
+	local gain: any = {
+		baerchiUid = "",
+		eventId    = "",
+		statKey    = nil,
+		newLevel   = 0,
+		cap        = 0,
+		bonusText  = text,
+		mutation   = nil,
+		midEvent   = true,
+	}
+	Remotes.EventStatGained:FireClient(player, gain)
+end
+
+-- Setzt die Figur wieder aufs Plot und beendet die Teilnahme (UFO-Absetzen).
+local function finishHome(presence: any)
+	local player: Player = presence.player
+	local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
+
+	if _present[player] == presence then
+		_present[player] = nil
+	end
+
+	if figure then
+		FigurePlacement.place(figure, presence.homeFoot, figure:GetPivot().Rotation)
+		FigureFX.idleBob(figure, {
+			height = MapConfig.IDLE_BOB_HEIGHT,
+			rate   = MapConfig.IDLE_BOB_RATE,
+		})
+	end
+
+	ActivityLock.release(player, LOCK_HOLDER)
+	if player.Parent ~= nil then
+		notifyPresence(player, false, nil)
+	end
+end
+
+-- UFO-Belohnung beim Absetzen: +1 auf alle Stats (begrenzt durch STAT_CAP)
+-- und der Rarity-Up-Wurf (EventConfig.RARITY_UP_CHANCE).
+local function applyUfoReward(presence: any)
+	local player: Player = presence.player
+	local data = PlayerService.getData(player)
+	if not data then return end
+
+	local baerchi = data.island.baerchis[presence.baerchiUid]
+	if not baerchi then return end
+
+	local def      = BaerchiConfig.getById(baerchi.configId)
+	local beforeHp = if def then CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp else 0
+
+	local cap    = PromotionConfig.getStatCap(baerchi.rarity)
+	local levels = baerchi.statLevels :: any
+	local gained: { string } = {}
+
+	for _, key in PromotionConfig.GROWABLE_STATS do
+		local old = levels[key] or 0
+		if old < cap then
+			levels[key] = math.min(cap, old + EventConfig.UFO.STAT_GAIN_PER_STAT)
+			table.insert(gained, PromotionConfig.STAT_LABELS[key] or key)
+		end
+	end
+
+	-- Rarity-Up: nur eine Stufe, Chance sinkt mit der aktuellen Rarity.
+	local oldRarity = baerchi.rarity
+	local rarityUp: string? = nil
+	local chance = EventConfig.getRarityUpChance(oldRarity)
+	if chance > 0 and math.random() < chance then
+		local nextRarity = BaerchiConfig.getNextRarity(oldRarity)
+		if nextRarity then
+			baerchi.rarity = nextRarity
+			rarityUp = nextRarity
+		end
+	end
+
+	-- Mehr maxHp (Stat-Stufe, hoehere Rarity): Differenz gutschreiben.
+	if def then
+		local afterHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
+		baerchi.currentHp = math.clamp(
+			(baerchi.currentHp or 0) + math.max(0, afterHp - beforeHp),
+			0,
+			afterHp
+		)
+	end
+
+	local parts: { string } = {}
+	if #gained > 0 then
+		table.insert(parts, "+1 " .. table.concat(gained, "/"))
+	else
+		table.insert(parts, "alle Stats am Maximum")
+	end
+	if rarityUp then
+		table.insert(parts, string.format("RARITY UP: %s -> %s!", oldRarity, rarityUp))
+	end
+
+	local gain: any = {
+		baerchiUid = presence.baerchiUid,
+		eventId    = "Ufo",
+		statKey    = nil,
+		newLevel   = 0,
+		cap        = PromotionConfig.getStatCap(baerchi.rarity),
+		bonusText  = "UFO: " .. table.concat(parts, "  •  "),
+		mutation   = nil,
+		midEvent   = true,
+		rarityUp   = rarityUp,
+	}
+	Remotes.EventStatGained:FireClient(player, gain)
+
+	PlayerService.markDirty(player)
+	PlayerService.saveNow(player)
+
+	MapService.celebrateBaerchi(player, presence.baerchiUid, BaerchiConfig.getRarityColor(baerchi.rarity))
+
+	print("[EventParticipationService]", player.Name, "| UFO:", table.concat(parts, " | "))
+end
+
+local function buildApi(token: number): any
+	local api: any = {}
+
+	api.center = MapService.getEventPitPosition()
+	api.radius = MapService.getEventPitRadius()
+
+	api.running = function(): boolean
+		return _sessionToken == token
+	end
+
+	api.footOf = footPosOf
+
+	-- Alle Teilnehmer, die gerade am Event stehen und deren Figur existiert.
+	-- Entfuehrte (abducting) sind nicht dabei.
+	api.participants = function(): { any }
+		local list = {}
+		for player, presence in _present do
+			local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
+			if figure and not presence.abducting then
+				presence.player = player
+				presence.figure = figure
+				table.insert(list, presence)
+			end
+		end
+		return list
+	end
+
+	api.stillHere = function(part: any): boolean
+		return part.player ~= nil and _present[part.player] == part
+	end
+
+	api.plotPosition = function(player: Player): Vector3?
+		local cf = MapService.getPlotCFrame(player)
+		return if cf then cf.Position else nil
+	end
+
+	api.level = function(part: any): number
+		local data = PlayerService.getData(part.player)
+		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
+		return if baerchi then baerchi.level else 1
+	end
+
+	-- Kampfstaerke fuer Duelle: ATK * maxHp (wie CombatCalculator).
+	api.power = function(part: any): number
+		local data = PlayerService.getData(part.player)
+		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
+		if not baerchi then return 1 end
+		local def = BaerchiConfig.getById(baerchi.configId)
+		if def then
+			local ok, stats = pcall(CombatCalculator.getEffectiveStats, baerchi, def.baseStats)
+			if ok and stats then
+				local s: any = stats
+				return math.max(1, s.atk or 1) * math.max(1, s.maxHp or 1)
+			end
+		end
+		return math.max(1, baerchi.level)
+	end
+
+	api.toast = toast
+
+	api.recall = function(player: Player)
+		EventParticipationService.recall(player)
+	end
+
+	api.finishHome = finishHome
+	api.ufoReward  = applyUfoReward
+
+	-- Laeuft die Figur zu `target` (nur X/Z, Y bleibt). Blockiert bis zur
+	-- Ankunft oder bis die Bewegung abgebrochen wurde. true = angekommen.
+	api.walkTo = function(part: any, target: Vector3): boolean
+		local figure: Model? = part.figure
+		if not figure or not figure.Parent or part.busy or _present[part.player] ~= part then
+			return false
+		end
+
+		part.busy       = true
+		part.cancelWalk = false
+
+		local ok, err = pcall(function()
+			FigureFX.stopIdle(figure)
+			local from = footPosOf(figure)
+			FigureWalker.walk(figure, from, Vector3.new(target.X, from.Y, target.Z), {
+				speed       = EVENT_WALK_SPEED,
+				isCancelled = function(): boolean
+					return part.cancelWalk == true
+						or _present[part.player] ~= part
+						or figure.Parent == nil
+				end,
+			})
+		end)
+		if not ok then
+			warn("[EventParticipationService] walkTo fehlgeschlagen:", err)
+		end
+
+		local cancelled = part.cancelWalk == true or _present[part.player] ~= part
+		part.busy       = false
+		part.cancelWalk = false
+
+		-- Der Spieler wollte waehrenddessen zurueck: jetzt ausfuehren.
+		if _recallPending[part.player] and _present[part.player] == part then
+			_recallPending[part.player] = nil
+			EventParticipationService.recall(part.player)
+			return false
+		end
+
+		return ok and not cancelled
+	end
+
+	return api
+end
+
+local function onEventStarted(def: EventConfig.EventDef)
+	if _session then
+		pcall(_session.stop)
+		_session = nil
+	end
+
+	_sessionToken += 1
+
+	local handler = (EventHandlers :: any)[def.handler]
+	if not handler then
+		warn("[EventParticipationService] Kein Handler fuer Event:", def.id, def.handler)
+		return
+	end
+
+	local ok, session = pcall(handler, buildApi(_sessionToken), def)
+	if ok then
+		_session = session
+	else
+		warn("[EventParticipationService] Handler-Start fehlgeschlagen:", session)
 	end
 end
 
@@ -662,15 +1056,28 @@ function EventParticipationService.isAtEvent(player: Player): boolean
 	return _present[player] ~= nil
 end
 
+-- v12: Phase fuer die Pet-Leiste: "ToEvent", "AtEvent", "Returning" oder nil.
+function EventParticipationService.getPhase(player: Player): string?
+	if _present[player] then
+		return "AtEvent"
+	end
+	if _walking[player] then
+		return if _walkDir[player] == "to" and not _cancelTo[player] then "ToEvent" else "Returning"
+	end
+	return nil
+end
+
+-- v12: wird der Baerchi gerade vom UFO entfuehrt? (Event-Knopf gesperrt)
+function EventParticipationService.isAbducting(player: Player): boolean
+	local presence = _present[player]
+	return presence ~= nil and presence.abducting == true
+end
+
 function EventParticipationService.init()
-	RateLimiter.connect(Remotes.RequestSendToEvent, "RequestSendToEvent", function(player)
-		EventParticipationService.sendToEvent(player)
-	end)
+	-- (v12: Hinschicken und Zurueckholen laufen ueber PetModeService /
+	-- RequestPetMode, nicht mehr ueber eigene Remotes.)
 
-	RateLimiter.connect(Remotes.RequestRecallFromEvent, "RequestRecallFromEvent", function(player)
-		EventParticipationService.recall(player)
-	end)
-
+	EventService.onEventStarted(onEventStarted)
 	EventService.onEventEnded(onEventEnded)
 
 	-- Beim Start eines Events die Bewegung der bereits Anwesenden umstellen —
@@ -678,8 +1085,10 @@ function EventParticipationService.init()
 	-- Bewusst ueber denselben Tick wie die Aufraeum-Pruefung: ein zweiter
 	-- Callback in EventService waere mehr Mechanik als der Effekt wert ist.
 	Players.PlayerRemoving:Connect(function(player)
-		_present[player] = nil
-		_walking[player] = nil
+		_present[player]  = nil
+		_walking[player]  = nil
+		_walkDir[player]  = nil
+		_cancelTo[player] = nil
 	end)
 
 	task.spawn(function()
@@ -698,7 +1107,7 @@ function EventParticipationService.init()
 					lastEventId = nowId
 					for player, presence in _present do
 						local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
-						if figure then
+						if figure and not presence.busy and not presence.abducting then
 							playEventMotion(figure)
 						end
 					end

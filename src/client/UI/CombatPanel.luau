@@ -3,8 +3,13 @@
 -- StarterPlayerScripts/UI/CombatPanel.luau
 --
 -- Einzige Zustaendigkeit:
---   - Den PIT-Lauf des ausgeruesteten Baerchis ausloesen
---   - Den Lauf Stage fuer Stage abspielen
+--   - Den ausgeruesteten Kaempfer und das PIT-Level anzeigen
+--   - Nach einem Lauf eine kurze Ergebnis-Meldung zeigen (Toast)
+--
+-- SEIT v12 startet dieses Panel keinen Lauf mehr: gestartet und
+-- zurueckgeholt wird ueber den Fight-Knopf der unteren Pet-Leiste (PetBar).
+-- Das Ergebnis kommt erst NACH der Abrechnung (am Ende der Wiedergabe in der
+-- Arena, bzw. nach dem Zurueckholen nur mit den gespielten Stages).
 --
 -- Seit dem Equip-System kann nur noch der AUSGERUESTETE Baerchi kaempfen: nur
 -- er steht auf dem Plot und laeuft selbststaendig zur Arena (siehe
@@ -30,6 +35,7 @@ local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
 local Theme        = require(script.Parent.Theme)
+local Toast        = require(script.Parent.Toast)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
@@ -42,17 +48,6 @@ local _root: Frame?              = nil
 local _info: TextLabel?          = nil
 local _scroller: ScrollingFrame? = nil
 local _empty: TextLabel?         = nil
-local _startButton: TextButton?  = nil
-
--- Kampf-Overlay (haengt am ScreenGui, damit es auch ohne offenes Panel geht)
-local _fight: Frame?           = nil
-local _fightTitle: TextLabel?  = nil
-local _selfBar: Theme.Progress? = nil
-local _enemyBar: Theme.Progress? = nil
-local _resultLabel: TextLabel? = nil
-local _rewardLabel: TextLabel? = nil
-local _okButton: TextButton?   = nil
-local _fightToken = 0
 
 --------------------------------------------------------------------------------
 -- Auswahl
@@ -139,118 +134,31 @@ function CombatPanel.refresh()
 	if baerchi then
 		buildRow(scroller, baerchi)
 	end
-
-	local startButton = _startButton
-	if startButton then
-		Theme.setEnabled(startButton, baerchi ~= nil)
-	end
 end
 
 --------------------------------------------------------------------------------
--- Wiedergabe des Ergebnisses
+-- Ergebnis des Laufs
 --------------------------------------------------------------------------------
 
--- Spielt einen kompletten PIT-Lauf ab: Stage fuer Stage, mit dem HP-Balken
--- des Baerchis als durchgehendem Faden. Der Balken wird zwischen den Stages
--- bewusst NICHT zurueckgesetzt — genau das ist die neue Mechanik, und man
--- soll sehen wie die Luft ausgeht.
---
--- Der Server schickt keine einzelnen Runden mehr (bei bis zu 60 Stages waere
--- das ein Vielfaches der Nutzlast), sondern pro Stage eine Zusammenfassung.
--- Der Gegner-Balken ist deshalb eine Darstellung des Ausgangs, keine
--- Runden-fuer-Runden-Wiedergabe: gewonnen = leer, verloren = Rest bleibt.
-local function playResult(result: Types.PitRunResult)
-	local fight = _fight
-	local selfBar, enemyBar = _selfBar, _enemyBar
-	if not fight or not selfBar or not enemyBar then return end
-
-	_fightToken += 1
-	local token = _fightToken
-
-	local baerchi = ClientState.getBaerchi(result.baerchiUid)
-	local def     = if baerchi then BaerchiConfig.getById(baerchi.configId) else nil
-
-	local maxHp = math.max(1, result.maxHp)
-
-	if _fightTitle then
-		_fightTitle.Text = if def then def.displayName .. " im PIT" else "PIT-Lauf"
+-- Frueher lief hier ein Kampf-Fenster mitten im Bildschirm mit HP-Balken.
+-- Auf Wunsch entfernt: es verdeckte genau den Kampf in der Arena, den man
+-- beobachten will (die Arena zeigt Stages, HP-Balken und Tafel ohnehin
+-- selbst). Uebrig bleibt nur eine kurze Meldung am unteren Rand.
+local function showResult(result: Types.PitRunResult)
+	local cleared = result.stagesCleared or 0
+	local parts = {
+		if cleared > 0 then string.format("%d Stages geschafft", cleared) else "Keine Stage geschafft",
+		"+" .. Theme.formatNumber(result.gummiesWon or 0) .. " Gummies",
+	}
+	if (result.goldGummiesWon or 0) > 0 then
+		table.insert(parts, "+" .. Theme.formatNumber(result.goldGummiesWon) .. " GoldGummies")
 	end
-	if _resultLabel then
-		_resultLabel.Text    = ""
-		_resultLabel.Visible = false
-	end
-	if _rewardLabel then
-		_rewardLabel.Text    = ""
-		_rewardLabel.Visible = false
-	end
-	if _okButton then
-		_okButton.Visible = false
+	if result.recalled then
+		table.insert(parts, "zurueckgeholt")
 	end
 
-	selfBar.fill.Size  = UDim2.fromScale(math.clamp(result.hpBefore / maxHp, 0, 1), 1)
-	selfBar.text.Text  = string.format("%d / %d HP", result.hpBefore, maxHp)
-	enemyBar.fill.Size = UDim2.fromScale(1, 1)
-	enemyBar.text.Text = "Stage 1"
-	fight.Visible      = true
-
-	-- Fehlt die Liste (Datenpaket von einem aelteren Serverstand), wird nur
-	-- die Zusammenfassung gezeigt statt an der Laengen-Operation zu scheitern.
-	local stages = if typeof(result.stages) == "table" then result.stages else {}
-
-	-- Gesamtdauer deckeln: ein Lauf ueber 40 Stages darf nicht 40 Sekunden
-	-- Zuschauen bedeuten.
-	local stepTime = math.clamp(3.0 / math.max(1, #stages), 0.10, 0.45)
-
-	task.spawn(function()
-		task.wait(0.3)
-
-		for _, stage in ipairs(stages) do
-			if token ~= _fightToken then return end
-
-			enemyBar.text.Text = string.format("Stage %d", stage.stage)
-			enemyBar.fill.Size = UDim2.fromScale(1, 1)
-			task.wait(stepTime * 0.4)
-
-			if token ~= _fightToken then return end
-
-			-- Gegner: bei Sieg leer, bei Niederlage bleibt ein Rest stehen
-			enemyBar.fill.Size = UDim2.fromScale(if stage.won then 0 else 0.35, 1)
-
-			-- Eigene HP nach dieser Stage
-			local ratio = math.clamp(stage.hpAfter / maxHp, 0, 1)
-			selfBar.fill.Size = UDim2.fromScale(ratio, 1)
-			selfBar.text.Text = string.format("%d / %d HP", stage.hpAfter, maxHp)
-
-			task.wait(stepTime * 0.6)
-		end
-
-		if token ~= _fightToken then return end
-
-		local cleared = result.stagesCleared or 0
-
-		if _resultLabel then
-			_resultLabel.Text = if cleared > 0
-				then string.format("%d Stages geschafft", cleared)
-				else "Keine Stage geschafft"
-			_resultLabel.TextColor3 = if cleared > 0 then Theme.COLORS.good else Theme.COLORS.bad
-			_resultLabel.Visible    = true
-		end
-
-		if _rewardLabel then
-			local parts = { "+" .. Theme.formatNumber(result.gummiesWon) .. " Gummies" }
-			if result.goldGummiesWon > 0 then
-				table.insert(parts, "+" .. Theme.formatNumber(result.goldGummiesWon) .. " GoldGummies")
-			end
-			table.insert(parts, string.format("%d / %d HP uebrig", result.hpAfter, maxHp))
-
-			_rewardLabel.Text = table.concat(parts, "    ")
-			_rewardLabel.Visible = true
-		end
-
-		if _okButton then
-			_okButton.Visible = true
-		end
-	end)
+	local text = "PIT: " .. table.concat(parts, "  •  ")
+	if cleared > 0 then Toast.success(text) else Toast.info(text) end
 end
 
 --------------------------------------------------------------------------------
@@ -273,60 +181,6 @@ end
 --------------------------------------------------------------------------------
 -- Aufbau
 --------------------------------------------------------------------------------
-
-local function buildFightOverlay(screenGui: ScreenGui)
-	local fight = Theme.dialog(
-		"CombatOverlay", screenGui,
-		Vector2.new(0.42, 0.40),
-		Vector2.new(290, 230),
-		Vector2.new(480, 320)
-	)
-	fight.ZIndex = 30
-	_fight = fight
-
-	local title = Theme.label("Title", fight, "Kampf im PIT")
-	title.Position       = UDim2.new(0, 14, 0, 12)
-	title.Size           = UDim2.new(1, -28, 0, 26)
-	title.TextXAlignment = Enum.TextXAlignment.Center
-	_fightTitle = title
-
-	local selfBar = Theme.progress(fight, Theme.COLORS.good)
-	selfBar.track.Position = UDim2.new(0, 14, 0, 46)
-	selfBar.track.Size     = UDim2.new(1, -28, 0, 26)
-	_selfBar = selfBar
-
-	local enemyBar = Theme.progress(fight, Theme.COLORS.bad)
-	enemyBar.track.Position = UDim2.new(0, 14, 0, 78)
-	enemyBar.track.Size     = UDim2.new(1, -28, 0, 26)
-	_enemyBar = enemyBar
-
-	local resultLabel = Theme.label("Result", fight, "")
-	resultLabel.Position       = UDim2.new(0, 14, 0, 116)
-	resultLabel.Size           = UDim2.new(1, -28, 0, 34)
-	resultLabel.TextXAlignment = Enum.TextXAlignment.Center
-	resultLabel.Visible        = false
-	_resultLabel = resultLabel
-
-	local rewardLabel = Theme.label("Reward", fight, "")
-	rewardLabel.Position       = UDim2.new(0, 14, 0, 152)
-	rewardLabel.Size           = UDim2.new(1, -28, 0, 22)
-	rewardLabel.TextXAlignment = Enum.TextXAlignment.Center
-	rewardLabel.TextColor3     = Theme.COLORS.textDim
-	rewardLabel.Visible        = false
-	_rewardLabel = rewardLabel
-
-	local ok = Theme.button("Ok", fight, "Weiter", Theme.COLORS.accent)
-	ok.AnchorPoint = Vector2.new(0.5, 1)
-	ok.Position    = UDim2.new(0.5, 0, 1, -12)
-	ok.Size        = UDim2.new(1, -28, 0, 32)
-	ok.Visible     = false
-	_okButton = ok
-
-	ok.Activated:Connect(function()
-		_fightToken += 1   -- laufende Wiedergabe abbrechen
-		fight.Visible = false
-	end)
-end
 
 function CombatPanel.init(screenGui: ScreenGui)
 	local root = Theme.dialog(
@@ -362,19 +216,10 @@ function CombatPanel.init(screenGui: ScreenGui)
 	empty.Visible  = false
 	_empty = empty
 
-	local start = Theme.button("Start", body, "In den PIT", Theme.COLORS.bad)
-	start.AnchorPoint = Vector2.new(0.5, 1)
-	start.Position    = UDim2.new(0.5, 0, 1, 0)
-	start.Size        = UDim2.new(1, -8, 0, 38)
-	_startButton = start
-
-	start.Activated:Connect(function()
-		local uid = equippedUid()
-		if not uid then return end
-		Remotes.RequestStartCombat:FireServer(uid)
-	end)
-
-	buildFightOverlay(screenGui)
+	local hint = Theme.bodyText("Hint", body, "In den PIT schickst du deinen Baerchi mit dem Fight-Knopf unten am Bildschirm. Nochmal druecken holt ihn zurueck.")
+	hint.AnchorPoint = Vector2.new(0.5, 1)
+	hint.Position    = UDim2.new(0.5, 0, 1, 0)
+	hint.Size        = UDim2.new(1, -8, 0, 40)
 
 	PanelManager.register(PANEL_NAME, {
 		open  = openInternal,
@@ -387,7 +232,15 @@ function CombatPanel.init(screenGui: ScreenGui)
 
 	Remotes.CombatResultReceived.OnClientEvent:Connect(function(result: any)
 		if typeof(result) ~= "table" then return end
-		playResult(result :: Types.PitRunResult)
+		local typed = result :: Types.PitRunResult
+
+		-- Auf dem Hinweg zurueckgeholt: es gab keinen Kampf, also auch
+		-- nichts abzuspielen.
+		if typed.recalled and (typeof(typed.stages) ~= "table" or #typed.stages == 0) then
+			return
+		end
+
+		showResult(typed)
 	end)
 
 	print("[CombatPanel] Initialisiert")

@@ -27,10 +27,9 @@
 -- ZUR VORSCHAU
 -- ============================================================
 -- Die Fusions-Regel steht verbindlich im Kopf von FusionService. Hier wird sie
--- NUR nachgelesen, um zu zeigen was herauskommt — welcher konkrete Baerchi der
--- neuen Rarity es wird, wuerfelt der Server, deshalb steht dort "?" und nur die
--- Rarity. Einzige Ausnahme ist Mythic: dafuer gibt es laut
--- BaerchiConfig.FUSION_MYTHIC_RESULT genau einen.
+-- NUR nachgelesen, um zu zeigen was herauskommt. Seit v14 steigt die Rarity
+-- NICHT mehr: das Ergebnis ist die Art des levelhoeheren Baerchis (bei
+-- Gleichstand A) in derselben Rarity, mit den besseren Stats beider.
 --
 -- Abgelehnt wird trotzdem serverseitig: die Vorschau kann veraltet sein.
 
@@ -148,30 +147,18 @@ local function buildPreview(a: Types.Baerchi?, b: Types.Baerchi?): Preview
 		}
 	end
 
-	local nextRarity = BaerchiConfig.getNextRarity(a.rarity)
-	if not nextRarity then
-		return {
-			ok = false,
-			headline = "Ende der Kette",
-			detail   = "Mythic laesst sich nicht weiter fusionieren.",
-		}
-	end
-
 	-- Seit v8: das HOEHERE Level, nicht mehr der Durchschnitt (siehe
 	-- FusionService, Regel C).
 	local resultLevel = math.clamp(math.max(a.level, b.level), 1, BaerchiConfig.MAX_LEVEL)
 	local bonus       = EconomyConfig.getFusionStatBonus()
 
-	local headline: string
-	if nextRarity == "Mythic" then
-		local def = BaerchiConfig.getById(BaerchiConfig.FUSION_MYTHIC_RESULT)
-		headline = (def and def.displayName or BaerchiConfig.FUSION_MYTHIC_RESULT) .. "  (Mythic)"
-	else
-		headline = "?  (" .. nextRarity .. ")"
-	end
+	-- v14: keine hoehere Rarity mehr — die Art des levelhoeheren Inputs.
+	local keep = if b.level > a.level then b else a
+	local keepDef = BaerchiConfig.getById(keep.configId)
+	local headline = string.format("%s  (%s)", keepDef and keepDef.displayName or keep.configId, keep.rarity)
 
 	local detail = string.format(
-		"Level %d  —  Stat-Bonus +%d%%\nBasiswerte und Stat-Stufen: pro Stat der bessere der beiden.\nPromotion und Charms fangen bei Null an.",
+		"Level %d  —  Stat-Bonus +%d%%\nDie Rarity bleibt gleich. Basiswerte und Stat-Stufen: pro Stat der bessere der beiden.\nPromotion und Charms fangen bei Null an.",
 		resultLevel,
 		math.floor(bonus * 100 + 0.5)
 	)

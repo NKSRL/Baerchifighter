@@ -72,8 +72,20 @@ function RebirthDialog.refresh()
 	end
 
 	if _rewardLabel then
-		_rewardLabel.Text = if eggs > 0
-			then Loc.tn("ui.rebirth.reward_eggs", eggs, { mult = nextMult })
+		-- v14: Meilensteine koennen jetzt alle vier Ascensions-Eier geben.
+		local milestone = EconomyConfig.getRebirthMilestone(data.rebirthCount + 1)
+		local onlyAscension = true
+		local parts: { string } = {}
+		if milestone then
+			for _, entry in milestone.eggs do
+				if entry.eggType ~= "AscensionEgg" then onlyAscension = false end
+				table.insert(parts, string.format("+%d %s", entry.count,
+					Loc.name("egg." .. entry.eggType .. ".name", entry.eggType)))
+			end
+		end
+		_rewardLabel.Text = if #parts > 0 and not onlyAscension
+			then Loc.t("ui.rebirth.reward_list", { mult = nextMult, eggs = table.concat(parts, ", ") })
+			elseif eggs > 0 then Loc.tn("ui.rebirth.reward_eggs", eggs, { mult = nextMult })
 			else Loc.t("ui.rebirth.reward", { mult = nextMult })
 	end
 
@@ -181,9 +193,22 @@ function RebirthDialog.init(screenGui: ScreenGui)
 
 		local args = { count = typed.newRebirthCount, mult = typed.newMultiplier }
 
-		Toast.success(if typed.ascensionEggs > 0
-			then Loc.tn("msg.rebirth_done_eggs", typed.ascensionEggs, args)
-			else Loc.t("msg.rebirth_done", args))
+		local parts: { string } = {}
+		local onlyAscension = true
+		for _, entry in (typed.milestoneEggs or {}) do
+			if entry.eggType ~= "AscensionEgg" then onlyAscension = false end
+			table.insert(parts, string.format("%d %s", entry.count,
+				Loc.name("egg." .. entry.eggType .. ".name", entry.eggType)))
+		end
+		if #parts > 0 and not onlyAscension then
+			Toast.success(Loc.t("msg.rebirth_done_list", {
+				count = typed.newRebirthCount, mult = typed.newMultiplier, eggs = table.concat(parts, ", "),
+			}))
+		else
+			Toast.success(if typed.ascensionEggs > 0
+				then Loc.tn("msg.rebirth_done_eggs", typed.ascensionEggs, args)
+				else Loc.t("msg.rebirth_done", args))
+		end
 
 		PanelManager.close(PANEL_NAME)
 	end)

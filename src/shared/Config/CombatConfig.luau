@@ -109,6 +109,19 @@ local PIT_LEVEL_GROWTH = 0.25
 --   Verbesserung stehen geblieben statt wegkorrigiert zu werden.
 local ENEMY_ATK_SOFTENING = 0.95
 
+-- ============================================================
+-- v14: GEGNER-SPD WAECHST MIT DER STAGE
+-- ============================================================
+-- Seit v14 wertet der Kampf SPD aus (wer schneller ist, handelt oefter).
+-- Die Baerchis bekommen +0.02 SPD je Level (BaerchiConfig.SPD_PER_LEVEL).
+-- Damit die Kalibrierung oben (Level N schafft etwa N Stages) fuer einen
+-- Baerchi mit SPD 1.0 stehen bleibt, waechst die Gegner-SPD genauso: Stage S
+-- hat die SPD, die ein Level-S-Baerchi mit Grund-SPD 1.0 haette. Ein
+-- Baerchi mit hoeherer Grund-SPD (Kristall-Pfad) handelt dadurch im
+-- Verhaeltnis oefter, einer mit niedriger (Gold-Pfad) seltener — genau das
+-- ist die Pfad-Identitaet.
+local ENEMY_SPD_PER_STAGE = 0.02
+
 -- Sicherheitsnetz gegen Endlos-Laeufe: selbst ein voellig ueberlegener
 -- Baerchi hoert hier auf. Rein technisch, kein Balancing-Wert.
 local MAX_STAGES_PER_RUN = 60
@@ -128,7 +141,7 @@ local function getEnemyStats(pitLevel: number, stage: number): EnemyStats
 	return {
 		maxHp   = math.max(1, math.floor(ENEMY_BASE.maxHp * growth)),
 		atk     = math.max(1, math.floor(ENEMY_BASE.atk * growth * ENEMY_ATK_SOFTENING)),
-		spd     = ENEMY_BASE.spd,
+		spd     = ENEMY_BASE.spd + ENEMY_SPD_PER_STAGE * (math.max(stage, 1) - 1),
 		pwr     = ENEMY_BASE.pwr,
 		skillId = ENEMY_BASE.skillId,
 	}
@@ -140,6 +153,7 @@ return {
 	PIT_LEVEL_GROWTH        = PIT_LEVEL_GROWTH,
 	ENEMY_ATK_SOFTENING     = ENEMY_ATK_SOFTENING,
 	MAX_STAGES_PER_RUN      = MAX_STAGES_PER_RUN,
+	ENEMY_SPD_PER_STAGE     = ENEMY_SPD_PER_STAGE,
 
 	getEnemyGrowth = getEnemyGrowth,
 	getEnemyStats  = getEnemyStats,

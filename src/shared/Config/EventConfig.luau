@@ -2,62 +2,21 @@
 -- EventConfig.luau
 -- ReplicatedStorage/Config/EventConfig.luau
 --
--- Der Event-Zyklus: welche Events es gibt, WAS eine Teilnahme bringt, wie lange
--- ein Event laeuft und wie lange die Pause bis zum naechsten ist.
+-- Der Event-Zyklus (Stand 2026-10-02, siehe Projekt-Doc
+-- EVENT_UND_RARITY_IDEEN_2026-10-02): FUENF Events im festen Wechsel.
 --
--- EventService faehrt nur die Uhr, EventParticipationService teilt nur aus —
--- entschieden und gerechnet wird ausschliesslich hier. Wer ein Event
--- hinzufuegen, streichen oder anders belohnen will, aendert genau diese Datei
--- und sonst keine.
+--   UFO             Flaggschiff, 4 Min. Als EINZIGES Event gibt es Stat-Stufen
+--                   (+1 auf ALLE fuenf Stats) und eine Rarity-Up-Chance.
+--   Hot Egg         Heisses Ei wird per Beruehrung weitergegeben -> Gutes Ei
+--   Mutations-Sturm Blitze mutieren Baerchis, Chance sinkt mit Rarity -> Mutation
+--   Koenigshuegel   Wer am laengsten oben steht -> Gutes Ei
+--   Schatzgraeber   Baerchis graben, Bomben schicken sie heim -> Gutes Ei
 --
--- ============================================================
--- WAS EIN EVENT IST
--- ============================================================
--- Das Event-Pit in der Weltmitte sieht normalerweise aus wie ein schlichter
--- Stall. Waehrend eines Events nimmt es dessen Farben an, und die Tafel
--- darueber zeigt Name, Restzeit und Belohnung (siehe EventService).
+-- EventService faehrt nur die Uhr, EventParticipationService teilt aus und
+-- startet die Event-Handler (Services/EventHandlers/*). WAS es gibt und alle
+-- Zahlen stehen ausschliesslich hier.
 --
--- Wer seinen ausgeruesteten Baerchi ueber den "Zum Event"-Knopf hinschickt und
--- ihn dort stehen laesst, BIS das Event ablaeuft, bekommt zwei Dinge:
---
---   1. IMMER eine Stat-Stufe (siehe PromotionConfig.GROWABLE_STATS). Welchen
---      Stat, haengt vom Event ab: `statFocus` setzt ihn fest, nil wuerfelt wie
---      bisher unter allen noch nicht gedeckelten Stats.
---   2. Bei manchen Events zusaetzlich einen BONUS (`bonus`) — Honig, Eier,
---      Gummies, GoldGummies oder einen Wurf auf eine Mutation.
---
--- Wer niemanden hinschickt, merkt vom Event weiterhin nichts ausser der Farbe.
--- Das ist unveraendert Absicht: der Knopf ist die Entscheidung, und waehrend
--- der Teilnahme frisst der Baerchi keinen Honig (siehe
--- EventParticipationService, LOCK_HOLDER).
---
--- ============================================================
--- WARUM GEZIELTE STAT-EVENTS
--- ============================================================
--- Frueher gab JEDES Event eine ZUFAELLIGE Stat-Stufe. Damit war Teilnahme zwar
--- Fortschritt, aber keine Entscheidung: man konnte nie auf etwas hinarbeiten.
--- Fuenf der zehn Events haben deshalb jetzt einen festen Stat (`statFocus`) —
--- wer PWR fuer seinen Ability-Baerchi will, wartet gezielt auf den
--- Zauber-Zirkel. Steht der Ziel-Stat schon am Rarity-Cap, faellt die Vergabe
--- automatisch auf einen zufaelligen offenen Stat zurueck; eine Teilnahme laeuft
--- also nie ins Leere, solange ueberhaupt noch etwas wachsen kann.
---
--- ============================================================
--- ANNAHMEN, NICHT VOM PROJEKTINHABER VORGEGEBEN
--- ============================================================
---   * Zehn Events in fester Reihenfolge (kein Zufall — sonst kann ein Server
---     durch reines Pech dasselbe Event dreimal hintereinander zeigen, und die
---     Tafel koennte nicht ankuendigen, was als naechstes kommt).
---   * Stat-Events und Bonus-Events wechseln sich in der Reihenfolge ab, damit
---     nicht fuenf Trainings-Events am Stueck laufen.
---   * Je 3 Minuten Event, 5 Minuten Pause → ein voller Durchlauf durch alle
---     zehn Events dauert 80 Minuten. Wer auf ein bestimmtes Event wartet,
---     wartet also hoechstens so lange. Beide Zeiten stehen unten an einer
---     Stelle, falls sich das als zu lang herausstellt.
---   * Die Bonus-Betraege sind an vorhandenen Preisen geeicht: ein Goldenes Ei
---     kostet 10 GoldGummies (EggConfig), ein Charm-Wurf 25 (CharmConfig), ein
---     Zucker-Ei 250 Gummies. Ein Bonus entspricht damit ungefaehr einem
---     mittleren Kauf — spuerbar, aber keine Abkuerzung durchs halbe Spiel.
+-- Der alte 10-Events-Katalog steht im Projekt-Doc EVENT_KATALOG_2026-09-16.
 
 local Types           = require(script.Parent.Parent.Network.Types)
 local EggConfig       = require(script.Parent.EggConfig)
@@ -67,219 +26,292 @@ local PromotionConfig = require(script.Parent.PromotionConfig)
 -- Typen
 --------------------------------------------------------------------------------
 
--- Der Zusatz-Ertrag eines Events, ueber die Stat-Stufe hinaus.
---
--- Bewusst EINE Tabellenform mit optionalen Feldern statt einer echten
--- Variantentypen-Union: `kind` sagt, welches Feld gilt, und
--- EventParticipationService verzweigt genau einmal darauf. Eine Union waere
--- sauberer zu lesen, braeuchte unter --!strict aber an jeder Auswertung eine
--- Typ-Einengung — fuer fuenf Faelle mehr Umstand als Nutzen.
---
 --   kind = "honey"        amount  = Honig je Gebaeude (aufs Lager gedeckelt)
 --   kind = "eggs"         amount  = Anzahl, eggType = welche Sorte
 --   kind = "gummies"      amount  = Basisbetrag, wird mit rebirthMult vergeben
---   kind = "goldGummies"  amount  = Betrag (kein Multiplikator, Premium-Waehrung)
---   kind = "mutation"     chance  = Wahrscheinlichkeit auf EINEN Mutations-Wurf
+--   kind = "goldGummies"  amount  = Betrag (kein Multiplikator)
+--   kind = "mutation"     chance  = Basis-Wahrscheinlichkeit auf EINEN Mutations-Wurf
+--                         (wird mit MUTATION_RARITY_FACTOR[rarity] multipliziert)
+--
+-- v14 (Ei-Baum, WP10): bei kind = "eggs" darf statt einer festen Sorte
+--   eggPick = "highest"   das hoechste freie Ei des Spielers (ohne Ascension)
+--   eggPick = "jump"      ein SPRUNG-EI: eine Stufe ueber dem hoechsten freien
+--                         Ei eines Pfads. Laesst sich oeffnen, schaltet den
+--                         Knoten aber nicht frei. Gibt es keins (alles frei),
+--                         wird es zu "highest".
+-- stehen, und blueprintChance gibt eine Chance auf eine Blaupause dazu.
 export type EventBonus = {
 	kind    : "honey" | "eggs" | "gummies" | "goldGummies" | "mutation",
 	amount  : number?,
 	eggType : Types.EggType?,
+	eggPick : ("highest" | "jump")?,
+	blueprintChance : number?,
 	chance  : number?,
 }
+
+-- v14: NOTFALL-EI. Bei jeder Ei-Belohnung eines Events gibt es mit dieser
+-- Chance ZUSAETZLICH ein Basis-Ei. Das Konzept sah "statt" vor — zusaetzlich
+-- erfuellt denselben Zweck (Notanker fuer das Basis-Ei), ohne dass ein
+-- Spieler sein gutes Ei verliert. ANNAHME, eine Zeile hier.
+local EMERGENCY_BASIC_EGG_CHANCE = 0.05
 
 export type EventDef = {
 	id          : string,
 	displayName : string,
 
-	-- Farben, die das Pit annimmt, waehrend dieses Event laeuft (siehe
-	-- MapService.setEventPitTheme). Neon auf Zaun und Ring, damit der
-	-- Unterschied zum stillen Stall-Look sofort auffaellt.
 	floorColor  : Color3,
 	fenceColor  : Color3,
 	ringColor   : Color3,
 	bannerColor : Color3,
 
-	-- Was ein teilnehmender Baerchi waehrend dieses Events TUT.
-	--
-	-- Bewusst rein kosmetisch: der Spieler soll sehen, dass sein Baerchi aktiv
-	-- mitmacht und nicht bloss herumsteht. Der Ertrag haengt NICHT daran — der
-	-- steht in statFocus/bonus direkt darunter.
-	--
-	--   "bounce" — huepft auf der Stelle
-	--   "lean"   — beugt sich rhythmisch vor (wie beim Fressen am Teich)
-	--   "spin"   — dreht sich langsam
+	-- "bounce" | "lean" | "spin": rein kosmetisch (Idle-Bewegung am Event).
 	action      : "bounce" | "lean" | "spin",
-
-	-- Ein Satz fuer die Anzeige, was der Baerchi dort gerade macht.
 	actionText  : string,
 
-	-- Welcher Stat die garantierte Stufe bekommt (Schluessel aus
-	-- PromotionConfig.GROWABLE_STATS). nil = zufaellig unter allen offenen.
+	-- Dauer DIESES Events in Sekunden (individuell je Event).
+	durationSeconds : number,
+
+	-- Welcher Handler (Services/EventHandlers/<handler>) das Event steuert.
+	handler     : string,
+
+	-- true NUR beim UFO: Stat-Stufen + Rarity-Up. Alle anderen Events geben
+	-- keine Stat-Stufe.
+	statGain    : boolean,
+
+	-- Legacy-Feld (frueher Stat-Fokus je Event). Bleibt nil.
 	statFocus   : string?,
 
-	-- Zusatz-Ertrag, oder nil fuer "nur die Stat-Stufe".
+	-- Zusatz-Ertrag ("gutes Ei" bzw. Mutations-Wurf), oder nil.
 	bonus       : EventBonus?,
+
+	-- Ein Satz fuer Tafel/UI. Hat Vorrang vor der automatisch gebauten Zeile.
+	rewardText  : string?,
 }
 
 --------------------------------------------------------------------------------
 -- Zeiten
 --------------------------------------------------------------------------------
 
--- Wie lange ein Event laeuft, und wie lange danach Pause ist, bevor das
--- naechste beginnt. Siehe Kommentar-Kopf — Annahme, kein Vorgabewert.
-local EVENT_DURATION_SECONDS = 180   -- 3 Minuten
-local EVENT_GAP_SECONDS      = 300   -- 5 Minuten
+-- Standard-Dauer, falls ein Event keine eigene hat (und fuer Debug-Ausgaben).
+local EVENT_DURATION_SECONDS = 180
+local EVENT_GAP_SECONDS      = 300
+
+--------------------------------------------------------------------------------
+-- UFO-Event
+--------------------------------------------------------------------------------
+
+local UFO = {
+	-- So viele Sekunden Beam-Fortschritt braucht ein Baerchi zur Entfuehrung.
+	-- Der Fortschritt muss nicht am Stueck laufen (Kaempfe pausieren ihn nur).
+	BEAM_REQUIRED_SECONDS = 30,
+
+	-- War so lange KEIN Baerchi im Beam (oder kommt einer zu spaet), schliesst
+	-- das UFO den Beam und setzt ihn zurueck: alle Countdowns beginnen neu.
+	BEAM_IDLE_TIMEOUT_SECONDS = 75,
+
+	-- Fixe Kampfdauer, wenn sich ein Baerchi im Beam und ein anderer beruehren.
+	-- Waehrenddessen pausiert der Beam-Fortschritt.
+	FIGHT_SECONDS = 3,
+
+	-- Nach der Entfuehrung: Wartezeit, bevor das Baerchi wieder aufs Plot gesetzt wird.
+	ABDUCT_WAIT_SECONDS = 10,
+
+	-- Beim Absetzen: +1 auf jeden dieser Stats (begrenzt durch STAT_CAP).
+	STAT_GAIN_PER_STAT = 1,
+
+	-- Radius des Beam-Rings (Anteil des Podest-Radius) und Beruehrungsabstand.
+	BEAM_RADIUS_FACTOR = 0.22,
+	TOUCH_DISTANCE     = 5,
+
+	-- Laufgeschwindigkeit der Baerchis im Event (Faktor auf WALK_SPEED).
+	WALK_SPEED_FACTOR = 1.0,
+}
+
+-- Rarity-Up-Chance beim Absetzen des entfuehrten Baerchis. Aufstieg immer nur
+-- EINE Stufe. Chance je AKTUELLER Rarity. Common->Uncommon 55 % und
+-- Secret->Godly 0,5 % vom Projektinhaber, Rest Interpolation.
+local RARITY_UP_CHANCE: { [string]: number } = {
+	Common    = 0.55,
+	Uncommon  = 0.40,
+	Rare      = 0.28,
+	Epic      = 0.18,
+	Legendary = 0.11,
+	Mythic    = 0.065,
+	Divine    = 0.035,
+	Cosmic    = 0.015,
+	Secret    = 0.005,
+	Godly     = 0.0025,
+	Eternal   = 0.001,
+	Omega     = 0,
+}
+
+--------------------------------------------------------------------------------
+-- Mutations-Sturm
+--------------------------------------------------------------------------------
+
+-- Faktor auf die Mutationschance: je hoeher die Rarity, desto geringer.
+local MUTATION_RARITY_FACTOR: { [string]: number } = {
+	Common    = 1.00,
+	Uncommon  = 0.80,
+	Rare      = 0.60,
+	Epic      = 0.40,
+	Legendary = 0.25,
+	Mythic    = 0.15,
+	Divine    = 0.10,
+	Cosmic    = 0.06,
+	Secret    = 0.03,
+	Godly     = 0.015,
+	Eternal   = 0.008,
+	Omega     = 0.004,
+}
+
+local STORM = {
+	-- Alle so viele Sekunden schlaegt ein Blitz in einen Teilnehmer ein (nur
+	-- Optik); der Mutations-Wurf selbst faellt am Event-Ende.
+	STRIKE_INTERVAL_SECONDS = 20,
+}
+
+--------------------------------------------------------------------------------
+-- Hot Egg
+--------------------------------------------------------------------------------
+
+local HOT_EGG = {
+	CHECK_INTERVAL_SECONDS = 0.5,
+	-- Nach einer Weitergabe darf das Ei kurz nicht zurueck.
+	PASS_COOLDOWN_SECONDS  = 2.0,
+	TOUCH_DISTANCE         = 5,
+}
+
+--------------------------------------------------------------------------------
+-- Koenigshuegel
+--------------------------------------------------------------------------------
+
+local KING = {
+	-- Radius des Huegels (Anteil des Podest-Radius).
+	HILL_RADIUS_FACTOR = 0.30,
+	TICK_SECONDS       = 1,
+}
+
+--------------------------------------------------------------------------------
+-- Schatzgraeber
+--------------------------------------------------------------------------------
+
+local TREASURE = {
+	-- Basis-Sekunden pro Fundstelle; hoeheres Level = schneller.
+	BASE_DIG_SECONDS      = 14,
+	DIG_SECONDS_PER_LEVEL = 0.15,
+	MIN_DIG_SECONDS       = 6,
+	-- Fundstellen je Spieler (hoeheres Level -> mehr).
+	BASE_SITES            = 5,
+	LEVEL_PER_EXTRA_SITE  = 10,
+	MAX_SITES             = 9,
+	-- Anteil der Fundstellen, in denen eine Bombe liegt.
+	BOMB_SHARE            = 0.15,
+	-- Belohnung nach Funden (ueberlebt man bis Ende): hoechste passende Stufe.
+	-- Bei Bombe geht ALLES verloren.
+	-- v14: hoechstes freies Ei statt fest Golden/Kristall; ab 5 Funden ein
+	-- Sprung-Ei mit 10% Chance auf eine Blaupause.
+	REWARDS = {
+		{ minFinds = 1, eggPick = "highest", amount = 1 },
+		{ minFinds = 3, eggPick = "highest", amount = 2 },
+		{ minFinds = 5, eggPick = "jump",    amount = 1, blueprintChance = 0.10 },
+	},
+}
 
 --------------------------------------------------------------------------------
 -- Der Katalog
 --------------------------------------------------------------------------------
 
--- Die Reihenfolge hier IST die Reihenfolge im Spiel (EventService zaehlt
--- stumpf durch und faengt danach wieder von vorne an).
 local EVENTS: { EventDef } = {
 
 	-- ---------------------------------------------------------------- 1
 	{
-		id          = "HotEgg",
-		displayName = "Hot Egg",
-		floorColor  = Color3.fromRGB(120,  30,  22),
-		fenceColor  = Color3.fromRGB(255, 100,  40),
-		ringColor   = Color3.fromRGB(255,  80,  40),
-		bannerColor = Color3.fromRGB(255, 140,  90),
-		action      = "bounce",
-		actionText  = "haelt das heisse Ei warm",
-		statFocus   = nil,
-		bonus       = { kind = "eggs", eggType = "GoldenEgg", amount = 1 },
+		id              = "Ufo",
+		displayName     = "UFO",
+		floorColor      = Color3.fromRGB( 18,  34,  64),
+		fenceColor      = Color3.fromRGB( 90, 255, 160),
+		ringColor       = Color3.fromRGB(120, 255, 190),
+		bannerColor     = Color3.fromRGB(150, 255, 200),
+		action          = "spin",
+		actionText      = "wartet im Strahl des UFOs",
+		durationSeconds = 240,
+		handler         = "Ufo",
+		statGain        = true,
+		statFocus       = nil,
+		bonus           = nil,
+		rewardText      = "+1 auf alle Stats  •  Chance auf Rarity-Up",
 	},
 
 	-- ---------------------------------------------------------------- 2
 	{
-		id          = "Kraftprobe",
-		displayName = "Kraftprobe",
-		floorColor  = Color3.fromRGB(110,  20,  30),
-		fenceColor  = Color3.fromRGB(255,  60,  80),
-		ringColor   = Color3.fromRGB(255,  90, 110),
-		bannerColor = Color3.fromRGB(255, 120, 140),
-		action      = "bounce",
-		actionText  = "stemmt Honigfaesser",
-		statFocus   = "atk",
-		bonus       = nil,
+		id              = "HotEgg",
+		displayName     = "Hot Egg",
+		floorColor      = Color3.fromRGB(120,  30,  22),
+		fenceColor      = Color3.fromRGB(255, 100,  40),
+		ringColor       = Color3.fromRGB(255,  80,  40),
+		bannerColor     = Color3.fromRGB(255, 140,  90),
+		action          = "bounce",
+		actionText      = "jongliert das heisse Ei",
+		durationSeconds = 180,
+		handler         = "HotEgg",
+		statGain        = false,
+		statFocus       = nil,
+		bonus           = { kind = "eggs", eggPick = "highest", amount = 1 },
+		rewardText      = "Wer das Ei am Ende haelt: 1x dein hoechstes Ei",
 	},
 
 	-- ---------------------------------------------------------------- 3
 	{
-		id          = "HoneyRush",
-		displayName = "Honig-Rausch",
-		floorColor  = Color3.fromRGB(150, 100,  20),
-		fenceColor  = Color3.fromRGB(255, 200,  60),
-		ringColor   = Color3.fromRGB(255, 214,  90),
-		bannerColor = Color3.fromRGB(255, 214, 120),
-		action      = "lean",
-		actionText  = "schleckt Honig aus dem Trog",
-		statFocus   = nil,
-		bonus       = { kind = "honey", amount = 3 },
+		id              = "MutationsSturm",
+		displayName     = "Mutations-Sturm",
+		floorColor      = Color3.fromRGB( 90,  20,  90),
+		fenceColor      = Color3.fromRGB(255,  60, 220),
+		ringColor       = Color3.fromRGB(255, 100, 235),
+		bannerColor     = Color3.fromRGB(255, 140, 240),
+		action          = "spin",
+		actionText      = "steht mitten im schimmernden Sturm",
+		durationSeconds = 180,
+		handler         = "MutationsSturm",
+		statGain        = false,
+		statFocus       = nil,
+		bonus           = { kind = "mutation", chance = 0.20 },
+		rewardText      = nil,
 	},
 
 	-- ---------------------------------------------------------------- 4
 	{
-		id          = "PanzerTraining",
-		displayName = "Panzer-Training",
-		floorColor  = Color3.fromRGB( 28,  90,  45),
-		fenceColor  = Color3.fromRGB( 90, 230, 120),
-		ringColor   = Color3.fromRGB(120, 240, 150),
-		bannerColor = Color3.fromRGB(150, 245, 175),
-		action      = "lean",
-		actionText  = "laesst sich mit Gummis bewerfen",
-		statFocus   = "hp",
-		bonus       = nil,
+		id              = "Koenigshuegel",
+		displayName     = "Koenigshuegel",
+		floorColor      = Color3.fromRGB( 60,  70,  30),
+		fenceColor      = Color3.fromRGB(255, 215,  70),
+		ringColor       = Color3.fromRGB(255, 225, 110),
+		bannerColor     = Color3.fromRGB(255, 232, 140),
+		action          = "bounce",
+		actionText      = "kaempft um den Huegel",
+		durationSeconds = 180,
+		handler         = "Koenigshuegel",
+		statGain        = false,
+		statFocus       = nil,
+		bonus           = { kind = "eggs", eggPick = "jump", amount = 1, blueprintChance = 0.10 },
+		rewardText      = "Wer am laengsten oben steht: 1 Sprung-Ei  •  Chance auf Blaupause",
 	},
 
 	-- ---------------------------------------------------------------- 5
 	{
-		id          = "GoldenSwarm",
-		displayName = "Goldener Schwarm",
-		floorColor  = Color3.fromRGB(140, 115,  40),
-		fenceColor  = Color3.fromRGB(255, 225, 120),
-		ringColor   = Color3.fromRGB(255, 240, 160),
-		bannerColor = Color3.fromRGB(255, 235, 170),
-		action      = "spin",
-		actionText  = "faengt goldene Bienen",
-		statFocus   = nil,
-		bonus       = { kind = "goldGummies", amount = 10 },
-	},
-
-	-- ---------------------------------------------------------------- 6
-	{
-		id          = "FlinkePfoten",
-		displayName = "Flinke Pfoten",
-		floorColor  = Color3.fromRGB( 20,  90, 105),
-		fenceColor  = Color3.fromRGB( 80, 225, 255),
-		ringColor   = Color3.fromRGB(120, 235, 255),
-		bannerColor = Color3.fromRGB(150, 240, 255),
-		action      = "spin",
-		actionText  = "jagt Schmetterlinge",
-		statFocus   = "spd",
-		bonus       = nil,
-	},
-
-	-- ---------------------------------------------------------------- 7
-	{
-		id          = "GummiRegen",
-		displayName = "Gummi-Regen",
-		floorColor  = Color3.fromRGB(120,  30,  70),
-		fenceColor  = Color3.fromRGB(255,  90, 170),
-		ringColor   = Color3.fromRGB(255, 120, 190),
-		bannerColor = Color3.fromRGB(255, 150, 200),
-		action      = "bounce",
-		actionText  = "faengt Gummis mit dem Maul",
-		statFocus   = nil,
-		bonus       = { kind = "gummies", amount = 400 },
-	},
-
-	-- ---------------------------------------------------------------- 8
-	{
-		id          = "ZauberZirkel",
-		displayName = "Zauber-Zirkel",
-		floorColor  = Color3.fromRGB( 60,  30, 110),
-		fenceColor  = Color3.fromRGB(170, 110, 255),
-		ringColor   = Color3.fromRGB(190, 140, 255),
-		bannerColor = Color3.fromRGB(205, 165, 255),
-		action      = "spin",
-		actionText  = "uebt seine Ability",
-		statFocus   = "pwr",
-		bonus       = nil,
-	},
-
-	-- ---------------------------------------------------------------- 9
-	{
-		id          = "NestFieber",
-		displayName = "Nest-Fieber",
-		floorColor  = Color3.fromRGB(120,  70,  40),
-		fenceColor  = Color3.fromRGB(255, 180, 140),
-		ringColor   = Color3.fromRGB(255, 200, 165),
-		bannerColor = Color3.fromRGB(255, 215, 185),
-		action      = "lean",
-		actionText  = "waermt fremde Nester mit",
-		statFocus   = "egg",
-		bonus       = nil,
-	},
-
-	-- ---------------------------------------------------------------- 10
-	-- Das seltenste Ereignis im Zyklus und der einzige Weg an eine Mutation
-	-- ausserhalb eines Eis. Bewusst nur eine CHANCE und bewusst nur nach
-	-- OBEN (siehe EventParticipationService): ein Baerchi, der schon Lava
-	-- traegt, verliert sie hier nie — er kann sie nur verbessern.
-	{
-		id          = "MutationsSturm",
-		displayName = "Mutations-Sturm",
-		floorColor  = Color3.fromRGB( 90,  20,  90),
-		fenceColor  = Color3.fromRGB(255,  60, 220),
-		ringColor   = Color3.fromRGB(255, 100, 235),
-		bannerColor = Color3.fromRGB(255, 140, 240),
-		action      = "spin",
-		actionText  = "steht mitten im schimmernden Sturm",
-		statFocus   = nil,
-		bonus       = { kind = "mutation", chance = 0.20 },
+		id              = "Schatzgraeber",
+		displayName     = "Schatzgraeber",
+		floorColor      = Color3.fromRGB(110,  78,  40),
+		fenceColor      = Color3.fromRGB(230, 180, 100),
+		ringColor       = Color3.fromRGB(240, 200, 120),
+		bannerColor     = Color3.fromRGB(245, 215, 150),
+		action          = "lean",
+		actionText      = "graebt nach Schaetzen",
+		durationSeconds = 180,
+		handler         = "Schatzgraeber",
+		statGain        = false,
+		statFocus       = nil,
+		bonus           = nil,
+		rewardText      = "Eier je nach Funden  •  Vorsicht, Bomben!",
 	},
 }
 
@@ -296,13 +328,18 @@ local function getById(id: string): EventDef?
 	return nil
 end
 
--- Der Bonus eines Events als kurzer, lesbarer Text ("1x Goldenes Ei").
--- nil, wenn das Event gar keinen Bonus hat.
---
--- Steht hier und nicht im UI, weil BEIDE Seiten denselben Text brauchen: die
--- Tafel ueber dem Pit (Server, EventService) und die Baerchi-Karte (Client).
--- Zwei getrennte Formulierungen wuerden beim naechsten Balancing auseinander
--- laufen.
+local function getDuration(def: EventDef): number
+	return def.durationSeconds or EVENT_DURATION_SECONDS
+end
+
+local function getRarityUpChance(rarity: string): number
+	return RARITY_UP_CHANCE[rarity] or 0
+end
+
+local function getMutationFactor(rarity: string): number
+	return MUTATION_RARITY_FACTOR[rarity] or 1
+end
+
 local function describeBonus(bonus: EventBonus?): string?
 	if not bonus then
 		return nil
@@ -314,6 +351,11 @@ local function describeBonus(bonus: EventBonus?): string?
 		return string.format("%d Honig je Gebaeude", amount)
 
 	elseif bonus.kind == "eggs" then
+		if bonus.eggPick == "jump" then
+			return string.format("%dx Sprung-Ei", amount)
+		elseif bonus.eggPick == "highest" then
+			return string.format("%dx dein hoechstes Ei", amount)
+		end
 		local eggType = bonus.eggType or "BasicEgg"
 		local eggDef  = EggConfig.data[eggType]
 		return string.format("%dx %s", amount, if eggDef then eggDef.displayName else eggType)
@@ -325,40 +367,47 @@ local function describeBonus(bonus: EventBonus?): string?
 		return string.format("%d GoldGummies", amount)
 
 	elseif bonus.kind == "mutation" then
-		return string.format("%d%% Chance auf eine Mutation", math.floor((bonus.chance or 0) * 100 + 0.5))
+		return string.format(
+			"bis zu %d%% Chance auf eine Mutation (sinkt mit Rarity)",
+			math.floor((bonus.chance or 0) * 100 + 0.5)
+		)
 	end
 
 	return nil
 end
 
--- Die vollstaendige Belohnung eines Events in einer Zeile, fuer Tafel und UI:
---   "+1 ATK-Stufe"
---   "+1 Stat-Stufe  •  1x Goldenes Ei"
+-- Die vollstaendige Belohnung in einer Zeile, fuer Tafel und UI.
 local function describeReward(def: EventDef): string
-	-- statFocus erst in eine lokale Variable: ein optionales Feld direkt als
-	-- Tabellen-Schluessel zu benutzen ist unter --!strict die Art Stelle, an
-	-- der die Typpruefung je nach Luau-Version zickt.
-	local focus    = def.statFocus
-	local statPart = "+1 Stat-Stufe"
-
-	if focus then
-		statPart = string.format("+1 %s-Stufe", PromotionConfig.STAT_LABELS[focus] or focus)
+	if def.rewardText then
+		return def.rewardText
 	end
 
 	local bonusPart = describeBonus(def.bonus)
-	if not bonusPart then
-		return statPart
+	if bonusPart then
+		return bonusPart
 	end
 
-	return statPart .. "  •  " .. bonusPart
+	return "Belohnung unbekannt"
 end
 
 return {
+	EMERGENCY_BASIC_EGG_CHANCE = EMERGENCY_BASIC_EGG_CHANCE,
 	EVENT_DURATION_SECONDS = EVENT_DURATION_SECONDS,
 	EVENT_GAP_SECONDS      = EVENT_GAP_SECONDS,
 	EVENTS                 = EVENTS,
 
-	getById        = getById,
-	describeBonus  = describeBonus,
-	describeReward = describeReward,
+	UFO                    = UFO,
+	RARITY_UP_CHANCE       = RARITY_UP_CHANCE,
+	MUTATION_RARITY_FACTOR = MUTATION_RARITY_FACTOR,
+	STORM                  = STORM,
+	HOT_EGG                = HOT_EGG,
+	KING                   = KING,
+	TREASURE               = TREASURE,
+
+	getById           = getById,
+	getDuration       = getDuration,
+	getRarityUpChance = getRarityUpChance,
+	getMutationFactor = getMutationFactor,
+	describeBonus     = describeBonus,
+	describeReward    = describeReward,
 }

@@ -52,6 +52,11 @@ local TICK_SECONDS     = 1
 local _label: TextLabel? = nil
 local _uid: string? = nil
 
+-- v12: Zustand der Pet-Leiste (PetModeChanged). Ist der Baerchi unterwegs
+-- (Event/PIT), pausiert der Lege-Timer auf dem Server — dann zeigt das
+-- Schild das an, statt herunterzuzaehlen.
+local _petState = "Home"
+
 --------------------------------------------------------------------------------
 -- Wem gehoert der Plot, in dem dieses Teil steckt?
 --
@@ -116,6 +121,11 @@ local function refresh()
 	local baerchi = data.island.baerchis[uid]
 	if not baerchi then
 		label.Text = ""
+		return
+	end
+
+	if _petState ~= "Home" then
+		label.Text = "Eier pausiert (unterwegs)"
 		return
 	end
 
@@ -188,6 +198,12 @@ function EggTimerController.init()
 	-- Sekunden-Tick zu warten.
 	Loc.onChanged(function()
 		refresh()
+	end)
+
+	local Remotes = require(ReplicatedStorage.Network.Remotes)
+	Remotes.PetModeChanged.OnClientEvent:Connect(function(state: any)
+		_petState = if typeof(state) == "string" then state else "Home"
+		pcall(refresh)
 	end)
 
 	task.spawn(function()

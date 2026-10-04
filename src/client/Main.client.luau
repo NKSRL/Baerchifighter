@@ -26,6 +26,7 @@
 --   7. WorldController zuletzt — er braucht Panel und PanelManager.
 --   8. EggTimerController — unabhaengig von allen anderen, braucht nur
 --      ClientState (schon initialisiert) und die Figuren in der Welt.
+--   9. SkillFXController (v14) — hoert nur auf Remotes.SkillFXPlay.
 --
 -- Davor, ganz am Anfang: LanguageController. Er legt die Sprache fest, bevor
 -- irgendein Text gebaut wird (er braucht ClientState erst, wenn es dort
@@ -46,6 +47,7 @@ local LanguageController = require(Controllers:WaitForChild("LanguageController"
 local ResultFeed         = require(Controllers:WaitForChild("ResultFeed"))
 local WorldController    = require(Controllers:WaitForChild("WorldController"))
 local EggTimerController = require(Controllers:WaitForChild("EggTimerController"))
+local SkillFXController  = require(Controllers:WaitForChild("SkillFXController"))
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local Hud              = require(UI:WaitForChild("Hud"))
@@ -59,6 +61,10 @@ local FusionPanel      = require(UI:WaitForChild("FusionPanel"))
 local CharmPanel       = require(UI:WaitForChild("CharmPanel"))
 local RebirthDialog    = require(UI:WaitForChild("RebirthDialog"))
 local LanguagePanel    = require(UI:WaitForChild("LanguagePanel"))
+local PetBar           = require(UI:WaitForChild("PetBar"))
+local QuestPanel       = require(UI:WaitForChild("QuestPanel"))
+local QuestTracker     = require(UI:WaitForChild("QuestTracker"))
+local EggTreePanel     = require(UI:WaitForChild("EggTreePanel"))
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -96,12 +102,23 @@ FusionPanel.init(screenGui)
 CharmPanel.init(screenGui)
 RebirthDialog.init(screenGui)
 LanguagePanel.init(screenGui)
+QuestPanel.init(screenGui)
+-- v14: Ei-Baum (oeffnet sich aus dem Ei-Menue)
+EggTreePanel.init(screenGui)
 
 Hud.init(screenGui)
 MenuBar.init(screenGui)
 
+-- v13: Quest-Karte links (braucht das Quest-Fenster, das oben angemeldet wird)
+QuestTracker.init(screenGui)
+
+-- v12: untere Pet-Leiste (Event / Fight), legt auch den PitResumeDialog an
+PetBar.init(screenGui)
+
 ResultFeed.init()
 WorldController.init()
 EggTimerController.init()
+-- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
+SkillFXController.init()
 
 print("[Client] Bereit")

@@ -64,6 +64,24 @@ function ResultFeed.init()
 		Toast.success(Loc.t("msg.level_up", { level = typed.newLevel }))
 	end)
 
+	-- v14: ein Knoten im Ei-Baum ist frei geworden
+	Remotes.EggTreeUnlocked.OnClientEvent:Connect(function(result: any)
+		if typeof(result) ~= "table" or typeof(result.eggType) ~= "string" then return end
+		local egg = Loc.name("egg." .. result.eggType .. ".name", result.eggType)
+		Toast.success(Loc.t("msg.tree_unlocked", { egg = egg }))
+	end)
+
+	-- v14: Ei-Presse
+	Remotes.EggPressResultReceived.OnClientEvent:Connect(function(result: any)
+		if typeof(result) ~= "table" then return end
+		local typed = result :: Types.EggPressResult
+		Toast.success(Loc.t("msg.pressed", {
+			n    = typed.used,
+			from = Loc.name("egg." .. typed.fromEgg .. ".name", typed.fromEgg),
+			to   = Loc.name("egg." .. typed.toEgg .. ".name", typed.toEgg),
+		}))
+	end)
+
 	print("[ResultFeed] Initialisiert")
 end
 

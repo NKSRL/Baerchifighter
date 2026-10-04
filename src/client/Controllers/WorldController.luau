@@ -12,7 +12,7 @@
 --   2. Gebaeude-Parts (Name = BuildingId, Attribute "BuildingLevel"/"HoneyPool")
 --      → ein hier erzeugter ProximityPrompt (E) oeffnet das Gebaeude-Panel
 --   3. Die Kampf-Plattform ("FightFloor" im Model "PitPlatform")
---      → Kampf-Panel, ebenfalls ueber einen hier erzeugten ProximityPrompt
+--      → Arena-Ausbau-Menue (die Kampf-Auswahl liegt in der PetBar), ueber einen hier erzeugten ProximityPrompt
 --
 -- Gelegte Eier sind ABSICHTLICH kein vierter Anker mehr: sie werden nicht
 -- mehr angeklickt, sondern serverseitig per Touched eingesammelt, sobald die
@@ -247,7 +247,7 @@ local function hookOwnedPart(instance: BasePart)
 	end
 
 	if instance.Name == "FightFloor" then
-		addPanelPrompt(instance, "Kaempfen", "Kampfplattform", "Combat")
+		addPanelPrompt(instance, "Ausbauen", "Kampfplattform", PanelManager.ARENA_PANEL)
 		return
 	end
 

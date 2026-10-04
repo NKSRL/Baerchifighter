@@ -53,6 +53,10 @@ local _phaseEndsAt = 0
 -- kein Zufall — siehe EventConfig, Kommentar bei EVENTS.
 local _nextIndex = 1
 
+-- Beobachter, die beim START eines Events benachrichtigt werden wollen
+-- (EventParticipationService startet damit den Event-Handler).
+local _onEventStarted: { (EventConfig.EventDef) -> () } = {}
+
 -- Beobachter, die beim ENDE eines Events benachrichtigt werden wollen.
 -- Aktuell genau einer: EventParticipationService, der dann die Stat-Stufen
 -- an die anwesenden Baerchis verteilt.
@@ -99,7 +103,7 @@ local function startEvent()
 	_nextIndex = (_nextIndex % #EventConfig.EVENTS) + 1
 
 	_active      = def
-	_phaseEndsAt = os.time() + EventConfig.EVENT_DURATION_SECONDS
+	_phaseEndsAt = os.time() + EventConfig.getDuration(def)
 
 	MapService.setEventPitTheme({
 		floorColor = def.floorColor,
@@ -110,6 +114,13 @@ local function startEvent()
 	broadcastPhase()
 
 	print("[EventService] Event gestartet:", def.displayName, "|", EventConfig.describeReward(def))
+
+	for _, callback in _onEventStarted do
+		local ok, err = pcall(callback, def)
+		if not ok then
+			warn("[EventService] onEventStarted-Callback fehlgeschlagen:", err)
+		end
+	end
 end
 
 local function endEvent()
@@ -253,6 +264,10 @@ end
 -- UNKRITISCH: der Server startet grundsaetzlich in einer Pause (siehe init),
 -- das erste Event endet also fruehestens nach EVENT_GAP + EVENT_DURATION
 -- Sekunden. Bis dahin sind laengst alle Services angemeldet.
+function EventService.onEventStarted(callback: (EventConfig.EventDef) -> ())
+	table.insert(_onEventStarted, callback)
+end
+
 function EventService.onEventEnded(callback: (EventConfig.EventDef) -> ())
 	table.insert(_onEventEnded, callback)
 end
@@ -284,7 +299,7 @@ function EventService.init()
 
 	print(
 		"[EventService] Initialisiert |", #EventConfig.EVENTS, "Events im Wechsel |",
-		EventConfig.EVENT_DURATION_SECONDS, "s aktiv,", EventConfig.EVENT_GAP_SECONDS, "s Pause"
+		"individuelle Dauer,", EventConfig.EVENT_GAP_SECONDS, "s Pause"
 	)
 end
 

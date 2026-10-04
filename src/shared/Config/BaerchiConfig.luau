@@ -6,8 +6,8 @@
 -- Kein Service hat hardcodierte Stats — alles kommt von hier.
 -- Neuer Baerchi = neuer Eintrag, kein Code aendern.
 --
--- Enthaelt ausserdem die Baerchi-Progression (Level-Cap, XP-Kurve) und
--- die Rarity-Kette die FusionService zum Hochstufen benutzt.
+-- Enthaelt ausserdem die Baerchi-Progression (Level-Cap, XP-Kurve), die
+-- Rarity-Kette und (v14) die Pfade des Ei-Baums.
 
 local Types = require(script.Parent.Parent.Network.Types)
 
@@ -64,8 +64,15 @@ export type BaerchiDef = {
 	layIntervalSeconds : number,
 	eggTable    : { { eggType: Types.EggType, weight: number } },
 
+	-- v14: Chance (0..1), dass ein gelegtes Ei eine Stufe hoeher im Baum
+	-- landet. Nur Void-Baerchis haben das (siehe Kommentar bei BAERCHIS).
+	layUpgradeChance : number?,
+
+	path        : Types.PathId,   -- v14: Pfad im Ei-Baum (siehe PATHS)
 	defaultSkill: string,   -- SkillId aus SkillConfig
-	eggSource   : { Types.EggType },  -- aus welchen Eiern hatchbar
+	-- Aus welchen Eiern hatchbar. Seit v14 BERECHNET (EggConfig traegt es beim
+	-- Laden ein), in der Tabelle unten immer leer.
+	eggSource   : { Types.EggType },
 	description : string,   -- fuer Ingame-UI
 }
 
@@ -100,87 +107,97 @@ export type BaerchiDef = {
 -- (siehe CombatConfig) statt hier — sonst wuerde jeder Baerchi HP bekommen,
 -- die im PvP spaeter niemand haben soll.
 
+-- ============================================================
+-- v14: PFADE UND PFAD-PROFILE (Mega Egg Tree)
+-- ============================================================
+-- Jeder Baerchi gehoert zu einem Pfad. Ein Pfad ist KEIN Upgrade, sondern
+-- ein Spielziel, mit echtem Preis:
+--
+--   Gold      das STAERKSTE Pet   hohe HP und ATK        niedrige SPD, mittleres Legen
+--   Kristall  das SCHNELLSTE Pet  hohe SPD und PWR,      niedrige HP (Glaskanone)
+--                                 schnelles Legen
+--   Void      das SELTENSTE Pet   legt seltenere Eier,   schwacher Kampf, langsames Legen
+--                                 Eier steigen auf
+--   Kosmos    Allrounder          Mischung, hoechste     teuer zu erreichen, nirgends Nr. 1
+--                                 Rarity
+--   Stamm     Einstieg            —                      —
+--
+-- Innerhalb EINER Rarity hat kein Pfad das objektiv beste Pet. Geprueft wird
+-- das von tools/sim/path_balance.lua (WP6).
+--
+-- `layUpgradeChance` (nur Void): Chance, dass ein gelegtes Ei eine Stufe
+-- hoeher im Baum landet (siehe EggLayService). Das ist die Void-Identitaet.
+--
+-- eggSource wird seit v14 NICHT mehr von Hand gepflegt: EggConfig berechnet
+-- die hatchTables aus Rarity-Verteilung und Pfad-Gewicht und traegt eggSource
+-- hier nach. Die Listen unten bleiben deshalb leer.
+
 local BAERCHIS: { [string]: BaerchiDef } = {
 
 	-- ============================================================
-	-- COMMON
+	-- COMMON (Stamm)
 	-- ============================================================
 
 	RedBaerchi = {
-		id          = "RedBaerchi",
-		displayName = "Roter Baerchi",
-		rarity      = "Common",
-		baseStats   = { hp = 105, atk = 10, spd = 1.0, pwr = 0.10 },
+		id = "RedBaerchi", displayName = "Roter Baerchi", rarity = "Common", path = "Stamm",
+		baseStats = { hp = 105, atk = 10, spd = 1.0, pwr = 0.10 },
 		layIntervalSeconds = 240,
-		eggTable    = {
+		eggTable = {
 			{ eggType = "BasicEgg", weight = 100 },
 		},
-		defaultSkill= "BasicPunch",
-		eggSource   = { "BasicEgg" },
+		defaultSkill = "BasicPunch", eggSource = {},
 		description = "Der Klassiker. Zuverlaessig, unaufgeregt.",
 	},
 
 	GreenBaerchi = {
-		id          = "GreenBaerchi",
-		displayName = "Gruener Baerchi",
-		rarity      = "Common",
-		baseStats   = { hp = 130, atk = 8, spd = 0.9, pwr = 0.06 },
+		id = "GreenBaerchi", displayName = "Gruener Baerchi", rarity = "Common", path = "Stamm",
+		baseStats = { hp = 130, atk = 8, spd = 0.9, pwr = 0.06 },
 		layIntervalSeconds = 300,
-		eggTable    = {
+		eggTable = {
 			{ eggType = "BasicEgg", weight = 90 },
 			{ eggType = "SugarEgg", weight = 10 },
 		},
-		defaultSkill= "GummyShield",
-		eggSource   = { "BasicEgg" },
+		defaultSkill = "GummyShield", eggSource = {},
 		description = "Etwas zaehlebiger, dafuer langsamer.",
 	},
 
 	YellowBaerchi = {
-		id          = "YellowBaerchi",
-		displayName = "Gelber Baerchi",
-		rarity      = "Common",
-		baseStats   = { hp = 93, atk = 12, spd = 1.2, pwr = 0.18 },
+		id = "YellowBaerchi", displayName = "Gelber Baerchi", rarity = "Common", path = "Stamm",
+		baseStats = { hp = 93, atk = 12, spd = 1.2, pwr = 0.18 },
 		layIntervalSeconds = 270,
-		eggTable    = {
+		eggTable = {
 			{ eggType = "BasicEgg", weight = 85 },
 			{ eggType = "SugarEgg", weight = 15 },
 		},
-		defaultSkill= "SugarRush",
-		eggSource   = { "BasicEgg" },
+		defaultSkill = "SugarRush", eggSource = {},
 		description = "Schnell aber zerbrechlich. Glaskanone.",
 	},
 
 	-- ============================================================
-	-- UNCOMMON
+	-- UNCOMMON (Stamm)
 	-- ============================================================
 
 	BlueBaerchi = {
-		id          = "BlueBaerchi",
-		displayName = "Blauer Baerchi",
-		rarity      = "Uncommon",
-		baseStats   = { hp = 156, atk = 14, spd = 1.0, pwr = 0.12 },
+		id = "BlueBaerchi", displayName = "Blauer Baerchi", rarity = "Uncommon", path = "Stamm",
+		baseStats = { hp = 156, atk = 14, spd = 1.0, pwr = 0.12 },
 		layIntervalSeconds = 330,
-		eggTable    = {
+		eggTable = {
 			{ eggType = "BasicEgg", weight = 65 },
 			{ eggType = "SugarEgg", weight = 35 },
 		},
-		defaultSkill= "IceSlam",
-		eggSource   = { "BasicEgg", "SugarEgg" },
+		defaultSkill = "IceSlam", eggSource = {},
 		description = "Solide in allen Bereichen.",
 	},
 
 	OrangeBaerchi = {
-		id          = "OrangeBaerchi",
-		displayName = "Oranger Baerchi",
-		rarity      = "Uncommon",
-		baseStats   = { hp = 117, atk = 18, spd = 1.1, pwr = 0.22 },
+		id = "OrangeBaerchi", displayName = "Oranger Baerchi", rarity = "Uncommon", path = "Stamm",
+		baseStats = { hp = 117, atk = 18, spd = 1.1, pwr = 0.22 },
 		layIntervalSeconds = 360,
-		eggTable    = {
+		eggTable = {
 			{ eggType = "BasicEgg", weight = 60 },
 			{ eggType = "SugarEgg", weight = 40 },
 		},
-		defaultSkill= "FireBite",
-		eggSource   = { "SugarEgg" },
+		defaultSkill = "FireBite", eggSource = {},
 		description = "Hoher Schaden, mittlere Ausdauer.",
 	},
 
@@ -189,35 +206,32 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	SugarBaerchi = {
-		id          = "SugarBaerchi",
-		displayName = "Zucker-Baerchi",
-		rarity      = "Rare",
-		baseStats   = { hp = 205, atk = 20, spd = 1.2, pwr = 0.20 },
+		id = "SugarBaerchi", displayName = "Zucker-Baerchi", rarity = "Rare", path = "Stamm",
+		baseStats = { hp = 205, atk = 20, spd = 1.2, pwr = 0.20 },
 		layIntervalSeconds = 420,
-		eggTable    = {
-			{ eggType = "BasicEgg", weight = 15 },
-			{ eggType = "SugarEgg", weight = 75 },
-			{ eggType = "GoldenEgg", weight = 10 },
+		-- v14: oeffnet beide Wege aus dem Stamm (Gold ueber Golden, Void ueber Nebel).
+		eggTable = {
+			{ eggType = "BasicEgg",  weight = 15 },
+			{ eggType = "SugarEgg",  weight = 60 },
+			{ eggType = "GoldenEgg", weight = 13 },
+			{ eggType = "MistEgg",   weight = 12 },
 		},
-		defaultSkill= "SugarStorm",
-		eggSource   = { "SugarEgg", "GoldenEgg" },
+		defaultSkill = "SugarStorm", eggSource = {},
 		description = "Smells like candy, hits like a truck.",
 	},
 
 	CrystalBaerchi = {
-		id          = "CrystalBaerchi",
-		displayName = "Kristall-Baerchi",
-		rarity      = "Rare",
-		baseStats   = { hp = 250, atk = 16, spd = 0.9, pwr = 0.28 },
-		layIntervalSeconds = 480,
-		eggTable    = {
-			{ eggType = "SugarEgg", weight = 55 },
-			{ eggType = "GoldenEgg", weight = 30 },
-			{ eggType = "CrystalEgg", weight = 15 },
+		id = "CrystalBaerchi", displayName = "Kristall-Baerchi", rarity = "Rare", path = "Kristall",
+		-- v14: Kristall-Profil (Glaskanone, schnell). Vorher 250 HP / 0.9 SPD.
+		baseStats = { hp = 165, atk = 17, spd = 1.45, pwr = 0.34 },
+		layIntervalSeconds = 360,
+		eggTable = {
+			{ eggType = "SugarEgg",   weight = 45 },
+			{ eggType = "GoldenEgg",  weight = 35 },
+			{ eggType = "CrystalEgg", weight = 20 },
 		},
-		defaultSkill= "ShardBlast",
-		eggSource   = { "GoldenEgg" },
-		description = "Haerter als Stahl, langsamer als Honig.",
+		defaultSkill = "ShardBlast", eggSource = {},
+		description = "Scharfkantig und blitzschnell. Zerbricht leicht.",
 	},
 
 	-- ============================================================
@@ -225,34 +239,32 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	GoldenGrizzly = {
-		id          = "GoldenGrizzly",
-		displayName = "Goldener Grizzly",
-		rarity      = "Epic",
-		baseStats   = { hp = 366, atk = 35, spd = 1.0, pwr = 0.14 },
+		id = "GoldenGrizzly", displayName = "Goldener Grizzly", rarity = "Epic", path = "Gold",
+		baseStats = { hp = 420, atk = 40, spd = 0.85, pwr = 0.14 },
 		layIntervalSeconds = 540,
-		eggTable    = {
-			{ eggType = "SugarEgg", weight = 20 },
-			{ eggType = "GoldenEgg", weight = 70 },
-			{ eggType = "CrystalEgg", weight = 10 },
+		eggTable = {
+			{ eggType = "SugarEgg",    weight = 15 },
+			{ eggType = "GoldenEgg",   weight = 62 },
+			{ eggType = "PlatinumEgg", weight = 15 },
+			{ eggType = "CrystalEgg",  weight = 8 },
 		},
-		defaultSkill= "GoldRush",
-		eggSource   = { "GoldenEgg", "CrystalEgg" },
+		defaultSkill = "GoldRush", eggSource = {},
 		description = "Selten, maechtig, und weiss es.",
 	},
 
 	VoidBaerchi = {
-		id          = "VoidBaerchi",
-		displayName = "Void-Baerchi",
-		rarity      = "Epic",
-		baseStats   = { hp = 278, atk = 45, spd = 1.4, pwr = 0.30 },
-		layIntervalSeconds = 510,
-		eggTable    = {
-			{ eggType = "SugarEgg", weight = 40 },
-			{ eggType = "GoldenEgg", weight = 40 },
-			{ eggType = "CrystalEgg", weight = 20 },
+		id = "VoidBaerchi", displayName = "Void-Baerchi", rarity = "Epic", path = "Void",
+		-- v14: Void-Profil (schwacher Kampf, seltene Eier). Vorher 278/45/1.4/0.30.
+		baseStats = { hp = 290, atk = 32, spd = 1.05, pwr = 0.24 },
+		layIntervalSeconds = 600,
+		layUpgradeChance = 0.08,
+		eggTable = {
+			{ eggType = "SugarEgg", weight = 15 },
+			{ eggType = "MistEgg",  weight = 55 },
+			{ eggType = "VoidEgg",  weight = 20 },
+			{ eggType = "GoldenEgg", weight = 10 },
 		},
-		defaultSkill= "BlackHole",
-		eggSource   = { "CrystalEgg" },
+		defaultSkill = "BlackHole", eggSource = {},
 		description = "Kommt aus dem Nichts. Verschwindet genauso.",
 	},
 
@@ -261,54 +273,299 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	RainbowBaerchi = {
-		id          = "RainbowBaerchi",
-		displayName = "Regenbogen-Baerchi",
-		rarity      = "Legendary",
-		baseStats   = { hp = 577, atk = 55, spd = 1.3, pwr = 0.35 },
-		layIntervalSeconds = 660,
-		eggTable    = {
-			{ eggType = "GoldenEgg", weight = 45 },
-			{ eggType = "CrystalEgg", weight = 50 },
-			{ eggType = "AscensionEgg", weight = 5 },
+		id = "RainbowBaerchi", displayName = "Regenbogen-Baerchi", rarity = "Legendary", path = "Kristall",
+		baseStats = { hp = 440, atk = 54, spd = 1.5, pwr = 0.42 },
+		layIntervalSeconds = 540,
+		eggTable = {
+			{ eggType = "GoldenEgg",    weight = 26 },
+			{ eggType = "CrystalEgg",   weight = 55 },
+			{ eggType = "PrismEgg",     weight = 15 },
+			{ eggType = "AscensionEgg", weight = 4 },
 		},
-		defaultSkill= "ChromaBlast",
-		eggSource   = { "AscensionEgg" },
+		defaultSkill = "ChromaBlast", eggSource = {},
 		description = "Jede Farbe. Jede Kraft.",
 	},
 
 	AncientBaerchi = {
-		id          = "AncientBaerchi",
-		displayName = "Uralter Baerchi",
-		rarity      = "Legendary",
-		baseStats   = { hp = 923, atk = 40, spd = 0.85, pwr = 0.08 },
-		layIntervalSeconds = 600,
-		eggTable    = {
-			{ eggType = "GoldenEgg", weight = 40 },
-			{ eggType = "CrystalEgg", weight = 57 },
+		id = "AncientBaerchi", displayName = "Uralter Baerchi", rarity = "Legendary", path = "Gold",
+		baseStats = { hp = 1000, atk = 56, spd = 0.85, pwr = 0.08 },
+		layIntervalSeconds = 660,
+		eggTable = {
+			{ eggType = "GoldenEgg",    weight = 30 },
+			{ eggType = "PlatinumEgg",  weight = 50 },
+			{ eggType = "SunEgg",       weight = 12 },
+			{ eggType = "CrystalEgg",   weight = 5 },
 			{ eggType = "AscensionEgg", weight = 3 },
 		},
-		defaultSkill= "TitanMode",
-		eggSource   = { "AscensionEgg" },
+		defaultSkill = "TitanMode", eggSource = {},
 		description = "War schon da bevor Gummies erfunden wurden.",
 	},
 
 	-- ============================================================
-	-- MYTHIC (Fusion-only — kein eggSource)
+	-- MYTHIC
 	-- ============================================================
 
 	CosmicBaerchi = {
-		id          = "CosmicBaerchi",
-		displayName = "Kosmischer Baerchi",
-		rarity      = "Mythic",
-		baseStats   = { hp = 1286, atk = 90, spd = 1.5, pwr = 0.26 },
+		-- v14: Anzeigename "Sternen-Baerchi" (die Rarity heisst jetzt Cosmic),
+		-- die ID bleibt wegen bestehender Spielstaende.
+		id = "CosmicBaerchi", displayName = "Sternen-Baerchi", rarity = "Mythic", path = "Kosmos",
+		baseStats = { hp = 1100, atk = 80, spd = 1.25, pwr = 0.26 },
 		layIntervalSeconds = 900,
-		eggTable    = {
-			{ eggType = "CrystalEgg", weight = 80 },
-			{ eggType = "AscensionEgg", weight = 20 },
+		eggTable = {
+			{ eggType = "PlatinumEgg",  weight = 25 },
+			{ eggType = "PrismEgg",     weight = 25 },
+			{ eggType = "VoidEgg",      weight = 25 },
+			{ eggType = "CrystalEgg",   weight = 15 },
+			{ eggType = "AscensionEgg", weight = 10 },
 		},
-		defaultSkill= "BigBang",
-		eggSource   = {},   -- nur durch Fusion erhaltbar
-		description = "Fusion aus zwei Legendaries. Das Limit.",
+		defaultSkill = "BigBang", eggSource = {},
+		description = "Ein Stueck Sternenhimmel mit Fell.",
+	},
+
+	PhoenixBaerchi = {
+		id = "PhoenixBaerchi", displayName = "Phoenix-Baerchi", rarity = "Mythic", path = "Gold",
+		baseStats = { hp = 2100, atk = 142, spd = 0.85, pwr = 0.16 },
+		layIntervalSeconds = 840,
+		eggTable = {
+			{ eggType = "PlatinumEgg",  weight = 40 },
+			{ eggType = "SunEgg",       weight = 45 },
+			{ eggType = "ZenithEgg",    weight = 10 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "PhoenixRebirth", eggSource = {},
+		description = "Faellt einmal. Steht immer wieder auf.",
+	},
+
+	GlacierBaerchi = {
+		id = "GlacierBaerchi", displayName = "Gletscher-Baerchi", rarity = "Mythic", path = "Kristall",
+		baseStats = { hp = 880, atk = 84, spd = 1.6, pwr = 0.44 },
+		layIntervalSeconds = 660,
+		eggTable = {
+			{ eggType = "CrystalEgg",   weight = 25 },
+			{ eggType = "PrismEgg",     weight = 45 },
+			{ eggType = "AuroraEgg",    weight = 25 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "GlacierFrost", eggSource = {},
+		description = "Wo er hinschaut, wird alles langsam.",
+	},
+
+	PhantomBaerchi = {
+		id = "PhantomBaerchi", displayName = "Phantom-Baerchi", rarity = "Mythic", path = "Void",
+		baseStats = { hp = 980, atk = 70, spd = 1.05, pwr = 0.20 },
+		layIntervalSeconds = 960,
+		layUpgradeChance = 0.25,
+		eggTable = {
+			{ eggType = "MistEgg",      weight = 10 },
+			{ eggType = "VoidEgg",      weight = 45 },
+			{ eggType = "ShadowEgg",    weight = 40 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "PhantomOmen", eggSource = {},
+		description = "Man sieht ihn kaum. Seine Eier schon.",
+	},
+
+	-- ============================================================
+	-- DIVINE
+	-- ============================================================
+
+	SeraphBaerchi = {
+		id = "SeraphBaerchi", displayName = "Seraph-Baerchi", rarity = "Divine", path = "Gold",
+		baseStats = { hp = 2900, atk = 170, spd = 0.85, pwr = 0.18 },
+		layIntervalSeconds = 1020,
+		eggTable = {
+			{ eggType = "SunEgg",       weight = 40 },
+			{ eggType = "ZenithEgg",    weight = 50 },
+			{ eggType = "CometEgg",     weight = 5 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "SeraphGrace", eggSource = {},
+		description = "Sechs Fluegel, ein Herz aus Honig.",
+	},
+
+	NorthernLightBaerchi = {
+		id = "NorthernLightBaerchi", displayName = "Polarlicht-Baerchi", rarity = "Divine", path = "Kristall",
+		baseStats = { hp = 1450, atk = 128, spd = 1.65, pwr = 0.48 },
+		layIntervalSeconds = 780,
+		eggTable = {
+			{ eggType = "PrismEgg",     weight = 30 },
+			{ eggType = "AuroraEgg",    weight = 60 },
+			{ eggType = "CometEgg",     weight = 5 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "AuroraVeil", eggSource = {},
+		description = "Tanzt ueber den Himmel, schneller als das Auge.",
+	},
+
+	EclipseBaerchi = {
+		id = "EclipseBaerchi", displayName = "Eklipse-Baerchi", rarity = "Divine", path = "Void",
+		baseStats = { hp = 1650, atk = 104, spd = 1.05, pwr = 0.22 },
+		layIntervalSeconds = 1140,
+		layUpgradeChance = 0.12,
+		eggTable = {
+			{ eggType = "ShadowEgg",    weight = 45 },
+			{ eggType = "AbyssEgg",     weight = 45 },
+			{ eggType = "CometEgg",     weight = 5 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "EclipseShroud", eggSource = {},
+		description = "Wenn er auftaucht, wird es mitten am Tag dunkel.",
+	},
+
+	-- ============================================================
+	-- COSMIC (Kosmos)
+	-- ============================================================
+
+	CometBaerchi = {
+		id = "CometBaerchi", displayName = "Kometen-Baerchi", rarity = "Cosmic", path = "Kosmos",
+		baseStats = { hp = 3800, atk = 205, spd = 1.25, pwr = 0.30 },
+		layIntervalSeconds = 1140,
+		eggTable = {
+			{ eggType = "ZenithEgg",    weight = 15 },
+			{ eggType = "AuroraEgg",    weight = 15 },
+			{ eggType = "AbyssEgg",     weight = 15 },
+			{ eggType = "CometEgg",     weight = 45 },
+			{ eggType = "NovaEgg",      weight = 5 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "CometImpact", eggSource = {},
+		description = "Kommt mit einem Knall. Bleibt mit einem Krater.",
+	},
+
+	NebulaBaerchi = {
+		id = "NebulaBaerchi", displayName = "Nebula-Baerchi", rarity = "Cosmic", path = "Kosmos",
+		baseStats = { hp = 3600, atk = 195, spd = 1.3, pwr = 0.34 },
+		layIntervalSeconds = 1140,
+		eggTable = {
+			{ eggType = "AbyssEgg",     weight = 20 },
+			{ eggType = "CometEgg",     weight = 55 },
+			{ eggType = "NovaEgg",      weight = 20 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "NebulaBurn", eggSource = {},
+		description = "Ein Fell aus Sternenstaub, der brennt.",
+	},
+
+	PulsarBaerchi = {
+		id = "PulsarBaerchi", displayName = "Pulsar-Baerchi", rarity = "Cosmic", path = "Kosmos",
+		baseStats = { hp = 3700, atk = 200, spd = 1.3, pwr = 0.30 },
+		layIntervalSeconds = 1140,
+		eggTable = {
+			{ eggType = "AuroraEgg",    weight = 20 },
+			{ eggType = "CometEgg",     weight = 55 },
+			{ eggType = "NovaEgg",      weight = 20 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "PulsarPulse", eggSource = {},
+		description = "Tickt wie eine Uhr. Jeder Schlag lauter.",
+	},
+
+	-- ============================================================
+	-- SECRET (Kosmos)
+	-- ============================================================
+
+	ShadeBaerchi = {
+		id = "ShadeBaerchi", displayName = "Schemen-Baerchi", rarity = "Secret", path = "Kosmos",
+		baseStats = { hp = 6200, atk = 310, spd = 1.35, pwr = 0.32 },
+		layIntervalSeconds = 1320,
+		eggTable = {
+			{ eggType = "CometEgg",     weight = 30 },
+			{ eggType = "NovaEgg",      weight = 55 },
+			{ eggType = "GalaxyEgg",    weight = 10 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "ShadeSlash", eggSource = {},
+		description = "Niemand hat ihn je ganz gesehen.",
+	},
+
+	RiddleBaerchi = {
+		id = "RiddleBaerchi", displayName = "Raetsel-Baerchi", rarity = "Secret", path = "Kosmos",
+		baseStats = { hp = 6400, atk = 295, spd = 1.3, pwr = 0.36 },
+		layIntervalSeconds = 1320,
+		eggTable = {
+			{ eggType = "CometEgg",     weight = 20 },
+			{ eggType = "NovaEgg",      weight = 60 },
+			{ eggType = "GalaxyEgg",    weight = 15 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "RiddleBeam", eggSource = {},
+		description = "Beantwortet jede Frage mit einer neuen.",
+	},
+
+	-- ============================================================
+	-- GODLY (Kosmos)
+	-- ============================================================
+
+	TitanBaerchi = {
+		id = "TitanBaerchi", displayName = "Titanen-Baerchi", rarity = "Godly", path = "Kosmos",
+		baseStats = { hp = 11500, atk = 480, spd = 1.2, pwr = 0.30 },
+		layIntervalSeconds = 1500,
+		eggTable = {
+			{ eggType = "NovaEgg",      weight = 45 },
+			{ eggType = "GalaxyEgg",    weight = 50 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "TitanFist", eggSource = {},
+		description = "Traegt Berge, als waeren es Gummibaerchen.",
+	},
+
+	GenesisBaerchi = {
+		id = "GenesisBaerchi", displayName = "Genesis-Baerchi", rarity = "Godly", path = "Kosmos",
+		baseStats = { hp = 10500, atk = 440, spd = 1.35, pwr = 0.36 },
+		layIntervalSeconds = 1500,
+		eggTable = {
+			{ eggType = "NovaEgg",      weight = 40 },
+			{ eggType = "GalaxyEgg",    weight = 55 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "GenesisWave", eggSource = {},
+		description = "Am Anfang war der Baerchi.",
+	},
+
+	-- ============================================================
+	-- ETERNAL (Kosmos)
+	-- ============================================================
+
+	ChronosBaerchi = {
+		id = "ChronosBaerchi", displayName = "Chronos-Baerchi", rarity = "Eternal", path = "Kosmos",
+		baseStats = { hp = 18500, atk = 690, spd = 1.4, pwr = 0.34 },
+		layIntervalSeconds = 1800,
+		eggTable = {
+			{ eggType = "NovaEgg",      weight = 30 },
+			{ eggType = "GalaxyEgg",    weight = 65 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "ChronosRift", eggSource = {},
+		description = "Kommt immer genau rechtzeitig.",
+	},
+
+	InfinityBaerchi = {
+		id = "InfinityBaerchi", displayName = "Unendlichkeits-Baerchi", rarity = "Eternal", path = "Kosmos",
+		baseStats = { hp = 18000, atk = 660, spd = 1.45, pwr = 0.38 },
+		layIntervalSeconds = 1800,
+		eggTable = {
+			{ eggType = "NovaEgg",      weight = 25 },
+			{ eggType = "GalaxyEgg",    weight = 70 },
+			{ eggType = "AscensionEgg", weight = 5 },
+		},
+		defaultSkill = "InfinityBarrage", eggSource = {},
+		description = "Hoert nie auf. Wirklich nie.",
+	},
+
+	-- ============================================================
+	-- OMEGA (Kosmos)
+	-- ============================================================
+
+	OmegaBaerchi = {
+		id = "OmegaBaerchi", displayName = "Omega-Baerchi", rarity = "Omega", path = "Kosmos",
+		baseStats = { hp = 31500, atk = 1050, spd = 1.5, pwr = 0.40 },
+		layIntervalSeconds = 2100,
+		eggTable = {
+			{ eggType = "GalaxyEgg",    weight = 90 },
+			{ eggType = "AscensionEgg", weight = 10 },
+		},
+		defaultSkill = "OmegaStrike", eggSource = {},
+		description = "Der letzte Baerchi. Danach kommt nichts mehr.",
 	},
 }
 
@@ -362,6 +619,7 @@ end
 
 local RARITY_ORDER: { Types.Rarity } = {
 	"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic",
+	"Divine", "Cosmic", "Secret", "Godly", "Eternal", "Omega",
 }
 
 -- Eine Farbe pro Rarity — benutzt von BEIDEN Seiten:
@@ -375,6 +633,12 @@ local RARITY_COLORS: { [Types.Rarity]: Color3 } = {
 	Epic      = Color3.fromRGB(168,  85, 247),   -- Lila
 	Legendary = Color3.fromRGB(255, 176,  32),   -- Gold
 	Mythic    = Color3.fromRGB(255,  59, 107),   -- Pink-Rot
+	Divine    = Color3.fromRGB(255, 244, 190),   -- Himmlisches Hellgold
+	Cosmic    = Color3.fromRGB( 92,  72, 255),   -- Tiefes Indigo
+	Secret    = Color3.fromRGB( 30,  34,  48),   -- Fast-Schwarz
+	Godly     = Color3.fromRGB( 40, 235, 220),   -- Tuerkis-Leuchten
+	Eternal   = Color3.fromRGB(255, 120,  40),   -- Gluehendes Orange
+	Omega     = Color3.fromRGB(255, 255, 255),   -- Weiss
 }
 
 local function getRarityColor(rarity: Types.Rarity): Color3
@@ -605,10 +869,27 @@ local function pickHigherMutation(a: Types.MutationId?, b: Types.MutationId?): T
 	return a
 end
 
--- Das Ergebnis einer Legendary + Legendary Fusion.
--- Bewusst fest verdrahtet auf genau einen Eintrag: der einzige Mythic
--- existiert laut Design nur ueber diesen Weg.
-local FUSION_MYTHIC_RESULT = "CosmicBaerchi"
+-- v14: Fusion erhoeht die Rarity NICHT mehr (Wunsch des Projektinhabers:
+-- "Fusionen sollen nur die Stats mergen"). Die fruehere Konstante
+-- FUSION_MYTHIC_RESULT ist entfallen — Mythics fallen jetzt aus Eiern.
+
+-- v14: die Pfade, in Anzeige-Reihenfolge, mit Farbe und Ziel. Server und
+-- Client nutzen dieselbe Tabelle (Ei-Baum-Panel, Index, Panel-Badges).
+local PATHS: { { id: Types.PathId, color: Color3, goal: string } } = {
+	{ id = "Stamm",     color = Color3.fromRGB(238, 214, 170), goal = "start" },
+	{ id = "Gold",      color = Color3.fromRGB(255, 196,  60), goal = "strong" },
+	{ id = "Kristall",  color = Color3.fromRGB(120, 220, 255), goal = "fast" },
+	{ id = "Void",      color = Color3.fromRGB(150,  90, 230), goal = "rare" },
+	{ id = "Kosmos",    color = Color3.fromRGB( 92,  72, 255), goal = "all" },
+	{ id = "Ascension", color = Color3.fromRGB(196, 128, 255), goal = "rebirth" },
+}
+
+local function getPathColor(path: string?): Color3
+	for _, p in PATHS do
+		if p.id == path then return p.color end
+	end
+	return PATHS[1].color
+end
 
 local function getRarityIndex(rarity: Types.Rarity): number
 	for i, r in RARITY_ORDER do
@@ -687,7 +968,8 @@ return {
 
 	RARITY_ORDER  = RARITY_ORDER,
 	RARITY_COLORS = RARITY_COLORS,
-	FUSION_MYTHIC_RESULT = FUSION_MYTHIC_RESULT,
+	PATHS         = PATHS,
+	getPathColor  = getPathColor,
 
 	getRarityColor = getRarityColor,
 	xpForNextLevel = xpForNextLevel,

@@ -78,6 +78,15 @@ function IslandService.upgradePit(player: Player)
 		return
 	end
 
+	-- v12: der gespeicherte letzte Lauf gilt nur fuer das alte PIT-Level (dort
+	-- standen andere Gegner in denselben Stage-Nummern). Ohne Loeschen wuerde
+	-- die Fortsetzungs-Frage einen Einstieg anbieten, der nicht mehr passt.
+	local data = PlayerService.getData(player)
+	if data then
+		data.island.pitProgress = nil
+		PlayerService.markDirty(player)
+	end
+
 	-- Plattform sichtbar hochziehen
 	MapService.updatePitLevel(player, newLevel)
 	PlayerService.saveNow(player)
@@ -92,8 +101,8 @@ end
 
 -- Setzt automatisch einen ausgeruesteten Baerchi, falls gerade keiner steht
 -- aber welche im Inventar sind. Oeffentlich, weil EggService (erster Hatch,
--- damit der Plot nicht leer bleibt) und RecycleService (der ausgeruestete
--- wird verwertet) das brauchen — und weil es hier beim Laden jedes
+-- damit der Plot nicht leer bleibt) und FusionService das brauchen (seit v12
+-- kann der ausgeruestete nicht mehr verwertet werden) — und weil es hier beim Laden jedes
 -- Spielstands als Sicherheitsnetz laeuft (siehe init unten).
 --
 -- Reine Datenfunktion ohne Remote-Antwort: der Aufrufer entscheidet selbst,

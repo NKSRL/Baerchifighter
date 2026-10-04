@@ -1,0 +1,100 @@
+--!strict
+-- QuestConfig.luau
+-- ReplicatedStorage/Config/QuestConfig.luau
+--
+-- Einzige Zustaendigkeit:
+--   - ALLE Zahlen und Definitionen der Quests: die Einsteiger-Kette, die
+--     Tages-Quests, ihre Ziele und Belohnungen
+--
+-- Texte stehen NICHT hier, sondern in den Sprachdateien unter
+-- "quest.<id>.title" (siehe Localization). Hier stehen nur ids und Zahlen.
+--
+-- ============================================================
+-- WARUM EINE KETTE UND TAGES-QUESTS
+-- ============================================================
+-- Die Kette ist das Tutorial: jeder Schritt zeigt dem Spieler die naechste
+-- Sache, die das Spiel anbietet, in der Reihenfolge, in der sie Sinn ergibt
+-- (Ei oeffnen -> kaempfen -> Gebaeude ausbauen -> fusionieren -> Index fuellen).
+-- Es ist immer genau EINE Quest aktiv, damit keine Liste zu lesen ist.
+-- Die Tages-Quests geben danach einen Grund, wiederzukommen.
+--
+-- Fortschritt wird nirgends mitgezaehlt, sondern aus den Spielzaehlern
+-- abgeleitet (siehe Modules/QuestProgress). Neue Quests brauchen deshalb nur
+-- einen Eintrag hier, keinen Eingriff in andere Services.
+
+local Types = require(script.Parent.Parent.Network.Types)
+
+-- Welche Groesse eine Quest misst. Gesamtwerte (Kette) lesen den Zaehler
+-- direkt, Tages-Quests ziehen den Stand zu Tagesbeginn ab.
+export type Metric =
+	"hatched"        -- geoeffnete Eier
+	| "fightsWon"    -- gewonnene Kaempfe
+	| "gummiesEarned"-- verdiente Gummies
+	| "fusions"      -- Fusionen
+	| "baerchiCount" -- Baerchis im Besitz (Zustand, kein Zaehler)
+	| "discovered"   -- Index-Eintraege
+	| "buildingLevel"-- hoechstes Gebaeude-Level
+	| "pitLevel"     -- Arena-Stufe
+
+export type Reward = {
+	gummies : number,
+	eggType : Types.EggType?,   -- optional: ein Ei dazu ("gelegentlich")
+}
+
+export type QuestDef = {
+	id     : string,
+	metric : Metric,
+	target : number,
+	reward : Reward,
+}
+
+-- Die Einsteiger-Kette, in Reihenfolge.
+local CHAIN: { QuestDef } = {
+	{ id = "c_hatch1",    metric = "hatched",       target = 1,  reward = { gummies = 50  } },
+	{ id = "c_pets3",     metric = "baerchiCount",  target = 3,  reward = { gummies = 100, eggType = "BasicEgg" } },
+	{ id = "c_fight1",    metric = "fightsWon",     target = 1,  reward = { gummies = 100 } },
+	{ id = "c_fight5",    metric = "fightsWon",     target = 5,  reward = { gummies = 200, eggType = "BasicEgg" } },
+	{ id = "c_upgrade",   metric = "buildingLevel", target = 2,  reward = { gummies = 250 } },
+	{ id = "c_hatch5",    metric = "hatched",       target = 5,  reward = { gummies = 300, eggType = "SugarEgg" } },
+	{ id = "c_discover5", metric = "discovered",    target = 5,  reward = { gummies = 400 } },
+	{ id = "c_fuse1",     metric = "fusions",       target = 1,  reward = { gummies = 500, eggType = "SugarEgg" } },
+	{ id = "c_pit2",      metric = "pitLevel",      target = 2,  reward = { gummies = 600 } },
+	{ id = "c_discover8", metric = "discovered",    target = 8,  reward = { gummies = 800, eggType = "GoldenEgg" } },
+	{ id = "c_fight25",   metric = "fightsWon",     target = 25, reward = { gummies = 1000 } },
+	{ id = "c_discover10",metric = "discovered",    target = 10, reward = { gummies = 1500, eggType = "CrystalEgg" } },
+}
+
+-- Tages-Quests: Fortschritt = Zuwachs seit Tagesbeginn.
+local DAILY: { QuestDef } = {
+	{ id = "d_hatch3",  metric = "hatched",       target = 3,    reward = { gummies = 150 } },
+	{ id = "d_fight8",  metric = "fightsWon",     target = 8,    reward = { gummies = 250 } },
+	{ id = "d_earn",    metric = "gummiesEarned", target = 1500, reward = { gummies = 100, eggType = "BasicEgg" } },
+}
+
+local SECONDS_PER_DAY = 86400
+
+local byId: { [string]: QuestDef } = {}
+for _, def in CHAIN do byId[def.id] = def end
+for _, def in DAILY do byId[def.id] = def end
+
+-- Tagesnummer (UTC). Ein Tageswechsel ist fuer alle Spieler derselbe Moment.
+local function dayOf(unixTime: number): number
+	return math.floor(unixTime / SECONDS_PER_DAY)
+end
+
+return {
+	CHAIN = CHAIN,
+	DAILY = DAILY,
+	SECONDS_PER_DAY = SECONDS_PER_DAY,
+
+	getById = function(id: string): QuestDef?
+		return byId[id]
+	end,
+
+	dayOf = dayOf,
+
+	-- Sekunden bis zum naechsten Tageswechsel.
+	secondsUntilReset = function(unixTime: number): number
+		return SECONDS_PER_DAY - (unixTime % SECONDS_PER_DAY)
+	end,
+}

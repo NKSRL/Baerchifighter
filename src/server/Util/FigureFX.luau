@@ -4,7 +4,8 @@
 --
 -- Einzige Zustaendigkeit:
 --   - Kleine, rein kosmetische Bewegungen an einem Model abspielen:
---     Ausfallschritt, Treffer-Blitz, Umkippen, Vorbeugen, Ruhe-Atmen.
+--     Ausfallschritt, Treffer-Blitz, Umkippen, Vorbeugen, Ruhe-Atmen,
+--     seit v15 Zusammenprall (clash), Taumeln und Aufprall-Ton.
 --
 -- Dieses Modul kennt WEDER Spielerdaten NOCH Remotes NOCH Gebaeude oder
 -- Kaempfe — nur Model, CFrame und Zahlen. Es entscheidet WIE eine Bewegung
@@ -408,6 +409,169 @@ function FigureFX.leanForward(model: Model, degrees: number, duration: number)
 	end
 
 	if resume then resume() end
+end
+
+--------------------------------------------------------------------------------
+-- v15: Zusammenprall (Kampf-Choreografie)
+--------------------------------------------------------------------------------
+-- Ein Stoss im PIT: der Angreifer rennt auf den Gegner zu und springt ihn an,
+-- der Gegner kommt ihm ein Stueck entgegen, beim Aufprall wird der Getroffene
+-- zurueckgestossen, danach gehen beide an ihre Plaetze zurueck.
+--
+-- Anders als attackLunge bewegt clash ZWEI Figuren in einem Zug — getrennte
+-- Aufrufe liefen nicht im Gleichtakt, und der Aufprall muss fuer beide im
+-- selben Frame passieren.
+--
+-- Die Plaetze (Fusspunkte) kommen herein, statt sie hier abzulesen: im Kampf
+-- weiss nur der Aufrufer, wo die Figuren hingehoeren (Turmetage). Waere eine
+-- Figur von einem abgebrochenen Stoss noch verschoben, wuerde sie so trotzdem
+-- wieder exakt auf ihren Platz gesetzt.
+
+export type ClashOptions = {
+	seconds   : number,           -- Gesamtdauer
+	gap       : number,           -- Abstand der Fusspunkte beim Aufprall
+	hop       : number,           -- Hoehe des Ansprungs
+	knockback : number,           -- wie weit der Getroffene zurueckfliegt
+	step      : number?,          -- Anteil des Wegs, den der Getroffene entgegenkommt
+	onImpact  : (() -> ())?,      -- genau im Aufprall-Frame (Balken, Funken, Ton)
+}
+
+-- Form des Stosses: Anteile an der Gesamtdauer.
+local CLASH_IMPACT_AT   = 0.42   -- bis hier: Anlauf und Sprung
+local CLASH_RECOIL_END  = 0.68   -- bis hier: Rueckstoss
+local CLASH_RECOIL_HOP  = 0.35   -- Huepfer des Getroffenen, Anteil von `hop`
+local CLASH_BOUNCE      = 0.25   -- Angreifer prallt um diesen Anteil von `gap` ab
+
+-- Weiche Kurve 0 → 1 (langsam rein, schnell, langsam raus).
+local function smooth(t: number): number
+	return t * t * (3 - 2 * t)
+end
+
+-- Blockiert bis der Stoss durch ist. `target` darf fehlen (Gegner-Mesh nicht
+-- da) — dann springt der Angreifer ins Leere, onImpact kommt trotzdem.
+function FigureFX.clash(attacker: Model, target: Model?, attackerHome: Vector3, targetHome: Vector3, options: ClashOptions)
+	local resumeA = takeOver(attacker)
+	local resumeB = if target then takeOver(target) else nil
+
+	local facingA = attacker:GetPivot().Rotation
+	local facingB = if target then target:GetPivot().Rotation else facingA
+
+	local flatTarget = Vector3.new(targetHome.X, attackerHome.Y, targetHome.Z)
+	local delta = flatTarget - attackerHome
+	local distance = delta.Magnitude
+	local dir = if distance > EPSILON then delta.Unit else Vector3.zAxis
+
+	-- Treffpunkt: der Getroffene kommt `step` des Wegs entgegen, der
+	-- Angreifer landet `gap` davor.
+	local stepShare = options.step or 0
+	local travel = math.max(0, distance - options.gap)
+	local targetMeet = targetHome - dir * (travel * stepShare)
+	local attackerMeet = Vector3.new(targetMeet.X, attackerHome.Y, targetMeet.Z) - dir * options.gap
+	local targetPushed = targetHome + dir * options.knockback
+	local attackerBounce = attackerMeet - dir * (options.gap * CLASH_BOUNCE)
+
+	local impacted = false
+
+	local function placeTarget(foot: Vector3)
+		if target and target.Parent ~= nil then
+			FigurePlacement.place(target, foot, facingB)
+		end
+	end
+
+	animate(attacker, options.seconds, function(t)
+		if t < CLASH_IMPACT_AT then
+			-- Anlauf mit Sprung: der Huepfer gipfelt kurz vor dem Aufprall.
+			local k = t / CLASH_IMPACT_AT
+			local ease = k * k
+			local lift = math.sin(math.min(1, k * 1.1) * math.pi) * options.hop
+			FigurePlacement.place(attacker, attackerHome:Lerp(attackerMeet, ease) + Vector3.new(0, lift, 0), facingA)
+			-- Der Getroffene setzt erst in der zweiten Haelfte des Anlaufs an.
+			local kb = math.clamp((k - 0.5) * 2, 0, 1)
+			placeTarget(targetHome:Lerp(targetMeet, smooth(kb)))
+		elseif t < CLASH_RECOIL_END then
+			if not impacted then
+				impacted = true
+				if options.onImpact then
+					options.onImpact()
+				end
+			end
+			local k = (t - CLASH_IMPACT_AT) / (CLASH_RECOIL_END - CLASH_IMPACT_AT)
+			local ease = 1 - (1 - k) * (1 - k)
+			FigurePlacement.place(attacker, attackerMeet:Lerp(attackerBounce, ease), facingA)
+			local lift = math.sin(k * math.pi) * options.hop * CLASH_RECOIL_HOP
+			placeTarget(targetMeet:Lerp(targetPushed, ease) + Vector3.new(0, lift, 0))
+		else
+			local k = smooth((t - CLASH_RECOIL_END) / (1 - CLASH_RECOIL_END))
+			FigurePlacement.place(attacker, attackerBounce:Lerp(attackerHome, k), facingA)
+			placeTarget(targetPushed:Lerp(targetHome, k))
+		end
+	end)
+
+	-- Bei sehr kurzen Dauern kann der Aufprall-Frame uebersprungen werden.
+	if not impacted and options.onImpact then
+		options.onImpact()
+	end
+
+	-- Immer exakt auf den Plaetzen enden, auch nach einem Abbruch.
+	if attacker.Parent ~= nil then
+		FigurePlacement.place(attacker, attackerHome, facingA)
+	end
+	placeTarget(targetHome)
+
+	if resumeA then resumeA() end
+	if resumeB then resumeB() end
+end
+
+-- Taumeln (betaeubt): die Figur wankt kurz hin und her, Fuesse bleiben
+-- stehen. Blockiert bis die Bewegung durch ist.
+local STAGGER_DEGREES = 12
+local STAGGER_SWINGS  = 2
+
+function FigureFX.stagger(model: Model, duration: number)
+	local resume = takeOver(model)
+
+	local basePivot = model:GetPivot()
+	local foot      = footOf(model)
+	local radians   = math.rad(STAGGER_DEGREES)
+
+	animate(model, duration, function(t)
+		local swing = math.sin(t * math.pi * 2 * STAGGER_SWINGS) * (1 - t)
+		model:PivotTo(tilted(basePivot, foot, radians * swing, 0))
+	end)
+
+	if model.Parent ~= nil then
+		model:PivotTo(basePivot)
+	end
+
+	if resume then resume() end
+end
+
+-- Ein kurzer Ton an einer Weltposition (Aufprall). Alle Spieler in der Naehe
+-- hoeren ihn, weil er serverseitig in der Welt haengt. Leise Grenzen fuer die
+-- Reichweite, damit ein Kampf nicht ueber die ganze Karte schallt.
+function FigureFX.soundAt(position: Vector3, soundId: string, volume: number, parent: Instance, pitch: number?)
+	local anchor = Instance.new("Part")
+	anchor.Name         = "FXSound"
+	anchor.Anchored     = true
+	anchor.CanCollide   = false
+	anchor.CanTouch     = false
+	anchor.CanQuery     = false
+	anchor.Transparency = 1
+	anchor.Size         = Vector3.new(0.2, 0.2, 0.2)
+	anchor.CFrame       = CFrame.new(position)
+	anchor.Parent       = parent
+
+	local sound = Instance.new("Sound")
+	sound.SoundId            = soundId
+	sound.Volume             = volume
+	sound.PlaybackSpeed      = pitch or 1
+	sound.RollOffMode        = Enum.RollOffMode.InverseTapered
+	sound.RollOffMinDistance = 8
+	sound.RollOffMaxDistance = 70
+	sound.Parent             = anchor
+	sound:Play()
+
+	Debris:AddItem(anchor, 2)
 end
 
 --------------------------------------------------------------------------------

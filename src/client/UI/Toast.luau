@@ -112,7 +112,8 @@ end
 function Toast.init(screenGui: ScreenGui)
 	local container = Theme.container("ToastStack", screenGui)
 	container.AnchorPoint = Vector2.new(0.5, 1)
-	container.Position    = UDim2.fromScale(0.5, 0.95)
+	-- v12: ueber der unteren Pet-Leiste (PetBar, ~76 px hoch) statt darauf
+	container.Position    = UDim2.new(0.5, 0, 1, -96)
 	container.Size        = UDim2.fromScale(0.45, 0.25)
 
 	-- Ueber allem anderen: Panels liegen auf ZIndex 10, die Kampf- und

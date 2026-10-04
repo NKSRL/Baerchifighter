@@ -28,7 +28,10 @@ local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local PromotionConfig  = require(ReplicatedStorage.Config.PromotionConfig)
 local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
+local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local QuestProgress    = require(ReplicatedStorage.Modules.QuestProgress)
+local EggTree          = require(ReplicatedStorage.Modules.EggTree)
 local MapService       = require(ServerScriptService.Services.MapService)
 local RateLimiter      = require(ServerScriptService.Util.RateLimiter)
 
@@ -47,7 +50,7 @@ local SAVE_INTERVAL = 60
 -- Fruehestens nach so vielen Sekunden darf derselbe Schluessel wieder
 -- geschrieben werden. Roblox drosselt Schreibvorgaenge auf denselben
 -- Schluessel unterhalb von etwa sechs Sekunden und verwirft sie irgendwann
--- ganz. saveNow() wird von acht Stellen aufgerufen (Ei einlegen, abholen,
+-- ganz. saveNow() wird von vielen Stellen aufgerufen (Ei oeffnen,
 -- fusionieren, verwerten, kaempfen, zwei Upgrades, Rebirth) — ohne diese
 -- Bremse kaeme ein normal spielender Mensch auf mehrere Schreibvorgaenge
 -- pro Sekunde.
@@ -133,6 +136,23 @@ local _onDataLoaded: { (Player, Types.PlayerData) -> () } = {}
 -- Callbacks anderer Services, ausgefuehrt bei jedem markDirty
 local _onDataChanged: { (Player, Types.PlayerData) -> () } = {}
 
+-- v12: Callbacks, die beim Verlassen (und beim Server-Shutdown) laufen,
+-- BEVOR gespeichert wird. Grund: ein PIT-Lauf wird erst am Ende seiner
+-- Wiedergabe abgerechnet (PitArenaService). Verlaesst der Spieler mitten im
+-- Lauf, muss die Abrechnung noch in den Spielstand, bevor er geschrieben
+-- wird — die Reihenfolge zweier PlayerRemoving-Verbindungen ist dafuer
+-- nicht verlaesslich genug.
+local _onPlayerLeaving: { (Player, Types.PlayerData) -> () } = {}
+
+local function runLeavingCallbacks(player: Player, data: Types.PlayerData)
+	for _, callback in _onPlayerLeaving do
+		local ok, err = pcall(callback, player, data)
+		if not ok then
+			warn("[PlayerService] onPlayerLeaving-Callback fehlgeschlagen:", err)
+		end
+	end
+end
+
 --------------------------------------------------------------------------------
 -- Hilfsfunktionen (privat)
 --------------------------------------------------------------------------------
@@ -178,8 +198,100 @@ local function applyDefaults(data: Types.PlayerData): Types.PlayerData
 	-- bei jedem Join (onDataLoaded) und ruestet automatisch den ersten
 	-- vorhandenen Baerchi aus, falls noch/wieder keiner steht.
 
-	-- v2: laufende Brut-Slots
-	if island.hatchingEggs == nil then island.hatchingEggs = {} end
+	-- ============================================================
+	-- ============================================================
+	-- v13: QUESTS + INDEX
+	-- ============================================================
+	-- Neue Felder: discovered, quests, stats.totalHatched (das Stats-Feld legt
+	-- die Schleife oben schon mit 0 an). Fuer Spielstaende VOR v13 wird
+	-- discovered aus den vorhandenen Baerchis gesaeet und totalHatched auf
+	-- deren Anzahl gesetzt, damit Veteranen nicht bei null anfangen.
+	if data.discovered == nil then
+		data.discovered = {}
+		for _, baerchi in data.island.baerchis do
+			data.discovered[baerchi.configId] = true
+		end
+	end
+
+	if (data.version or 0) < 13 then
+		local owned = 0
+		for _ in data.island.baerchis do owned += 1 end
+		data.stats.totalHatched = math.max(data.stats.totalHatched or 0, owned)
+	end
+
+	if data.quests == nil then
+		data.quests = default.quests
+	end
+
+	-- ============================================================
+	-- v14: EI-BAUM (Mega Egg Tree)
+	-- ============================================================
+	-- Neues Top-Level-Feld eggTree (ausserhalb der Insel, damit ein Rebirth
+	-- es nicht loescht). Bestandsspieler bekommen die Knoten der Eier frei,
+	-- die sie schon im Lager haben oder die auf ihrem Plot liegen — wer ein
+	-- Goldenes Ei besitzt, soll es nicht ploetzlich "gesperrt" sehen. Die
+	-- Rebirth-Knoten (Ascensions-Pfad) schaltet evaluate unten frei.
+	--
+	-- Gefahrlos wiederholbar: sanitize ergaenzt nur Fehlendes, und die
+	-- Lager-Freischaltung laeuft nur fuer Spielstaende vor v14.
+	local hadTree = data.eggTree ~= nil
+	data.eggTree = EggTree.sanitize(data.eggTree)
+	if not hadTree and (data.version or 0) < 14 then
+		for eggType, count in island.eggStock do
+			if (count or 0) > 0 and EggConfig.data[eggType] then
+				data.eggTree.unlocked[eggType] = true
+			end
+		end
+		for _, egg in (island.laidEggs or {}) do
+			if EggConfig.data[egg.eggType] then
+				data.eggTree.unlocked[egg.eggType] = true
+			end
+		end
+	end
+	-- Unbekannte Ei-Typen im Lager (alte Config) werden zum Basis-Ei.
+	local stockAny = island.eggStock :: any
+	for eggType, count in stockAny do
+		if not EggConfig.data[eggType] then
+			stockAny.BasicEgg = (stockAny.BasicEgg or 0) + (tonumber(count) or 0)
+			stockAny[eggType] = nil
+		end
+	end
+	EggTree.evaluate(data)
+
+	-- v12: BRUT-SLOTS ENTFALLEN (Eier werden sofort geoeffnet)
+	-- ============================================================
+	-- Alte Spielstaende koennen noch laufende oder fertige Bruten in
+	-- island.hatchingEggs haben. Die gehen NICHT verloren: jedes Ei wandert
+	-- als ungeoeffnetes Ei zurueck ins Lager, danach wird das Feld entfernt.
+	-- Ein Ei-Typ, den es nicht mehr gibt, wird zum Basis-Ei (dieselbe Regel,
+	-- die frueher beim Abholen galt).
+	--
+	-- Gefahrlos wiederholbar: beim zweiten Durchlauf ist das Feld schon nil.
+	-- Ueber `any`, weil Types.IslandData das Feld seit v12 nicht mehr kennt.
+	local legacyIsland = island :: any
+	if legacyIsland.hatchingEggs ~= nil then
+		if typeof(legacyIsland.hatchingEggs) == "table" then
+			for _, egg in legacyIsland.hatchingEggs do
+				local eggType = if typeof(egg) == "table" then egg.eggType else nil
+				if typeof(eggType) ~= "string" or not EggConfig.data[eggType :: Types.EggType] then
+					eggType = "BasicEgg"
+				end
+				local stock = island.eggStock :: any
+				stock[eggType] = (stock[eggType] or 0) + 1
+			end
+		end
+		legacyIsland.hatchingEggs = nil
+	end
+
+	-- v12: pitProgress muss nur gueltig sein, wenn es da ist (nil = kein
+	-- gespeicherter Lauf). Ein halber Eintrag wird verworfen statt geraten.
+	local progress = legacyIsland.pitProgress
+	if progress ~= nil and (typeof(progress) ~= "table"
+		or typeof(progress.pitLevel) ~= "number"
+		or typeof(progress.reachedStage) ~= "number")
+	then
+		legacyIsland.pitProgress = nil
+	end
 
 	-- v10: gelegte Eier.
 	--
@@ -211,16 +323,8 @@ local function applyDefaults(data: Types.PlayerData): Types.PlayerData
 		island.lastEggAt = os.time()
 	end
 
-	-- v5: Eier werden ueber eine uid geclaimt statt ueber ihren Listenindex.
-	-- Alte Spielstaende haben noch keine — ohne Nachruesten waere ihr Ei
-	-- unclaimbar, weil der Server keine passende uid findet. Der Index geht
-	-- hier mit in den Namen, damit zwei Eier desselben Spielstands sich nicht
-	-- zufaellig dieselbe uid teilen koennen.
-	for index, egg in island.hatchingEggs do
-		if egg.uid == nil or typeof(egg.uid) ~= "string" or #egg.uid == 0 then
-			egg.uid = string.format("e_migrated_%d_%d", index, egg.startedAt or 0)
-		end
-	end
+	-- (v5 hatte hier die uid-Nachruestung der Brut-Eier — seit v12 gibt es
+	-- keine Brut-Eier mehr, siehe oben.)
 
 	-- v4: die Gebaeude sind komplett ausgetauscht. Frueher gab es Hatchery,
 	-- GummyFarm, Recycler (und davor FusionLab) mit je eigener Funktion —
@@ -553,6 +657,9 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		rank         = data.rank,
 		language     = data.language,
 		island       = data.island,
+		discovered   = data.discovered,
+		quests       = QuestProgress.buildView(data, os.time()),
+		eggTree      = data.eggTree,
 	}
 end
 
@@ -647,6 +754,12 @@ function PlayerService.onDataChanged(callback: (Player, Types.PlayerData) -> ())
 	table.insert(_onDataChanged, callback)
 end
 
+-- v12: Callback, der beim Verlassen VOR dem Speichern laeuft (siehe
+-- _onPlayerLeaving). Darf Daten aendern, aber nicht yielden.
+function PlayerService.onPlayerLeaving(callback: (Player, Types.PlayerData) -> ())
+	table.insert(_onPlayerLeaving, callback)
+end
+
 --------------------------------------------------------------------------------
 -- Join / Leave
 --------------------------------------------------------------------------------
@@ -716,6 +829,7 @@ end
 local function onPlayerRemoving(player: Player)
 	local data = _playerData[player]
 	if data then
+		runLeavingCallbacks(player, data)
 		saveToDataStore(player, data)
 		MapService.despawnIsland(player)
 	end
@@ -790,6 +904,7 @@ function PlayerService.init()
 	-- Sicherheitsnetz: beim Server-Shutdown alle speichern
 	game:BindToClose(function()
 		for player, data in _playerData do
+			runLeavingCallbacks(player, data)
 			saveToDataStore(player, data)
 		end
 	end)
