@@ -436,15 +436,42 @@ export type ClashOptions = {
 	onImpact  : (() -> ())?,      -- genau im Aufprall-Frame (Balken, Funken, Ton)
 }
 
--- Form des Stosses: Anteile an der Gesamtdauer.
-local CLASH_IMPACT_AT   = 0.42   -- bis hier: Anlauf und Sprung
-local CLASH_RECOIL_END  = 0.68   -- bis hier: Rueckstoss
-local CLASH_RECOIL_HOP  = 0.35   -- Huepfer des Getroffenen, Anteil von `hop`
-local CLASH_BOUNCE      = 0.25   -- Angreifer prallt um diesen Anteil von `gap` ab
+-- Form des Stosses (v15.1: natuerlicher). Anteile an der Gesamtdauer:
+--   0 .. RUN_END     beide LAUFEN aufeinander zu: kleine Schritt-Huepfer,
+--                    nach vorne geneigt, erst langsam, dann schneller
+--   .. IMPACT_AT     der Angreifer setzt zum kurzen Sprung an (Bogen)
+--   .. RECOIL_END    Aufprall: der Getroffene fliegt zurueck, der Angreifer
+--                    prallt ab
+--   .. 1             beide trotten an ihre Plaetze zurueck (kleine Schritte)
+local CLASH_RUN_END      = 0.46
+local CLASH_IMPACT_AT    = 0.60
+local CLASH_RECOIL_END   = 0.76
+local CLASH_LEAP_SHARE   = 0.30   -- Sprungweite als Anteil des Anlaufwegs
+local CLASH_RUN_STEPS    = 4      -- Schritt-Huepfer waehrend des Anlaufs
+local CLASH_BACK_STEPS   = 3      -- ... auf dem Rueckweg
+local CLASH_STEP_HOP     = 0.30   -- Huepfhoehe eines Schritts, Anteil von `hop`
+local CLASH_LEAN_DEGREES = 12     -- Vorlage beim Rennen
+local CLASH_RECOIL_HOP   = 0.35   -- Huepfer des Getroffenen, Anteil von `hop`
+local CLASH_BOUNCE       = 0.25   -- Angreifer prallt um diesen Anteil von `gap` ab
+local CLASH_TARGET_DELAY = 0.25   -- der Getroffene laeuft etwas spaeter los
 
 -- Weiche Kurve 0 → 1 (langsam rein, schnell, langsam raus).
 local function smooth(t: number): number
 	return t * t * (3 - 2 * t)
+end
+
+-- Schritt-Huepfer: |sin| ergibt eine Folge kleiner Boegen, nie unter 0.
+local function stepLift(k: number, steps: number, height: number): number
+	return math.abs(math.sin(k * steps * math.pi)) * height
+end
+
+-- Figur auf `foot` stellen, mit Blick `facing`, um `degrees` nach vorne
+-- geneigt (Fuesse bleiben am Boden, siehe tilted).
+local function placeLeaning(model: Model, foot: Vector3, lift: number, facing: CFrame, degrees: number)
+	FigurePlacement.place(model, foot + Vector3.new(0, lift, 0), facing)
+	if degrees ~= 0 then
+		model:PivotTo(tilted(model:GetPivot(), foot + Vector3.new(0, lift, 0), -math.rad(degrees), 0))
+	end
 end
 
 -- Blockiert bis der Stoss durch ist. `target` darf fehlen (Gegner-Mesh nicht
@@ -462,32 +489,46 @@ function FigureFX.clash(attacker: Model, target: Model?, attackerHome: Vector3, 
 	local dir = if distance > EPSILON then delta.Unit else Vector3.zAxis
 
 	-- Treffpunkt: der Getroffene kommt `step` des Wegs entgegen, der
-	-- Angreifer landet `gap` davor.
+	-- Angreifer landet `gap` davor. Der letzte Teil seines Wegs ist ein
+	-- Sprung, davor wird gelaufen.
 	local stepShare = options.step or 0
 	local travel = math.max(0, distance - options.gap)
 	local targetMeet = targetHome - dir * (travel * stepShare)
 	local attackerMeet = Vector3.new(targetMeet.X, attackerHome.Y, targetMeet.Z) - dir * options.gap
+	local runWay = (attackerMeet - attackerHome).Magnitude
+	local leapStart = attackerMeet - dir * (runWay * CLASH_LEAP_SHARE)
 	local targetPushed = targetHome + dir * options.knockback
 	local attackerBounce = attackerMeet - dir * (options.gap * CLASH_BOUNCE)
 
+	local stepHop = options.hop * CLASH_STEP_HOP
 	local impacted = false
 
-	local function placeTarget(foot: Vector3)
+	local function placeTarget(foot: Vector3, lift: number, lean: number)
 		if target and target.Parent ~= nil then
-			FigurePlacement.place(target, foot, facingB)
+			placeLeaning(target, foot, lift, facingB, lean)
 		end
 	end
 
 	animate(attacker, options.seconds, function(t)
-		if t < CLASH_IMPACT_AT then
-			-- Anlauf mit Sprung: der Huepfer gipfelt kurz vor dem Aufprall.
-			local k = t / CLASH_IMPACT_AT
-			local ease = k * k
-			local lift = math.sin(math.min(1, k * 1.1) * math.pi) * options.hop
-			FigurePlacement.place(attacker, attackerHome:Lerp(attackerMeet, ease) + Vector3.new(0, lift, 0), facingA)
-			-- Der Getroffene setzt erst in der zweiten Haelfte des Anlaufs an.
-			local kb = math.clamp((k - 0.5) * 2, 0, 1)
-			placeTarget(targetHome:Lerp(targetMeet, smooth(kb)))
+		if t < CLASH_RUN_END then
+			-- Anlauf: beschleunigen (k^1.6), Schritt-Huepfer, Vorlage.
+			local k = t / CLASH_RUN_END
+			local pos = attackerHome:Lerp(leapStart, k ^ 1.6)
+			placeLeaning(attacker, pos, stepLift(k, CLASH_RUN_STEPS, stepHop), facingA,
+				CLASH_LEAN_DEGREES * math.min(1, k * 3))
+
+			-- Der Getroffene laeuft etwas spaeter los, ebenfalls mit Schritten.
+			local kb = math.clamp((t / CLASH_IMPACT_AT - CLASH_TARGET_DELAY) / (1 - CLASH_TARGET_DELAY), 0, 1)
+			placeTarget(targetHome:Lerp(targetMeet, smooth(kb)),
+				stepLift(kb, CLASH_RUN_STEPS - 1, stepHop * 0.8), CLASH_LEAN_DEGREES * 0.6 * math.min(1, kb * 3))
+		elseif t < CLASH_IMPACT_AT then
+			-- Sprung: flacher Bogen bis zum Treffpunkt, leicht vorgebeugt.
+			local k = (t - CLASH_RUN_END) / (CLASH_IMPACT_AT - CLASH_RUN_END)
+			local lift = math.sin(k * math.pi) * options.hop
+			placeLeaning(attacker, leapStart:Lerp(attackerMeet, k), lift, facingA, CLASH_LEAN_DEGREES * 1.3)
+
+			local kb = math.clamp((t / CLASH_IMPACT_AT - CLASH_TARGET_DELAY) / (1 - CLASH_TARGET_DELAY), 0, 1)
+			placeTarget(targetHome:Lerp(targetMeet, smooth(kb)), 0, CLASH_LEAN_DEGREES * 0.6)
 		elseif t < CLASH_RECOIL_END then
 			if not impacted then
 				impacted = true
@@ -497,13 +538,16 @@ function FigureFX.clash(attacker: Model, target: Model?, attackerHome: Vector3, 
 			end
 			local k = (t - CLASH_IMPACT_AT) / (CLASH_RECOIL_END - CLASH_IMPACT_AT)
 			local ease = 1 - (1 - k) * (1 - k)
-			FigurePlacement.place(attacker, attackerMeet:Lerp(attackerBounce, ease), facingA)
+			placeLeaning(attacker, attackerMeet:Lerp(attackerBounce, ease), 0, facingA, CLASH_LEAN_DEGREES * (1 - k))
+			-- Der Getroffene wird nach hinten gekippt zurueckgestossen.
 			local lift = math.sin(k * math.pi) * options.hop * CLASH_RECOIL_HOP
-			placeTarget(targetMeet:Lerp(targetPushed, ease) + Vector3.new(0, lift, 0))
+			placeTarget(targetMeet:Lerp(targetPushed, ease), lift, -CLASH_LEAN_DEGREES * math.sin(k * math.pi))
 		else
-			local k = smooth((t - CLASH_RECOIL_END) / (1 - CLASH_RECOIL_END))
-			FigurePlacement.place(attacker, attackerBounce:Lerp(attackerHome, k), facingA)
-			placeTarget(targetPushed:Lerp(targetHome, k))
+			-- Zurueck an die Plaetze, in kleinen Schritten statt zu gleiten.
+			local k = (t - CLASH_RECOIL_END) / (1 - CLASH_RECOIL_END)
+			local e = smooth(k)
+			placeLeaning(attacker, attackerBounce:Lerp(attackerHome, e), stepLift(k, CLASH_BACK_STEPS, stepHop * 0.6), facingA, 0)
+			placeTarget(targetPushed:Lerp(targetHome, e), stepLift(k, CLASH_BACK_STEPS - 1, stepHop * 0.5), 0)
 		end
 	end)
 
@@ -516,7 +560,9 @@ function FigureFX.clash(attacker: Model, target: Model?, attackerHome: Vector3, 
 	if attacker.Parent ~= nil then
 		FigurePlacement.place(attacker, attackerHome, facingA)
 	end
-	placeTarget(targetHome)
+	if target and target.Parent ~= nil then
+		FigurePlacement.place(target, targetHome, facingB)
+	end
 
 	if resumeA then resumeA() end
 	if resumeB then resumeB() end

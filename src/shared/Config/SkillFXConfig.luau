@@ -611,6 +611,52 @@ local function getDuration(skillId: string?, full: boolean): number
 	return math.min(fx.duration, TIERS[fx.tier].maxDuration)
 end
 
+-- v15.1: WANN die Show den Gegner trifft (Sekunden ab Start). In genau
+-- diesem Moment setzt PitArenaService die HP- und Ladeleisten und laesst den
+-- Gegner zurueckfliegen — der Schaden soll sichtbar MIT dem Treffer kommen,
+-- nicht erst nach der Show.
+--
+-- Regel: die Shows sind auf ihre Klaenge geschnitten — der "impact"-Ton
+-- sitzt auf dem Einschlag (Omega: Strahl + Saeule), wo es keinen gibt, der
+-- "strike"-Ton (Schwarzes Loch: die Welle). Hat eine Show keinen von beiden,
+-- zaehlt der erste Effekt am Gegner. Eine Show kann das mit `impactAt` selbst
+-- setzen.
+local HIT_BLOCKS: { [string]: boolean } = {
+	beam = true, pillar = true, ring = true, sparks = true, shards = true,
+	frost = true, wave = true, spiral = true, rise = true,
+}
+
+local function firstSound(fx: SkillFX, slot: string): number?
+	for _, step in fx.steps do
+		if step.fx == "sound" and step.slot == slot then
+			return step.t or 0
+		end
+	end
+	return nil
+end
+
+local function getImpactTime(skillId: string?, full: boolean): number
+	local fx = get(skillId)
+	if not full then
+		return TIERS[fx.tier].echo * 0.4
+	end
+	local limit = getDuration(skillId, true)
+	local explicit = (fx :: any).impactAt
+	if typeof(explicit) == "number" then
+		return math.clamp(explicit, 0, limit)
+	end
+	local best = firstSound(fx, "impact") or firstSound(fx, "strike")
+	if not best then
+		for _, step in fx.steps do
+			local t = step.t or 0
+			if HIT_BLOCKS[step.fx] and (step.at == "target" or step.fx == "beam") then
+				if not best or t < best then best = t end
+			end
+		end
+	end
+	return math.clamp(best or limit * 0.5, 0, limit)
+end
+
 return {
 	CINEMATIC_CAMERA = CINEMATIC_CAMERA,
 	TIERS            = TIERS,
@@ -620,4 +666,5 @@ return {
 	data             = FX,
 	get              = get,
 	getDuration      = getDuration,
+	getImpactTime    = getImpactTime,
 }

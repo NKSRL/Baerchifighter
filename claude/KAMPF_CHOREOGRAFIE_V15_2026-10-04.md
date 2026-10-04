@@ -34,6 +34,13 @@ Wunsch: Die Bärchis sollen im Kampf aufeinander zulaufen und sich anspringen. N
 - Kürzere Reichweite (90 statt 200 Studs).
 - Aufprall-Ton: `action_jump_land.mp3`, Lautstärke 0,25, Reichweite 70 Studs. In Studio geladen und geprüft.
 
+## Nachtrag v15.1: natürlicheres Anlaufen
+
+- Statt eines einzigen Riesensprungs **laufen** beide jetzt aufeinander zu. Sie machen kleine Schritt-Hüpfer, sind nach vorne geneigt und werden schneller. Der Gegner läuft etwas später los und kommt bis fast zur Mitte (40 % statt 18 %).
+- Erst auf dem letzten Stück springt der Angreifer in einem flachen Bogen.
+- Der Getroffene kippt beim Rückstoß nach hinten. Danach trotten beide in kleinen Schritten zurück, statt zu gleiten.
+- Ein Stoß dauert 0,95 s (vorher 0,55), mit Fähigkeit 1,15 s. Die längste gemessene Wiedergabe sind jetzt etwa 50 s. Bei vielen Stages wird das Tempo bis ×2,5 erhöht.
+
 ## Architektur
 
 - `FightTimeline` (Modules) rechnet nur: Welche Züge passen in welches Tempo. Kein Model, kein Warten, offline testbar.

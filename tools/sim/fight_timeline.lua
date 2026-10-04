@@ -47,19 +47,37 @@ local function runOnce(b)
 		if st.won then total += MapConfig.FIGHT_KO_SECONDS * plan.tempo end
 		for _, i in plan.indices do
 			local beat = st.beats[i]
-			total += FightTimeline.beatSeconds(beat) * plan.tempo
 			if FightTimeline.isSkillBeat(beat) and beat.actor == "A" then
+				-- v15.1: die Show IST der Angriff; Rueckstoss ab dem Treffer.
 				skills += 1
 				local id = beat.skillId or b.skillId
 				local full = not fullDone
 				fullDone = true
-				total += SkillFXConfig.getDuration(id, full) * (if full then 1 else plan.tempo)
+				local scale = if full then 1 else plan.tempo
+				local impact = SkillFXConfig.getImpactTime(id, full) * scale
+				local showEnd = SkillFXConfig.getDuration(id, full) * scale
+				check(impact <= showEnd + 1e-6, "Treffer nach Show-Ende: " .. tostring(id))
+				total += math.max(showEnd, impact + FightTimeline.beatSeconds(beat) * plan.tempo)
+			else
+				total += FightTimeline.beatSeconds(beat) * plan.tempo
 			end
 		end
 		shown += #plan.indices
 		all += n
 	end
 	return #stages, total, shown, all, skills
+end
+
+-- Trefferzeit jeder Show (volle Show) zur Kontrolle.
+do
+	local list = {}
+	for id in SkillFXConfig.data do table.insert(list, id) end
+	table.sort(list)
+	local parts = {}
+	for _, id in list do
+		table.insert(parts, string.format("%s %.2f/%.1f", id, SkillFXConfig.getImpactTime(id, true), SkillFXConfig.getDuration(id, true)))
+	end
+	print("Treffer/Dauer: " .. table.concat(parts, ", "))
 end
 
 local ids = {}

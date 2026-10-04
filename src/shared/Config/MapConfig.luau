@@ -918,16 +918,16 @@ local FIGHT_HIT_FLASH_COLOR   = Color3.fromRGB(255, 238, 200)
 local FIGHT_RUN_TARGET_SECONDS  = 30
 local FIGHT_STAGE_MIN_SECONDS   = 0.5
 local FIGHT_STAGE_MAX_SECONDS   = 6.0
-local FIGHT_MIN_TEMPO           = 0.45
-local FIGHT_BEAT_SECONDS        = 0.55   -- ein Stoss (Anlauf, Aufprall, zurueck)
-local FIGHT_SKILL_BEAT_SECONDS  = 0.75   -- der Stoss nach einer Faehigkeit (wuchtiger)
+local FIGHT_MIN_TEMPO           = 0.40
+local FIGHT_BEAT_SECONDS        = 0.95   -- ein Stoss (Anlauf, Sprung, Aufprall, zurueck)
+local FIGHT_SKILL_BEAT_SECONDS  = 1.15   -- der Stoss nach einer Faehigkeit (wuchtiger)
 local FIGHT_ENEMY_INTRO_SECONDS = 0.35   -- kurz stehen, wenn ein neuer Gegner erscheint
 local FIGHT_KO_SECONDS          = 0.35   -- besiegter Gegner kippt, bevor der naechste kommt
 local FIGHT_CONTACT_GAP         = 2.4    -- Abstand der Fusspunkte beim Aufprall (Studs)
 local FIGHT_HOP_HEIGHT          = 1.6    -- Hoehe des Ansprungs
 local FIGHT_KNOCKBACK           = 1.3    -- wie weit der Getroffene zurueckgestossen wird
 local FIGHT_SKILL_KNOCKBACK     = 3.2    -- ... nach einer Faehigkeit
-local FIGHT_ENEMY_STEP_SHARE    = 0.18   -- der Getroffene kommt dem Angreifer ein Stueck entgegen
+local FIGHT_ENEMY_STEP_SHARE    = 0.40   -- der Getroffene laeuft dem Angreifer entgegen (Treffen eher in der Mitte)
 
 -- Ladeleiste (unter dem HP-Balken des eigenen Baerchis)
 local FIGHT_CHARGE_BAR_HEIGHT   = 0.35
