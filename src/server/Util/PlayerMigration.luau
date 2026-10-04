@@ -55,6 +55,12 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		end
 	end
 
+	-- highestTowerFloor gehoerte zu einem Tower-Modus, den es nicht gibt. Das
+	-- Feld wird entfernt, damit es nicht bei jedem Speichern wieder im
+	-- DataStore landet. Am Feld erkennbar und deshalb ohne Versions-Sprung
+	-- wiederholbar; ein Wert geht nicht verloren, er war immer 0.
+	stats.highestTowerFloor = nil
+
 	-- Neue Island-Felder
 	local island = data.island
 	if island.pitLevel  == nil then island.pitLevel  = 1  end

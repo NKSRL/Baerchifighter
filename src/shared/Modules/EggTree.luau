@@ -285,18 +285,6 @@ function EggTree.upgradeTarget(state: Types.EggTreeState?, eggType: Types.EggTyp
 	return nil
 end
 
--- Das hoechste freie Ei eines Pfads (Events: "Ei der hoechsten Stufe").
-function EggTree.highestUnlockedInPath(state: Types.EggTreeState?, path: Types.PathId): Types.EggType?
-	local best: Types.EggType? = nil
-	local bestTier = -1
-	for eggId, egg in EggConfig.data do
-		if egg.path == path and EggTree.isUnlocked(state, eggId) and egg.tier > bestTier then
-			best, bestTier = eggId, egg.tier
-		end
-	end
-	return best
-end
-
 -- Das hoechste freie Ei ueber alle Pfade ausser Ascension (Events).
 -- Bei Gleichstand der Stufe gewinnt die kleinere sortOrder (stabil).
 function EggTree.highestUnlocked(state: Types.EggTreeState?): Types.EggType

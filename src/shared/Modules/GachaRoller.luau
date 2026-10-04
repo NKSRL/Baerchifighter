@@ -39,13 +39,4 @@ function GachaRoller.roll(entries: { WeightedEntry }): string
 	return entries[#entries].configId
 end
 
--- Mehrere Rolls auf einmal (fuer "x10 Hatch"-Feature spaeter)
-function GachaRoller.rollMultiple(entries: { WeightedEntry }, count: number): { string }
-	local results = {}
-	for i = 1, count do
-		results[i] = GachaRoller.roll(entries)
-	end
-	return results
-end
-
 return GachaRoller

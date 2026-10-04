@@ -407,7 +407,7 @@ export type PlayerData = {
 	lastSeenAt : number,   -- fuer Offline-Gummy-Farm-Berechnung
 
 	-- Waehrungen
-	gummies     : number,  -- aktiv: durch PIT-Kaempfe und Tower
+	gummies     : number,  -- aktiv: PIT-Kaempfe, Quests, Recycling
 	goldGummies : number,  -- Premium: PIT-Meilensteine, Events
 
 	-- Progression
@@ -433,7 +433,6 @@ export type PlayerData = {
 		totalRebirths       : number,
 		totalRecycled       : number,
 		highestPitLevel     : number,
-		highestTowerFloor   : number,
 		totalHatched        : number,   -- v13: geoeffnete Eier (Quest-Zaehler)
 	},
 
@@ -770,7 +769,6 @@ local function createDefaultPlayerData(): PlayerData
 			totalRebirths       = 0,
 			totalRecycled       = 0,
 			highestPitLevel     = 1,
-			highestTowerFloor   = 0,
 			totalHatched        = 0,
 		},
 

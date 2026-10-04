@@ -99,15 +99,6 @@ function PromotionService.getMaterials(data: Types.PlayerData, target: Types.Bae
 	return materials
 end
 
--- Was der naechste Schritt kostet — 0 wenn schon am Maximum.
-function PromotionService.getNextCost(baerchi: Types.Baerchi): number
-	local next_ = (baerchi.promotionLevel or 0) + 1
-	if next_ > PromotionConfig.MAX_PROMOTION then
-		return 0
-	end
-	return PromotionConfig.getDuplicateCost(baerchi.rarity, next_)
-end
-
 --------------------------------------------------------------------------------
 -- Befoerdern
 --------------------------------------------------------------------------------

@@ -2306,17 +2306,6 @@ function MapService.worldToPlot(player: Player, worldPosition: Vector3): Vector3
 	return plotCFrame:PointToObjectSpace(worldPosition)
 end
 
--- Die Rueckrichtung zu worldToPlot.
-function MapService.plotToWorld(player: Player, localPosition: Vector3): Vector3?
-	local slot = _playerSlot[player]
-	if not slot then return nil end
-
-	local plotCFrame = _plotCFrames[slot]
-	if not plotCFrame then return nil end
-
-	return plotCFrame:PointToWorldSpace(localPosition)
-end
-
 -- Aktualisiert nur Beschriftung und Erschoepfung der bereits stehenden
 -- Figuren. Billig — das ist der Weg fuer HP-Aenderungen.
 function MapService.updateBaerchiStates(player: Player, islandData: Types.IslandData)

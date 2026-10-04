@@ -450,8 +450,4 @@ function Loc.bind(instance: Instance, key: string, args: { [string]: any }?)
 	;(instance :: any).Text = Loc.t(key, args)
 end
 
-function Loc.unbind(instance: Instance)
-	_bound[instance] = nil
-end
-
 return Loc

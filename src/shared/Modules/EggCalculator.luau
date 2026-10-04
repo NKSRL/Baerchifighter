@@ -98,17 +98,6 @@ function EggCalculator.getLayIntervalSeconds(baerchi: Types.Baerchi, offline: bo
 	return math.max(interval, EggConfig.MIN_LAY_INTERVAL_SECONDS)
 end
 
--- Wie viele Eier dieser Baerchi in `seconds` legen wuerde.
--- Reine Division — steht hier, damit Online-Tick und Offline-Nachrechnung
--- garantiert dieselbe Rechnung benutzen.
-function EggCalculator.countEggsIn(baerchi: Types.Baerchi, seconds: number, offline: boolean?): number
-	local interval = EggCalculator.getLayIntervalSeconds(baerchi, offline)
-	if not interval or seconds <= 0 then
-		return 0
-	end
-	return math.floor(seconds / interval)
-end
-
 --------------------------------------------------------------------------------
 -- Welches Ei
 --------------------------------------------------------------------------------

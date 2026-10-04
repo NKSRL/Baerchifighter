@@ -308,9 +308,4 @@ function PetBar.init(screenGui: ScreenGui)
 	print("[PetBar] Initialisiert")
 end
 
--- Fuer EggTimerController: ist der Baerchi gerade zu Hause?
-function PetBar.getState(): string
-	return _state
-end
-
 return PetBar

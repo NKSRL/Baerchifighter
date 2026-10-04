@@ -59,20 +59,6 @@ end
 -- Steuern
 --------------------------------------------------------------------------------
 
-function PanelManager.getOpen(): string?
-	return _openName
-end
-
-function PanelManager.closeAll()
-	for name, panel in _panels do
-		local ok, err = pcall(panel.close)
-		if not ok then
-			warn("[PanelManager] close fehlgeschlagen:", name, err)
-		end
-	end
-	_openName = nil
-end
-
 -- Schliesst alle anderen und oeffnet dieses. Zusaetzliche Argumente gehen
 -- unveraendert an die open-Funktion des Panels (z.B. die uid einer Karte).
 function PanelManager.open(name: string, ...: any)

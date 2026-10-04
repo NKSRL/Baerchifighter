@@ -367,11 +367,6 @@ end
 -- Oeffentliche API
 --------------------------------------------------------------------------------
 
--- Wie viele Eier gerade herumliegen. Fuer andere Services und den Debug-Weg.
-function EggLayService.countLaid(data: Types.PlayerData): number
-	return #data.island.laidEggs
-end
-
 -- Legt sofort ein Ei, unabhaengig von der Zeitmarke. NUR fuer den Studio-Test
 -- (DebugService): auf ein echtes Intervall zu warten macht das Ei-System sonst
 -- praktisch unpruefbar.

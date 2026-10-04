@@ -1049,13 +1049,6 @@ end
 -- Oeffentliche API
 --------------------------------------------------------------------------------
 
--- Steht der Baerchi dieses Spielers gerade am Event? Fuer andere Services
--- (aktuell liest das niemand — die Auskunft an den Client laeuft ueber
--- EventPresenceChanged).
-function EventParticipationService.isAtEvent(player: Player): boolean
-	return _present[player] ~= nil
-end
-
 -- v12: Phase fuer die Pet-Leiste: "ToEvent", "AtEvent", "Returning" oder nil.
 function EventParticipationService.getPhase(player: Player): string?
 	if _present[player] then

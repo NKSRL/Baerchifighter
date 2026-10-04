@@ -46,6 +46,7 @@ local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local DebugConfig      = require(ReplicatedStorage.Config.DebugConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
@@ -330,13 +331,15 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 
 	PlayerService.markDirty(player)
 
-	print(
-		"[HoneyService]", player.Name,
-		"| fuettert:", baerchi.configId,
-		"| aus:", building.id, "Lv.", building.level,
-		"| +", result.hpGained, "HP, +", xp, "XP",
-		leveled and ("| LEVEL UP → " .. baerchi.level) or ""
-	)
+	if DebugConfig.VERBOSE_LOG then
+		print(
+			"[HoneyService]", player.Name,
+			"| fuettert:", baerchi.configId,
+			"| aus:", building.id, "Lv.", building.level,
+			"| +", result.hpGained, "HP, +", xp, "XP",
+			leveled and ("| LEVEL UP → " .. baerchi.level) or ""
+		)
+	end
 end
 
 --------------------------------------------------------------------------------

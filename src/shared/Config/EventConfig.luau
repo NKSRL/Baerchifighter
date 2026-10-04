@@ -122,9 +122,6 @@ local UFO = {
 	-- Radius des Beam-Rings (Anteil des Podest-Radius) und Beruehrungsabstand.
 	BEAM_RADIUS_FACTOR = 0.22,
 	TOUCH_DISTANCE     = 5,
-
-	-- Laufgeschwindigkeit der Baerchis im Event (Faktor auf WALK_SPEED).
-	WALK_SPEED_FACTOR = 1.0,
 }
 
 -- Rarity-Up-Chance beim Absetzen des entfuehrten Baerchis. Aufstieg immer nur

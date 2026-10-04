@@ -221,6 +221,7 @@ do
 		check("v6: Goldenes Ei im Baum frei (v14)", d.eggTree.unlocked.GoldenEgg == true)
 		check("v6: Ausruestung bleibt", d.island.equippedUid == "b_1")
 		check("v6: Waehrungen unveraendert", d.gummies == 5400 and d.goldGummies == 12)
+		check("v6: highestTowerFloor entfernt", d.stats.highestTowerFloor == nil)
 		checkIdempotent("v6", d)
 	end
 end
