@@ -3,27 +3,28 @@
 -- ServerScriptService/Services/PitArenaService.luau
 --
 -- Einzige Zustaendigkeit:
---   - Einen bereits ausgerechneten PIT-Lauf in der Arena SICHTBAR abspielen
+--   - Einen von CombatService fertig simulierten PIT-Lauf in der Arena
+--     abspielen und dabei den Lauf ZEITLICH fuehren: Hinweg, Stage fuer Stage,
+--     Rueckweg, Zurueckholen und Abbruch
 --
--- Dieser Service feuert auch `Remotes.CombatResultReceived` an den Client —
--- bewusst NICHT CombatService. Der Baerchi laeuft erst selbststaendig zum
--- Kampf-Spot; die Kampf-UI (CombatPanel) darf erst danach losgehen, sonst
--- liefe sie schon, waehrend er noch sichtbar unterwegs waere. sendResult()
--- ist der einzige Ort, der das Event abschickt, und idempotent — mehrere
--- Abbruch-/Erfolgspfade duerfen ihn gefahrlos alle aufrufen.
+-- Zum Fuehren gehoert, dass dieser Service entscheidet, WANN abgerechnet und
+-- WANN das Ergebnis verschickt wird — beides haengt an der Wiedergabe:
+--   - Abrechnung: CombatService gibt eine Funktion (settle) mit. Sie laeuft
+--     GENAU EINMAL mit der Zahl der tatsaechlich gespielten Stages: alle bei
+--     normalem Ende, bis einschliesslich der laufenden beim Zurueckholen
+--     (requestRecall; vor der ersten Stage: 0), und beim Verlassen so, als
+--     waere die begonnene Stage zu Ende gespielt (PlayerService.onPlayerLeaving).
+--     WAS abgerechnet wird, weiss nur CombatService; dieser Service fasst
+--     Spielerdaten selbst nicht an.
+--   - Ergebnis: Remotes.CombatResultReceived geht erst raus, wenn abgerechnet
+--     ist. sendResult() ist die einzige Stelle, die es abschickt, und
+--     idempotent — alle Abbruch- und Erfolgspfade duerfen es aufrufen.
+--   - Phase (ToPit / InPit / Returning) und laufende Stage meldet er fuer
+--     die Pet-Leiste (PetModeService liest getPhase).
 --
--- ============================================================
--- WAS DAS IST — UND WAS NICHT
--- ============================================================
--- Der Kampf ist zu dem Zeitpunkt, an dem dieser Service loslaeuft, komplett
--- entschieden: CombatService hat alle Stages simuliert, die Gummies sind
--- gutgeschrieben und die HP stehen schon auf dem Endwert. Dieser Service
--- aendert KEINE Spieldaten — er ist reine Darstellung.
---
--- Warum trotzdem auf dem SERVER und nicht im Client:
--- die Plattform ist gemeinsam, alle acht Spieler laufen auf derselben Wiese.
--- Ein Kampf, den nur der Besitzer sieht, waere in so einer Welt verschenkt —
--- serverseitig kann der Nachbar ueber die Bruecke kommen und zuschauen.
+-- Warum auf dem SERVER und nicht im Client: die Arenen liegen in derselben
+-- Welt wie alle Plots. Serverseitig kann ein Nachbar ueber den Steg kommen
+-- und zuschauen.
 --
 -- Die Figur wird nicht kopiert, sondern die ECHTE Figur vom Plot wandert in
 -- die Arena und danach exakt an ihren Platz zurueck. Eine zweite Kopie waere
@@ -44,36 +45,23 @@
 -- keinem Fall bleibt etwas Halbes stehen.
 --
 -- ============================================================
--- SEIT v12: ABRECHNUNG AM ENDE, ZURUECKHOLEN
--- ============================================================
--- CombatService rechnet nicht mehr vorher ab, sondern gibt eine
--- Abrechnungs-Funktion (settle) mit. Dieser Service ruft sie GENAU EINMAL
--- mit der Zahl der tatsaechlich gespielten Stages auf:
---   - normal zu Ende:             alle Stages
---   - zurueckgeholt (requestRecall): die Stages bis einschliesslich der
---     gerade laufenden; vor der ersten Stage: 0 (nichts passiert)
---   - Abbruch / Spieler geht:     so, als waere die gerade begonnene Stage
---     zu Ende gespielt (siehe PlayerService.onPlayerLeaving)
--- Erst danach geht das (abgerechnete) Ergebnis an den Client. Der Client
--- erfaehrt den Ausgang also nie, bevor er gespielt ist.
---
--- Ausserdem meldet der Service seine Phase (ToPit / InPit / Returning) und
--- die laufende Stage — PetModeService zeigt das in der Pet-Leiste an.
---
--- ============================================================
--- SEIT v15: ZUG UM ZUG
+-- ZUG UM ZUG
 -- ============================================================
 -- CombatService gibt pro Stage die einzelnen Zuege mit (Types.FightBeat).
--- Jede Stage wird als Folge von Stoessen gezeigt: die Baerchis rennen
+-- Jede Stage wird als Folge von Stoessen gezeigt: die Baerchis laufen
 -- aufeinander zu und prallen zusammen (FigureFX.clash). Unter dem eigenen
--- HP-Balken laeuft eine Ladeleiste; ist sie voll, kommt die Faehigkeit mit
--- ihrer Show (SkillFX, beim ersten Mal voll, danach als Echo) und ein
--- wuchtiger Stoss. WELCHE Zuege in die Zeit passen, rechnet FightTimeline.
+-- HP-Balken laeuft eine Ladeleiste (Util/FightBars); ist sie voll, kommt die
+-- Faehigkeit mit ihrer Show (SkillFX, beim ersten Mal voll, danach als Echo).
+-- WELCHE Zuege in die Zeit passen, rechnet FightTimeline.
+--
+-- startPlayback ist bewusst EINE lange Funktion: sie erzaehlt den Ablauf
+-- eines Laufs von vorn nach hinten, und ihre Schritte teilen viel Zustand.
+-- Zerlegt in viele kleine Funktionen muesste man zum Verstehen hin und her
+-- springen.
 
 local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
-local TweenService        = game:GetService("TweenService")
 
 local MapConfig   = require(ReplicatedStorage.Config.MapConfig)
 local SkillConfig = require(ReplicatedStorage.Config.SkillConfig)
@@ -89,6 +77,7 @@ local FigureWalker    = require(ServerScriptService.Util.FigureWalker)
 local FigurePlacement = require(ServerScriptService.Util.FigurePlacement)
 local FigureFX        = require(ServerScriptService.Util.FigureFX)
 local ActivityLock    = require(ServerScriptService.Util.ActivityLock)
+local FightBars       = require(ServerScriptService.Util.FightBars)
 
 -- Name unter dem PitArenaService das Bewegungs-Schloss haelt (siehe
 -- ActivityLock) — verhindert dass BaerchiAutopilotService den Baerchi
@@ -143,133 +132,6 @@ local _home: { [Player]: Home } = {}
 -- Hilfen
 --------------------------------------------------------------------------------
 
--- Das Aufstellen der Kaempfer (Fusspunkt exakt auf dem Boden, Blick zum
--- Gegner) macht FigurePlacement.placeLookingAt — dieselbe Funktion, die auch
--- FigureWalker jeden Frame benutzt. Sie stand hier frueher als eigene Kopie
--- (`placeModel`) und ist mit Teil C in das gemeinsame Util gewandert.
---
--- Wichtig fuer das Verstaendnis der Arena: die Ausrichtung wird dort ABSOLUT
--- gesetzt. Genau das ist hier richtig — die Figur vom Plot traegt bereits die
--- Plot-Drehung, und die soll in der Arena durch "schau den Gegner an"
--- ERSETZT werden, nicht mit ihr verrechnet.
-
--- HP-Balken ueber einer Figur. Gibt die Fuell-Flaeche zurueck, damit der
--- Aufrufer sie animieren kann.
-local function attachHealthBar(model: Model, fillColor: Color3): Frame?
-	local anchor = (model:FindFirstChild("head", true) :: BasePart?) or model.PrimaryPart
-	if not anchor then return nil end
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name        = "FightBar"
-	billboard.Size        = UDim2.fromScale(MapConfig.FIGHT_BAR_WIDTH, MapConfig.FIGHT_BAR_HEIGHT)
-	billboard.StudsOffset = Vector3.new(0, BaerchiMesh.getHeight(model) * 0.55 + 2.2, 0)
-	billboard.AlwaysOnTop = true
-	-- Ohne Reichweiten-Grenze waeren die Balken ueber ALLEN acht Arenen quer
-	-- ueber die Karte zu sehen — und wegen AlwaysOnTop auch noch durch die
-	-- Landschaft hindurch.
-	billboard.MaxDistance = MapConfig.FIGHT_BAR_DISTANCE
-	billboard.Adornee     = anchor
-	billboard.Parent      = anchor
-
-	local back = Instance.new("Frame")
-	back.Name              = "Back"
-	back.Size              = UDim2.fromScale(1, 1)
-	back.BackgroundColor3  = MapConfig.FIGHT_BAR_BACK_COLOR
-	back.BorderSizePixel   = 0
-	back.Parent            = billboard
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.4, 0)
-	corner.Parent       = back
-
-	local fill = Instance.new("Frame")
-	fill.Name              = "Fill"
-	fill.Size              = UDim2.fromScale(1, 1)
-	fill.BackgroundColor3  = fillColor
-	fill.BorderSizePixel   = 0
-	fill.Parent            = back
-
-	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(0.4, 0)
-	fillCorner.Parent       = fill
-
-	return fill
-end
-
-local function removeHealthBar(model: Model)
-	local bar = model:FindFirstChild("FightBar", true)
-	if bar then
-		bar:Destroy()
-	end
-	local charge = model:FindFirstChild("ChargeBar", true)
-	if charge then
-		charge:Destroy()
-	end
-end
-
--- v15: Ladeleiste der Faehigkeit, direkt unter dem HP-Balken. Gibt die
--- Fuell-Flaeche zurueck (Breite = Ladestand).
-local function attachChargeBar(model: Model): Frame?
-	local anchor = (model:FindFirstChild("head", true) :: BasePart?) or model.PrimaryPart
-	if not anchor then return nil end
-
-	local below = (MapConfig.FIGHT_BAR_HEIGHT + MapConfig.FIGHT_CHARGE_BAR_HEIGHT) * 0.5 + 0.08
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name        = "ChargeBar"
-	billboard.Size        = UDim2.fromScale(MapConfig.FIGHT_BAR_WIDTH, MapConfig.FIGHT_CHARGE_BAR_HEIGHT)
-	billboard.StudsOffset = Vector3.new(0, BaerchiMesh.getHeight(model) * 0.55 + 2.2 - below, 0)
-	billboard.AlwaysOnTop = true
-	billboard.MaxDistance = MapConfig.FIGHT_BAR_DISTANCE
-	billboard.Adornee     = anchor
-	billboard.Parent      = anchor
-
-	local back = Instance.new("Frame")
-	back.Name             = "Back"
-	back.Size             = UDim2.fromScale(1, 1)
-	back.BackgroundColor3 = MapConfig.FIGHT_BAR_BACK_COLOR
-	back.BorderSizePixel  = 0
-	back.Parent           = billboard
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent       = back
-
-	local fill = Instance.new("Frame")
-	fill.Name             = "Fill"
-	fill.Size             = UDim2.fromScale(0, 1)
-	fill.BackgroundColor3 = MapConfig.FIGHT_CHARGE_COLOR
-	fill.BorderSizePixel  = 0
-	fill.Parent           = back
-
-	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(0.5, 0)
-	fillCorner.Parent       = fill
-
-	return fill
-end
-
--- Ladeleiste setzen: voll = gold, sonst blau.
-local function setCharge(fill: Frame?, ratio: number, seconds: number)
-	if not fill then return end
-	local r = math.clamp(ratio, 0, 1)
-	fill.BackgroundColor3 = if r >= 0.999 then MapConfig.FIGHT_CHARGE_FULL_COLOR else MapConfig.FIGHT_CHARGE_COLOR
-	TweenService:Create(
-		fill,
-		TweenInfo.new(math.max(seconds, 0.05), Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Size = UDim2.fromScale(r, 1) }
-	):Play()
-end
-
-local function tweenFill(fill: Frame?, ratio: number, seconds: number)
-	if not fill then return end
-
-	local goal = UDim2.fromScale(math.clamp(ratio, 0, 1), 1)
-	local info = TweenInfo.new(math.max(seconds, 0.05), Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-	TweenService:Create(fill, info, { Size = goal }):Play()
-end
-
 -- Bringt eine noch in der Arena stehende Figur an ihren Platz auf dem Plot
 -- zurueck und raeumt ihren Kampf-Balken weg. Idempotent: zweimal aufrufen
 -- schadet nicht.
@@ -281,7 +143,7 @@ local function restoreHome(player: Player)
 
 	local model = home.model
 	if model.Parent ~= nil then
-		removeHealthBar(model)
+		FightBars.removeHealthBar(model)
 		model:SetAttribute("InArena", nil)
 
 		-- ZUERST abmelden, DANN heimsetzen — nie andersherum. Waehrend des
@@ -645,10 +507,10 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				rate   = MapConfig.IDLE_BOB_RATE,
 			})
 
-			selfFill = attachHealthBar(figure, MapConfig.FIGHT_BAR_SELF_COLOR)
-			tweenFill(selfFill, run.hpBefore / maxHp, 0.01)
+			selfFill = FightBars.attachHealthBar(figure, MapConfig.FIGHT_BAR_SELF_COLOR)
+			FightBars.tweenFill(selfFill, run.hpBefore / maxHp, 0.01)
 			if showsCharge then
-				chargeFill = attachChargeBar(figure)
+				chargeFill = FightBars.attachChargeBar(figure)
 			end
 
 			-- (v12: das Ergebnis geht erst nach der Abrechnung am Ende raus.)
@@ -765,7 +627,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				if enemy then
 					FigurePlacement.placeLookingAt(enemy, stageEnemyPos, stageSelfPos)
 					enemy.Parent = fighters
-					enemyFill = attachHealthBar(enemy, MapConfig.FIGHT_BAR_ENEMY_COLOR)
+					enemyFill = FightBars.attachHealthBar(enemy, MapConfig.FIGHT_BAR_ENEMY_COLOR)
 					previousEnemy = enemy
 
 					-- Auch der Gegner soll nicht wie ein Standbild dastehen,
@@ -812,9 +674,9 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 					-- Leisten und Treffer-Rueckmeldung genau im Aufprall.
 					local function onImpact()
 						local barSeconds = MapConfig.FIGHT_BEAT_SECONDS * tempo * 0.5
-						tweenFill(selfFill, beat.selfHp, barSeconds)
-						tweenFill(enemyFill, beat.enemyHp, barSeconds)
-						setCharge(chargeFill, beat.charge, barSeconds)
+						FightBars.tweenFill(selfFill, beat.selfHp, barSeconds)
+						FightBars.tweenFill(enemyFill, beat.enemyHp, barSeconds)
+						FightBars.setCharge(chargeFill, beat.charge, barSeconds)
 						if target and target.Parent ~= nil then
 							FigureFX.hitFlash(target, MapConfig.FIGHT_HIT_FLASH_COLOR, MapConfig.FIGHT_HIT_FLASH_SECONDS)
 						end
@@ -829,7 +691,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 					if beat.kind == "stunned" then
 						-- Betaeubt: kein Stoss, die Figur taumelt.
 						if attacker then
-							setCharge(chargeFill, beat.charge, 0.1)
+							FightBars.setCharge(chargeFill, beat.charge, 0.1)
 							FigureFX.stagger(attacker, MapConfig.FIGHT_BEAT_SECONDS * tempo)
 						else
 							task.wait(MapConfig.FIGHT_BEAT_SECONDS * tempo)
@@ -838,7 +700,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 						-- Faehigkeit: Leiste leuchtet voll auf, die Show laeuft,
 						-- dann der wuchtige Stoss.
 						if isSkill and isSelf then
-							setCharge(chargeFill, 1, 0.1)
+							FightBars.setCharge(chargeFill, 1, 0.1)
 							local showId = beat.skillId or fxSkillId
 							if showId then
 								local full = not fxShownFull
@@ -878,8 +740,8 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 
 				-- Leisten auf den echten Endstand der Stage (falls Zuege
 				-- ausgelassen wurden, stimmt so trotzdem alles).
-				tweenFill(selfFill, stage.hpAfter / maxHp, 0.15)
-				tweenFill(enemyFill, if stage.won then 0 else stageBeats[#stageBeats].enemyHp, 0.15)
+				FightBars.tweenFill(selfFill, stage.hpAfter / maxHp, 0.15)
+				FightBars.tweenFill(enemyFill, if stage.won then 0 else stageBeats[#stageBeats].enemyHp, 0.15)
 
 				if stage.won then
 					cleared += 1
