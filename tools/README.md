@@ -64,6 +64,7 @@ das nicht, weil die Configs einfache Tabellen zurückgeben.
   und jedes verbundene Remote hat einen eigenen Cooldown in `NetworkConfig`.
 * Jedes Modul in der `GameManager`-Startliste existiert als Datei.
 * Jeder Service mit `init()` oder `start()` steht in der Startliste.
+* Jede `.luau`-Datei unter `src/` beginnt mit `--!strict`.
 
 ## `check_loc.py` — Übersetzungen
 

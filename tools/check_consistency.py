@@ -11,6 +11,7 @@ nicht sieht, weil sie ueber mehrere Dateien verteilt sind:
   3. Jedes verbundene Remote sollte einen eigenen Cooldown haben.
   4. Jedes Modul in der GameManager-Boot-Liste muss als Datei existieren.
   5. Jeder Service mit init() oder start() muss in der Boot-Liste stehen.
+  6. Jede .luau-Datei unter src/ beginnt mit --!strict.
 
 Aufruf:  python3 tools/check_consistency.py [pfad/zu/src]
 """
@@ -129,6 +130,14 @@ for f in sorted((ROOT / "server" / "Services").glob("*.luau")):
     for phase in ("init", "start"):
         if re.search(rf"function \w+\.{phase}\(", src) and f.stem not in listed:
             issues.append(f"Service hat {phase}(), steht aber nicht in der Boot-Liste: {f.stem}")
+
+# ---------- 6. --!strict ----------
+# Die Typpruefung ist nur so gut wie ihre schwaechste Datei: ein Modul ohne
+# strict liefert anderen Modulen ungeprueft `any` zurueck.
+for f in sorted(ROOT.rglob("*.luau")):
+    first = f.read_text(encoding="utf-8", errors="replace").lstrip("\ufeff").split("\n", 1)[0].strip()
+    if first != "--!strict":
+        issues.append(f"Datei beginnt nicht mit --!strict: {f.relative_to(ROOT)} (erste Zeile: {first[:40]!r})")
 
 print("=" * 62)
 if issues:

@@ -122,6 +122,22 @@ local UFO = {
 	-- Radius des Beam-Rings (Anteil des Podest-Radius) und Beruehrungsabstand.
 	BEAM_RADIUS_FACTOR = 0.22,
 	TOUCH_DISTANCE     = 5,
+
+	-- Takt der Beam-Pruefung. Der Fortschritt waechst je Takt um genau diesen
+	-- Wert, die Summe pro Sekunde bleibt also gleich; der Takt bestimmt nur,
+	-- wie fein Beruehrungen und Beam-Grenze erkannt werden.
+	TICK_SECONDS = 0.25,
+
+	-- Der Verlierer eines Kampfs laeuft zurueck und darf so lange nicht
+	-- wieder zum Beam.
+	LOSER_COOLDOWN_SECONDS = 4,
+
+	-- Dasselbe Paar kaempft fruehestens nach FIGHT_SECONDS + so vielen
+	-- Sekunden erneut gegeneinander.
+	PAIR_COOLDOWN_EXTRA_SECONDS = 6,
+
+	-- Nach einem Beam-Reset bleibt der Beam so lange geschlossen.
+	BEAM_REOPEN_SECONDS = 4,
 }
 
 -- Rarity-Up-Chance beim Absetzen des entfuehrten Baerchis. Aufstieg immer nur
@@ -162,6 +178,13 @@ local MUTATION_RARITY_FACTOR: { [string]: number } = {
 	Omega     = 0.004,
 }
 
+-- Duelle (UFO, Koenigshuegel): die Kampfkraft beider Seiten wird mit einem
+-- Zufallsfaktor 1 ± POWER_SPREAD multipliziert. 0.2 = auch der Schwaechere
+-- gewinnt manchmal, wenn der Abstand klein ist.
+local DUEL = {
+	POWER_SPREAD = 0.2,
+}
+
 local STORM = {
 	-- Alle so viele Sekunden schlaegt ein Blitz in einen Teilnehmer ein (nur
 	-- Optik); der Mutations-Wurf selbst faellt am Event-Ende.
@@ -187,6 +210,16 @@ local KING = {
 	-- Radius des Huegels (Anteil des Podest-Radius).
 	HILL_RADIUS_FACTOR = 0.30,
 	TICK_SECONDS       = 1,
+
+	-- Zwei Baerchis auf dem Huegel, die sich so nahe kommen, kaempfen.
+	TOUCH_DISTANCE = 6,
+	-- Fixe Dauer eines Huegel-Duells.
+	DUEL_SECONDS = 3,
+	-- Der Verlierer muss runter und darf so lange nicht wieder hoch.
+	LOSER_COOLDOWN_SECONDS = 6,
+	-- Ein Herausforderer bleibt so weit vor dem Koenig stehen (innerhalb von
+	-- TOUCH_DISTANCE, damit das Duell ausgeloest wird).
+	CHALLENGE_DISTANCE = 4,
 }
 
 --------------------------------------------------------------------------------
@@ -204,6 +237,10 @@ local TREASURE = {
 	MAX_SITES             = 9,
 	-- Anteil der Fundstellen, in denen eine Bombe liegt.
 	BOMB_SHARE            = 0.15,
+	-- Fundstellen liegen in diesem Ring um die Event-Mitte (Anteil des
+	-- Podest-Radius): nicht direkt in der Mitte und nicht am Zaun.
+	SITE_MIN_RADIUS_FACTOR = 0.25,
+	SITE_MAX_RADIUS_FACTOR = 0.80,
 	-- Belohnung nach Funden (ueberlebt man bis Ende): hoechste passende Stufe.
 	-- Bei Bombe geht ALLES verloren.
 	-- v14: hoechstes freies Ei statt fest Golden/Kristall; ab 5 Funden ein
@@ -394,6 +431,7 @@ return {
 	EVENTS                 = EVENTS,
 
 	UFO                    = UFO,
+	DUEL                   = DUEL,
 	RARITY_UP_CHANCE       = RARITY_UP_CHANCE,
 	MUTATION_RARITY_FACTOR = MUTATION_RARITY_FACTOR,
 	STORM                  = STORM,
