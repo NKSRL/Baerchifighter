@@ -5,7 +5,7 @@ Konsistenz-Pruefung fuer das RBL-Projekt.
 Prueft die Dinge, die Roblox erst beim Start bemerkt und die Luau selbst
 nicht sieht, weil sie ueber mehrere Dateien verteilt sind:
 
-  1. Gebaeude-IDs muessen in ALLEN acht Listen identisch sein.
+  1. Gebaeude-IDs muessen in ALLEN neun Listen identisch sein.
   2. Bei RateLimiter.connect muessen Remote-Objekt und Cooldown-Schluessel
      denselben Namen tragen.
   3. Jedes verbundene Remote sollte einen eigenen Cooldown haben.

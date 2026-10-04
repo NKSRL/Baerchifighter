@@ -12,6 +12,11 @@ Dann:
     node check_syntax.mjs               # kompiliert JEDE .luau-Datei, meldet Syntaxfehler
     node run.mjs loc.test.lua           # Tests für Localization/Loc
     node run.mjs client.test.lua        # Rauchtest der Client-UI (Sprachwechsel, Toasts, HUD ...)
+    node run.mjs ../sim/egg_tree_check.lua   # Regeln des Ei-Baums
+    node run.mjs ../sim/path_balance.lua     # Pfad-Profile
+    node run.mjs ../sim/fight_timeline.lua   # Zeitbudget der Kampf-Wiedergabe
+    node run.mjs ../sim/pit_balance.lua      # nur Tabelle, keine Pruefung
+    node run.mjs ../sim/egg_tree_sim.lua     # nur Tabelle, keine Pruefung
 
 Exit-Code 0 = alles in Ordnung, 1 = ein Test ist gescheitert.
 

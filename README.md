@@ -1,7 +1,8 @@
 # Bärchi Fighter (RBL)
 
 Roblox-Spiel: Idle-/Gacha-/Kampf-Hybrid im Stil von „Grow a Chicken Fighter",
-mit Bärchen statt Hühnern. Bis zu 8 Spieler auf einer gemeinsamen Wiese.
+mit Bärchen statt Hühnern. Bis zu 8 Spieler, jeder auf einer eigenen
+Plot-Insel rund um eine gemeinsame Hauptinsel.
 
 Die vollständige Beschreibung — Spielschleife, Weltaufbau, Architektur,
 Datenmodell, Balance und offene Punkte — steht im **Context Briefing** im
@@ -24,32 +25,42 @@ rojo serve
 
 Rojo 7.7.0, verwaltet über Aftman (`aftman.toml`). Doku: <https://rojo.space/docs>
 
-## Vor dem Studio-Start prüfen
+**Zwei-Wege-Sync bleibt aus.** Die Dateien hier sind die einzige Wahrheit.
+Änderungen, die nur in Studio gemacht werden, gehen verloren oder setzen —
+mit Zwei-Wege-Sync — Dateien auf der Festplatte zurück.
 
-Im Ordner `tools/` liegen Skripte, die die häufigsten Fehler finden, bevor
-Roblox sie beim Laden meldet — falsche Config-Feldnamen, auseinandergelaufene
-Gebäude-IDs, schwebende Deko-Teile:
+## Vor dem Studio-Start und vor jedem Commit prüfen
 
 ```bash
-python3 tools/check_members.py
-python3 tools/check_consistency.py
-python3 tools/check_decor.py
+cd tools/luau-tests && npm install      # einmalig
+node check_syntax.mjs
+node run.mjs loc.test.lua
+node run.mjs client.test.lua
+node run.mjs ../sim/egg_tree_check.lua
+node run.mjs ../sim/path_balance.lua
+node run.mjs ../sim/fight_timeline.lua
+cd ../..
+python tools/check_members.py
+python tools/check_consistency.py
+python tools/check_loc.py
+python tools/check_decor.py
 ```
 
-Details und die Syntaxprüfung mit dem offiziellen Luau-Compiler stehen in
-`tools/README.md`.
+Was jede Prüfung abdeckt, steht in `tools/README.md`.
 
 ## Zwei Dinge, die Studio selbst braucht
 
 * **`MaxPlayers` auf 8 setzen.** `MapConfig.PLOT_COUNT` ist 8; ein neunter
   Spieler bekäme keinen Plot.
-* **Bärchi-Meshes importieren** nach `src/shared/Assets/` als
-  `BaerchiTemplate.rbxm` (Standard) bzw. `BaerchiTemplate_<Rarity>.rbxm`.
+* **Bärchi-Meshes** liegen in `src/shared/Assets/` (`BaerchiTemplate.rbxm`;
+  ein eigenes Modell je Rarity als `BaerchiTemplate_<Rarity>.rbxm`).
   Roblox übernimmt beim glTF-Import keine Farben ohne Textur — die müssen
   nach dem Import von Hand gesetzt werden.
 
 ## Konventionen
 
-`--!strict` in jeder Datei, deutsche Kommentare, alle Zahlen in `Config`-Modulen,
-`Types.luau` und `Remotes.luau` als einzige Quellen für Datenstrukturen und
-Remote-Namen. Ausführlich im Context Briefing.
+`--!strict` in jeder Datei, deutsche Kommentare (das Warum, nicht die
+Geschichte), Balance- und Tuning-Zahlen in `Config`-Modulen (reine Geometrie
+und Optik als benannte Konstanten am Dateianfang), `Types.luau` und
+`Remotes.luau` als einzige Quellen für Datenstrukturen und Remote-Namen.
+Ausführlich im Context Briefing.
