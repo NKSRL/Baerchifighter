@@ -189,24 +189,19 @@ function PlotDisplayService.init()
 		return if data then data.island else nil
 	end)
 
-	PlayerService.onDataLoaded(function(player, data)
+	PlayerService.onPlayerReady(function(player, data)
 		-- Die Figuren und Schilder stehen zu diesem Zeitpunkt schon
-		-- (MapService.spawnIsland laeuft in onPlayerAdded davor), aber die
-		-- Daten haben sich seitdem noch geaendert: HoneyService schreibt in
-		-- SEINEM onDataLoaded den Offline-Honig gut, und dieser Callback
-		-- laeuft danach. Die Schilder zeigten sonst bis zum naechsten
-		-- Honig-Tick den Stand von vor der Gutschrift.
+		-- (MapService.spawnIsland laeuft beim Join davor), aber die Daten
+		-- haben sich seitdem noch geaendert: die onDataLoaded-Callbacks haben
+		-- Offline-Honig gutgeschrieben und offline gelegte Eier eingetragen.
+		-- Die Schilder zeigten sonst bis zum naechsten Honig-Tick den Stand von
+		-- vor der Gutschrift, und die Eier laegen nur in den Daten.
 		--
 		-- Deshalb einmal aktiv nachziehen — und ERST DANN die Signatur
 		-- merken, sonst haelt der Vergleich unten den Unterschied faelschlich
 		-- fuer bereits dargestellt.
 		MapService.updateBuildingSigns(player, data.island)
 		MapService.updateBaerchiStates(player, data.island)
-
-		-- Die offline gelegten Eier stehen zu diesem Zeitpunkt schon in den
-		-- Daten (EggLayService haengt weiter oben im GameManager und hat seinen
-		-- onDataLoaded-Callback vor diesem hier laufen lassen) — aber noch
-		-- nicht in der Welt: spawnIsland lief davor.
 		MapService.updateLaidEggs(player, data.island)
 
 		_signatures[player] = allSignatures(data)

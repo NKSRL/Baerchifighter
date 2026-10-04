@@ -63,7 +63,7 @@ das nicht, weil die Configs einfache Tabellen zurückgeben.
 * `RateLimiter.connect`: Remote-Objekt und Cooldown-Schlüssel heißen gleich,
   und jedes verbundene Remote hat einen eigenen Cooldown in `NetworkConfig`.
 * Jedes Modul in der `GameManager`-Startliste existiert als Datei.
-* Jeder Service mit `init()` steht in der Startliste.
+* Jeder Service mit `init()` oder `start()` steht in der Startliste.
 
 ## `check_loc.py` — Übersetzungen
 

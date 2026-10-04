@@ -273,12 +273,6 @@ function EventService.onEventEnded(callback: (EventConfig.EventDef) -> ())
 end
 
 function EventService.init()
-	-- Server startet in der Pause, nicht mitten in einem Event — sonst wuerde
-	-- jeder frisch gestartete Server sofort mit einem laufenden Event
-	-- begruesst, was sich nach einem Fehler anfuehlt statt nach Absicht.
-	_phaseEndsAt = os.time() + EventConfig.EVENT_GAP_SECONDS
-	MapService.setEventPitTheme(nil)
-
 	-- Wer spaeter dazukommt, hat den letzten Phasenwechsel verpasst — also
 	-- bekommt jeder neue Spieler den Stand einmal gezielt zugeschickt. Ohne
 	-- das zeigte seine Baerchi-Karte bis zum naechsten Wechsel (bis zu fuenf
@@ -286,6 +280,22 @@ function EventService.init()
 	Players.PlayerAdded:Connect(function(player)
 		Remotes.EventPhaseChanged:FireClient(player, phasePayload())
 	end)
+
+	print(
+		"[EventService] Initialisiert |", #EventConfig.EVENTS, "Events im Wechsel |",
+		"individuelle Dauer,", EventConfig.EVENT_GAP_SECONDS, "s Pause"
+	)
+end
+
+-- Der Zyklus laeuft erst in start(): dann steht die Welt (das Event-Pit baut
+-- MapService.init) und alle onEventStarted/onEventEnded-Rueckrufe sind
+-- angemeldet.
+function EventService.start()
+	-- Server startet in der Pause, nicht mitten in einem Event — sonst wuerde
+	-- jeder frisch gestartete Server sofort mit einem laufenden Event
+	-- begruesst, was sich nach einem Fehler anfuehlt statt nach Absicht.
+	_phaseEndsAt = os.time() + EventConfig.EVENT_GAP_SECONDS
+	MapService.setEventPitTheme(nil)
 
 	task.spawn(function()
 		while true do
@@ -296,11 +306,6 @@ function EventService.init()
 			task.wait(1)
 		end
 	end)
-
-	print(
-		"[EventService] Initialisiert |", #EventConfig.EVENTS, "Events im Wechsel |",
-		"individuelle Dauer,", EventConfig.EVENT_GAP_SECONDS, "s Pause"
-	)
 end
 
 return EventService

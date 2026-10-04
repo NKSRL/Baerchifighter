@@ -10,7 +10,7 @@ nicht sieht, weil sie ueber mehrere Dateien verteilt sind:
      denselben Namen tragen.
   3. Jedes verbundene Remote sollte einen eigenen Cooldown haben.
   4. Jedes Modul in der GameManager-Boot-Liste muss als Datei existieren.
-  5. Jeder Service mit init() muss in der Boot-Liste stehen.
+  5. Jeder Service mit init() oder start() muss in der Boot-Liste stehen.
 
 Aufruf:  python3 tools/check_consistency.py [pfad/zu/src]
 """
@@ -126,8 +126,9 @@ for mm in re.finditer(r"module\s*=\s*ServerScriptService\.(\w+)\.(\w+)", gm):
 
 for f in sorted((ROOT / "server" / "Services").glob("*.luau")):
     src = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
-    if re.search(r"function \w+\.init\(", src) and f.stem not in listed:
-        issues.append(f"Service hat init(), steht aber nicht in der Boot-Liste: {f.stem}")
+    for phase in ("init", "start"):
+        if re.search(rf"function \w+\.{phase}\(", src) and f.stem not in listed:
+            issues.append(f"Service hat {phase}(), steht aber nicht in der Boot-Liste: {f.stem}")
 
 print("=" * 62)
 if issues:

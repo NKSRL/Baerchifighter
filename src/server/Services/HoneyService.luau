@@ -407,8 +407,6 @@ local function grantOfflineHoney(player: Player, data: Types.PlayerData)
 end
 
 function HoneyService.init()
-	-- Muss VOR PlayerService.init() laufen, sonst verpasst der Callback die
-	-- ersten Joins — siehe Reihenfolge im GameManager.
 	PlayerService.onDataLoaded(grantOfflineHoney)
 
 	RateLimiter.connect(Remotes.RequestFeedHoney, "RequestFeedHoney", function(player, baerchiUid: any, buildingId: any)

@@ -59,6 +59,7 @@ local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService    = require(ServerScriptService.Services.MapService)
+local IslandService = require(ServerScriptService.Services.IslandService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
 -- v12: nur fuer "ist der Baerchi zu Hause?"
 local PetModeService = require(ServerScriptService.Services.PetModeService)
@@ -456,10 +457,15 @@ function EggLayService.init()
 		_wasAway[player]  = nil
 	end)
 
-	-- Offline-Nachholen beim Join. Muss VOR PlayerService.init() angemeldet
-	-- werden, also aus dem init() eines Services, der im GameManager frueher
-	-- steht — genau wie HoneyService es fuer den Offline-Honig macht.
+	-- Offline-Nachholen beim Join.
 	PlayerService.onDataLoaded(function(player, data)
+		-- Gelegt wird vom AUSGERUESTETEN Baerchi. Ein alter Spielstand kann
+		-- beim Laden noch keinen (gueltigen) haben; IslandService ruestet in
+		-- seinem eigenen onDataLoaded zwar nach, aber die Reihenfolge der
+		-- Callbacks ist nicht zugesichert. autoEquipIfNone ist idempotent,
+		-- der zweite Aufruf tut nichts.
+		IslandService.autoEquipIfNone(data)
+
 		local secondsAway = os.time() - (data.lastSeenAt or os.time())
 		local laid, blocked = catchUp(player, data, true)
 

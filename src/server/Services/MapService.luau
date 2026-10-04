@@ -77,8 +77,8 @@ local _pendingRebuild: { [Player]: boolean } = {}
 -- Woher der nachgeholte Neuaufbau seine FRISCHEN IslandData bekommt.
 --
 -- Absichtlich als eingehaengte Funktion statt eines require(PlayerService):
--- PlayerService requiret bereits MapService (Join-Reihenfolge im GameManager),
--- der umgekehrte Weg waere ein Ringschluss. Ausserdem bleibt damit die Regel
+-- PlayerService requiret bereits MapService, der umgekehrte Weg waere ein
+-- Ringschluss. Ausserdem bleibt damit die Regel
 -- im Kopf dieser Datei gueltig — MapService kennt weiterhin keine
 -- Spielerdaten ausser IslandData. Eingehaengt wird sie von
 -- PlotDisplayService.init(); ohne sie faellt nur das Nachholen aus.

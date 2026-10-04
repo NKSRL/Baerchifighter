@@ -133,6 +133,9 @@ local _pendingSave: { [Player]: boolean } = {}
 -- Callbacks anderer Services, ausgefuehrt direkt nach dem Laden
 local _onDataLoaded: { (Player, Types.PlayerData) -> () } = {}
 
+-- Callbacks anderer Services, ausgefuehrt nach allen _onDataLoaded
+local _onPlayerReady: { (Player, Types.PlayerData) -> () } = {}
+
 -- Callbacks anderer Services, ausgefuehrt bei jedem markDirty
 local _onDataChanged: { (Player, Types.PlayerData) -> () } = {}
 
@@ -438,10 +441,22 @@ end
 
 -- Registriert einen Callback der laeuft sobald die Daten eines Spielers
 -- geladen und seine Insel gespawnt ist — aber bevor der erste Client-Sync
--- rausgeht. Muss VOR PlayerService.init() aufgerufen werden, also aus dem
--- init() eines Services der im GameManager vorher steht.
+-- rausgeht. Hier gehoert alles hin, was die Daten beim Join noch aendert
+-- (Offline-Honig, Offline-Eier, Ausruesten). Aus init() aufrufen: Spieler
+-- werden erst in start() geladen, also verpasst kein Callback einen Join.
+--
+-- Die Callbacks laufen in Anmelde-Reihenfolge. Keiner darf sich auf einen
+-- anderen verlassen; wer den fertigen Stand braucht, nimmt onPlayerReady.
 function PlayerService.onDataLoaded(callback: (Player, Types.PlayerData) -> ())
 	table.insert(_onDataLoaded, callback)
+end
+
+-- Registriert einen Callback der nach ALLEN onDataLoaded-Callbacks laeuft,
+-- direkt vor dem ersten Client-Sync. Fuer alles, was den fertig geladenen
+-- Stand nur anzeigt (Schilder, gelegte Eier in der Welt). Darf die Daten
+-- nicht mehr aendern.
+function PlayerService.onPlayerReady(callback: (Player, Types.PlayerData) -> ())
+	table.insert(_onPlayerReady, callback)
 end
 
 -- Registriert einen Callback der bei JEDER Datenaenderung laeuft (markDirty).
@@ -467,7 +482,7 @@ local function onPlayerAdded(player: Player)
 
 	-- Daten laden (kann einen Moment dauern).
 	--
-	-- Zusaetzlich in pcall: die Migration (PlayerMigration) rechnet fuer die Migration alter
+	-- Zusaetzlich in pcall: die Migration (PlayerMigration) rechnet fuer alte
 	-- Spielstaende echte Kampfwerte aus. Ein einzelner kaputter Eintrag darf
 	-- den Join nicht mittendrin abbrechen — sonst bliebe _loading fuer immer
 	-- gesetzt, der Spieler haette nie Daten und jedes Remote liefe still ins
@@ -512,6 +527,13 @@ local function onPlayerAdded(player: Player)
 		local ok, err = pcall(callback, player, data)
 		if not ok then
 			warn("[PlayerService] onDataLoaded-Callback fehlgeschlagen:", err)
+		end
+	end
+
+	for _, callback in _onPlayerReady do
+		local ok, err = pcall(callback, player, data)
+		if not ok then
+			warn("[PlayerService] onPlayerReady-Callback fehlgeschlagen:", err)
 		end
 	end
 
@@ -590,14 +612,6 @@ function PlayerService.init()
 		return buildUpdate(data)
 	end)
 
-	-- Bereits verbundene Spieler (falls Script spaet laedt)
-	for _, player in Players:GetPlayers() do
-		task.spawn(onPlayerAdded, player)
-	end
-
-	Players.PlayerAdded:Connect(onPlayerAdded)
-	Players.PlayerRemoving:Connect(onPlayerRemoving)
-
 	-- Sicherheitsnetz: beim Server-Shutdown alle speichern
 	game:BindToClose(function()
 		for player, data in _playerData do
@@ -615,6 +629,20 @@ function PlayerService.init()
 	else
 		print("[PlayerService] Initialisiert | OHNE DataStore — nur Sitzungs-Speicher")
 	end
+end
+
+-- Erst hier werden Spieler geladen: GameManager ruft start() nach ALLEN
+-- init(). Damit hat jeder Service seine Callbacks angemeldet, bevor der erste
+-- Join sie ausloest — egal, wo er in der Startliste steht.
+function PlayerService.start()
+	-- Bereits verbundene Spieler (in Studio-Play-Solo ist der Spieler oft
+	-- schon da, bevor der Server mit dem Starten fertig ist)
+	for _, player in Players:GetPlayers() do
+		task.spawn(onPlayerAdded, player)
+	end
+
+	Players.PlayerAdded:Connect(onPlayerAdded)
+	Players.PlayerRemoving:Connect(onPlayerRemoving)
 end
 
 return PlayerService

@@ -190,8 +190,7 @@ function IslandService.init()
 
 	-- Sicherheitsnetz: ein alter Spielstand ohne equippedUid (oder einer
 	-- dessen ausgeruesteter Baerchi inzwischen weg ist) bekommt beim Laden
-	-- automatisch den naechstbesten. Muss vor PlayerService.init() stehen —
-	-- siehe PlayerService.onDataLoaded.
+	-- automatisch den naechstbesten.
 	PlayerService.onDataLoaded(function(_player, data)
 		IslandService.autoEquipIfNone(data)
 	end)

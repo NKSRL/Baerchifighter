@@ -2,17 +2,20 @@
 -- GameManager.server.luau
 -- ServerScriptService/Core/GameManager.server.luau
 --
--- Startet alle Services in der richtigen Reihenfolge.
--- Einzige Stelle die die Initialisierungsreihenfolge kennt.
--- Kein anderer Script startet Services direkt.
+-- Einzige Zustaendigkeit:
+--   - Alle Services laden und in drei Phasen starten
 --
--- Reihenfolge — die Begruendung steht hier, nicht in den Services:
---   1. RateLimiter zuerst: jeder Service der ein Remote verbindet benutzt ihn.
---   2. MapService vor PlayerService (PlayerService ruft MapService beim Join auf).
---   3. EconomyService vor allen Services die Waehrung bewegen.
---   4. HoneyService vor PlayerService: es registriert den onDataLoaded-Callback
---      fuer den Offline-Honig und wuerde sonst die ersten Joins verpassen.
---   5. PlayerService als LETZTES — sein init() loest sofort Join-Events aus.
+-- Kein anderes Skript startet Services. Die drei Phasen:
+--   1. laden   alle Module per require — danach existiert jedes Modul
+--   2. init()  jeder Service richtet sich ein: Remotes verbinden, Rueckrufe
+--              bei anderen Services anmelden (onDataLoaded, onEventEnded ...)
+--   3. start() erst jetzt passiert etwas mit Spielern oder Zeit: PlayerService
+--              laedt verbundene Spieler, EventService startet den Zyklus
+--
+-- Weil kein Service in init() schon Spieler verarbeitet, ist die Reihenfolge
+-- in REGISTRY beliebig: jeder Rueckruf ist angemeldet, bevor der erste
+-- Spieler geladen wird. Ein neuer Service traegt sich irgendwo ein und
+-- verschiebt Arbeit mit Spielern in ein start().
 
 local Players             = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -27,112 +30,51 @@ local RunService          = game:GetService("RunService")
 -- ueberhaupt zu laufen beginnt.
 Players.CharacterAutoLoads = false
 
--- Reihenfolge = Startreihenfolge. Der Name links ist nur fuer den
--- Studio-Debug-Hook am Ende der Datei relevant.
+-- Der Name links ist nur fuer den Studio-Debug-Hook am Ende der Datei
+-- relevant. Gruppiert nach Thema, nicht nach Abhaengigkeit.
 local REGISTRY: { { name: string, module: ModuleScript } } = {
+	-- Infrastruktur
 	{ name = "RateLimiter",    module = ServerScriptService.Util.RateLimiter },
-
-	{ name = "MapService",     module = ServerScriptService.Services.MapService },
+	{ name = "PlayerService",  module = ServerScriptService.Services.PlayerService },
 	{ name = "EconomyService", module = ServerScriptService.Services.EconomyService },
 
-	-- Faehrt den Event-Zyklus (Pause/Event-Wechsel am Event-Pit in der
-	-- Weltmitte). Braucht nur MapService, keine Spielerdaten — Reihenfolge zu
-	-- allem anderen ist unkritisch, steht aber der Vollstaendigkeit halber
-	-- gleich bei MapService/EconomyService.
-	{ name = "EventService",   module = ServerScriptService.Services.EventService },
-
-	{ name = "IslandService",  module = ServerScriptService.Services.IslandService },
-	{ name = "EggService",     module = ServerScriptService.Services.EggService },
-
-	-- v12: der versteckte Basis-Ei-Haendler (einzige Kaufmoeglichkeit). Baut
-	-- seinen Stand selbst in die Welt und nutzt EggService zum Abrechnen.
-	{ name = "EggMerchantService", module = ServerScriptService.Services.EggMerchantService },
-
-	-- Reine Darstellung des PIT-Laufs in der Arena. Muss vor CombatService
-	-- stehen, weil der sie am Ende eines Laufs aufruft.
-	{ name = "PitArenaService", module = ServerScriptService.Services.PitArenaService },
-	{ name = "CombatService",  module = ServerScriptService.Services.CombatService },
-	{ name = "FusionService",  module = ServerScriptService.Services.FusionService },
-	{ name = "RecycleService", module = ServerScriptService.Services.RecycleService },
-	{ name = "RebirthService", module = ServerScriptService.Services.RebirthService },
-
-	-- Die zweite Fortschrittsachse (Promotion/Charms, siehe
-	-- Config/PromotionConfig). Beide aendern nur Spielerdaten und verbinden je
-	-- ein Remote — sie brauchen weder MapService noch eine bestimmte Position
-	-- vor PlayerService. Sie stehen hier bei Fusion/Recycling, weil sie
-	-- dieselbe Art Aktion sind: der Spieler gibt Besitz auf und bekommt dafuer
-	-- etwas Staerkeres.
-	--
-	-- CharmService MUSS nach EconomyService stehen (er bucht GoldGummies ab) —
-	-- das ist durch dessen Platz weiter oben erfuellt.
-	{ name = "PromotionService", module = ServerScriptService.Services.PromotionService },
-	{ name = "CharmService",     module = ServerScriptService.Services.CharmService },
-
-	-- Honig-Produktion und Fuettern. Registriert einen onDataLoaded-Callback
-	-- (Offline-Honig) und muss deshalb vor PlayerService stehen.
-	-- Ersetzt den frueheren FarmService, der aus dem Projekt entfernt ist.
-	{ name = "HoneyService",   module = ServerScriptService.Services.HoneyService },
-
-	-- Laesst den ausgeruesteten Baerchi Eier legen und nimmt das Einsammeln
-	-- entgegen. Registriert einen onDataLoaded-Callback (Offline-Eier) und muss
-	-- deshalb vor PlayerService stehen — genau wie HoneyService.
-	--
-	-- Steht nach MapService, weil es dessen Figuren-Position braucht, um zu
-	-- wissen, WO das Ei landet.
-	{ name = "EggLayService",  module = ServerScriptService.Services.EggLayService },
-
-	-- Wie HoneyService: registriert einen onDataLoaded-Callback und muss
-	-- deshalb vor PlayerService stehen. Haengt ausserdem beim Start die
-	-- Datenquelle fuer MapServices nachgeholten Figuren-Neuaufbau ein.
-	-- Ersetzt den frueheren BaerchiDisplayService, der aus dem Projekt
-	-- entfernt ist.
-	{ name = "PlotDisplayService", module = ServerScriptService.Services.PlotDisplayService },
-
-	-- Laesst den ausgeruesteten Baerchi selbststaendig zum Honig-Teich laufen.
-	-- Registriert keinen onDataLoaded-Callback (pollt einfach Players:GetPlayers()),
-	-- die Reihenfolge zu PlayerService ist deshalb nicht kritisch — steht aber
-	-- der Vollstaendigkeit halber bei den anderen Anzeige-nahen Services.
+	-- Welt und Darstellung
+	{ name = "MapService",              module = ServerScriptService.Services.MapService },
+	{ name = "PlotDisplayService",      module = ServerScriptService.Services.PlotDisplayService },
 	{ name = "BaerchiAutopilotService", module = ServerScriptService.Services.BaerchiAutopilotService },
 
-	-- Schickt den ausgeruesteten Baerchi auf Knopfdruck zum Event-Pit in der
-	-- Weltmitte und verteilt beim Event-Ende die Stat-Stufen.
-	--
-	-- Muss nach EventService stehen: sein init() meldet dort den
-	-- onEventEnded-Callback an. Und nach BaerchiAutopilotService, weil beide
-	-- dieselbe Figur bewegen und sich ueber ActivityLock einigen — die
-	-- Reihenfolge ist dafuer zwar nicht zwingend, aber wer eines der beiden
-	-- anfasst, soll das andere direkt daneben sehen.
+	-- Insel, Honig, Eier
+	{ name = "IslandService",      module = ServerScriptService.Services.IslandService },
+	{ name = "HoneyService",       module = ServerScriptService.Services.HoneyService },
+	{ name = "EggService",         module = ServerScriptService.Services.EggService },
+	{ name = "EggMerchantService", module = ServerScriptService.Services.EggMerchantService },
+	{ name = "EggLayService",      module = ServerScriptService.Services.EggLayService },
+	{ name = "EggTreeService",     module = ServerScriptService.Services.EggTreeService },
+
+	-- Kampf
+	{ name = "PitArenaService", module = ServerScriptService.Services.PitArenaService },
+	{ name = "CombatService",   module = ServerScriptService.Services.CombatService },
+	{ name = "PetModeService",  module = ServerScriptService.Services.PetModeService },
+
+	-- Events
+	{ name = "EventService",              module = ServerScriptService.Services.EventService },
 	{ name = "EventParticipationService", module = ServerScriptService.Services.EventParticipationService },
 
-	-- v13: Quests + Index. Liest nur Spielerdaten, zahlt ueber EconomyService
-	-- aus und haengt sich per onDataChanged an PlayerService — steht deshalb
-	-- nach EconomyService und vor PlayerService.
-	{ name = "QuestService", module = ServerScriptService.Services.QuestService },
+	-- Baerchis veraendern
+	{ name = "FusionService",    module = ServerScriptService.Services.FusionService },
+	{ name = "RecycleService",   module = ServerScriptService.Services.RecycleService },
+	{ name = "PromotionService", module = ServerScriptService.Services.PromotionService },
+	{ name = "CharmService",     module = ServerScriptService.Services.CharmService },
+	{ name = "RebirthService",   module = ServerScriptService.Services.RebirthService },
 
-	-- v14: Ei-Baum (Freischaltung, Ei-Presse, Blaupausen). Haengt sich wie
-	-- QuestService per onDataChanged an — und zwar NACH ihm, damit der Index
-	-- (den QuestService nachtraegt) beim Pruefen schon aktuell ist.
-	{ name = "EggTreeService", module = ServerScriptService.Services.EggTreeService },
-
-	-- Spieler-Einstellungen (aktuell: Sprache). Aendert nur ein Feld in den
-	-- Spielerdaten und verbindet ein Remote — Reihenfolge zu PlayerService
-	-- unkritisch (der Handler laeuft erst, wenn ein Spieler etwas anklickt).
+	-- Meta
+	{ name = "QuestService",    module = ServerScriptService.Services.QuestService },
 	{ name = "SettingsService", module = ServerScriptService.Services.SettingsService },
 
-	-- v12: die untere Pet-Leiste (Event / Fight). Liest den Zustand aus
-	-- EventParticipationService und PitArenaService und startet ueber
-	-- CombatService — muss deshalb nach allen dreien stehen.
-	{ name = "PetModeService", module = ServerScriptService.Services.PetModeService },
-
-	{ name = "PlayerService",  module = ServerScriptService.Services.PlayerService },  -- letzter Spiel-Service!
-
-	-- Kein Spiel-Service: baut nur die Studio-Test-Schnittstelle.
-	-- Muss nach allen anderen kommen, weil es sie alle referenziert.
-	{ name = "DebugService",   module = ServerScriptService.Services.DebugService },
+	-- Kein Spiel-Service: die Studio-Test-Schnittstelle
+	{ name = "DebugService", module = ServerScriptService.Services.DebugService },
 }
 
--- Erst alle laden, dann alle starten — ein init() darf sich darauf verlassen
--- dass jedes andere Modul bereits ausgewertet ist.
 local loaded: { [string]: any } = {}
 
 for _, entry in REGISTRY do
@@ -143,6 +85,13 @@ for _, entry in REGISTRY do
 	local service = loaded[entry.name]
 	if service.init then
 		service.init()
+	end
+end
+
+for _, entry in REGISTRY do
+	local service = loaded[entry.name]
+	if service.start then
+		service.start()
 	end
 end
 
