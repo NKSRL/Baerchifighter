@@ -223,7 +223,7 @@ export type Building = {
 
 -- v12: Brut-Slots (HatchingEgg, island.hatchingEggs) sind entfallen. Ein Ei
 -- aus dem Lager wird per Klick sofort geoeffnet (EggService.openEgg). Die
--- Migration in PlayerService legt laufende Bruten alter Spielstaende zurueck
+-- Migration (Util/PlayerMigration) legt laufende Bruten alter Spielstaende zurueck
 -- ins Lager.
 
 -- v12: Stand des letzten PIT-Laufs fuer die Fortsetzungs-Frage.
@@ -386,6 +386,17 @@ export type Rank = {
 }
 
 --------------------------------------------------------------------------------
+-- Sitzungs-Sperre
+--------------------------------------------------------------------------------
+
+-- jobId ist game.JobId des haltenden Servers, lockedAt sein os.time() beim
+-- letzten Laden oder Speichern.
+export type SessionLock = {
+	jobId    : string,
+	lockedAt : number,
+}
+
+--------------------------------------------------------------------------------
 -- PlayerData — alles was im DataStore landet
 --------------------------------------------------------------------------------
 
@@ -435,6 +446,12 @@ export type PlayerData = {
 
 	-- v14: Ei-Baum (ueberlebt Rebirths)
 	eggTree : EggTreeState,
+
+	-- Welcher Server den Spielstand gerade haelt (siehe Util/SessionLock).
+	-- Nur serverseitig, geht nie an den Client. nil = niemand; das ist der
+	-- Stand nach einem sauberen Verlassen und bei jedem alten Spielstand,
+	-- deshalb ohne Versions-Sprung.
+	session : SessionLock?,
 }
 
 --------------------------------------------------------------------------------
@@ -689,19 +706,19 @@ local function createDefaultPlayerData(): PlayerData
 		--
 		-- v9: DEF ist ersatzlos entfallen, PWR (Ability-Staerke) ist an seine
 		-- Stelle getreten, und jeder Baerchi hat ein isInverted-Feld bekommen.
-		-- Die Migration in PlayerService raeumt dafuer die alten def-Eintraege
+		-- Die Migration (Util/PlayerMigration) raeumt dafuer die alten def-Eintraege
 		-- aus statLevels und baseStatOverride weg — DAS ist der Grund, warum
 		-- diese Zahl steigen MUSS: die Migration entfernt etwas, statt nur ein
 		-- fehlendes Feld anzulegen.
 		--
 		-- v8: jeder Baerchi hat drei neue Felder bekommen (promotionLevel,
 		-- statLevels, charms) plus das optionale baseStatOverride. Die
-		-- zugehoerige Migration in PlayerService legt sie auf bestehenden
+		-- zugehoerige Migration (Util/PlayerMigration) legt sie auf bestehenden
 		-- Baerchis an — sie erkennt fehlende Felder selbst und ist deshalb
 		-- gefahrlos wiederholbar.
 		--
 		-- v7: eigene Rolle pro Gebaeude. KEIN neues Feld — die Zahl stieg
-		-- trotzdem, weil die zugehoerige Migration in PlayerService einen Wert
+		-- trotzdem, weil die zugehoerige Migration (Util/PlayerMigration) einen Wert
 		-- UMRECHNET (die Presse erbt einmalig das hoechste Gebaeude-Level) und
 		-- deshalb genau einmal laufen darf.
 		-- v13: Quests + Index. Neu: discovered, quests, stats.totalHatched. Die

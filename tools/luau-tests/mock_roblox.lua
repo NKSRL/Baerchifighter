@@ -59,6 +59,7 @@ local services = {}
 game = {
   GetService = function(_, name)
     if name == "ReplicatedStorage" then return RS end
+    if name == "ServerScriptService" and SSS then return SSS end
     if name == "Players" then
       local p = newProxy("Players"); p.LocalPlayer = fakePlayer; return p
     end

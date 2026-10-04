@@ -36,6 +36,8 @@ cd tools/luau-tests && npm install      # einmalig
 node check_syntax.mjs
 node run.mjs loc.test.lua
 node run.mjs client.test.lua
+node run.mjs migration.test.lua
+node run.mjs session_lock.test.lua
 node run.mjs ../sim/egg_tree_check.lua
 node run.mjs ../sim/path_balance.lua
 node run.mjs ../sim/fight_timeline.lua

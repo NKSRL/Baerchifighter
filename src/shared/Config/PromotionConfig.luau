@@ -161,7 +161,7 @@ local function getStatCap(rarity: Types.Rarity): number
 end
 
 -- Frische, vollstaendig genullte Stat-Level-Tabelle. Einzige erlaubte Quelle —
--- BaerchiFactory und die Migration in PlayerService rufen beide dies auf,
+-- BaerchiFactory und die Migration (Util/PlayerMigration) rufen beide dies auf,
 -- damit ein neues Feld nur an EINER Stelle nachgetragen werden muss.
 local function newStatLevels(): Types.StatLevels
 	return { hp = 0, atk = 0, spd = 0, pwr = 0, egg = 0 }

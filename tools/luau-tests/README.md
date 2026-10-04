@@ -12,6 +12,8 @@ Dann:
     node check_syntax.mjs               # kompiliert JEDE .luau-Datei, meldet Syntaxfehler
     node run.mjs loc.test.lua           # Tests für Localization/Loc
     node run.mjs client.test.lua        # Rauchtest der Client-UI (Sprachwechsel, Toasts, HUD ...)
+    node run.mjs migration.test.lua     # alte Spielstaende (v6, v10, v13) durch die Migration
+    node run.mjs session_lock.test.lua  # Sitzungs-Sperre (welcher Server haelt den Spielstand)
     node run.mjs ../sim/egg_tree_check.lua   # Regeln des Ei-Baums
     node run.mjs ../sim/path_balance.lua     # Pfad-Profile
     node run.mjs ../sim/fight_timeline.lua   # Zeitbudget der Kampf-Wiedergabe
@@ -38,7 +40,9 @@ Exit-Code 0 = alles in Ordnung, 1 = ein Test ist gescheitert.
 
 Siehe `client.test.lua` als Vorlage. Die globalen Hilfen:
 
-* `RS` — der `ReplicatedStorage`-Baum, `CL` — der Client-Baum (`StarterPlayerScripts`)
+* `RS` — der `ReplicatedStorage`-Baum, `CL` — der Client-Baum (`StarterPlayerScripts`),
+  `SSS` — der Server-Baum (`ServerScriptService`, nur geladen, nichts gestartet;
+  für reine Module wie `Util/PlayerMigration`)
 * `CREATED` — Liste aller per `Instance.new` erzeugten Objekte
 * `FIRED` — Protokoll der `FireServer`-Aufrufe
 * `SetLocale("fr-fr")` — setzt die Roblox-Sprache des Test-Spielers

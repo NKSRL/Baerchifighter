@@ -13,6 +13,8 @@ Aus dem Projektordner:
     node check_syntax.mjs                    # alle .luau-Dateien kompilieren
     node run.mjs loc.test.lua                # Lokalisierung
     node run.mjs client.test.lua             # Rauchtest der Client-UI
+    node run.mjs migration.test.lua          # alte Spielstände → aktuelle Version
+    node run.mjs session_lock.test.lua       # Sitzungs-Sperre beim Speichern
     node run.mjs ../sim/egg_tree_check.lua   # Regeln des Ei-Baums
     node run.mjs ../sim/path_balance.lua     # Pfad-Profile (Gold/Kristall/Void)
     node run.mjs ../sim/fight_timeline.lua   # Zeitbudget der Kampf-Wiedergabe
@@ -35,6 +37,8 @@ selbst ist durch Attrappen ersetzt. Details: `luau-tests/README.md`.
 | `check_syntax.mjs` | jede `.luau`-Datei unter `src/` kompiliert |
 | `loc.test.lua` | `Loc`: Sprachwahl, Platzhalter, Plural, Fallbacks |
 | `client.test.lua` | Client-UI startet, Sprachwechsel, Toasts, HUD, Menü |
+| `migration.test.lua` | Spielstände im Format v6, v10 und v13 laufen durch `PlayerMigration.applyDefaults`, ergeben die Struktur von `Types.PlayerData` und ändern sich beim zweiten Durchlauf nicht mehr |
+| `session_lock.test.lua` | `SessionLock`: wann ein Spielstand als von einem anderen Server gehalten gilt |
 | `sim/egg_tree_check.lua` | Verteilungen = 100 %, Ø steigt entlang jeder Kante, jeder Bärchi fällt aus einem Ei, jede Fähigkeit hat eine Show, Lege-Fallback landet auf freiem Ei |
 | `sim/path_balance.lua` | kein Pfad gewinnt alle drei Ziele (Stärke, Tempo, Seltenheit) |
 | `sim/fight_timeline.lua` | ein PIT-Lauf bleibt im Zeitbudget |
