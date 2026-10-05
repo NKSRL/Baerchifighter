@@ -243,6 +243,13 @@ function MenuBar.init(screenGui: ScreenGui)
 
 	ClientState.onChanged(refresh)
 
+	-- HBB Paket 3: ein Panel, das sich von selbst oeffnet (Login-Bonus u.a.), gilt
+	-- ebenso als gesehen wie eines, das per Kachel geoeffnet wurde.
+	PanelManager.onOpened(function(name)
+		local element = TILE_ELEMENT[name]
+		if element then Unlock.markSeen(element) end
+	end)
+
 	-- Sprachwechsel: nur die Beschriftungen neu setzen (die Zahlen in den
 	-- Kacheln sind sprachunabhaengig)
 	Loc.onChanged(function()

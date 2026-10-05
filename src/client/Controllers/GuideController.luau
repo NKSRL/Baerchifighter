@@ -187,7 +187,8 @@ local function showHighlight(target: GuiObject, strong: boolean, t: number)
 	local bounce = wave * (if strong then 18 else 8)
 	arrow.Visible = true
 	if fromLeft then
-		arrow.Text = "➜"
+		-- "➡" statt "➜": "➜" kann die Spielschrift nicht darstellen.
+		arrow.Text = "➡"
 		arrow.Position = UDim2.fromOffset(pos.X - 48 - bounce, pos.Y + size.Y * 0.5 - 20)
 	else
 		arrow.Text = "⬇"
