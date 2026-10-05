@@ -333,6 +333,32 @@ end
 -- Schild. Zu SEHEN und anzustossen ist ausschliesslich die Deko. Getrennt,
 -- weil das Anklickbare und das Huebsche zwei verschiedene Dinge sind — sonst
 -- muesste jede Formaenderung Ruecksicht auf die Trefferflaeche nehmen.
+-- Partikel-Effekte des Looks an die gerade gebauten Deko-Teile haengen
+-- (MapConfig.BUILDING_LOOK_FX / FX_PRESETS). Fehlt ein Teil, wird der Effekt
+-- still uebersprungen — der Test honey_pond.test.lua faengt das vorher ab.
+function PlotBuilder.addLookEffects(body: BasePart, buildingId: string, look: number)
+	for _, fx in MapConfig.getLookFx(buildingId, look) do
+		local target = body:FindFirstChild(fx.piece)
+		local preset = MapConfig.FX_PRESETS[fx.preset]
+		if target and target:IsA("BasePart") and preset then
+			local emitter = Instance.new("ParticleEmitter")
+			emitter.Name          = "Fx_" .. fx.preset
+			emitter.Texture       = preset.texture
+			emitter.Color         = ColorSequence.new(preset.color)
+			emitter.Size          = NumberSequence.new(preset.size[1], preset.size[2])
+			emitter.Transparency  = NumberSequence.new(preset.transparency[1], preset.transparency[2])
+			emitter.Lifetime      = NumberRange.new(preset.lifetime[1], preset.lifetime[2])
+			emitter.Rate          = preset.rate
+			emitter.Speed         = NumberRange.new(preset.speed[1], preset.speed[2])
+			emitter.SpreadAngle   = Vector2.new(preset.spread, preset.spread)
+			emitter.Acceleration  = preset.acceleration
+			emitter.EmissionDirection = (Enum.NormalId :: any)[preset.emitFrom]
+			emitter.LightEmission = preset.lightEmission
+			emitter.Parent        = target
+		end
+	end
+end
+
 function PlotBuilder.buildBuilding(plotModel: Model, slot: number, buildingData: Types.Building, pool: number)
 	local config = MapConfig.BUILDING_OFFSETS[buildingData.id]
 	if not config then return end
@@ -363,6 +389,7 @@ function PlotBuilder.buildBuilding(plotModel: Model, slot: number, buildingData:
 	local look  = BuildingBehavior.getLook(buildingData.level)
 	local decor = MapConfig.getBuildingDecor(buildingData.id, look)
 	MapParts.buildDecor(part, ground, decor)
+	PlotBuilder.addLookEffects(part, buildingData.id, look)
 
 	PlotBuilder.buildHoneyDots(part, ground,
 		math.min(BuildingBehavior.getMaxCapacity(buildingData.id), MapConfig.HONEY_DOT_MAX))

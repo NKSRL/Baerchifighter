@@ -71,5 +71,26 @@ for _, level in { 1, 5, 10, 20, 30, 45, 60 } do
 end
 check("Auto-Ernte ab L10", BuildingBehavior.hasAbility("HoneyPond", 10, "AutoHarvest") and not BuildingBehavior.hasAbility("HoneyPond", 9, "AutoHarvest"))
 
+-- 3. Brunnen-Effekte: jedes Ziel-Teil existiert ab seinem Look, jedes Preset
+--    gibt es, und "drip" sitzt nur an stehenden Zylindern (Richtung "Left").
+local MapConfig = rbxRequire("ReplicatedStorage/Config/MapConfig")
+for _, fx in MapConfig.BUILDING_LOOK_FX.HoneyPond do
+	check("Preset " .. fx.preset .. " vorhanden", MapConfig.FX_PRESETS[fx.preset] ~= nil)
+	for look = fx.look, 6 do
+		local found = nil
+		for _, piece in MapConfig.getBuildingDecor("HoneyPond", look) do
+			if piece.name == fx.piece then found = piece end
+		end
+		if not found then
+			check(fx.piece .. " fehlt in Look " .. look, false)
+		elseif fx.preset == "drip" then
+			local r = found.rotation
+			if not (r and r.Z == 90) then check(fx.piece .. ": drip nur an stehenden Zylindern", false) end
+		end
+	end
+end
+check("Look 1 ohne Effekte", #MapConfig.getLookFx("HoneyPond", 1) == 0)
+check("Look 6 hat alle Effekte", #MapConfig.getLookFx("HoneyPond", 6) == #MapConfig.BUILDING_LOOK_FX.HoneyPond)
+
 if failures > 0 then error(failures .. " Fehler", 0) end
 print("honey_pond: alle Tests gruen")

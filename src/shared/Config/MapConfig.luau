@@ -534,6 +534,76 @@ local BUILDING_LOOK_DECOR: { [string]: { [number]: { DecorPiece } } } = {
 
 -- Grund-Deko plus alle Look-Zusaetze bis `look` (fuer PlotBuilder und
 -- RecyclerBuilder; der Recycler gibt seine eigenen Tabellen mit).
+-- ============================================================
+-- LOOK-EFFEKTE (Partikel) — bisher nur der Honig-Brunnen
+-- ============================================================
+-- Je Gebaeude: ab welchem Look an welchem Deko-Teil (Name aus
+-- BUILDING_DECOR/BUILDING_LOOK_DECOR) welcher Effekt sitzt. Gebaut von
+-- PlotBuilder.addLookEffects, mit dem Look neu (das Gebaeude wird bei jedem
+-- Look-Wechsel ohnehin neu gebaut). Nur eingebaute Roblox-Texturen, keine
+-- Lichter (Performance, siehe ScenicBuilder). tools/luau-tests/honey_pond.test.lua
+-- prueft, dass jedes Ziel-Teil im jeweiligen Look existiert.
+export type FxPreset = {
+	texture       : string,
+	color         : Color3,
+	size          : { number },     -- { Anfang, Ende } in Studs
+	transparency  : { number },     -- { Anfang, Ende }
+	lifetime      : { number },     -- { min, max } Sekunden
+	rate          : number,         -- Partikel pro Sekunde
+	speed         : { number },     -- { min, max }
+	spread        : number,         -- SpreadAngle in Grad (beide Achsen)
+	acceleration  : Vector3,
+	emitFrom      : string,         -- "Top" | "Bottom" | "Front" (NormalId)
+	lightEmission : number,
+}
+
+local FX_SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
+local FX_DROP    = "rbxasset://textures/particles/fire_main.dds"
+
+local FX_PRESETS: { [string]: FxPreset } = {
+	-- Honigtropfen, die von einem Strahl/Fall nach unten perlen. Sitzen an
+	-- STEHENDEN Zylindern (rotation UPRIGHT = 90 Grad um Z): deren lokales -X
+	-- zeigt nach unten, deshalb "Left" statt "Bottom".
+	drip = { texture = FX_DROP, color = Color3.fromRGB(255, 176, 44), size = { 0.28, 0.12 }, transparency = { 0.1, 0.6 },
+		lifetime = { 0.5, 0.8 }, rate = 6, speed = { 1, 2 }, spread = 8, acceleration = Vector3.new(0, -18, 0), emitFrom = "Left", lightEmission = 0.4 },
+	-- ruhiges Funkeln auf Honigflaechen
+	glint = { texture = FX_SPARKLE, color = Color3.fromRGB(255, 225, 130), size = { 0.35, 0 }, transparency = { 0, 1 },
+		lifetime = { 0.8, 1.4 }, rate = 4, speed = { 0.2, 0.6 }, spread = 180, acceleration = Vector3.new(0, 0.5, 0), emitFrom = "Top", lightEmission = 1 },
+	-- Fontaene: Honig spritzt hoch und faellt zurueck in die Schale
+	spray = { texture = FX_DROP, color = Color3.fromRGB(255, 186, 50), size = { 0.32, 0.14 }, transparency = { 0, 0.4 },
+		lifetime = { 0.8, 1.1 }, rate = 22, speed = { 8, 11 }, spread = 22, acceleration = Vector3.new(0, -24, 0), emitFrom = "Top", lightEmission = 0.5 },
+	-- goldene Aura um das Herzstueck (Look 6)
+	aura = { texture = FX_SPARKLE, color = Color3.fromRGB(255, 210, 80), size = { 0.7, 0 }, transparency = { 0, 1 },
+		lifetime = { 1.5, 2.2 }, rate = 12, speed = { 0.6, 1.6 }, spread = 180, acceleration = Vector3.new(0, 1.2, 0), emitFrom = "Top", lightEmission = 1 },
+}
+
+local BUILDING_LOOK_FX: { [string]: { { look: number, piece: string, preset: string } } } = {
+	HoneyPond = {
+		{ look = 2, piece = "L2Strahl",   preset = "drip" },
+		{ look = 3, piece = "L3Honig",    preset = "glint" },
+		{ look = 4, piece = "L4Kaskade1", preset = "drip" },
+		{ look = 4, piece = "L4Kaskade2", preset = "drip" },
+		{ look = 5, piece = "L5Kuppe",    preset = "spray" },
+		{ look = 5, piece = "L5Biene1",   preset = "glint" },
+		{ look = 5, piece = "L5Biene2",   preset = "glint" },
+		{ look = 6, piece = "L6Tropfen",  preset = "aura" },
+		{ look = 6, piece = "L6Krone",    preset = "glint" },
+		{ look = 6, piece = "L6Fall1",    preset = "drip" },
+		{ look = 6, piece = "L6Fall2",    preset = "drip" },
+		{ look = 6, piece = "L6Fall3",    preset = "drip" },
+		{ look = 6, piece = "L6Fall4",    preset = "drip" },
+	},
+}
+
+-- Effekte, die auf diesem Look gelten (alle bis einschliesslich `look`).
+local function getLookFx(buildingId: string, look: number): { { look: number, piece: string, preset: string } }
+	local result = {}
+	for _, fx in BUILDING_LOOK_FX[buildingId] or {} do
+		if fx.look <= look then table.insert(result, fx) end
+	end
+	return result
+end
+
 local function combineLookDecor(base: { DecorPiece }?, extras: { [number]: { DecorPiece } }?, look: number): { DecorPiece }
 	local result: { DecorPiece } = {}
 	for _, piece in base or {} do
@@ -1376,6 +1446,9 @@ return {
 	LOOK_PART_BUDGET    = LOOK_PART_BUDGET,
 	combineLookDecor    = combineLookDecor,
 	getBuildingDecor    = getBuildingDecor,
+	FX_PRESETS          = FX_PRESETS,
+	BUILDING_LOOK_FX    = BUILDING_LOOK_FX,
+	getLookFx           = getLookFx,
 	CENTER_DECOR     = CENTER_DECOR,
 
 	HONEY_DOT_SIZE   = HONEY_DOT_SIZE,

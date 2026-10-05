@@ -25,7 +25,17 @@ Schalter: `FeatureFlags.HONEY_POND_V2 = true`. Auf `false` ist alles wie vorher,
 | 4 | 30–44 | zweite Schale, Goldring, zwei Honig-Kaskaden |
 | 5 | 45–59 | goldene Bienen-Statuen, Honig-Fontäne |
 | 6 | 60 | riesiger Neon-Honigtropfen mit Goldkrone, vier Honigfälle, Kristalle |
-Platzhalter aus Grundformen wie bei Türmen und Gebäuden; echte Modelle können die Tabelle 1:1 ersetzen. Partikel (Funkeln/Spritzer) wären der nächste Schritt für „unglaublich“.
+Platzhalter aus Grundformen wie bei Türmen und Gebäuden; echte Modelle können die Tabelle 1:1 ersetzen.
+
+### Effekte (Partikel, `MapConfig.BUILDING_LOOK_FX` / `FX_PRESETS`, gebaut von `PlotBuilder.addLookEffects`)
+| Look | Effekt |
+| --- | --- |
+| 2 | Honigtropfen am Strahl |
+| 3 | Funkeln auf der Honigschale |
+| 4 | Tropfen an beiden Kaskaden |
+| 5 | Fontäne spritzt Honig hoch, der in die Schale zurückfällt; Funkeln an den Bienen |
+| 6 | goldene Funkel-Aura um den Riesentropfen, Glitzer an der Krone, Tropfen an allen vier Fällen |
+Nur eingebaute Roblox-Texturen, keine Lichter. Der Test prüft, dass jedes Ziel-Teil ab seinem Look existiert. In Studio prüfen: Stärke (`rate`) nach Gefühl nachstellen, nur in `FX_PRESETS`.
 
 ## Pacing (`progression_pacing.lua`, alle Ziele grün)
 Die Looks zählen jetzt am Honig-Gebäude (vorher am ersten Gebäude, oft dem Recycler).
