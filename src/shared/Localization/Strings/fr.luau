@@ -638,7 +638,7 @@ return {
 	["guide.collect"] = "Ramasse les œufs pondus sur ton terrain.",
 	["guide.merchant"] = "Achète un nouvel œuf chez le marchand.",
 	["guide.combs"] = "Prends des rayons au centre et apporte-les à ton recycleur — ça rapporte des Gummies.",
-	["guide.upgrade"] = "Améliore ton bâtiment à miel : plus de miel = plus d'XP pour ton Baerchi.",
+	["guide.upgrade"] = "Va à la fontaine de miel et maintiens E : plus de miel = plus d'XP pour ton Baerchi.",
 	["guide.event"] = "Événement au centre : ton Baerchi y devient plus fort.",
 	["ui.menu.building"] = "Améliorer",
 	-- Sammel-Update 05.10.2026
@@ -708,4 +708,7 @@ return {
 	["ui.building.maxed_button"] = "AU MAXIMUM",
 	["ui.building.feed"] = "Nourrir  ({n} miel)",
 	["ui.world.your_plot"] = "Ton terrain",
+	-- Sammel-Update 05.10.2026
+	["ui.pond.prompt_upgrade"] = "Améliorer au niv. {level}",
+	["err.pond_too_far"] = "Va à la fontaine de miel pour l'améliorer",
 }

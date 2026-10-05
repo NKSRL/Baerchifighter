@@ -75,6 +75,7 @@ local LanguagePanel    = require(UI:WaitForChild("LanguagePanel"))
 local PetBar           = require(UI:WaitForChild("PetBar"))
 local QuestPanel       = require(UI:WaitForChild("QuestPanel"))
 local QuestTracker     = require(UI:WaitForChild("QuestTracker"))
+local TopButtons       = require(UI:WaitForChild("TopButtons"))
 local EggTreePanel     = require(UI:WaitForChild("EggTreePanel"))
 local LeaderboardPanel = require(UI:WaitForChild("LeaderboardPanel"))
 local ProfilePanel     = require(UI:WaitForChild("ProfilePanel"))
@@ -153,6 +154,7 @@ CurrencyHint.init(screenGui)    -- Sammel-Update 3.4: Waehrungs-Hinweise
 
 -- v13: Quest-Karte links (braucht das Quest-Fenster, das oben angemeldet wird)
 QuestTracker.init(screenGui)
+TopButtons.init(screenGui)         -- Rueckmeldung 05.10.: Quests + Shop neben dem Zahnrad
 
 -- v12: untere Pet-Leiste (Event / Fight), legt auch den PitResumeDialog an
 PetBar.init(screenGui)

@@ -25,7 +25,6 @@ local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local GuideSteps   = require(ReplicatedStorage.Modules.GuideSteps)
 local EggConfig    = require(ReplicatedStorage.Config.EggConfig)
 local Loc          = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 3.5
-local PanelManager = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PanelManager"))
 
 local UI          = script.Parent.Parent:WaitForChild("UI")
 local Theme       = require(UI:WaitForChild("Theme"))
@@ -79,10 +78,6 @@ local function uiTarget(step: string): GuiObject?
 		return PetBar.getButton("Fight")
 	elseif step == "event" then
 		return PetBar.getButton("Event")
-	elseif step == "upgrade" then
-		-- Sammel-Update 3.5: Gebaeude-Kachel rechts
-		return MenuBar.getTileAnchor(PanelManager.buildingPanelName(
-			if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"))
 	end
 	return nil
 end
@@ -125,10 +120,10 @@ local function merchantCounter(): BasePart?
 	return if counter and counter:IsA("BasePart") then counter else nil
 end
 
--- Recycler auf dem EIGENEN Plot (Attribut PlotOwner am Plot-Model).
-local function ownRecycler(): BasePart?
+-- Teil mit diesem Namen auf dem EIGENEN Plot (Attribut PlotOwner am Plot-Model).
+local function ownPart(name: string): BasePart?
 	for _, descendant in Workspace:GetDescendants() do
-		if descendant.Name == "Recycler" and descendant:IsA("BasePart") then
+		if descendant.Name == name and descendant:IsA("BasePart") then
 			local model = descendant.Parent
 			if model and model:GetAttribute("PlotOwner") == Players.LocalPlayer.UserId then
 				return descendant
@@ -143,12 +138,15 @@ local function worldTarget(step: string): BasePart?
 		return nearestOwnEgg()
 	elseif step == "merchant" then
 		return merchantCounter()
+	elseif step == "upgrade" then
+		-- Rueckmeldung 05.10.: verbessert wird an der Honig-Fontaene selbst
+		return ownPart(if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner")
 	elseif step == "combs" then
 		-- Sammel-Update 3.5: mit Waben auf dem Kopf zum eigenen Recycler,
 		-- sonst zu den Waben in die Mitte.
 		local carried = Players.LocalPlayer:GetAttribute("CombsCarried")
 		if typeof(carried) == "number" and carried > 0 then
-			return ownRecycler()
+			return ownPart("Recycler")
 		end
 		local pit = Workspace:FindFirstChild("EventFloor", true)
 		return if pit and pit:IsA("BasePart") then pit else nil

@@ -47,9 +47,24 @@ end
 -- Gebaeude-Upgrade
 --------------------------------------------------------------------------------
 
+-- Sammel-Update (Rueckmeldung 05.10.): die Honig-Fontaene laesst sich nur
+-- verbessern, wenn man davorsteht (kein Menue mehr aus der Ferne).
+local POND_UPGRADE_DISTANCE = 30
+
 function IslandService.upgradeBuilding(player: Player, buildingId: Types.BuildingId)
 	local data = PlayerService.getData(player)
 	if not data then return end
+
+	if buildingId == "HoneyPond" then
+		local character = player.Character
+		local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		local at = MapService.getBuildingPosition(player, buildingId)
+		if not (root and root:IsA("BasePart") and at)
+			or (Vector3.new(root.Position.X - at.X, 0, root.Position.Z - at.Z)).Magnitude > POND_UPGRADE_DISTANCE then
+			fail(player, "RequestUpgradeBuilding", Loc.msg("err.pond_too_far"))
+			return
+		end
+	end
 
 	local ok, reason = EconomyService.upgradeBuilding(player, buildingId)
 	if not ok then

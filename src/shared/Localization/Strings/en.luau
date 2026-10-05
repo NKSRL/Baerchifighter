@@ -637,7 +637,7 @@ return {
 	["guide.collect"] = "Collect the eggs laid on your plot.",
 	["guide.merchant"] = "Buy a new egg at the egg merchant.",
 	["guide.combs"] = "Grab combs in the middle and bring them to your recycler — that pays Gummies.",
-	["guide.upgrade"] = "Upgrade your honey building: more honey = more XP for your Baerchi.",
+	["guide.upgrade"] = "Go to the honey fountain and hold E: more honey = more XP for your Baerchi.",
 	["guide.event"] = "Event in the middle: your Baerchi gets stronger there.",
 	["ui.menu.building"] = "Upgrade",
 	-- Sammel-Update 05.10.2026
@@ -707,4 +707,7 @@ return {
 	["ui.building.maxed_button"] = "FULLY UPGRADED",
 	["ui.building.feed"] = "Feed  ({n} honey)",
 	["ui.world.your_plot"] = "Your plot",
+	-- Sammel-Update 05.10.2026
+	["ui.pond.prompt_upgrade"] = "Upgrade to Lv. {level}",
+	["err.pond_too_far"] = "Go to the honey fountain to upgrade it",
 }

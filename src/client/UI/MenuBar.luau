@@ -23,11 +23,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
-local IncubatorRules   = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
 local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig) -- Sammel-Update 7
-local BuildingBehavior  = require(ReplicatedStorage.Config.BuildingBehavior)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
-local Workspace        = game:GetService("Workspace")
 
 local Theme        = require(script.Parent.Theme)
 local UiScale      = require(script.Parent.UiScale)
@@ -40,18 +37,18 @@ local Unlock       = require(script.Parent.Unlock)
 local TILE_ELEMENT: { [string]: string } = {
 	Hatch = "tile_eggs", Inventory = "tile_bears", EggTree = "tile_tree",
 	Leaderboard = "tile_leaderboard", DailyBonus = "tile_daily",
-	Shop = "tile_shop",
-	Incubator = "tile_incubator",   -- Sammel-Update Paket 8
 }
 
 local MenuBar = {}
 
 -- Groessen. TILE ist gleichzeitig die Antippflaeche — darunter wird es auf dem
 -- Handy zur Geduldsprobe.
-local TILE   = 54
-local LABEL  = 16
-local GAP    = 6
-local WIDTH  = 76
+-- Rueckmeldung 05.10.: weniger Kacheln (Verbessern und Inkubator laufen nur
+-- noch vor Ort, Shop und Quests sitzen oben links) -> groesser.
+local TILE   = 70
+local LABEL  = 18
+local GAP    = 8
+local WIDTH  = 92
 
 -- Was eine Kachel anzeigt: `value` ist die Beschriftung IN der Kachel,
 -- `alert` laesst das rote Ausrufezeichen erscheinen.
@@ -81,29 +78,15 @@ type Tile = {
 }
 
 local _tiles: { Tile } = {}
-local buildAllEntries: () -> { Entry }
-
--- Sammel-Update 3.5: welches Gebaeude-Menue die Kachel oeffnet
-local function buildingPanel(): string
-	return PanelManager.buildingPanelName(if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner")
-end
-TILE_ELEMENT[buildingPanel()] = "tile_building"
 
 --------------------------------------------------------------------------------
 -- Die Eintraege
 --------------------------------------------------------------------------------
 
+-- Rueckmeldung 05.10.: "Verbessern" (Honig-Fontaene) und "Inkubator" gibt es
+-- nur noch vor Ort, Shop und Quests sitzen oben links (HudRow). Hier bleiben
+-- Eier, Baerchis, Ei-Baum, Bestenliste und Login-Bonus.
 local function buildEntries(): { Entry }
-	local list = buildAllEntries()
-	if not FeatureFlags.isOn("INCUBATOR") then
-		for i = #list, 1, -1 do
-			if list[i].panel == "Incubator" then table.remove(list, i) end
-		end
-	end
-	return list
-end
-
-function buildAllEntries(): { Entry }
 	return {
 		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI", icon = "egg" },
 		-- Sammel-Update 05.10. (Paket 7): "!" = eine Index-Belohnung ist abholbar.
@@ -111,28 +94,6 @@ function buildAllEntries(): { Entry }
 			live = function(data: Types.PlayerDataUpdate)
 				if not FeatureFlags.isOn("INDEX_REWARDS") then return "BA", false end
 				return "BA", #IndexRewardConfig.claimable(data.discovered, data.indexClaimed) > 0
-			end },
-		-- Sammel-Update 05.10. (Paket 3.5/3.6): das Honig-Gebaeude als Kachel
-		-- (Verbessern ohne hinzulaufen). "!" = Ausbau bezahlbar.
-		{ panel = buildingPanel(), title = function() return Loc.t("ui.menu.building") end, color = Theme.COLORS.goldGummy, symbol = "⬆", icon = "upgrade",
-			live = function(data: Types.PlayerDataUpdate)
-				local id = if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"
-				local building = data.island.buildings[id :: any]
-				if not building then return "⬆", false end
-				local cost = BuildingBehavior.getUpgrade(id :: any, building.level + 1)
-				return "⬆", cost ~= nil and data.gummies >= cost.costGummies and data.goldGummies >= (cost.costGoldGummies or 0)
-			end },
-		-- Sammel-Update 05.10. (Paket 8): Inkubator ("!" = ein Ei ist fertig).
-		{ panel = "Incubator", title = function() return Loc.t("ui.incubator.tile") end, color = Theme.COLORS.growth, symbol = "⏳", icon = "incubator",
-			live = function(data: Types.PlayerDataUpdate)
-				local incubator = data.island.incubator
-				if not incubator then return "⏳", false end
-				local now = Workspace:GetServerTimeNow()
-				local ready = false
-				for _, entry in incubator.slots do
-					if IncubatorRules.isReady(entry, now) then ready = true end
-				end
-				return "⏳", ready
 			end },
 		-- v14: Ei-Baum. Das "!" zeigt eine ungenutzte Blaupause an.
 		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM", icon = "tree",
@@ -146,13 +107,6 @@ function buildAllEntries(): { Entry }
 			live = function(data: Types.PlayerDataUpdate)
 				local daily = data.daily
 				return if daily then tostring(daily.day) else "7", daily ~= nil and daily.claimable
-			end },
-		-- HBB Paket 10: Shop ("!" = Gratis-Griff heute noch offen). Sichtbar ab
-		-- der 2. Sitzung und nur mit SHOP_V1 (UnlockRules "tile_shop").
-		{ panel = "Shop", title = function() return Loc.t("ui.menu.shop") end, color = Theme.COLORS.goldGummy, symbol = "GG", icon = "goldgummy",
-			live = function(data: Types.PlayerDataUpdate)
-				local shop = data.shop
-				return "GG", shop ~= nil and shop.freeReady
 			end },
 	}
 end

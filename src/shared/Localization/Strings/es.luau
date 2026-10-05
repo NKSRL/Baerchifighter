@@ -638,7 +638,7 @@ return {
 	["guide.collect"] = "Recoge los huevos puestos en tu parcela.",
 	["guide.merchant"] = "Compra un huevo nuevo en el vendedor.",
 	["guide.combs"] = "Coge panales del centro y llévalos a tu reciclador — eso da Gummies.",
-	["guide.upgrade"] = "Mejora tu edificio de miel: más miel = más XP para tu Baerchi.",
+	["guide.upgrade"] = "Ve a la fuente de miel y mantén E: más miel = más XP para tu Baerchi.",
 	["guide.event"] = "Evento en el centro: allí tu Baerchi se hace más fuerte.",
 	["ui.menu.building"] = "Mejorar",
 	-- Sammel-Update 05.10.2026
@@ -708,4 +708,7 @@ return {
 	["ui.building.maxed_button"] = "AL MÁXIMO",
 	["ui.building.feed"] = "Alimentar  ({n} miel)",
 	["ui.world.your_plot"] = "Tu parcela",
+	-- Sammel-Update 05.10.2026
+	["ui.pond.prompt_upgrade"] = "Mejorar a nv. {level}",
+	["err.pond_too_far"] = "Ve a la fuente de miel para mejorarla",
 }

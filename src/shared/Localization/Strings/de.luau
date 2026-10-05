@@ -645,7 +645,7 @@ return {
 	["guide.collect"] = "Sammle die gelegten Eier auf deinem Plot ein.",
 	["guide.merchant"] = "Kauf beim Ei-Händler ein neues Ei.",
 	["guide.combs"] = "Hol Waben aus der Mitte und bring sie zu deinem Recycler — das gibt Gummies.",
-	["guide.upgrade"] = "Verbessere dein Honig-Gebäude: mehr Honig = mehr XP für deinen Baerchi.",
+	["guide.upgrade"] = "Geh zur Honig-Fontäne und halte E: mehr Honig = mehr XP für deinen Baerchi.",
 	["guide.event"] = "Event in der Mitte: dein Baerchi wird dort stärker.",
 	["ui.menu.building"] = "Verbessern",
 	-- Sammel-Update 05.10.2026
@@ -715,4 +715,7 @@ return {
 	["ui.building.maxed_button"] = "VOLL AUSGEBAUT",
 	["ui.building.feed"] = "Füttern  ({n} Honig)",
 	["ui.world.your_plot"] = "Dein Plot",
+	-- Sammel-Update 05.10.2026
+	["ui.pond.prompt_upgrade"] = "Auf Lv. {level} verbessern",
+	["err.pond_too_far"] = "Geh zur Honig-Fontäne, um sie zu verbessern",
 }

@@ -181,6 +181,10 @@ function QuestTracker.init(screenGui: ScreenGui)
 	card.Position = UDim2.new(0.012, 12, 0, 148)
 	card.Size     = UDim2.new(0, CARD_W, 0, CARD_H)
 	card.ZIndex   = 2
+	-- Rueckmeldung 05.10.: die Karte steht nicht mehr dauerhaft im Bild. Der
+	-- Zugang ist der kleine Quest-Knopf neben dem Zahnrad (TopButtons); die
+	-- Karte bleibt gebaut (Toast, Abholen-Logik), nur unsichtbar.
+	card.Visible  = false
 	_card = card
 
 	-- Die ganze Karte ist antippbar (oeffnet das Quest-Fenster); die Knoepfe

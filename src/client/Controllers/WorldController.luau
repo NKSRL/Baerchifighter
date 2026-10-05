@@ -55,6 +55,8 @@ local Workspace = game:GetService("Workspace")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loc          = require(ReplicatedStorage.Localization.Loc)
+local Remotes          = require(ReplicatedStorage.Network.Remotes)               -- Sammel-Update
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 
 local Theme        = require(script.Parent.Parent.UI.Theme)
 local BaerchiPanel = require(script.Parent.Parent.UI.BaerchiPanel)
@@ -316,9 +318,35 @@ local function hookOwnedPart(instance: BasePart)
 	-- niemand mehr.
 	local buildingId = instance.Name
 
-	-- Sammel-Update 2.6: am Honig-Teich gibt es kein Schild und kein
-	-- "Honig essen"-Klicken mehr (der Baerchi isst selbst). Der Prompt hier
-	-- ist nur noch "Verbessern" — dazu die Gebaeude-Kachel rechts (MenuBar).
+	-- Sammel-Update (Rueckmeldung 05.10.): an der Honig-Fontaene geht KEIN
+	-- Fenster mehr auf. Wer davorsteht, haelt E und verbessert direkt; Level
+	-- und Preis stehen ueber der Fontaene (PlotBuilder). Der Server prueft
+	-- die Entfernung selbst (IslandService).
+	if buildingId == "HoneyPond" then
+		local function write(prompt: ProximityPrompt)
+			local level = instance:GetAttribute(LEVEL_ATTRIBUTE)
+			local n = if typeof(level) == "number" then level else 1
+			local cost = BuildingBehavior.getUpgrade("HoneyPond", n + 1)
+			if cost then
+				prompt.ActionText = Loc.t("ui.pond.prompt_upgrade", { level = n + 1 })
+				prompt.ObjectText = string.format("%s G", Loc.formatNumber(cost.costGummies))
+					.. (if cost.costGoldGummies > 0 then string.format(" + %s Gold", Loc.formatNumber(cost.costGoldGummies)) else "")
+				prompt.Enabled = true
+			else
+				prompt.Enabled = false
+			end
+		end
+		local prompt = addPrompt(instance, "UpgradePond", "", "", Enum.KeyCode.E, function()
+			Remotes.RequestUpgradeBuilding:FireServer("HoneyPond")
+		end)
+		if prompt then
+			prompt.HoldDuration = 0.4
+			write(prompt)
+			instance:GetAttributeChangedSignal(LEVEL_ATTRIBUTE):Connect(function() write(prompt) end)
+			Loc.onChanged(function() write(prompt) end)
+		end
+		return
+	end
 
 	local function attach()
 		addPrompt(instance, "OpenPanel", Loc.t("ui.building.prompt_upgrade"), Loc.name("building." .. buildingId .. ".name", buildingId), Enum.KeyCode.E, function()

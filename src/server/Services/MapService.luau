@@ -444,6 +444,13 @@ end
 
 -- Aktualisiert das Level-Attribut einer Gebaeude-Part (fuer Client-UI).
 -- Wird nach einem Gebaeude-Upgrade aufgerufen; baut nichts neu.
+-- Sammel-Update: Weltposition eines Gebaeudes auf dem Plot des Spielers (nil = keins).
+function MapService.getBuildingPosition(player: Player, buildingId: string): Vector3?
+	local model = _plotModels[player]
+	local part = if model then model:FindFirstChild(buildingId) else nil
+	return if part and part:IsA("BasePart") then part.Position else nil
+end
+
 function MapService.updateBuildingLevel(player: Player, buildingId: Types.BuildingId, level: number)
 	local model = _plotModels[player]
 	if not model then return end
