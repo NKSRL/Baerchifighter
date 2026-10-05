@@ -65,6 +65,8 @@
 --   D:Invoke("tower", "II", 20)     -- Tower II waehlen und ab Stage 20 kaempfen (Fortsetzung gratis)
 --   D:Invoke("towerrecord", "III", 45) -- Rekord setzen (Meilensteine bis dorthin werden ausgezahlt)
 --   D:Invoke("rebirthcap")          -- Deckel des aktuellen Rebirths in allen Towern
+--   D:Invoke("stagebest", "I", 30)  -- Sammel-Update: beste Stage dieses Lebens (Rebirth-Bedingung)
+--   D:Invoke("incubator", "done")   -- Sammel-Update: Inkubator-Stand, "done" = alle Eier fertig
 --   D:Invoke("dailyshift", 1)       -- Login-Bonus: so tun, als waeren 1 Tag(e) vergangen
 --   D:Invoke("lbflush")             -- Bestenlisten sofort schreiben und neu lesen
 --   D:Invoke("parts")               -- Teile auf der eigenen Insel zaehlen (Budget 250)
@@ -429,6 +431,31 @@ commands.rebirthcap = function(_player, data)
 	end
 	local capTower, capStage = TowerConfig.getCap(data.rebirthCount)
 	return { rebirths = data.rebirthCount, deckelTower = capTower, deckelStage = capStage, proTower = caps }
+end
+
+-- Sammel-Update 05.10. (Paket 4.1): beste Stage dieses Lebens setzen und die
+-- Rebirth-Bedingung zeigen. D:Invoke("stagebest", "I", 30)
+commands.stagebest = function(player, data, towerId: any, stage: any)
+	if typeof(towerId) == "string" and TowerConfig.get(towerId) then
+		data.island.stageBest[towerId] = math.max(0, math.floor(tonumber(stage) or 0))
+		PlayerService.markDirty(player)
+	end
+	local reqTower, reqStage = TowerConfig.getRebirthRequirement(data.rebirthCount, data.towers.records)
+	return {
+		stageBest  = data.island.stageBest,
+		bedingung  = reqTower .. "/" .. reqStage,
+		bereit     = TowerConfig.isRebirthReady(data.rebirthCount, data.island.stageBest, data.towers.records),
+	}
+end
+
+-- Sammel-Update 05.10. (Paket 8): Inkubator-Stand; "done" macht alle Eier fertig.
+commands.incubator = function(player, data, action: any)
+	local incubator = data.island.incubator
+	if action == "done" then
+		for _, entry in incubator.slots do entry.finishAt = os.time() end
+		PlayerService.markDirty(player)
+	end
+	return { level = incubator.level, plaetze = incubator.slots }
 end
 
 -- v15: Login-Bonus — so tun, als waeren `days` Tage vergangen
