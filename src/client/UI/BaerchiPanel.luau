@@ -347,6 +347,10 @@ local function fill(baerchi: Types.Baerchi)
 	end
 	if _levelLabel then
 		_levelLabel.Text = string.format("Level %d / %d", baerchi.level, BaerchiConfig.MAX_LEVEL)
+		if baerchi.level >= BaerchiConfig.MAX_LEVEL and (baerchi.endlessLevel or 0) > 0 then
+			-- Paket 9: Endless-Level dahinter
+			_levelLabel.Text ..= "  " .. Loc.t("ui.baerchi.endless_level", { n = baerchi.endlessLevel or 0 })
+		end
 	end
 
 	-- Nur der ausgeruestete Baerchi steht auf dem Plot, kaempft und isst von
@@ -403,8 +407,14 @@ local function fill(baerchi: Types.Baerchi)
 	end
 
 	-- XP-Balken
-	local needed = BaerchiConfig.xpForNextLevel(baerchi.level)
-	local ratio  = if baerchi.level >= BaerchiConfig.MAX_LEVEL
+	-- Paket 9: auf Max-Level sammeln sich XP nur mit offenem Endless (sonst
+	-- immer 0) — dann zeigt der Balken den Weg zum naechsten Endless-Level.
+	local endlessXp = baerchi.level >= BaerchiConfig.MAX_LEVEL
+		and ((baerchi.endlessLevel or 0) > 0 or baerchi.xp > 0)
+	local needed = if endlessXp
+		then BaerchiConfig.xpForEndlessLevel(baerchi.endlessLevel or 0)
+		else BaerchiConfig.xpForNextLevel(baerchi.level)
+	local ratio  = if baerchi.level >= BaerchiConfig.MAX_LEVEL and not endlessXp
 		then 1
 		else math.clamp(baerchi.xp / math.max(needed, 1), 0, 1)
 
@@ -413,7 +423,9 @@ local function fill(baerchi: Types.Baerchi)
 		_xpFill.BackgroundColor3 = color
 	end
 	if _xpText then
-		_xpText.Text = if baerchi.level >= BaerchiConfig.MAX_LEVEL
+		_xpText.Text = if endlessXp
+			then string.format("%s / %s XP", Theme.formatNumber(baerchi.xp), Theme.formatNumber(needed))
+			elseif baerchi.level >= BaerchiConfig.MAX_LEVEL
 			then "MAX"
 			else string.format("%d / %d XP", baerchi.xp, needed)
 	end

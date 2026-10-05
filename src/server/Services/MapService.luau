@@ -101,6 +101,11 @@ local _islandDataProvider: ((Player) -> Types.IslandData?)? = nil
 local _showcase: { [Player]: ArenaBuilder.ShowcaseView } = {}
 type Badge = { text: string, color: Color3 }
 local _badge: { [Player]: Badge } = {}
+local _crown: { [Player]: boolean } = {}   -- Paket 9: Top 10 der Endless-Woche
+
+local function badgeText(player: Player, text: string): string
+	return if _crown[player] then "♛ " .. text else text
+end
 
 --------------------------------------------------------------------------------
 -- Plot-Inhalt
@@ -127,7 +132,7 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	end
 	local badge = _badge[owner]
 	if badge then
-		PlotBuilder.writeOwnerBadge(plotModel, badge.text, badge.color)
+		PlotBuilder.writeOwnerBadge(plotModel, badgeText(owner, badge.text), badge.color)
 	end
 end
 
@@ -199,6 +204,7 @@ function MapService.despawnIsland(player: Player)
 	_pendingRebuild[player] = nil
 	_showcase[player] = nil
 	_badge[player] = nil
+	_crown[player] = nil
 
 	local model = _plotModels[player]
 	if model then
@@ -240,7 +246,19 @@ function MapService.setOwnerBadge(player: Player, text: string, color: Color3)
 	_badge[player] = { text = text, color = color }
 	local model = _plotModels[player]
 	if model then
-		PlotBuilder.writeOwnerBadge(model, text, color)
+		PlotBuilder.writeOwnerBadge(model, badgeText(player, text), color)
+	end
+end
+
+-- Paket 9: Krone vor dem Plot-Symbol fuer die Top 10 der Endless-Woche.
+-- Aufrufer ist LeaderboardService (kennt die Wochenliste).
+function MapService.setOwnerCrown(player: Player, crowned: boolean)
+	if (_crown[player] == true) == crowned then return end
+	_crown[player] = if crowned then true else nil
+	local badge = _badge[player]
+	local model = _plotModels[player]
+	if badge and model then
+		PlotBuilder.writeOwnerBadge(model, badgeText(player, badge.text), badge.color)
 	end
 end
 

@@ -169,6 +169,7 @@ export type Baerchi = {
 	rarity         : Rarity,
 	level          : number,   -- 1 - BaerchiConfig.MAX_LEVEL
 	xp             : number,   -- XP-Fortschritt zum naechsten Level
+	endlessLevel   : number?,  -- Paket 9: Level ueber MAX_LEVEL (nil = 0), bleibt ueber Rebirths
 	skillId        : SkillId,  -- aktiver Skill (durch Fusion ueberschreibbar)
 	isFusionResult : boolean,  -- fuer UI-Badge "FUSION"
 	fusionBonus    : number,   -- 0.0 = kein Bonus, 0.25 = +25% HP/ATK
@@ -245,7 +246,7 @@ export type Building = {
 -- Vier Tower mit eigener Stage-Zahl und eigenem Gegner-Wachstum, Zahlen in
 -- Config/TowerConfig. "I" Holz (30 Stages), "II" Stein (45), "III" Gold (60),
 -- "Final" Kristall (100).
-export type TowerId = "I" | "II" | "III" | "Final"
+export type TowerId = "I" | "II" | "III" | "Final" | "Endless"   -- Endless: HBB Paket 9
 
 -- Permanenter Tower-Fortschritt. Liegt bewusst AUSSERHALB von island (wie
 -- eggTree): ein Rebirth setzt die Insel zurueck, Rekorde und abgeholte
@@ -264,6 +265,7 @@ export type TowerState = {
 	claimed      : { [string]: { [string]: boolean } },
 	highestTower : string,
 	selected     : string,
+	endlessWeek  : { week: number, best: number }?, -- Paket 9: beste Endless-Stage der Woche
 }
 
 -- v15: Taeglicher Login-Bonus (Config/LoginBonusConfig). Tage zaehlen nach
@@ -830,6 +832,7 @@ export type TowerMilestoneReward = {
 	eggType     : EggType?,
 	eggs        : number,
 	blueprints  : number,
+	endlessLevels : number?, -- Paket 9: +Endless-Level fuer den ausgeruesteten Baerchi
 }
 
 -- v15: eine Zeile einer Bestenliste (Server → Client).

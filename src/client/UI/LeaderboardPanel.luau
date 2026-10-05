@@ -133,7 +133,9 @@ function LeaderboardPanel.init(screenGui: ScreenGui)
 	tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	for order, listId in LeaderboardConfig.LISTS do
 		local tab = Theme.button("Tab_" .. listId, tabs, Loc.t("ui.leaderboard.list." .. listId), Theme.COLORS.panelLight)
-		tab.Size = UDim2.new(0.31, 0, 1, 0)
+		-- Paket 9: 5 Listen passen nur schmaler (gleich breit, 6 px Luecke)
+		tab.Size = UDim2.new(1 / #LeaderboardConfig.LISTS, -6, 1, 0)
+		tab.TextScaled = true
 		tab.LayoutOrder = order
 		tab.TextColor3 = Theme.COLORS.text
 		tab.Activated:Connect(function() load(listId) end)

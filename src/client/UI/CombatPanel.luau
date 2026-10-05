@@ -125,17 +125,20 @@ end
 local function refreshCard(card: Card, def: TowerConfig.TowerDef, data: Types.PlayerDataUpdate)
 	local towers = data.towers
 	local record = if towers then towers.records[def.id] or 0 else 0
-	local cap    = TowerConfig.getStageCap(data.rebirthCount, def.id)
+	local cap    = TowerConfig.getStageCap(data.rebirthCount, def.id, if towers then towers.records else nil)
 	local open   = cap > 0
 	local selected = towers ~= nil and towers.selected == def.id
+	local endless = def.id == "Endless"   -- HBB Paket 9: ohne Obergrenze
 
-	card.title.Text = string.format("%s  (%d)", towerName(def), def.stages)
+	card.title.Text = if endless then towerName(def) else string.format("%s  (%d)", towerName(def), def.stages)
 
 	if open then
 		local claimed = if towers then towers.claimed[def.id] else nil
 		local nextStage = TowerConfig.nextMilestoneStage(def.id, claimed, record + 1)
 		local lines = {
-			Loc.t("ui.tower.record_cap", { record = record, cap = cap, stages = def.stages }),
+			if endless
+				then Loc.t("ui.tower.record_endless", { record = record })
+				else Loc.t("ui.tower.record_cap", { record = record, cap = cap, stages = def.stages }),
 		}
 		if nextStage then
 			table.insert(lines, Loc.t("ui.tower.next_milestone", { stage = nextStage }))
@@ -144,7 +147,9 @@ local function refreshCard(card: Card, def: TowerConfig.TowerDef, data: Types.Pl
 		card.button.Text = if selected then Loc.t("ui.tower.selected") else Loc.t("ui.tower.choose")
 		Theme.setEnabled(card.button, not selected)
 	else
-		card.info.Text = Loc.t("ui.tower.locked", { rebirths = TowerConfig.getOpeningRebirth(def.id) })
+		card.info.Text = if endless
+			then Loc.t("ui.tower.locked_endless")
+			else Loc.t("ui.tower.locked", { rebirths = TowerConfig.getOpeningRebirth(def.id) })
 		card.button.Text = Loc.t("ui.tower.locked_short")
 		Theme.setEnabled(card.button, false)
 	end
@@ -241,6 +246,9 @@ local function showMilestone(reward: Types.TowerMilestoneReward)
 		table.insert(parts, string.format("+%d %s", reward.eggs, Loc.name("egg." .. reward.eggType .. ".name", if egg then egg.displayName else reward.eggType)))
 	end
 	if reward.blueprints > 0 then table.insert(parts, Loc.t("msg.tower_blueprint")) end
+	if (reward.endlessLevels or 0) > 0 then
+		table.insert(parts, Loc.t("msg.tower_endless_level", { n = reward.endlessLevels or 0 }))
+	end
 	Notify.emit("tower_milestone", function()
 		Toast.success(Loc.t("msg.tower_milestone", { tower = def.numeral, stage = reward.stage, reward = table.concat(parts, ", ") }))
 	end, function()

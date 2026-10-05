@@ -1100,10 +1100,14 @@ local TOWER_SHOWCASE = {
 -- Luecke = 22,5 + k x 45 Grad), verteilt, damit jeder Plot eine in der
 -- Naehe hat. 67,5 ist der Ei-Haendler, 202,5 das Live-Kampf-Board.
 -- Masse wie LEADERBOARD_BOARD.
-local LEADERBOARD_BOARDS_V2: { { listId: string, angleDegrees: number } } = {
+-- Paket 9: Endless und Endless-Woche in den freien Luecken 112,5/247,5,
+-- nur mit FeatureFlags.ENDLESS (Feld `flag`, ausgewertet in MapLayout).
+local LEADERBOARD_BOARDS_V2: { { listId: string, angleDegrees: number, flag: string? } } = {
 	{ listId = "Tower",      angleDegrees = 22.5 },
 	{ listId = "Rebirths",   angleDegrees = 157.5 },
 	{ listId = "Collection", angleDegrees = 292.5 },
+	{ listId = "Endless",     angleDegrees = 112.5, flag = "ENDLESS" },
+	{ listId = "EndlessWeek", angleDegrees = 247.5, flag = "ENDLESS" },
 }
 
 -- HBB Paket 6 (MAP_V2_LIVE_BOARD): Tafel "LIVE" auf der Hauptinsel. Zeigt,
@@ -1201,6 +1205,19 @@ local TOWER_LOOKS: { [string]: TowerLook } = {
 		top = {
 			{ name = "Spitze", shape = Enum.PartType.Block,    size = Vector3.new(2.6, 6.0, 2.6),   offset = Vector3.new(0, 3.0, 0), color = Color3.fromRGB(190, 240, 255), material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
 			{ name = "Schweberring", shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 7.0, 7.0), offset = Vector3.new(0, 4.4, 0), color = Color3.fromRGB(150, 225, 255), material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+	},
+	-- HBB Paket 9: Endless — rosa Honig-Kristall mit Leuchtring, Stern als Spitze
+	Endless = {
+		plinth = Color3.fromRGB(90, 60, 110),
+		accent = Color3.fromRGB(255, 170, 230),
+		floor = {
+			{ name = "Kern",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.6, 7.4, 7.4), offset = Vector3.new(0, 1.3, 0), color = Color3.fromRGB(255, 190, 235), material = Enum.Material.Glass, rotation = UPRIGHT, solid = true },
+			{ name = "Ring",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 9.6, 9.6), offset = Vector3.new(0, 2.6, 0), color = Color3.fromRGB(255, 200, 80), material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+		top = {
+			{ name = "Spitze", shape = Enum.PartType.Block,    size = Vector3.new(2.6, 6.0, 2.6),   offset = Vector3.new(0, 3.0, 0), color = Color3.fromRGB(255, 170, 230), material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+			{ name = "Stern",  shape = Enum.PartType.Ball,     size = Vector3.new(2.2, 2.2, 2.2),   offset = Vector3.new(0, 6.6, 0), color = Color3.fromRGB(255, 220, 90), material = Enum.Material.Neon },
 		},
 	},
 }

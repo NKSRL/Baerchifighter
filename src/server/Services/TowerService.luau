@@ -28,6 +28,7 @@ local Types       = require(ReplicatedStorage.Network.Types)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
 local Loc         = require(ReplicatedStorage.Localization.Loc)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
+local LeaderboardConfig = require(ReplicatedStorage.Config.LeaderboardConfig)  -- Paket 9: Woche
 local EggTree     = require(ReplicatedStorage.Modules.EggTree)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
@@ -52,7 +53,7 @@ end
 
 -- Deckel in diesem Tower beim aktuellen Rebirth (0 = Tower noch zu).
 function TowerService.getStageCap(data: Types.PlayerData, towerId: string): number
-	local cap = TowerConfig.getStageCap(data.rebirthCount, towerId)
+	local cap = TowerConfig.getStageCap(data.rebirthCount, towerId, data.towers.records)
 	if cap <= 0 and _debugOpen[data] then
 		local def = TowerConfig.get(towerId)
 		return if def then def.stages else 0
@@ -64,7 +65,7 @@ end
 -- der hoechste offene.
 function TowerService.getSelected(data: Types.PlayerData): string
 	local selected = data.towers.selected
-	if TowerConfig.isOpen(data.rebirthCount, selected) or (_debugOpen[data] and TowerConfig.isValidId(selected)) then
+	if TowerConfig.isOpen(data.rebirthCount, selected, data.towers.records) or (_debugOpen[data] and TowerConfig.isValidId(selected)) then
 		return selected
 	end
 	local capTower = TowerConfig.getCap(data.rebirthCount)
@@ -117,6 +118,13 @@ local function grantMilestone(player: Player, data: Types.PlayerData, towerId: s
 		EggTreeService.grantBlueprint(player, data, milestone.blueprints)
 		reward.blueprints = milestone.blueprints
 	end
+	if milestone.endlessLevels > 0 then
+		local baerchi = data.island.equippedUid and data.island.baerchis[data.island.equippedUid]
+		if baerchi then
+			baerchi.endlessLevel = (baerchi.endlessLevel or 0) + milestone.endlessLevels
+			reward.endlessLevels = milestone.endlessLevels
+		end
+	end
 
 	-- Kurz verzoegert: beim Join haengt der Client sein UI erst noch an.
 	task.delay(1, function()
@@ -167,6 +175,17 @@ function TowerService.recordRun(player: Player, data: Types.PlayerData, towerId:
 		grantMilestonesUpTo(player, data, towerId, counted)
 	end
 
+	-- Paket 9: beste Endless-Stage dieser Woche (Wochen-Bestenliste).
+	if towerId == "Endless" then
+		local week = LeaderboardConfig.weekOf(os.time())
+		local entry = data.towers.endlessWeek
+		if not entry or entry.week ~= week then
+			entry = { week = week, best = 0 }
+			data.towers.endlessWeek = entry
+		end
+		entry.best = math.max(entry.best, counted)
+	end
+
 	local capReached = highestWon >= cap and TowerConfig.isCapLimiting(data.rebirthCount, towerId)
 	return newRecord, capReached
 end
@@ -183,8 +202,12 @@ function TowerService.select(player: Player, towerId: string)
 		fail(player, Loc.msg("err.tower_unknown"))
 		return
 	end
-	if not TowerConfig.isOpen(data.rebirthCount, towerId) then
-		fail(player, Loc.msg("err.tower_locked", { rebirths = TowerConfig.getOpeningRebirth(towerId) }))
+	if not TowerConfig.isOpen(data.rebirthCount, towerId, data.towers.records) then
+		if towerId == "Endless" then
+			fail(player, Loc.msg("err.tower_locked_endless"))
+		else
+			fail(player, Loc.msg("err.tower_locked", { rebirths = TowerConfig.getOpeningRebirth(towerId) }))
+		end
 		return
 	end
 	if data.towers.selected == towerId then return end

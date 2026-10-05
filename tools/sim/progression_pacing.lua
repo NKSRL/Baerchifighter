@@ -139,13 +139,22 @@ local function gainXp(p, xp)
 		p.baerchiXp -= BaerchiConfig.xpForNextLevel(p.baerchiLevel)
 		p.baerchiLevel += 1
 	end
-	if p.baerchiLevel >= BaerchiConfig.MAX_LEVEL then p.baerchiXp = 0 end
+	-- Paket 9: mit offenem Endless fliessen die XP ins Endless-Level.
+	if p.baerchiLevel >= BaerchiConfig.MAX_LEVEL and TowerConfig.isEndlessOpen(p.records) then
+		while p.baerchiXp >= BaerchiConfig.xpForEndlessLevel(p.endless) do
+			p.baerchiXp -= BaerchiConfig.xpForEndlessLevel(p.endless)
+			p.endless += 1
+		end
+	elseif p.baerchiLevel >= BaerchiConfig.MAX_LEVEL then
+		p.baerchiXp = 0
+	end
 end
 
 -- Wie viele Stages schafft der Baerchi in diesem Tower? (Aequivalenz-Modell)
 local function reach(p, towerId)
 	local def = TowerConfig.get(towerId)
-	local equivalent = p.baerchiLevel + powerBonus(p.minutes / 60)
+	local endless = if p.baerchiLevel >= BaerchiConfig.MAX_LEVEL then p.endless else 0
+	local equivalent = p.baerchiLevel + endless + powerBonus(p.minutes / 60)
 	if equivalent < def.startEquivalent then return 0 end
 	local s = 1 + math.floor((equivalent - def.startEquivalent) / def.equivalentPerStage)
 	return math.clamp(s, 0, def.stages)
@@ -157,7 +166,27 @@ local function award(p, base)
 	p.earned += amount
 end
 
+-- Paket 9: Ist Endless offen und schafft der Baerchi dort mehr als den
+-- Rekord, geht der Lauf in den Endless-Tower (Rekord + Meilensteine).
+local function doEndlessRun(p)
+	if not TowerConfig.isEndlessOpen(p.records) then return false end
+	local cleared = reach(p, "Endless")
+	local record = p.records.Endless or 0
+	if cleared <= record then return false end
+	award(p, TowerConfig.sumStageRewards("Endless", 1, cleared))
+	for stage = record + 1, cleared do
+		local m = TowerConfig.getMilestone("Endless", stage)
+		if m then
+			p.gummies += m.gummies
+			p.endless += m.endlessLevels
+		end
+	end
+	p.records.Endless = cleared
+	return true
+end
+
 local function doRun(p)
+	if doEndlessRun(p) then return end
 	-- Erst den Rekord im Deckel-Tower schieben (dafuer spielt man), sonst der
 	-- Tower mit dem meisten Ertrag pro Lauf (nur bis zum Deckel bezahlt).
 	local bestId, bestGain, bestCleared, bestCap = nil, -1, 0, 0
@@ -273,6 +302,7 @@ local function simulate(profile, stopAfterRebirth)
 	local p = {
 		minutes = 0, gummies = 100, gold = 0, earned = 0, rebirths = 0, incomePerMin = 0,
 		records = {}, highestTower = "I", lookAt = {}, rebirthAt = {}, final100 = nil, lives = {},
+		endless = 0,   -- Paket 9: Endless-Level (bleibt ueber Rebirths, newLife fasst es nicht an)
 	}
 	newLife(p)
 
@@ -324,6 +354,7 @@ local function simulate(profile, stopAfterRebirth)
 			table.insert(weekly, {
 				week = day // 7, rebirths = p.rebirths, tower = towerId, record = record,
 				maxLevel = maxLevel, baerchi = p.baerchiLevel, bonus = powerBonus(p.minutes / 60),
+				endless = p.endless, endlessRecord = p.records.Endless or 0,
 			})
 		end
 	end
@@ -369,11 +400,13 @@ for _, profile in PROFILES do
 		lastEnd = life.endMin
 	end
 	__log("")
-	__log("Woche | Rebirths | bester Tower | Gebaeude max | Baerchi-Lvl | Ausbau-Bonus")
+	__log("Woche | Rebirths | bester Tower | Gebaeude max | Baerchi-Lvl | Ausbau-Bonus | Endless-Lvl | Endless-Stage")
 	for _, w in weekly do
-		__log(string.format("%5d | %8d | %4s / %-3d   | %12d | %11d | %12.0f",
-			w.week, w.rebirths, w.tower, w.record, w.maxLevel, w.baerchi, w.bonus))
+		__log(string.format("%5d | %8d | %4s / %-3d   | %12d | %11d | %12.0f | %11d | %13d",
+			w.week, w.rebirths, w.tower, w.record, w.maxLevel, w.baerchi, w.bonus, w.endless, w.endlessRecord))
 	end
+	profile.result = p
+	profile.weekly = weekly
 end
 
 -- Pruefung gegen die Ziele (Profil Normal, 90 min/Tag)
@@ -392,4 +425,26 @@ within("Normal: Look 5 Woche 2-3 (13,5-31,5 h)",      p.lookAt[45], 13.5, 31.5)
 within("Normal: Look 6 Woche 5-8 (52,5-84 h)",        p.lookAt[60], 52.5, 84)
 within("Normal: Rebirth 1 nach ~2-3 Spieltagen (1,5-4,5 h)", p.rebirthAt[1], 1.5, 4.5)
 within("Normal: Final Stage 100 nicht vor Woche 8 (>= 73,5 h)", p.final100 or 1e9, 73.5, 1e9)
+-- Paket 9: Endless. Vielspieler soll in Woche 16 grob bei Stage 180-200
+-- (Endless 80-100) stehen und Woche fuer Woche weiterkommen; wer Endless
+-- offen hat, darf nie stehen bleiben.
+if TowerConfig.isEndlessOpen({ Final = 100 }) then
+	for _, profile in PROFILES do
+		if profile.name == "Viel" then
+			local weekly = profile.weekly
+			local last = weekly[#weekly]
+			local ok = last.endlessRecord >= 80 and last.endlessRecord <= 100
+			if ok then __log("ok  ", "Viel: Endless Woche 16 bei 80-100 (" .. last.endlessRecord .. ")")
+			else fails += 1; __log("FAIL", "Viel: Endless Woche 16 bei 80-100", last.endlessRecord) end
+			local stuck = false
+			for i = 2, #weekly do
+				if weekly[i - 1].endlessRecord > 0 and weekly[i].endlessRecord <= weekly[i - 1].endlessRecord then
+					stuck = true
+				end
+			end
+			if not stuck then __log("ok  ", "Viel: Endless waechst jede Woche")
+			else fails += 1; __log("FAIL", "Viel: Endless steht eine Woche still") end
+		end
+	end
+end
 __log(fails == 0 and "ALLE ZIELE OK" or ("ZIELE VERFEHLT: " .. fails))

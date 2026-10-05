@@ -68,8 +68,9 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 8/9: neue Pacing-Werte. Bleibt aus, bis der Mensch die Tabelle
 	-- freigegeben hat (Stopp-Punkt im Plan).
 	PACING_V2         = false,
-	-- Paket 9: Final 101+ nur nach Freigabe des Entwurfs
-	ENDLESS           = false,
+	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
+	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
+	ENDLESS           = true,
 }
 
 local FeatureFlags = {}

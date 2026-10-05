@@ -143,8 +143,16 @@ end
 -- eigener configId hergibt (siehe FusionService, Regel 1) — dafuer, und NUR
 -- dafuer, gibt es Baerchi.baseStatOverride. Fuer jeden anderen Baerchi ist das
 -- Feld nil.
+-- Paket 9: Kampf-Level = Level + Endless-Level (nur auf MAX_LEVEL).
+function CombatCalculator.getCombatLevel(baerchi: Types.Baerchi): number
+	if baerchi.level >= BaerchiConfig.MAX_LEVEL then
+		return baerchi.level + math.max(0, baerchi.endlessLevel or 0)
+	end
+	return baerchi.level
+end
+
 function CombatCalculator.getEffectiveStats(baerchi: Types.Baerchi, baseDef: { [string]: any }): FighterStats
-	local level  = baerchi.level
+	local level  = CombatCalculator.getCombatLevel(baerchi)
 	local growth = CombatCalculator.getLevelGrowth(level)
 
 	-- 1. Basiswerte: Override schlaegt Config, wo gesetzt.

@@ -1,6 +1,8 @@
 # HBB Paket 9 – Endless (Stage 101+) – ENTWURF zur Freigabe – 05.10.2026
 
-**Stopp-Punkt:** Laut Plan wird Paket 9 erst nach Freigabe dieses Entwurfs gebaut. `FeatureFlags.ENDLESS` bleibt `false`. Am Ende stehen 4 Fragen.
+**ÜBERHOLT (05.10.):** Gebaut wurde die Variante aus Frage 1 „Bärchi-Level über 50 hinaus“ statt Kronen – siehe `docs/HBB_PAKET_9_ENDLESS_2026-10-05.md`.
+
+**Stopp-Punkt (alt):** Laut Plan wird Paket 9 erst nach Freigabe dieses Entwurfs gebaut. `FeatureFlags.ENDLESS` bleibt `false`. Am Ende stehen 4 Fragen.
 
 ## Problem (aus den Zahlen)
 - Vielspieler (4 h/Tag) erreichen Final 100 in **Woche 6**, Normalspieler (90 min/Tag) in **Woche 15** (`progression_pacing.lua`).

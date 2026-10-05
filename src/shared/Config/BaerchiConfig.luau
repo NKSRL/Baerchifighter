@@ -613,6 +613,19 @@ local function xpForNextLevel(level: number): number
 	return math.floor(XP_CURVE_BASE * math.pow(XP_CURVE_FACTOR, math.max(level, 1) - 1))
 end
 
+-- Paket 9 (FeatureFlags.ENDLESS): Endless-Level ueber Level 50 hinaus.
+-- Zaehlt nur auf MAX_LEVEL, bleibt ueber Rebirths (RebirthService setzt nur
+-- level/xp zurueck) und kommt aus Honig-XP (sobald Final 100 geschafft ist)
+-- und aus jeder 10. Endless-Stage. +1 Endless-Level wirkt wie +1 Level
+-- (CombatCalculator) und ist im Tower-Modell etwa +2 Endless-Stages wert.
+-- Faktor per tools/sim/progression_pacing.lua abgestimmt.
+local ENDLESS_XP_BASE   = 340     -- x xpForNextLevel(MAX_LEVEL)
+local ENDLESS_XP_FACTOR = 1.02
+
+local function xpForEndlessLevel(endlessLevel: number): number
+	return math.floor(xpForNextLevel(MAX_LEVEL) * ENDLESS_XP_BASE * math.pow(ENDLESS_XP_FACTOR, math.max(endlessLevel, 0)))
+end
+
 --------------------------------------------------------------------------------
 -- Rarity-Kette (Grundlage der Fusions-Regel)
 --------------------------------------------------------------------------------
@@ -975,6 +988,9 @@ return {
 
 	getRarityColor = getRarityColor,
 	xpForNextLevel = xpForNextLevel,
+	ENDLESS_XP_BASE   = ENDLESS_XP_BASE,
+	ENDLESS_XP_FACTOR = ENDLESS_XP_FACTOR,
+	xpForEndlessLevel = xpForEndlessLevel,
 	getRarityIndex = getRarityIndex,
 	getNextRarity  = getNextRarity,
 	getById        = getById,
