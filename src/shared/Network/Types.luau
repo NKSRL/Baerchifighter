@@ -362,20 +362,25 @@ export type IslandData = {
 	incubator : IncubatorData,
 }
 
--- v16 (Paket 8): ein belegter Brut-Platz. Zeitmarken statt Timer (wie
--- Honig und Recycler): fertig ist das Ei, sobald os.time() >= finishAt —
--- auch wenn der Spieler dazwischen offline war. `slot` steht IM Eintrag
--- (dichte Liste, derselbe DataStore-Grund wie bei Baerchi.charms).
+-- v16 (Paket 8, Umbau nach Rueckmeldung 05.10.): ein belegter Brut-Platz.
+-- Im Platz sitzt ein BAERCHI (nicht der ausgeruestete), der im Takt seiner
+-- Rarity zusaetzliche Eier aus seiner eigenen Ei-Tabelle bruetet. Zeitmarke
+-- statt Timer (wie Honig und Recycler): faellig ist das naechste Ei, sobald
+-- os.time() >= lastEggAt + Takt — auch offline (dann gebremst). Die Eier
+-- warten im Platz (`eggs`, hoechstens IncubatorConfig.STORE_PER_SLOT), bis
+-- der Spieler sie am Inkubator abholt. `slot` steht IM Eintrag (dichte
+-- Liste, derselbe DataStore-Grund wie bei Baerchi.charms).
 export type IncubatorSlot = {
-	slot      : number,    -- 1 .. IncubatorConfig.MAX_SLOTS
-	eggType   : EggType,
-	startedAt : number,
-	finishAt  : number,
+	slot       : number,      -- 1 .. IncubatorConfig.MAX_SLOTS
+	baerchiUid : string,
+	lastEggAt  : number,
+	eggs       : { EggType },
 }
 
--- v16 (Paket 8): Level (Ausbau mit Gummies, Geldsenke vor dem Rebirth) und
--- die belegten Plaetze. Ein Rebirth setzt das Level zurueck, die Eier in den
--- Plaetzen bleiben (wie das Ei-Lager).
+-- v16 (Paket 8): Level (Ausbau mit Gummies, Geldsenke vor dem Rebirth: mehr
+-- Plaetze, schnellerer Takt) und die belegten Plaetze. Ein Rebirth setzt das
+-- Level zurueck; Plaetze, deren Baerchi es nicht mehr gibt, raeumt
+-- IncubatorService (Eier ins Lager).
 export type IncubatorData = {
 	level : number,
 	slots : { IncubatorSlot },

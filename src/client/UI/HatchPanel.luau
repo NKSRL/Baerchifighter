@@ -22,8 +22,6 @@ local Remotes   = require(ReplicatedStorage.Network.Remotes)
 local EggConfig = require(ReplicatedStorage.Config.EggConfig)
 local Loc       = require(ReplicatedStorage.Localization.Loc)
 local EggTree   = require(ReplicatedStorage.Modules.EggTree)
-local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
-local IncubatorRules = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
 
 local Theme          = require(script.Parent.Theme)
 local PanelManager   = require(script.Parent.PanelManager)
@@ -100,22 +98,13 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	count.TextXAlignment = Enum.TextXAlignment.Right
 	count.TextColor3     = Theme.COLORS.good
 
-	-- Sammel-Update 05.10. (Paket 8): Eier ab Gold-Stufe gehen in den
-	-- Inkubator statt sofort auf (gleiche Regel wie der Server).
-	local toIncubator = FeatureFlags.isOn("INCUBATOR") and data ~= nil
-		and IncubatorRules.requiresIncubator(eggType, IncubatorRules.isUnlocked(data))
-	local button = Theme.bigButton("Open", card,
-		if toIncubator then Loc.t("ui.hatch.to_incubator") else Loc.t("ui.hatch.open"),
-		if toIncubator then Theme.COLORS.growth else Theme.COLORS.accent)
+	-- Rueckmeldung 05.10.: alle Eier gehen wieder sofort auf (der Inkubator
+	-- bruetet jetzt zusaetzliche Eier, statt Eier zu sperren).
+	local button = Theme.bigButton("Open", card, Loc.t("ui.hatch.open"), Theme.COLORS.accent)
 	button.Position = UDim2.new(1, -128, 0, 38)
 	button.Size     = UDim2.new(0, 116, 0, 32)
 
 	button.Activated:Connect(function()
-		if toIncubator then
-			Remotes.RequestIncubatorStart:FireServer(eggType)
-			PanelManager.open("Incubator")
-			return
-		end
 		-- Animation zuerst: der Klick soll sich sofort anfuehlen. Was
 		-- herauskommt, kommt trotzdem ausschliesslich vom Server.
 		HatchAnimation.request(eggType)
@@ -139,7 +128,7 @@ function HatchPanel.refresh()
 	-- Sammel-Update 1.3-Muster: nur neu bauen, wenn sich das Lager (oder die
 	-- Sprache) aendert — sonst zerstoert jeder Datenstand den Knopf unter dem
 	-- Finger, und der Tipp kommt nicht an.
-	local parts = { Loc.getLanguage(), tostring(IncubatorRules.isUnlocked(data)) }
+	local parts = { Loc.getLanguage() }
 	for _, eggType in EGG_ORDER do
 		local n = data.island.eggStock[eggType] or 0
 		if n > 0 then table.insert(parts, eggType .. n) end

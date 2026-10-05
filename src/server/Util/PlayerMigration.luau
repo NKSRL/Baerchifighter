@@ -667,6 +667,25 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	else
 		if typeof(incubator.level) ~= "number" or incubator.level < 1 then incubator.level = 1 end
 		if typeof(incubator.slots) ~= "table" then incubator.slots = {} end
+		-- Umbau 05.10.: im Platz sitzt jetzt ein Baerchi statt eines Eis.
+		-- Alte Ei-Eintraege gehen zurueck ins Lager (nichts geht verloren),
+		-- kaputte Eintraege fallen weg.
+		local kept = {}
+		for _, entry in incubator.slots do
+			if typeof(entry) ~= "table" then continue end
+			if typeof(entry.eggType) == "string" and entry.baerchiUid == nil then
+				local stock = island.eggStock
+				if typeof(stock) == "table" then
+					stock[entry.eggType] = (stock[entry.eggType] or 0) + 1
+				end
+				continue
+			end
+			if typeof(entry.slot) ~= "number" or typeof(entry.baerchiUid) ~= "string" then continue end
+			if typeof(entry.lastEggAt) ~= "number" then entry.lastEggAt = os.time() end
+			if typeof(entry.eggs) ~= "table" then entry.eggs = {} end
+			table.insert(kept, entry)
+		end
+		incubator.slots = kept
 	end
 	if typeof((data :: any).indexClaimed) ~= "table" then
 		data.indexClaimed = {}

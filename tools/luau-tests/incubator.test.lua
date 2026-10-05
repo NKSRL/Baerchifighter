@@ -1,10 +1,10 @@
 -- incubator.test.lua — Sammel-Update 05.10., Paket 8 (+ Paket 7 Index-Belohnungen)
 -- python tools/luau-tests/run_local.py tools/luau-tests/incubator.test.lua
 --
--- 1. Zeitrechnung (rein, mit festem `now`): fertig genau ab finishAt, auch
---    nach langer Abwesenheit (Offline-Fall), Fortschritt 0..1, Beschleunigen.
+-- 1. Brut-Takt (Umbau 05.10.: Baerchi im Platz): faellige Eier, Rest der
+--    Zeitmarke, Lager-Deckel auch offline, keine angesammelte Wartezeit.
 -- 2. Plaetze: 1 am Anfang, mehr ueber Level/Rebirth/Index, nie ueber MAX.
--- 3. Sofort-Oeffnen: Basis/Zucker immer, Gold+ erst nach Freischaltung.
+-- 3. Ei-Chancen eines Baerchis: 100 %, nur freie Eier.
 -- 4. Index-Belohnungen: Ei-Reihe fertig/rueckwirkend, Ascension nur bei "all".
 
 local IncubatorRules    = rbxRequire("ReplicatedStorage/Modules/IncubatorRules")
@@ -20,22 +20,35 @@ local function check(name, ok, detail)
 	end
 end
 
--- 1. Zeit
+-- 1. Brut-Takt (rein, mit festem `now`)
 local T0 = 1_000_000
-local brew = IncubatorRules.brewSeconds("BasicEgg", 1)
-check("Basis-Ei 30 s auf Level 1", brew == 30, brew)
-check("Gold-Ei braucht laenger als Basis", IncubatorRules.brewSeconds("GoldenEgg", 1) > brew)
-check("hoeheres Level bruetet schneller", IncubatorRules.brewSeconds("GoldenEgg", 30) < IncubatorRules.brewSeconds("GoldenEgg", 1))
-local slot = { slot = 1, eggType = "GoldenEgg", startedAt = T0, finishAt = T0 + 180 }
-check("nicht fertig kurz davor", not IncubatorRules.isReady(slot, T0 + 179))
-check("fertig genau bei finishAt", IncubatorRules.isReady(slot, T0 + 180))
-check("offline: nach 3 Tagen fertig", IncubatorRules.isReady(slot, T0 + 3 * 86400))
-check("Fortschritt halb", math.abs(IncubatorRules.progress(slot, T0 + 90) - 0.5) < 1e-9)
-check("Fortschritt gedeckelt", IncubatorRules.progress(slot, T0 + 9999) == 1)
-check("Restzeit 0 wenn fertig", IncubatorRules.remaining(slot, T0 + 500) == 0)
-check("Beschleunigen 3 min = 3 Gold", IncubatorRules.speedUpCost(slot, T0) == 3 * IncubatorConfig.SPEEDUP_GOLD_PER_MINUTE)
-check("Beschleunigen angefangene Minute", IncubatorRules.speedUpCost(slot, T0 + 170) == IncubatorConfig.SPEEDUP_GOLD_PER_MINUTE)
-check("Beschleunigen fertig = 0", IncubatorRules.speedUpCost(slot, T0 + 180) == 0)
+local common = IncubatorRules.breedSeconds("Common", 1)
+check("Common-Takt laut Config", common == IncubatorConfig.BREED_SECONDS_BY_RARITY.Common, common)
+check("seltener bruetet schneller", IncubatorRules.breedSeconds("Legendary", 1) < common)
+check("hoeheres Level bruetet schneller", IncubatorRules.breedSeconds("Common", 30) < common)
+check("offline gebremst", IncubatorRules.breedSeconds("Common", 1, true) > common)
+check("unbekannte Rarity -> Ersatzwert", IncubatorRules.breedSeconds("Quatsch", 1) == IncubatorConfig.BREED_SECONDS_FALLBACK)
+
+local slot = { slot = 1, baerchiUid = "b1", lastEggAt = T0, eggs = {} }
+local n, mark = IncubatorRules.due(slot, 100, T0 + 99)
+check("vor dem Takt kein Ei", n == 0 and mark == T0, tostring(n) .. "/" .. tostring(mark))
+n, mark = IncubatorRules.due(slot, 100, T0 + 250)
+check("2 Eier nach 250 s", n == 2, n)
+check("Rest bleibt erhalten (Marke +200)", mark == T0 + 200, mark)
+n, mark = IncubatorRules.due(slot, 100, T0 + 3 * 86400)
+check("offline: gedeckelt durch Lager", n == IncubatorConfig.STORE_PER_SLOT, n)
+check("volles Lager: Marke auf jetzt", mark == T0 + 3 * 86400, mark)
+local fullSlot = { slot = 1, baerchiUid = "b1", lastEggAt = T0, eggs = {} }
+for _ = 1, IncubatorConfig.STORE_PER_SLOT do table.insert(fullSlot.eggs, "BasicEgg") end
+n, mark = IncubatorRules.due(fullSlot, 100, T0 + 500)
+check("Lager voll: keine neuen Eier", n == 0, n)
+check("Lager voll: Zeit sammelt sich nicht an", mark == T0 + 500, mark)
+check("Fortschritt halb", math.abs(IncubatorRules.progress(slot, 100, T0 + 50) - 0.5) < 1e-9)
+check("Fortschritt voll bei vollem Lager", IncubatorRules.progress(fullSlot, 100, T0) == 1)
+check("Zeitmarke in der Zukunft: nichts", (IncubatorRules.due(slot, 100, T0 - 10)) == 0)
+check("storedCount", IncubatorRules.storedCount({ slot, fullSlot }) == IncubatorConfig.STORE_PER_SLOT)
+check("slotOf findet Baerchi", IncubatorRules.slotOf({ slot }, "b1") == 1)
+check("slotOf sonst nil", IncubatorRules.slotOf({ slot }, "b2") == nil)
 
 -- 2. Plaetze
 check("Start 1 Platz", IncubatorRules.slotCount(1, 0, {}) == 1)
@@ -45,18 +58,31 @@ local allPaths = {}
 for _, p in IndexRewardConfig.PATHS do allPaths["path:" .. p] = true end
 check("nie ueber MAX", IncubatorRules.slotCount(60, 99, allPaths) == IncubatorConfig.MAX_SLOTS)
 check("Index-Pfad +1", IncubatorRules.slotCount(1, 0, { ["path:Stamm"] = true }) == 2)
-check("firstFree", IncubatorRules.firstFree({ { slot = 1, eggType = "BasicEgg", startedAt = 0, finishAt = 1 } }, 2) == 2)
-check("firstFree voll", IncubatorRules.firstFree({ { slot = 1, eggType = "BasicEgg", startedAt = 0, finishAt = 1 } }, 1) == nil)
+check("firstFree", IncubatorRules.firstFree({ slot }, 2) == 2)
+check("firstFree voll", IncubatorRules.firstFree({ slot }, 1) == nil)
 check("Ausbau kostet etwas", (IncubatorRules.upgradeCost(2) or { gummies = 0 }).gummies > 0)
 check("ueber MAX kein Ausbau", IncubatorRules.upgradeCost(IncubatorConfig.MAX_LEVEL + 1) == nil)
-
--- 3. Sofort-Oeffnen
-check("Basis sofort", not IncubatorRules.requiresIncubator("BasicEgg", true))
-check("Zucker sofort", not IncubatorRules.requiresIncubator("SugarEgg", true))
-check("Gold braucht Inkubator", IncubatorRules.requiresIncubator("GoldenEgg", true))
-check("vor Freischaltung alles sofort", not IncubatorRules.requiresIncubator("GoldenEgg", false))
 check("frisch: gesperrt", not IncubatorRules.isUnlocked({ rebirthCount = 0, towers = { records = {} }, stats = {} }))
 check("nach Kampf frei", IncubatorRules.isUnlocked({ rebirthCount = 0, towers = { records = {} }, stats = { totalFightsLost = 1 } }))
+
+-- 3. Chancen: summieren zu 100 %, gesperrte Eier landen beim Vorgaenger
+local BaerchiConfig = rbxRequire("ReplicatedStorage/Config/BaerchiConfig")
+local EggTree       = rbxRequire("ReplicatedStorage/Modules/EggTree")
+local anyId = nil
+for id, def in BaerchiConfig.data do
+	if def.eggTable and #def.eggTable > 1 then anyId = id break end
+end
+if anyId then
+	local baerchi = { configId = anyId, rarity = BaerchiConfig.data[anyId].rarity }
+	local total = 0
+	for _, entry in IncubatorRules.chances(baerchi, EggTree.newState()) do
+		total += entry.percent
+		check("Chance nur fuer freie Eier: " .. entry.eggType, EggTree.isUnlocked(EggTree.newState(), entry.eggType))
+	end
+	check("Chancen summieren zu 100", math.abs(total - 100) < 1e-6, total)
+else
+	check("Baerchi mit Ei-Tabelle gefunden", false)
+end
 
 -- 4. Index-Belohnungen
 local basic = IndexRewardConfig.get("egg:BasicEgg")

@@ -66,7 +66,7 @@
 --   D:Invoke("towerrecord", "III", 45) -- Rekord setzen (Meilensteine bis dorthin werden ausgezahlt)
 --   D:Invoke("rebirthcap")          -- Deckel des aktuellen Rebirths in allen Towern
 --   D:Invoke("stagebest", "I", 30)  -- Sammel-Update: beste Stage dieses Lebens (Rebirth-Bedingung)
---   D:Invoke("incubator", "done")   -- Sammel-Update: Inkubator-Stand, "done" = alle Eier fertig
+--   D:Invoke("incubator", "done")   -- Sammel-Update: Inkubator-Stand, "done" = alle Plaetze voll gebruetet
 --   D:Invoke("dailyshift", 1)       -- Login-Bonus: so tun, als waeren 1 Tag(e) vergangen
 --   D:Invoke("lbflush")             -- Bestenlisten sofort schreiben und neu lesen
 --   D:Invoke("parts")               -- Teile auf der eigenen Insel zaehlen (Budget 250)
@@ -167,6 +167,7 @@ local JackpotRoll               = require(ServerScriptService.Util.JackpotRoll)
 
 -- HBB Paket 0
 local FunnelService             = require(ServerScriptService.Services.FunnelService)
+local IncubatorService          = require(ServerScriptService.Services.IncubatorService)   -- Umbau 05.10.
 
 local DebugService = {}
 
@@ -448,12 +449,12 @@ commands.stagebest = function(player, data, towerId: any, stage: any)
 	}
 end
 
--- Sammel-Update 05.10. (Paket 8): Inkubator-Stand; "done" macht alle Eier fertig.
+-- Sammel-Update 05.10. (Paket 8, Umbau): Inkubator-Stand; "done" bruetet
+-- alle belegten Plaetze sofort voll.
 commands.incubator = function(player, data, action: any)
 	local incubator = data.island.incubator
 	if action == "done" then
-		for _, entry in incubator.slots do entry.finishAt = os.time() end
-		PlayerService.markDirty(player)
+		IncubatorService.debugFill(player)
 	end
 	return { level = incubator.level, plaetze = incubator.slots }
 end

@@ -140,9 +140,11 @@ function RebirthService.rebirth(player: Player)
 	freshIsland.eggStock = keptStock
 	freshIsland.baerchis    = keptBaerchis
 	freshIsland.equippedUid = keptEquippedUid
-	-- Sammel-Update Paket 8: Eier im Inkubator bleiben (wie das Ei-Lager),
-	-- das Ausbau-Level faellt zurueck (Geldsenke vor dem Rebirth). Plaetze
-	-- ueber der neuen Platz-Zahl lassen sich noch abholen, aber nicht neu belegen.
+	-- Sammel-Update Paket 8 (Umbau 05.10.): die Plaetze bleiben (Baerchi und
+	-- wartende Eier), das Ausbau-Level faellt zurueck (Geldsenke vor dem
+	-- Rebirth). Plaetze ueber der neuen Platz-Zahl oder mit einem Baerchi, der
+	-- den Rebirth nicht mitmacht, raeumt IncubatorService im naechsten Takt
+	-- (Eier ins Lager).
 	local oldIncubator = data.island.incubator
 	if oldIncubator and freshIsland.incubator then
 		freshIsland.incubator.slots = oldIncubator.slots

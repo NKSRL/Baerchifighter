@@ -103,10 +103,21 @@ function IslandService.autoEquipIfNone(data: Types.PlayerData)
 	-- Deterministisch nach uid statt "irgendeiner": sonst wuerde bei jedem
 	-- Aufruf ein anderer Baerchi gewinnen, weil die Iteration ueber eine
 	-- Hash-Tabelle nicht stabil ist.
+	-- Rueckmeldung 05.10.: Baerchis im Inkubator bruetet dort schon — sie
+	-- nur nehmen, wenn es keinen anderen gibt (IncubatorService raeumt den
+	-- Platz dann im naechsten Takt, die Eier gehen ins Lager).
+	local busy: { [string]: boolean } = {}
+	local incubator = island.incubator
+	if incubator then
+		for _, entry in incubator.slots do busy[entry.baerchiUid] = true end
+	end
 	local bestUid: string? = nil
+	local bestBusy = true
 	for uid in island.baerchis do
-		if not bestUid or uid < bestUid then
+		local isBusy = busy[uid] == true
+		if not bestUid or (bestBusy and not isBusy) or (isBusy == bestBusy and uid < (bestUid :: string)) then
 			bestUid = uid
+			bestBusy = isBusy
 		end
 	end
 

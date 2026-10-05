@@ -72,13 +72,22 @@ check("v16: zweiter Durchlauf aendert nichts", deepEqual(again, out), true)
 -- Ein v16-Stand mit Inhalt bleibt, wie er ist
 local full = deepCopy(out)
 full.island.stageBest = { II = 30 }
-full.island.incubator = { level = 4, slots = { { slot = 1, eggType = "GoldenEgg", startedAt = 10, finishAt = 130 } } }
+full.island.incubator = { level = 4, slots = { { slot = 1, baerchiUid = "b1", lastEggAt = 10, eggs = { "SugarEgg" } } } }
 full.indexClaimed = { ["egg:BasicEgg"] = true }
 local kept = PlayerMigration.applyDefaults(deepCopy(full))
 check("v16: stageBest bleibt", kept.island.stageBest.II, 30)
-check("v16: Inkubator-Ei bleibt", kept.island.incubator.slots[1].eggType, "GoldenEgg")
+check("v16: Inkubator-Baerchi bleibt", kept.island.incubator.slots[1].baerchiUid, "b1")
+check("v16: wartendes Ei bleibt", kept.island.incubator.slots[1].eggs[1], "SugarEgg")
 check("v16: Inkubator-Level bleibt", kept.island.incubator.level, 4)
 check("v16: indexClaimed bleibt", kept.indexClaimed["egg:BasicEgg"], true)
+
+-- Umbau 05.10.: ein alter Ei-Eintrag (Brutzeit-Modell) geht zurueck ins Lager
+local oldModel = deepCopy(out)
+oldModel.island.eggStock.GoldenEgg = 2
+oldModel.island.incubator = { level = 2, slots = { { slot = 1, eggType = "GoldenEgg", startedAt = 10, finishAt = 130 } } }
+local moved = PlayerMigration.applyDefaults(oldModel)
+check("Umbau: alter Ei-Platz geraeumt", #moved.island.incubator.slots, 0)
+check("Umbau: Ei zurueck im Lager", moved.island.eggStock.GoldenEgg, 3)
 
 if failures > 0 then error(failures .. " Test(s) fehlgeschlagen", 0) end
 print("migration_v16: alle Tests gruen")

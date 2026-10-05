@@ -4,23 +4,25 @@
 --
 -- Einzige Zustaendigkeit:
 --   - Die Rechenregeln des Inkubators als reine Funktionen (Sammel-Update
---     05.10., Paket 8): Freischaltung, Platz-Zahl, Brutzeit, fertig?,
---     Beschleunigungs-Kosten, Ausbau-Kosten.
+--     05.10., Paket 8, Umbau nach Rueckmeldung 05.10.): Freischaltung,
+--     Platz-Zahl, Brut-Takt eines Baerchis, wie viele Eier faellig sind,
+--     Ausbau-Kosten.
 --
 -- Keine Roblox-Dienste, keine Zeit-Abfrage: `now` kommt immer von aussen.
 -- Damit laeuft die Zeitrechnung (auch der Offline-Fall) im reinen Test
 -- (tools/luau-tests/incubator.test.lua) und auf Server und Client gleich.
 --
 -- WARUM ZEITMARKEN STATT TIMER: wie Honig und Recycler. Ein Platz traegt
--- startedAt/finishAt; fertig ist er, sobald now >= finishAt — egal, ob der
--- Spieler dazwischen offline war oder der Server neu gestartet ist. Kein
--- Thread pro Ei.
+-- lastEggAt; faellig sind floor((now - lastEggAt) / Takt) Eier — egal, ob
+-- der Spieler dazwischen offline war oder der Server neu gestartet ist.
 
 local Types             = require(script.Parent.Parent.Network.Types)
 local IncubatorConfig   = require(script.Parent.Parent.Config.IncubatorConfig)
 local EggConfig         = require(script.Parent.Parent.Config.EggConfig)
 local EconomyConfig     = require(script.Parent.Parent.Config.EconomyConfig)
 local IndexRewardConfig = require(script.Parent.Parent.Config.IndexRewardConfig)
+local EggCalculator     = require(script.Parent.EggCalculator)
+local EggTree           = require(script.Parent.EggTree)
 
 local IncubatorRules = {}
 
@@ -56,43 +58,70 @@ function IncubatorRules.speed(level: number): number
 	return 1 + math.max(0, math.floor(level) - 1) * IncubatorConfig.SPEED_PER_LEVEL
 end
 
--- Brutzeit in Sekunden fuer dieses Ei auf diesem Level.
-function IncubatorRules.brewSeconds(eggType: Types.EggType, level: number): number
-	local egg = EggConfig.data[eggType]
-	local tier = if egg then egg.tier else 1
-	local base = IncubatorConfig.BREW_SECONDS_BY_TIER[tier] or IncubatorConfig.BREW_SECONDS_BY_TIER[11]
-	return math.max(1, math.floor(base / IncubatorRules.speed(level) + 0.5))
+-- Sekunden pro Ei fuer einen Baerchi dieser Rarity auf diesem Level.
+-- `offline = true` bremst wie beim Legen (EggConfig.OFFLINE_SLOWDOWN).
+function IncubatorRules.breedSeconds(rarity: string, level: number, offline: boolean?): number
+	local base = IncubatorConfig.BREED_SECONDS_BY_RARITY[rarity] or IncubatorConfig.BREED_SECONDS_FALLBACK
+	local seconds = base / IncubatorRules.speed(level)
+	if offline then seconds *= EggConfig.OFFLINE_SLOWDOWN end
+	return math.max(1, math.floor(seconds + 0.5))
 end
 
--- Muss dieses Ei in den Inkubator (statt sofort aufzugehen)? Nur, wenn der
--- Inkubator schon frei ist — vorher geht alles sofort (sonst haengt ein
--- neuer Spieler mit einem gelegten Gold-Ei fest).
-function IncubatorRules.requiresIncubator(eggType: Types.EggType, unlocked: boolean): boolean
-	if not unlocked then return false end
-	local egg = EggConfig.data[eggType]
-	if not egg then return false end
-	return egg.tier > IncubatorConfig.INSTANT_MAX_TIER or egg.special == true
+-- Wie viele Eier seit lastEggAt faellig sind (gedeckelt durch den freien
+-- Platz im Lager) und die neue Zeitmarke. Ist das Lager voll, laeuft die
+-- Zeitmarke mit (sonst kaeme nach dem Abholen die Wartezeit auf einmal).
+function IncubatorRules.due(slot: Types.IncubatorSlot, interval: number, now: number): (number, number)
+	local stored = #slot.eggs
+	local room = math.max(0, IncubatorConfig.STORE_PER_SLOT - stored)
+	local elapsed = now - slot.lastEggAt
+	if elapsed <= 0 or interval <= 0 then return 0, math.min(slot.lastEggAt, now) end
+	local count = math.floor(elapsed / interval)
+	if count >= room then
+		return room, now
+	end
+	return count, slot.lastEggAt + count * interval
 end
 
-function IncubatorRules.isReady(slot: Types.IncubatorSlot, now: number): boolean
-	return now >= slot.finishAt
+-- Anteil 0..1 bis zum naechsten Ei (fuer den Balken ueber der Kuppel).
+function IncubatorRules.progress(slot: Types.IncubatorSlot, interval: number, now: number): number
+	if #slot.eggs >= IncubatorConfig.STORE_PER_SLOT then return 1 end
+	return math.clamp((now - slot.lastEggAt) / math.max(1, interval), 0, 1)
 end
 
-function IncubatorRules.remaining(slot: Types.IncubatorSlot, now: number): number
-	return math.max(0, slot.finishAt - now)
+-- Mit welcher Wahrscheinlichkeit bruetet dieser Baerchi welches Ei? Wie
+-- EggCalculator.getChances, aber gesperrte Eier schon auf ihren freien
+-- Vorgaenger umgerechnet (EggTree.resolveLaid) — also genau das, was im
+-- Platz landen kann. Absteigend sortiert.
+function IncubatorRules.chances(baerchi: Types.Baerchi, eggTree: Types.EggTreeState?): { { eggType: Types.EggType, percent: number } }
+	local merged: { [string]: number } = {}
+	for _, entry in EggCalculator.getChances(baerchi) do
+		local eggType = EggTree.resolveLaid(eggTree, entry.eggType)
+		merged[eggType] = (merged[eggType] or 0) + entry.percent
+	end
+	local result: { { eggType: Types.EggType, percent: number } } = {}
+	for eggType, percent in merged do
+		table.insert(result, { eggType = eggType :: Types.EggType, percent = percent })
+	end
+	table.sort(result, function(a, b)
+		if a.percent ~= b.percent then return a.percent > b.percent end
+		return a.eggType < b.eggType
+	end)
+	return result
 end
 
--- Anteil 0..1 (fuer Fortschrittsbalken).
-function IncubatorRules.progress(slot: Types.IncubatorSlot, now: number): number
-	local total = math.max(1, slot.finishAt - slot.startedAt)
-	return math.clamp((now - slot.startedAt) / total, 0, 1)
+-- Ist dieser Baerchi gerade im Inkubator? (Platz-Index oder nil)
+function IncubatorRules.slotOf(slots: { Types.IncubatorSlot }, baerchiUid: string): number?
+	for _, entry in slots do
+		if entry.baerchiUid == baerchiUid then return entry.slot end
+	end
+	return nil
 end
 
--- GoldGummies fuer "sofort fertig" (0 = schon fertig).
-function IncubatorRules.speedUpCost(slot: Types.IncubatorSlot, now: number): number
-	local left = IncubatorRules.remaining(slot, now)
-	if left <= 0 then return 0 end
-	return math.max(1, math.ceil(left / 60)) * IncubatorConfig.SPEEDUP_GOLD_PER_MINUTE
+-- Alle wartenden Eier zusammen.
+function IncubatorRules.storedCount(slots: { Types.IncubatorSlot }): number
+	local n = 0
+	for _, entry in slots do n += #entry.eggs end
+	return n
 end
 
 -- Kosten fuer Level `targetLevel` (nil = gibt es nicht).

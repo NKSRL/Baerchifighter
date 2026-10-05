@@ -157,12 +157,15 @@ function ResultFeed.init()
 		end)
 	end)
 
-	-- Sammel-Update 05.10. (Paket 8): Inkubator — kurze Bestaetigung beim Einlegen
+	-- Sammel-Update 05.10. (Paket 8, Umbau): Inkubator — kurze Bestaetigung
+	-- beim Einsetzen/Herausnehmen/Abholen/Ausbauen
 	Remotes.IncubatorChanged.OnClientEvent:Connect(function(info: any)
 		if typeof(info) ~= "table" then return end
-		if info.kind == "start" or info.kind == "speedup" or info.kind == "upgrade" then
+		local kind = info.kind
+		if kind == "insert" or kind == "remove" or kind == "collect" or kind == "upgrade" then
+			local count = if typeof(info.count) == "number" then info.count else 0
 			Notify.emit("incubator", function()
-				Toast.info(Loc.t("msg.incubator." .. tostring(info.kind)))
+				Toast.info(Loc.t("msg.incubator." .. kind, { n = count }))
 			end)
 		end
 	end)

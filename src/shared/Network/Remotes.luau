@@ -334,14 +334,14 @@ local RequestClaimIndexReward = getOrCreateEvent("RequestClaimIndexReward")
 local IndexRewardReceived = getOrCreateEvent("IndexRewardReceived")
 -- Paket 6.2: besonderer Meilenstein ausgezahlt (S->C). Args: Types.SpecialMilestoneResult
 local SpecialMilestoneReceived = getOrCreateEvent("SpecialMilestoneReceived")
--- Paket 8: Inkubator. Start (eggType), Abholen (slot), Beschleunigen (slot),
--- Ausbauen (keine Args). Das Schluepfen meldet HatchResultReceived.
+-- Paket 8 (Umbau 05.10.): Inkubator. Start (baerchiUid = einsetzen),
+-- Abholen (keine Args, alle Eier ins Lager), Remove (slot), Ausbauen (keine Args).
 local RequestIncubatorStart   = getOrCreateEvent("RequestIncubatorStart")
 local RequestIncubatorCollect = getOrCreateEvent("RequestIncubatorCollect")
-local RequestIncubatorSpeedUp = getOrCreateEvent("RequestIncubatorSpeedUp")
+local RequestIncubatorRemove  = getOrCreateEvent("RequestIncubatorRemove")   -- Umbau 05.10.: Baerchi herausnehmen
 local RequestUpgradeIncubator = getOrCreateEvent("RequestUpgradeIncubator")
 -- Paket 8: S->C Hinweis "Platz belegt / fertig / abgeholt" (Feedback, Ton).
--- Args: { slot: number, kind: "start" | "ready" | "collect" | "speedup" | "upgrade" }
+-- Args: { slot: number, kind: "insert" | "remove" | "collect" | "upgrade", count: number }
 local IncubatorChanged = getOrCreateEvent("IncubatorChanged")
 
 -- ============================================================
@@ -428,7 +428,7 @@ return {
 	SpecialMilestoneReceived = SpecialMilestoneReceived,
 	RequestIncubatorStart    = RequestIncubatorStart,
 	RequestIncubatorCollect  = RequestIncubatorCollect,
-	RequestIncubatorSpeedUp  = RequestIncubatorSpeedUp,
+	RequestIncubatorRemove   = RequestIncubatorRemove,
 	RequestUpgradeIncubator  = RequestUpgradeIncubator,
 	IncubatorChanged         = IncubatorChanged,
 

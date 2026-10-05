@@ -180,14 +180,15 @@ local function towerSignature(data: Types.PlayerData): string
 	return string.format("%s:%d", towerId, record)
 end
 
--- Sammel-Update Paket 8: Inkubator — belegte Plaetze (Ei + Zeitmarken),
--- Level und Platz-Zahl. Fortschritt rechnet der Client selbst.
+-- Sammel-Update Paket 8 (Umbau 05.10.): Inkubator — belegte Plaetze
+-- (Baerchi, Zeitmarke, wartende Eier), Level und Platz-Zahl. Fortschritt
+-- rechnet der Client selbst.
 local function incubatorSignature(data: Types.PlayerData): string
 	local incubator = data.island.incubator
 	if not incubator then return "" end
 	local parts: { string } = { tostring(incubator.level), tostring(IncubatorRules.slotCountFor(data)) }
 	for _, entry in incubator.slots do
-		table.insert(parts, string.format("%d=%s@%d", entry.slot, entry.eggType, entry.finishAt))
+		table.insert(parts, string.format("%d=%s@%d#%d", entry.slot, entry.baerchiUid, entry.lastEggAt, #entry.eggs))
 	end
 	return table.concat(parts, "|")
 end

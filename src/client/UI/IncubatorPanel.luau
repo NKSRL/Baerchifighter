@@ -3,17 +3,19 @@
 -- StarterPlayerScripts/UI/IncubatorPanel.luau
 --
 -- Einzige Zustaendigkeit:
---   - Das Fenster des Inkubators (Sammel-Update 05.10., Paket 8): Plaetze mit
---     Ei und Restzeit (Abholen / Beschleunigen), Eier aus dem Lager zum
---     Einlegen, Ausbau mit Vorher/Nachher.
+--   - Das Fenster des Inkubators (Sammel-Update 05.10., Paket 8, Umbau nach
+--     Rueckmeldung 05.10.): belegte Plaetze mit Baerchi, Takt, Fortschritt,
+--     wartenden Eiern und Ei-Chancen (Herausnehmen), Abholen, die eigenen
+--     Baerchis zum Einsetzen, Ausbau mit Vorher/Nachher.
 --
--- Rechnet mit Modules/IncubatorRules (dieselben Regeln wie der Server) und
--- workspace:GetServerTimeNow() als "jetzt" — die Zeitmarken der Plaetze sind
--- os.time() des Servers. Entscheiden tut der Server (IncubatorService).
+-- Oeffnet NUR am Inkubator (Prompt aus IncubatorController) — kein
+-- Seitenknopf. Rechnet mit Modules/IncubatorRules (dieselben Regeln wie der
+-- Server) und workspace:GetServerTimeNow() als "jetzt" (die Zeitmarken sind
+-- os.time() des Servers). Entscheiden tut der Server (IncubatorService).
 --
--- Neu gebaut wird nur, wenn sich der Inhalt aendert (Signatur); die Restzeiten
--- laufen in einer eigenen Schleife. So geht ein Tipp nicht verloren, weil die
--- Zeile gerade neu gebaut wurde (siehe Sammel-Update 1.3).
+-- Neu gebaut wird nur, wenn sich der Inhalt aendert (Signatur); der
+-- Fortschritt laeuft in einer eigenen Schleife. So geht ein Tipp nicht
+-- verloren, weil die Zeile gerade neu gebaut wurde (siehe Sammel-Update 1.3).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
@@ -22,6 +24,7 @@ local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
 local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
+local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local IncubatorRules  = require(ReplicatedStorage.Modules.IncubatorRules)
 
@@ -35,13 +38,16 @@ local IncubatorPanel = {}
 local PANEL_NAME = "Incubator"
 IncubatorPanel.PANEL_NAME = PANEL_NAME
 
-local ROW_H = 64
+local SLOT_H    = 112
+local PICK_H    = 52
+local MAX_PICKS = 40   -- so viele Baerchis zur Auswahl (die seltensten zuerst)
+local MAX_CHANCES = 4  -- so viele Ei-Chancen pro Platz
 
 local _root: Frame? = nil
 local _scroller: ScrollingFrame? = nil
 local _signature = ""
--- Zeilen der Plaetze: Restzeit-Label und Knoepfe, damit die Uhr ohne Neubau laeuft
-type SlotRow = { slot: number, timeLabel: TextLabel, collect: TextButton, speed: TextButton }
+-- Zeilen der Plaetze: Fortschritt laeuft ohne Neubau
+type SlotRow = { slot: number, interval: number, bar: Theme.Progress }
 local _slotRows: { SlotRow } = {}
 
 local function now(): number
@@ -53,25 +59,39 @@ local function eggName(eggType: string): string
 	return Loc.name("egg." .. eggType .. ".name", if def then def.displayName else eggType)
 end
 
+local function baerchiName(baerchi: Types.Baerchi): string
+	local def = BaerchiConfig.getById(baerchi.configId)
+	return Loc.name("baerchi." .. baerchi.configId .. ".name", if def then def.displayName else baerchi.configId)
+end
+
+-- "Basis-Ei 70 % · Zucker-Ei 25 % · ..." — was dieser Baerchi bruetet.
+function IncubatorPanel.chanceText(baerchi: Types.Baerchi, eggTree: Types.EggTreeState?): string
+	local parts: { string } = {}
+	for i, entry in IncubatorRules.chances(baerchi, eggTree) do
+		if i > MAX_CHANCES then break end
+		local digits = if entry.percent < 10 then 1 else 0
+		table.insert(parts, string.format("%s %s %%", eggName(entry.eggType), Loc.formatDecimal(entry.percent, digits)))
+	end
+	return table.concat(parts, " · ")
+end
+
 local function signatureOf(data: any): string
 	local incubator = data.island.incubator
 	if not incubator then return "none" end
 	local parts = { tostring(incubator.level), tostring(IncubatorRules.slotCountFor(data)),
-		tostring(data.gummies), tostring(data.goldGummies), Loc.getLanguage() }
+		tostring(data.gummies), tostring(data.goldGummies), Loc.getLanguage(), tostring(data.island.equippedUid) }
 	for _, entry in incubator.slots do
-		table.insert(parts, string.format("%d=%s@%d", entry.slot, entry.eggType, entry.finishAt))
+		table.insert(parts, string.format("%d=%s@%d#%d", entry.slot, entry.baerchiUid, entry.lastEggAt, #entry.eggs))
 	end
-	local stock = {}
-	for eggType, count in data.island.eggStock do
-		if count > 0 then table.insert(stock, eggType .. "x" .. count) end
-	end
-	table.sort(stock)
-	table.insert(parts, table.concat(stock, ","))
+	local uids = {}
+	for uid in data.island.baerchis do table.insert(uids, uid) end
+	table.sort(uids)
+	table.insert(parts, table.concat(uids, ","))
 	return table.concat(parts, "|")
 end
 
 --------------------------------------------------------------------------------
--- Restzeiten (laeuft jede halbe Sekunde, baut nichts neu)
+-- Fortschritt (laeuft jede halbe Sekunde, baut nichts neu)
 --------------------------------------------------------------------------------
 
 local function tickRows()
@@ -81,14 +101,11 @@ local function tickRows()
 	for _, row in _slotRows do
 		local entry = IncubatorRules.findSlot(data.island.incubator.slots, row.slot)
 		if not entry then continue end
-		local ready = IncubatorRules.isReady(entry, t)
-		row.timeLabel.Text = if ready
-			then Loc.t("ui.incubator.ready")
-			else Loc.t("ui.incubator.left", { time = Loc.formatDuration(IncubatorRules.remaining(entry, t)) })
-		row.timeLabel.TextColor3 = if ready then Theme.COLORS.good else Theme.COLORS.textDim
-		row.collect.Visible = ready
-		row.speed.Visible = not ready
-		row.speed.Text = Loc.t("ui.incubator.speedup", { gold = IncubatorRules.speedUpCost(entry, t) })
+		local full = #entry.eggs >= IncubatorConfig.STORE_PER_SLOT
+		row.bar.fill.Size = UDim2.fromScale(IncubatorRules.progress(entry, row.interval, t), 1)
+		row.bar.text.Text = if full
+			then Loc.t("ui.incubator.full_store")
+			else Loc.t("ui.incubator.next_egg", { time = Loc.formatDuration(math.max(0, math.ceil(entry.lastEggAt + row.interval - t))) })
 	end
 end
 
@@ -114,7 +131,8 @@ local function rebuild()
 	end
 	table.clear(_slotRows)
 
-	local incubator = data.island.incubator
+	local island = data.island
+	local incubator = island.incubator
 	local count = IncubatorRules.slotCountFor(data)
 	local order = 0
 	local function nextOrder(): number
@@ -124,47 +142,53 @@ local function rebuild()
 
 	-- Plaetze ---------------------------------------------------------------
 	sectionRow(scroller, nextOrder(), Loc.t("ui.incubator.slots", { used = #incubator.slots, total = count }))
-	local readyCount = 0
-	for index = 1, math.max(count, #incubator.slots) do
+	for index = 1, count do
 		local entry = IncubatorRules.findSlot(incubator.slots, index)
+		local baerchi = if entry then island.baerchis[entry.baerchiUid] else nil
 		local row = Theme.panel("Slot_" .. index, scroller, Theme.COLORS.panel)
-		row.Size = UDim2.new(1, -8, 0, ROW_H)
 		row.LayoutOrder = nextOrder()
 
-		if entry then
-			local icon = EggIcon.make(row, entry.eggType, 48, 2)
-			icon.AnchorPoint = Vector2.new(0, 0.5)
-			icon.Position = UDim2.new(0, 8, 0.5, 0)
+		if entry and baerchi then
+			row.Size = UDim2.new(1, -8, 0, SLOT_H)
+			local color = BaerchiConfig.getRarityColor(baerchi.rarity)
+			local interval = IncubatorRules.breedSeconds(baerchi.rarity, incubator.level)
 
-			local name = Theme.label("Name", row, eggName(entry.eggType))
-			name.Position = UDim2.new(0, 64, 0, 6)
-			name.Size = UDim2.new(1, -200, 0, 24)
+			local name = Theme.label("Name", row, string.format("%s  ·  %s", baerchiName(baerchi),
+				Loc.name("rarity." .. baerchi.rarity, baerchi.rarity)))
+			name.Position = UDim2.new(0, 10, 0, 4)
+			name.Size = UDim2.new(1, -150, 0, 24)
+			name.TextColor3 = color
+			Theme.outlineText(name, 2)
 
-			local timeLabel = Theme.label("Time", row, "")
-			timeLabel.Position = UDim2.new(0, 64, 0, 32)
-			timeLabel.Size = UDim2.new(1, -200, 0, 22)
-			timeLabel.Font = Theme.FONT_BODY
+			local pace = Theme.bodyText("Pace", row, Loc.t("ui.incubator.pace", {
+				time = Loc.formatDuration(interval), n = #entry.eggs, max = IncubatorConfig.STORE_PER_SLOT }))
+			pace.Position = UDim2.new(0, 10, 0, 28)
+			pace.Size = UDim2.new(1, -150, 0, 18)
 
-			local collect = Theme.bigButton("Collect", row, Loc.t("ui.incubator.collect"), Theme.COLORS.good)
-			collect.AnchorPoint = Vector2.new(1, 0.5)
-			collect.Position = UDim2.new(1, -8, 0.5, 0)
-			collect.Size = UDim2.fromOffset(128, 40)
-			collect.Activated:Connect(function()
-				Remotes.RequestIncubatorCollect:FireServer(index)
+			local chances = Theme.bodyText("Chances", row, "🥚 " .. IncubatorPanel.chanceText(baerchi, data.eggTree))
+			chances.Position = UDim2.new(0, 10, 0, 48)
+			chances.Size = UDim2.new(1, -20, 0, 32)
+			chances.TextWrapped = true
+			chances.TextColor3 = Theme.COLORS.goldGummy
+
+			local bar = Theme.progress(row, color)
+			bar.track.Position = UDim2.new(0, 10, 1, -26)
+			bar.track.Size = UDim2.new(1, -20, 0, 18)
+			bar.text.TextScaled = false
+			bar.text.TextSize = 12
+
+			local out = Theme.button("Remove", row, Loc.t("ui.incubator.remove"), Theme.COLORS.panelLight)
+			out.AnchorPoint = Vector2.new(1, 0)
+			out.Position = UDim2.new(1, -8, 0, 8)
+			out.Size = UDim2.fromOffset(128, 34)
+			out.TextColor3 = Theme.COLORS.text
+			out.Activated:Connect(function()
+				Remotes.RequestIncubatorRemove:FireServer(index)
 			end)
 
-			local speed = Theme.button("Speed", row, "", Theme.COLORS.goldGummy)
-			speed.AnchorPoint = Vector2.new(1, 0.5)
-			speed.Position = UDim2.new(1, -8, 0.5, 0)
-			speed.Size = UDim2.fromOffset(128, 40)
-			speed.TextColor3 = Theme.COLORS.outline
-			speed.Activated:Connect(function()
-				Remotes.RequestIncubatorSpeedUp:FireServer(index)
-			end)
-
-			table.insert(_slotRows, { slot = index, timeLabel = timeLabel, collect = collect, speed = speed })
-			if IncubatorRules.isReady(entry, now()) then readyCount += 1 end
+			table.insert(_slotRows, { slot = index, interval = interval, bar = bar })
 		else
+			row.Size = UDim2.new(1, -8, 0, 44)
 			local free = Theme.bodyText("Free", row, Loc.t("ui.incubator.free"))
 			free.Position = UDim2.new(0, 12, 0, 0)
 			free.Size = UDim2.new(1, -24, 1, 0)
@@ -172,55 +196,64 @@ local function rebuild()
 		end
 	end
 
-	if readyCount > 1 then
+	-- Abholen ------------------------------------------------------------------
+	local stored = IncubatorRules.storedCount(incubator.slots)
+	if stored > 0 then
 		local allRow = Theme.container("CollectAll", scroller)
-		allRow.Size = UDim2.new(1, -8, 0, 40)
+		allRow.Size = UDim2.new(1, -8, 0, 44)
 		allRow.LayoutOrder = nextOrder()
-		local all = Theme.bigButton("All", allRow, Loc.t("ui.incubator.collect_all", { n = readyCount }), Theme.COLORS.good)
+		local all = Theme.bigButton("All", allRow, Loc.t("ui.incubator.collect_all", { n = stored }), Theme.COLORS.good)
 		all.Size = UDim2.fromScale(1, 1)
 		all.Activated:Connect(function()
-			Remotes.RequestIncubatorCollect:FireServer("all")
+			Remotes.RequestIncubatorCollect:FireServer()
 		end)
 	end
 
-	-- Eier aus dem Lager --------------------------------------------------------
-	sectionRow(scroller, nextOrder(), Loc.t("ui.incubator.stock"))
+	-- Baerchis zum Einsetzen ------------------------------------------------------
+	sectionRow(scroller, nextOrder(), Loc.t("ui.incubator.pick"))
 	local freeSlot = IncubatorRules.firstFree(incubator.slots, count) ~= nil
-	local ids: { Types.EggType } = {}
-	for eggType, n in data.island.eggStock do
-		if n > 0 and EggConfig.data[eggType] then table.insert(ids, eggType) end
+	local picks: { Types.Baerchi } = {}
+	for uid, baerchi in island.baerchis do
+		if uid ~= island.equippedUid and not IncubatorRules.slotOf(incubator.slots, uid) then
+			table.insert(picks, baerchi)
+		end
 	end
-	table.sort(ids, function(a, b) return EggConfig.data[a].sortOrder < EggConfig.data[b].sortOrder end)
-	if #ids == 0 then
-		local empty = Theme.bodyText("Empty", scroller, Loc.t("ui.incubator.no_eggs"))
+	table.sort(picks, function(a, b)
+		local ra, rb = BaerchiConfig.getRarityIndex(a.rarity), BaerchiConfig.getRarityIndex(b.rarity)
+		if ra ~= rb then return ra > rb end
+		return a.uid < b.uid
+	end)
+	if #picks == 0 then
+		local empty = Theme.bodyText("Empty", scroller, Loc.t("ui.incubator.no_baerchis"))
 		empty.Size = UDim2.new(1, -8, 0, 40)
 		empty.LayoutOrder = nextOrder()
 	end
-	for _, eggType in ids do
-		local row = Theme.panel("Egg_" .. eggType, scroller, Theme.COLORS.panel)
-		row.Size = UDim2.new(1, -8, 0, 52)
+	for i, baerchi in picks do
+		if i > MAX_PICKS then break end
+		local row = Theme.panel("Pick_" .. i, scroller, Theme.COLORS.panel)
+		row.Size = UDim2.new(1, -8, 0, PICK_H)
 		row.LayoutOrder = nextOrder()
 
-		local icon = EggIcon.make(row, eggType, 40, 2)
-		icon.AnchorPoint = Vector2.new(0, 0.5)
-		icon.Position = UDim2.new(0, 8, 0.5, 0)
+		local name = Theme.label("Name", row, string.format("%s  ·  %s", baerchiName(baerchi),
+			Loc.name("rarity." .. baerchi.rarity, baerchi.rarity)))
+		name.Position = UDim2.new(0, 10, 0, 4)
+		name.Size = UDim2.new(1, -150, 0, 22)
+		name.TextColor3 = BaerchiConfig.getRarityColor(baerchi.rarity)
+		Theme.outlineText(name, 2)
 
-		local name = Theme.label("Name", row, string.format("%s  x%d", eggName(eggType), data.island.eggStock[eggType] or 0))
-		name.Position = UDim2.new(0, 56, 0, 4)
-		name.Size = UDim2.new(1, -200, 0, 22)
-
-		local brew = Theme.bodyText("Brew", row, Loc.t("ui.incubator.brew_time", {
-			time = Loc.formatDuration(IncubatorRules.brewSeconds(eggType, incubator.level)) }))
-		brew.Position = UDim2.new(0, 56, 0, 26)
-		brew.Size = UDim2.new(1, -200, 0, 20)
+		local pace = Theme.bodyText("Pace", row, Loc.t("ui.incubator.pace_short", {
+			time = Loc.formatDuration(IncubatorRules.breedSeconds(baerchi.rarity, incubator.level)) }))
+		pace.Position = UDim2.new(0, 10, 0, 26)
+		pace.Size = UDim2.new(1, -150, 0, 20)
 
 		local put = Theme.button("Put", row, Loc.t("ui.incubator.put"), Theme.COLORS.accent)
 		put.AnchorPoint = Vector2.new(1, 0.5)
 		put.Position = UDim2.new(1, -8, 0.5, 0)
 		put.Size = UDim2.fromOffset(128, 36)
 		Theme.setEnabled(put, freeSlot)
+		local uid = baerchi.uid
 		put.Activated:Connect(function()
-			Remotes.RequestIncubatorStart:FireServer(eggType)
+			Remotes.RequestIncubatorStart:FireServer(uid)
 		end)
 	end
 
@@ -306,23 +339,7 @@ function IncubatorPanel.init(screenGui: ScreenGui)
 	task.spawn(function()
 		while true do
 			task.wait(0.5)
-			if root.Visible then
-				-- Ein fertig gewordener Platz aendert die Knoepfe: einmal neu
-				-- bauen, wenn sich die Zahl der fertigen aendert.
-				local data = ClientState.get()
-				if data and data.island.incubator then
-					local ready = 0
-					for _, entry in data.island.incubator.slots do
-						if IncubatorRules.isReady(entry, now()) then ready += 1 end
-					end
-					if root:GetAttribute("Ready") ~= ready then
-						root:SetAttribute("Ready", ready)
-						_signature = ""
-						refresh()
-					end
-				end
-				tickRows()
-			end
+			if root.Visible then tickRows() end
 		end
 	end)
 

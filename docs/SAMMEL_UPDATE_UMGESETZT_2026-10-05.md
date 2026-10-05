@@ -19,9 +19,9 @@ Neue Schalter in `FeatureFlags`: `INCUBATOR`, `INDEX_REWARDS`, `PIT_BRAWL`, `ARE
 | 3 | Erster Rebirth | **Tower I Stage 30** |
 | 4 | Spielzeit bis Rebirth 1 | Sim „Normal“: **52 min** aktiv (Fenster 0,5–1,5 h); „Gelegenheit“ (30 min/Tag): Tag 2 |
 | 5 | Geldsenke vor dem Rebirth | **Inkubator-Ausbau** (Level 1–60, 60 % der Gebäudekurve). Ei-Händler-Stufen: siehe 6.3-Entwurf |
-| 6 | Inkubator | Basis- und Zucker-Ei sofort öffenbar, ab Gold nur im Inkubator; 1 Platz ab dem ersten Kampf; Beschleunigen mit GoldGummies: ja |
+| 6 | Inkubator | **Umgebaut (Rückmeldung 05.10.):** Bärchi im Platz brütet zusätzliche Eier; alle Eier sofort öffenbar; 1 Platz ab dem ersten Kampf |
 | 7 | Index-Belohnungen | alle vier Ebenen |
-| 8 | „Brüten“ (6.5) | **beides**: Lege-Intervall (Common ×0,6, Uncommon ×0,7, Rare ×0,82) und Brutzeit im Inkubator nach Ei-Stufe |
+| 8 | „Brüten“ (6.5) | **beides**: Lege-Intervall (Common ×0,6, Uncommon ×0,7, Rare ×0,82) und der Inkubator (Bärchi brütet zusätzliche Eier im Rarity-Takt) |
 | 9 | Waben | 30 Slots / 30 s Respawn / 10 s Tröpfeln |
 | 10 | Kampf um die Mitte | Spieler wird nur gestoßen, wenn er **kein eigenes Bärchi** am Event hat |
 
@@ -61,7 +61,7 @@ Nachtrag Auftraggeber (Chat): „Der Sprung von Tower I geschafft zu Rebirth hat
 * **3.6** Satz im Gebäude-Menü („mehr Honig = mehr XP = höhere Stages“). Vorher/Nachher stand dort schon. Recycler-Schild „⬡ = 12 G“.
 * **3.7** Stat-Zeile mit Symbolen, „?“ klappt je Stat einen Satz auf.
 * **3.8** `AreaSignController`: Bereichs-Schilder (Event · Waben, Ei-Händler, Live-Kämpfe, Honig-Teich, Waben-Recycler, Ei-Inkubator, Tower-Arena). Sie werden **clientseitig** in der Sprache des Spielers gebaut und brauchen **0 Teile**.
-* **3.9** Siehe 6.4, 6.5 und den Inkubator (Basis-Ei 30 s).
+* **3.9** Siehe 6.4, 6.5 und den Inkubator.
 * **3.10** Die erste Kettenquest steht immer groß mit Volltext da. Die Tages-Quests erscheinen erst nach ihr.
 
 ## Paket 4 – Rebirth und Tower-Tempo
@@ -119,28 +119,41 @@ Geänderte Ziele in der Sim (begründet im Code): Rebirth 1 jetzt 0,5–1,5 h (E
 
 `IndexRewardService` prüft beim Abholen und zahlt aus (über EconomyService, `EggService.grantEggs` und `EggTreeService.grantBlueprint`). Abholen ist auch rückwirkend möglich. Ein Beobachter meldet neu fertige Reihen (mit `task.defer`, ohne `markDirty`). `data.indexClaimed` geht an den Client. Im Index: Abschnitt „Sammlungen“ oben, je Ei-Reihe ein Abholen-Knopf bzw. ✔, und ein „!“ am Reiter und an der Bärchi-Kachel. „Entdeckt“ bedeutet die Art, nicht die Mutation (Annahme).
 
-## Paket 8 – Inkubator und Plot
+## Paket 8 – Inkubator und Plot (umgebaut nach Rückmeldung 05.10.)
 
-* **Daten:** `island.incubator = { level, slots = { { slot, eggType, startedAt, finishAt } } }`. Es gibt keinen Timer pro Ei: fertig ist ein Ei, sobald `os.time() >= finishAt`. Das gilt auch offline und über Server-Neustarts hinweg.
+> **Umbau:** Der erste Entwurf (Eier ab Gold-Stufe mussten im Inkubator brüten) ist ersetzt. Jetzt setzt man einen **Bärchi** in den Inkubator, und der brütet im Takt seiner Rarity **zusätzliche** Eier aus seiner eigenen Ei-Tabelle. Alle Eier gehen wieder sofort auf.
+
+* **Daten:** `island.incubator = { level, slots = { { slot, baerchiUid, lastEggAt, eggs = { EggType… } } } }`. Kein Timer pro Ei: fällig sind `floor((now - lastEggAt) / Takt)` Eier. Das gilt auch offline (gebremst mit `EggConfig.OFFLINE_SLOWDOWN`) und über Server-Neustarts hinweg. Höchstens `STORE_PER_SLOT = 5` Eier warten pro Platz; ist das Lager voll, läuft die Zeitmarke mit (keine angesammelte Wartezeit).
+* **Migration:** Alte Ei-Einträge (`eggType`) gehen zurück ins Ei-Lager, der Platz wird frei (`migration_v16.test.lua`).
 * **Regeln** (`Modules/IncubatorRules`, rein, getestet):
   * Frei ab dem ersten Kampf.
   * Plätze: 1, mit Level 10 → 2, mit Level 25 → 3, +1 ab Rebirth 2, +1 je fertigem Index-Pfad, höchstens 6.
-  * Brutzeit nach Ei-Stufe (Basis 30 s, Zucker 60 s, Gold 3 min … Omega 2 h), Level +2 % Tempo je Stufe.
-  * Beschleunigen: 1 Gold je angefangene Minute.
-  * Ausbau: 60 % der Gebäudekurve.
-* **Server:** `IncubatorService` (einlegen, abholen, alle abholen, beschleunigen, ausbauen). Das Schlüpfen bleibt in `EggService.openEgg` (`fromIncubator`), Index, Quests und Auto-Ausrüsten laufen also unverändert. `openEgg` lehnt Eier ab Gold-Stufe ab, sobald der Inkubator frei ist (`err.egg_needs_incubator`).
-* **Rebirth:** Das Level fällt zurück, die Eier in den Plätzen bleiben.
-* **Plot:** `IncubatorBuilder` baut Sockel und 6 Glaskuppeln (20 Teile) links hinten auf dem Beet bei `(-20, 0, 20)`. Fortschrittsbalken, Restzeit und Leuchten macht der Client (`IncubatorController`) aus den Attributen. Dazu kommen der Prompt „Öffnen“, die Kachel „Inkubator“ („!“ = fertig) und `IncubatorPanel` (Plätze, Lager, Ausbau mit Vorher/Nachher). Im Eier-Fenster heißt der Knopf für solche Eier „In den Inkubator“.
+  * Takt je Rarity (`IncubatorConfig.BREED_SECONDS_BY_RARITY`): Common 10 min, Uncommon 9, Rare 8, Epic 7, Legendary 6 … Omega 3 min. Level +2 % Tempo je Stufe.
+  * `chances(baerchi, eggTree)`: welche Eier mit welcher Wahrscheinlichkeit kommen (gesperrte Eier schon auf ihren freien Vorgänger umgerechnet, wie beim Legen).
+  * Ausbau: 60 % der Gebäudekurve (mehr Plätze, schnellerer Takt).
+* **Server:** `IncubatorService` mit Takt alle 5 s: einsetzen (`RequestIncubatorStart`, uid), herausnehmen (`RequestIncubatorRemove`, Platz; wartende Eier gehen ins Lager), alle Eier abholen (`RequestIncubatorCollect`, ins Lager), ausbauen. Alles nur **in der Nähe** des Inkubators (30 Studs, `err.incubator_too_far`). Der ausgerüstete Bärchi darf nicht hinein. Wird ein Bärchi aus einem Platz ausgerüstet, verschmolzen, verwertet oder fehlt er nach einem Rebirth, räumt der Takt den Platz (Eier ins Lager). `autoEquipIfNone` nimmt Inkubator-Bärchis nur, wenn es keinen anderen gibt.
+* **Rebirth:** Das Level fällt zurück, die Plätze bleiben (Plätze über der neuen Zahl werden geräumt).
+* **Plot:** `IncubatorBuilder` baut Sockel und 6 Glaskuppeln links hinten auf dem Beet bei `(-20, 0, 20)`. Unter jeder belegten Kuppel steht der Bärchi verkleinert (`Figure_<n>`, Kuppel in Rarity-Farbe getönt), daneben ein Ei, wenn Eier warten. Über jeder belegten Kuppel zeigt `IncubatorController` die **Ei-Chancen** des Bärchis, „🥚 n/5“ und einen Balken bis zum nächsten Ei; die Kuppel leuchtet, solange Eier warten.
+* **Bedienung durch Hingehen:** Am Sockel gibt es zwei Prompts: **E „Eier abholen (n)“** (nur sichtbar, wenn Eier warten, holt direkt ab) und **F „Bärchi einsetzen“** (öffnet `IncubatorPanel`: Plätze mit Takt, Chancen, Fortschritt und „Herausnehmen“, darunter die eigenen Bärchis zum Einsetzen, seltenste zuerst, und der Ausbau). Keine Seitenkachel mehr.
 * **8.2:** Option 1 (Plot bleibt, der Inkubator füllt die Fläche). Option 2 (Radius 46) erst nach dem Bildschirmfoto.
+* **Balance:** Die Sims (`progression_pacing`, `tower_calibration`) bilden den Inkubator nicht ab und bleiben grün. Zusätzliche Eier: bei 1 Common-Platz ~6 Eier/h online. Werte stehen in `IncubatorConfig` und lassen sich nach dem Playtest leicht drehen.
 
 **Studio-Test:**
 1. `D:Invoke("snapshot")`, `D:Invoke("state","fresh")`.
-2. Ei öffnen und kämpfen, danach ist der Inkubator frei.
-3. `D:Invoke("egg","GoldenEgg",2)`, über das Eier-Fenster in den Inkubator legen.
-4. Warten oder beschleunigen, abholen (die Animation läuft).
-5. Einmal Stop/Play mitten in der Brut, die Zeit läuft weiter.
-6. `D:Invoke("stagebest","I",30)`, dann `D:Invoke("rebirth")`: Die Eier bleiben, das Level fällt. `D:Invoke("incubator","done")` macht alle Eier sofort fertig.
-7. Teile mit `D:Invoke("parts")` zählen.
+2. Ei öffnen und kämpfen, danach ist der Inkubator frei. Einen zweiten Bärchi schlüpfen lassen.
+3. Zum Inkubator gehen, F drücken, den zweiten Bärchi einsetzen: Er steht unter der Kuppel, darüber die Ei-Chancen.
+4. `D:Invoke("incubator","done")` füllt alle Plätze. Dann E „Eier abholen“: Die Eier landen im Lager.
+5. Den Bärchi aus dem Inkubator ausrüsten: Nach höchstens 5 s ist der Platz frei, wartende Eier sind im Lager.
+6. Aus der Ferne geht nichts (Server lehnt mit „Geh näher an den Inkubator“ ab).
+7. Einmal Stop/Play: Die Zeit läuft weiter (offline gebremst).
+
+## Rückmeldung 05.10. – weitere Änderungen
+
+* **Honig-Fontäne:** kein Fenster mehr. Man verbessert sie nur direkt davor (Prompt „Verbessern“, Server prüft 30 Studs, `err.pond_too_far`). Über der Fontäne stehen nur Level und Kosten des nächsten Upgrades („Lv. 7“, „⬆ 12.500 G“).
+* **Seitenleiste:** Verbessern, Inkubator und Shop sind weg, die übrigen Kacheln sind größer (70 px).
+* **Oben links:** Die Quest-Karte steht nicht mehr dauerhaft im Bild. Rechts neben dem Zahnrad sitzt in einer Zeile ein kleiner **Quest-Knopf** (📜, rotes „!“, wenn etwas abholbereit ist) und rechts daneben der **Shop-Knopf** (🛒, „!“ = Gratis-Griff frei; erscheint über `tile_shop`). Neu: `src/client/UI/TopButtons.luau`.
+* **Einführung:** Der Schritt „Verbessern“ zeigt in der Welt auf die Fontäne.
+* Beibehalten: Der gezogene Bärchi wird beim Schlüpfen groß gezeigt.
 
 ---
 
@@ -160,6 +173,7 @@ Geänderte Ziele in der Sim (begründet im Code): Rebirth 1 jetzt 0,5–1,5 h (E
 * `src/client/UI/CurrencyHint.luau`
 * `src/client/Controllers/IncubatorController.luau`
 * `src/client/Controllers/AreaSignController.luau`
+* `src/client/UI/TopButtons.luau`
 * Tests: `tools/luau-tests/rebirth_rules.test.lua`, `migration_v16.test.lua`, `incubator.test.lua`
 
 **Geändert:** siehe `git diff 52f75c1 --stat -- src`. Die neuen Services stehen in `GameManager`, die neuen Remotes in `Remotes`/`NetworkConfig`.
@@ -170,5 +184,5 @@ Geänderte Ziele in der Sim (begründet im Code): Rebirth 1 jetzt 0,5–1,5 h (E
 * **Ascension-Regel:** Ascensions-Eier haben genau zwei Quellen: Rebirth-Meilensteine und besondere Meilensteine (inkl. „ganzer Index“). Kein Bärchi legt sie.
 * **Rebirth-Regel:** kein Gummy-Preis. Bedingung ist `TowerConfig.getRebirthRequirement` (Stage in diesem Leben, über Äquivalenz). Gummies verfallen weiterhin.
 * **Offline:** Rate ×3,5, höchstens 6 liegende Eier (online 12).
-* **Inkubator:** Eier ab Gold-Stufe nur dort. Basis- und Zucker-Ei sofort.
+* **Inkubator:** Ein Bärchi (nicht der ausgerüstete) brütet dort im Rarity-Takt zusätzliche Eier, höchstens 5 warten pro Platz. Alle Eier gehen sofort auf.
 * `migration.test.lua` (Heim-PC): Fall v15 → v16 aus `migration_v16.test.lua` übernehmen.

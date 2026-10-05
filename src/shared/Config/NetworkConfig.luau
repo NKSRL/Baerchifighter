@@ -78,9 +78,9 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- Sammel-Update 05.10.
 	RequestPitSpeed          = 0.25,   -- 4.3: nur ein Schalter, keine Spielwerte
 	RequestClaimIndexReward  = 0.50,   -- 7: Auszahlung, einmalig je Belohnung
-	RequestIncubatorStart    = 0.30,   -- 8: mehrere Plaetze schnell hintereinander belegen
+	RequestIncubatorStart    = 0.30,   -- 8: Baerchi einsetzen (mehrere schnell hintereinander)
 	RequestIncubatorCollect  = 0.30,
-	RequestIncubatorSpeedUp  = 0.50,   -- kostet GoldGummies
+	RequestIncubatorRemove   = 0.30,   -- Umbau 05.10.: Baerchi herausnehmen
 	RequestUpgradeIncubator  = 0.50,   -- kostet Gummies (wie Recycler)
 
 	-- v15: Bestenliste und Inspektor. Der Server antwortet aus dem Cache bzw.

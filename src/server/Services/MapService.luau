@@ -129,7 +129,7 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	-- Sammel-Update Paket 8: Inkubator (Plaetze liefert der Daten-Lieferant,
 	-- weil sie auch an Rebirths und Index haengen, die nicht in der Insel stehen).
 	if FeatureFlags.isOn("INCUBATOR") and islandData.incubator then
-		IncubatorBuilder.build(plotModel, slot, islandData.incubator, _incubatorSlots(owner))
+		IncubatorBuilder.build(plotModel, slot, islandData, _incubatorSlots(owner))
 	end
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
@@ -448,6 +448,7 @@ end
 function MapService.getBuildingPosition(player: Player, buildingId: string): Vector3?
 	local model = _plotModels[player]
 	local part = if model then model:FindFirstChild(buildingId) else nil
+	if part and part:IsA("Model") then return part:GetPivot().Position end   -- z. B. der Inkubator
 	return if part and part:IsA("BasePart") then part.Position else nil
 end
 
@@ -530,9 +531,9 @@ function MapService.updateIncubator(player: Player, islandData: Types.IslandData
 	if not model or not slot then return end
 	local existing = model:FindFirstChild(IncubatorConfig.MODEL_NAME)
 	if existing and existing:IsA("Model") then
-		IncubatorBuilder.writeState(existing, islandData.incubator, slotCount)
+		IncubatorBuilder.writeState(existing, islandData, slotCount)
 	else
-		IncubatorBuilder.build(model, slot, islandData.incubator, slotCount)
+		IncubatorBuilder.build(model, slot, islandData, slotCount)
 	end
 end
 
