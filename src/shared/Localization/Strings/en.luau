@@ -34,7 +34,7 @@ return {
 	["ui.rebirth.title"]   = "Rebirth",
 	["ui.rebirth.status"]  = "Rebirth {count}  —  Multiplier x{mult:d2}",
 	["ui.rebirth.cost"]    = "Costs {cost} Gummies  (you have {have})",
-	["ui.rebirth.loss"]    = "Lost: all building levels, your Baerchis' levels and your Gummies (reset to {start}).\nKept: your Baerchis, all eggs, the Egg Tree, tower records, GoldGummies, rank and stats.",
+	["ui.rebirth.loss"]    = "Lost: all building levels, the incubator upgrades, your Baerchis' levels and your Gummies (back to {start}) — spend them first!\nKept: your Baerchis, all eggs (incubator too), the egg tree, tower records, GoldGummies, rank and stats.",
 	["ui.rebirth.reward"]  = "After: Multiplier x{mult:d2}",
 	["ui.rebirth.reward_eggs.one"]   = "After: Multiplier x{mult:d2}  —  +{n} Ascension Egg",
 	["ui.rebirth.reward_eggs.other"] = "After: Multiplier x{mult:d2}  —  +{n} Ascension Eggs",
@@ -93,7 +93,7 @@ return {
 	["err.event_not_at_event"]      = "Your Baerchi is not at the event",
 
 	["err.combat_busy"]             = "The Baerchi is still fighting in the PIT",
-	["err.combat_exhausted"]        = "The Baerchi is exhausted — feed it honey first",
+	["err.combat_exhausted"]        = "Your Baerchi is exhausted — it's eating at the honey pond, back in a moment",
 	["err.recycle_equipped"] = "Equip a different Baerchi first, then you can recycle this one",
 	["err.honey_in_pit"] = "The Baerchi is fighting in the PIT right now",
 	["err.event_ufo"] = "Your Baerchi is being abducted by the UFO right now",
@@ -241,7 +241,7 @@ return {
 	["quest.c_fuse1.title"] = "Fuse two Baerchis",
 	["quest.c_fuse1.hint"] = "In BAERCHIS turn Fusion on and pick two of the same rarity.",
 	["quest.c_tower10.title"] = "Clear stage 10 in the Tower",
-	["quest.c_tower10.hint"] = "Send your Bärchi into the Tower with the fight button and feed it honey first.",
+	["quest.c_tower10.hint"] = "Send your Baerchi into the tower with the fight button. It eats honey at the pond on its own.",
 	["quest.c_discover8.title"] = "Discover 8 Baerchis",
 	["quest.c_discover8.hint"] = "Tap a black silhouette in the Index to see which egg you need.",
 	["quest.c_fight25.title"] = "Win 25 fights",
@@ -564,4 +564,22 @@ return {
 	["ui.fusion.fuse"] = "Fuse",
 	-- Sammel-Update 05.10.2026
 	["ui.egg.paused"] = "Eggs paused (away)",
+	-- Sammel-Update 05.10.2026
+	["ui.common.close"] = "Close",
+	["ui.hatch.new"] = "NEW!",
+	["ui.hatch.sub"] = "Lv. {level}{mutation}\nfrom {egg}",
+	["ui.hatch.tap_close"] = "Tap to close",
+	["err.hatch_timeout"] = "No answer from the server — the egg is still in storage",
+	["err.hatch_failed"] = "Opening failed",
+	["err.merchant_far"] = "Too far from the merchant",
+	["ui.charm.unlock_at"] = "from promotion {n}",
+	["ui.charm.empty_slot"] = "empty — included in the next roll",
+	-- Sammel-Update 05.10.2026
+	["ui.building.prompt_upgrade"] = "Upgrade",
+	-- Sammel-Update 05.10.2026
+	["ui.rebirth.button"] = "Rebirth!",
+	["ui.rebirth.requirement"] = "Needed: Tower {tower}, stage {stage}  (cleared: {have})",
+	["err.rebirth_stage"] = "To rebirth, first clear Tower {tower} stage {stage} (so far {have})",
+	-- Sammel-Update 05.10.2026
+	["ui.petbar.speed_skip"] = "Instant",
 }

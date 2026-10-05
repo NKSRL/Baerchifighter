@@ -579,6 +579,17 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	Theme.corner(accent, 10)
 	_accentBar = accent
 
+	-- Sammel-Update 2.1: X oben rechts wie bei allen anderen Fenstern
+	-- (vorher nur "Schliessen" ganz unten in der rechten Spalte).
+	local closeHolder = Theme.container("CloseHolder", root)
+	closeHolder.AnchorPoint = Vector2.new(1, 0)
+	closeHolder.Position    = UDim2.new(1, -10, 0, 18)
+	closeHolder.Size        = UDim2.new(0, 44, 0, 40)
+	closeHolder.ZIndex      = 12
+	Theme.closeButton(closeHolder, function()
+		PanelManager.close(PANEL_NAME)
+	end).Position = UDim2.new(1, 0, 0.5, 0)
+
 	local shell = Theme.container("Body", root)
 	shell.Position = UDim2.new(0, 0, 0, 16)
 	shell.Size     = UDim2.new(1, 0, 1, -16)
@@ -617,7 +628,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	-- Name
 	local titleRow = row(34)
 	_titleLabel = Theme.label("Title", titleRow, "—")
-	_titleLabel.Size = UDim2.fromScale(1, 1)
+	_titleLabel.Size = UDim2.new(1, -40, 1, 0)   -- Platz fuer das X (2.1)
 
 	-- HBB Paket 4: Kampfwert (eine Zahl statt fuenf Werte)
 	local ratingRow = row(40)
@@ -929,7 +940,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 	-- Schliessen
 	local closeRow = row(34)
-	local close = Theme.button("Close", closeRow, "Schliessen", Theme.COLORS.panelLight)
+	local close = Theme.button("Close", closeRow, Loc.t("ui.common.close"), Theme.COLORS.panelLight)
 	close.Size       = UDim2.new(1, 0, 1, 0)
 	close.TextColor3 = Theme.COLORS.text
 	close.Activated:Connect(BaerchiPanel.close)

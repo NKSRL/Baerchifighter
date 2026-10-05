@@ -42,7 +42,7 @@ return {
 	["ui.rebirth.title"]   = "Rebirth",
 	["ui.rebirth.status"]  = "Rebirth {count}  —  Multiplikator x{mult:d2}",
 	["ui.rebirth.cost"]    = "Kostet {cost} Gummies  (du hast {have})",
-	["ui.rebirth.loss"]    = "Weg: alle Gebäude-Level, die Level deiner Baerchis und deine Gummies (zurück auf {start}).\nBleibt: deine Baerchis, alle Eier, der Ei-Baum, Tower-Rekorde, GoldGummies, Rang und Statistiken.",
+	["ui.rebirth.loss"]    = "Weg: alle Gebäude-Level, der Inkubator-Ausbau, die Level deiner Baerchis und deine Gummies (zurück auf {start}) — gib sie vorher aus!\nBleibt: deine Baerchis, alle Eier (auch im Inkubator), der Ei-Baum, Tower-Rekorde, GoldGummies, Rang und Statistiken.",
 	["ui.rebirth.reward"]  = "Danach: Multiplikator x{mult:d2}",
 	["ui.rebirth.reward_eggs.one"]   = "Danach: Multiplikator x{mult:d2}  —  +{n} Ascensions-Ei",
 	["ui.rebirth.reward_eggs.other"] = "Danach: Multiplikator x{mult:d2}  —  +{n} Ascensions-Eier",
@@ -101,7 +101,7 @@ return {
 	["err.event_not_at_event"]      = "Dein Baerchi ist nicht am Event",
 
 	["err.combat_busy"]             = "Der Baerchi kämpft noch im PIT",
-	["err.combat_exhausted"]        = "Der Baerchi ist erschöpft — füttere ihn erst mit Honig",
+	["err.combat_exhausted"]        = "Der Baerchi ist erschöpft — er isst gerade am Honig-Teich, gleich geht's weiter",
 	["err.recycle_equipped"] = "Rüste zuerst einen anderen Baerchi aus, dann kannst du diesen verwerten",
 	["err.honey_in_pit"] = "Der Baerchi kämpft gerade im PIT",
 	["err.event_ufo"] = "Dein Baerchi wird gerade vom UFO entführt",
@@ -249,7 +249,7 @@ return {
 	["quest.c_fuse1.title"] = "Fusioniere zwei Baerchis",
 	["quest.c_fuse1.hint"] = "Schalte in BAERCHIS die Fusion an und waehle zwei derselben Rarity.",
 	["quest.c_tower10.title"] = "Schaffe Stage 10 im Tower",
-	["quest.c_tower10.hint"] = "Schick deinen Bärchi mit dem Kampf-Knopf in den Tower und fütter ihn vorher mit Honig.",
+	["quest.c_tower10.hint"] = "Schick deinen Bärchi mit dem Kampf-Knopf in den Tower. Honig isst er am Teich von selbst.",
 	["quest.c_discover8.title"] = "Entdecke 8 Baerchis",
 	["quest.c_discover8.hint"] = "Tippe im Index eine schwarze Silhouette an, um zu sehen, welches Ei du brauchst.",
 	["quest.c_fight25.title"] = "Gewinne 25 Kaempfe",
@@ -572,4 +572,22 @@ return {
 	["ui.fusion.fuse"] = "Fusionieren",
 	-- Sammel-Update 05.10.2026
 	["ui.egg.paused"] = "Eier pausiert (unterwegs)",
+	-- Sammel-Update 05.10.2026
+	["ui.common.close"] = "Schließen",
+	["ui.hatch.new"] = "NEU!",
+	["ui.hatch.sub"] = "Lv. {level}{mutation}\naus {egg}",
+	["ui.hatch.tap_close"] = "Tippen zum Schließen",
+	["err.hatch_timeout"] = "Keine Antwort vom Server — das Ei ist noch im Lager",
+	["err.hatch_failed"] = "Öffnen fehlgeschlagen",
+	["err.merchant_far"] = "Zu weit vom Händler entfernt",
+	["ui.charm.unlock_at"] = "ab Promotion {n}",
+	["ui.charm.empty_slot"] = "leer — beim nächsten Wurf dabei",
+	-- Sammel-Update 05.10.2026
+	["ui.building.prompt_upgrade"] = "Verbessern",
+	-- Sammel-Update 05.10.2026
+	["ui.rebirth.button"] = "Rebirth!",
+	["ui.rebirth.requirement"] = "Nötig: Tower {tower}, Stage {stage}  (geschafft: {have})",
+	["err.rebirth_stage"] = "Für den Rebirth musst du erst Tower {tower} Stage {stage} schaffen (bisher {have})",
+	-- Sammel-Update 05.10.2026
+	["ui.petbar.speed_skip"] = "Sofort",
 }

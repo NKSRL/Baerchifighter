@@ -462,6 +462,20 @@ function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: V
 	return root
 end
 
+-- Sammel-Update 2.1: der eine Schliessen-Knopf fuer alle Fenster (oben
+-- rechts, gross genug zum Tippen). Fenster ohne dialogHeader (Baerchi-Karte)
+-- setzen ihn direkt.
+function Theme.closeButton(parent: Instance, onClose: () -> ()): TextButton
+	local close = Theme.button("Close", parent, "X", Theme.COLORS.bad)
+	close.AnchorPoint = Vector2.new(1, 0.5)
+	close.Position    = UDim2.new(1, 4, 0.5, 0)
+	close.Size        = UDim2.new(0, 44, 0, 40)
+	close.TextColor3  = Theme.COLORS.text
+	close.ZIndex      = math.max(close.ZIndex, 12)
+	close.Activated:Connect(onClose)
+	return close
+end
+
 -- Kopfzeile eines Dialogs: Titel links, Schliessen-Kreuz rechts.
 -- Gibt das Titel-Label zurueck, damit der Aufrufer es spaeter aendern kann.
 function Theme.dialogHeader(root: Frame, title: string, onClose: () -> ()): TextLabel
@@ -484,15 +498,12 @@ function Theme.dialogHeader(root: Frame, title: string, onClose: () -> ()): Text
 	header.Size     = UDim2.new(1, -28, 0, 30)
 
 	local label = Theme.label("Title", header, title)
-	label.Size = UDim2.new(1, -44, 1, 0)
+	label.Size = UDim2.new(1, -52, 1, 0)
 	Theme.outlineText(label, 2)
 
-	local close = Theme.button("Close", header, "X", Theme.COLORS.bad)
-	close.AnchorPoint = Vector2.new(1, 0.5)
-	close.Position    = UDim2.new(1, 0, 0.5, 0)
-	close.Size        = UDim2.new(0, 34, 0, 30)
-	close.TextColor3  = Theme.COLORS.text
-	close.Activated:Connect(onClose)
+	-- Sammel-Update 2.1: groesserer X-Knopf (Tippflaeche ~44 px, Apple/
+	-- Google-Empfehlung) — er ragt bewusst etwas ueber die Kopfzeile hinaus.
+	Theme.closeButton(header, onClose)
 
 	return label
 end

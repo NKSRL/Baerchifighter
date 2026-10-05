@@ -75,6 +75,14 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestGoHome          = 3.00,
 	RequestClaimFreeGrab   = 1.00,   -- HBB Paket 10
 
+	-- Sammel-Update 05.10.
+	RequestPitSpeed          = 0.25,   -- 4.3: nur ein Schalter, keine Spielwerte
+	RequestClaimIndexReward  = 0.50,   -- 7: Auszahlung, einmalig je Belohnung
+	RequestIncubatorStart    = 0.30,   -- 8: mehrere Plaetze schnell hintereinander belegen
+	RequestIncubatorCollect  = 0.30,
+	RequestIncubatorSpeedUp  = 0.50,   -- kostet GoldGummies
+	RequestUpgradeIncubator  = 0.50,   -- kostet Gummies (wie Recycler)
+
 	-- v15: Bestenliste und Inspektor. Der Server antwortet aus dem Cache bzw.
 	-- aus dem Speicher; die Bremse schuetzt nur vor Spam.
 	GetLeaderboard         = 1.00,

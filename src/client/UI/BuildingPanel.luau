@@ -362,8 +362,11 @@ function BuildingPanel.init(screenGui: ScreenGui)
 		local id        = entry.id
 		local panelName = PanelManager.buildingPanelName(id)
 
+		-- Sammel-Update 2.6: kein "Honig fuettern"-Knopf mehr — der Baerchi
+		-- isst selbst (BaerchiAutopilotService). RequestFeedHoney bleibt als
+		-- Remote bestehen, nur die Oberflaeche dazu entfaellt.
 		local menu = buildMenu(
-			screenGui, panelName, displayName(id), Theme.buildingColor(id), true,
+			screenGui, panelName, displayName(id), Theme.buildingColor(id), false,
 			function()
 				Remotes.RequestUpgradeBuilding:FireServer(id)
 			end,

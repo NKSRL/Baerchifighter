@@ -35,7 +35,7 @@ return {
 	["ui.rebirth.title"]   = "Rebirth",
 	["ui.rebirth.status"]  = "Rebirth {count}  —  Multiplicateur x{mult:d2}",
 	["ui.rebirth.cost"]    = "Coûte {cost} Gummies  (tu as {have})",
-	["ui.rebirth.loss"]    = "Perdu : tous les niveaux de bâtiments, les niveaux de tes Baerchis et tes Gummies (retour à {start}).\nConservé : tes Baerchis, tous les oeufs, l'Arbre des Oeufs, les records de tour, GoldGummies, rang et statistiques.",
+	["ui.rebirth.loss"]    = "Perdu : tous les niveaux des bâtiments, les améliorations de l'incubateur, les niveaux de tes Baerchis et tes Gummies (retour à {start}) — dépense-les avant !\nConservé : tes Baerchis, tous les œufs (incubateur compris), l'arbre des œufs, les records de tour, les GoldGummies, le rang et les stats.",
 	["ui.rebirth.reward"]  = "Ensuite : Multiplicateur x{mult:d2}",
 	["ui.rebirth.reward_eggs.one"]   = "Ensuite : Multiplicateur x{mult:d2}  —  +{n} Oeuf d'Ascension",
 	["ui.rebirth.reward_eggs.other"] = "Ensuite : Multiplicateur x{mult:d2}  —  +{n} Oeufs d'Ascension",
@@ -94,7 +94,7 @@ return {
 	["err.event_not_at_event"]      = "Ton Baerchi n'est pas à l'événement",
 
 	["err.combat_busy"]             = "Le Baerchi combat encore dans le PIT",
-	["err.combat_exhausted"]        = "Le Baerchi est épuisé — donne-lui d'abord du miel",
+	["err.combat_exhausted"]        = "Ton Baerchi est épuisé — il mange à l'étang de miel, il revient bientôt",
 	["err.recycle_equipped"] = "Équipe d'abord un autre Baerchi, ensuite tu pourras recycler celui-ci",
 	["err.honey_in_pit"] = "Le Baerchi combat actuellement dans le PIT",
 	["err.event_ufo"] = "Ton Baerchi est en train d'être enlevé par l'OVNI",
@@ -242,7 +242,7 @@ return {
 	["quest.c_fuse1.title"] = "Fusionne deux Baerchis",
 	["quest.c_fuse1.hint"] = "Dans BAERCHIS, active la Fusion et choisis-en deux de même rareté.",
 	["quest.c_tower10.title"] = "Termine l'étape 10 de la tour",
-	["quest.c_tower10.hint"] = "Envoie ton Bärchi dans la tour avec le bouton de combat et nourris-le de miel avant.",
+	["quest.c_tower10.hint"] = "Envoie ton Baerchi dans la tour avec le bouton combat. Il mange le miel à l'étang tout seul.",
 	["quest.c_discover8.title"] = "Découvre 8 Baerchis",
 	["quest.c_discover8.hint"] = "Touche une silhouette noire dans l'Index pour voir quel oeuf il te faut.",
 	["quest.c_fight25.title"] = "Gagne 25 combats",
@@ -565,4 +565,22 @@ return {
 	["ui.fusion.fuse"] = "Fusionner",
 	-- Sammel-Update 05.10.2026
 	["ui.egg.paused"] = "Œufs en pause (en route)",
+	-- Sammel-Update 05.10.2026
+	["ui.common.close"] = "Fermer",
+	["ui.hatch.new"] = "NOUVEAU !",
+	["ui.hatch.sub"] = "Niv. {level}{mutation}\nde {egg}",
+	["ui.hatch.tap_close"] = "Touche pour fermer",
+	["err.hatch_timeout"] = "Pas de réponse du serveur — l'œuf est encore dans ta réserve",
+	["err.hatch_failed"] = "L'ouverture a échoué",
+	["err.merchant_far"] = "Trop loin du marchand",
+	["ui.charm.unlock_at"] = "dès la promotion {n}",
+	["ui.charm.empty_slot"] = "vide — inclus au prochain lancer",
+	-- Sammel-Update 05.10.2026
+	["ui.building.prompt_upgrade"] = "Améliorer",
+	-- Sammel-Update 05.10.2026
+	["ui.rebirth.button"] = "Rebirth !",
+	["ui.rebirth.requirement"] = "Requis : tour {tower}, étape {stage}  (réussi : {have})",
+	["err.rebirth_stage"] = "Pour le Rebirth, réussis d'abord la tour {tower} étape {stage} (pour l'instant {have})",
+	-- Sammel-Update 05.10.2026
+	["ui.petbar.speed_skip"] = "Direct",
 }

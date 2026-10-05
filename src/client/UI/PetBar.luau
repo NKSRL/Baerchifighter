@@ -60,6 +60,10 @@ local _fight: ButtonView? = nil
 
 -- Letzte Server-Meldung (PetModeChanged)
 local _state   = "Home"
+-- Sammel-Update 05.10. (Paket 4.3): gewaehltes Wiedergabe-Tempo (0 = sofort)
+local SPEED_STEPS = { 1, 2, 4, 0 }
+local _speedChoice = 1
+local _speedButton: TextButton? = nil
 local _pending: string? = nil
 local _stage: number? = nil
 local _tower: string? = nil   -- v15: Tower des laufenden Kampfs (vom Server)
@@ -189,6 +193,13 @@ end
 local function refresh()
 	local event, fight = _event, _fight
 	if not event or not fight then return end
+
+	-- Paket 4.3: Tempo-Knopf nur im Tower
+	local speedButton = _speedButton
+	if speedButton then
+		speedButton.Visible = _state == "InPit" or _state == "ToPit"
+		speedButton.Text = if _speedChoice == 0 then "⏭ " .. Loc.t("ui.petbar.speed_skip") else "⏩ x" .. _speedChoice
+	end
 
 	-- HBB Paket 3: der Event-Knopf erscheint erst nach dem ersten Kampf
 	Unlock.apply("button_event", event.button)
@@ -370,6 +381,25 @@ function PetBar.init(screenGui: ScreenGui)
 
 	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO")
 	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X")
+
+	-- Sammel-Update 05.10. (Paket 4.3): Tempo-Knopf ueber dem Fight-Knopf,
+	-- nur waehrend der Baerchi im Tower kaempft. Ein Tipp schaltet
+	-- x1 -> x2 -> x4 -> "sofort" -> x1. Der Server spielt ab der naechsten
+	-- Stage schneller ab; die Abrechnung bleibt gleich.
+	local speedButton = Theme.button("SpeedButton", _fight.button, "⏩ x1", Theme.COLORS.panelLight)
+	speedButton.AnchorPoint = Vector2.new(1, 1)
+	speedButton.Position    = UDim2.new(1, 0, 0, -6)
+	speedButton.Size        = UDim2.fromOffset(96, 34)
+	speedButton.ZIndex      = 6
+	speedButton.TextColor3  = Theme.COLORS.text
+	speedButton.Visible     = false
+	_speedButton = speedButton
+	speedButton.Activated:Connect(function()
+		local index = (table.find(SPEED_STEPS, _speedChoice) or 1) % #SPEED_STEPS + 1
+		_speedChoice = SPEED_STEPS[index]
+		Remotes.RequestPitSpeed:FireServer(_speedChoice)
+		refresh()
+	end)
 	FightStartPrompt.init(screenGui, bar)
 
 	PitResumeDialog.init(screenGui)

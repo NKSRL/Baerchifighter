@@ -350,6 +350,35 @@ export type IslandData = {
 	-- Migration schreibt den Betrag, TowerService zahlt ihn beim Join ueber
 	-- EconomyService aus und setzt das Feld auf 0.
 	pitRefund : number,
+
+	-- v16 (Sammel-Update, Paket 4.1): beste geschaffte Stage je Tower in
+	-- DIESEM Leben (seit dem letzten Rebirth). Die Rebirth-Bedingung
+	-- (TowerConfig.getRebirthRequirement) prueft dagegen — nicht gegen die
+	-- dauerhaften Rekorde, sonst koennte ein Veteran mehrere Rebirths am Stueck
+	-- machen. Liegt in der Insel, damit ein Rebirth es von selbst leert.
+	stageBest : { [string]: number },
+
+	-- v16 (Sammel-Update, Paket 8): der Inkubator auf dem Plot.
+	incubator : IncubatorData,
+}
+
+-- v16 (Paket 8): ein belegter Brut-Platz. Zeitmarken statt Timer (wie
+-- Honig und Recycler): fertig ist das Ei, sobald os.time() >= finishAt —
+-- auch wenn der Spieler dazwischen offline war. `slot` steht IM Eintrag
+-- (dichte Liste, derselbe DataStore-Grund wie bei Baerchi.charms).
+export type IncubatorSlot = {
+	slot      : number,    -- 1 .. IncubatorConfig.MAX_SLOTS
+	eggType   : EggType,
+	startedAt : number,
+	finishAt  : number,
+}
+
+-- v16 (Paket 8): Level (Ausbau mit Gummies, Geldsenke vor dem Rebirth) und
+-- die belegten Plaetze. Ein Rebirth setzt das Level zurueck, die Eier in den
+-- Plaetzen bleiben (wie das Ei-Lager).
+export type IncubatorData = {
+	level : number,
+	slots : { IncubatorSlot },
 }
 
 --------------------------------------------------------------------------------
@@ -539,6 +568,14 @@ export type PlayerData = {
 	-- v15: taeglicher Login-Bonus
 	daily : DailyState,
 
+	-- v16 (Sammel-Update, Paket 7): abgeholte Index-Belohnungen
+	-- (Schluessel = IndexRewardConfig-Id, z.B. "egg:BasicEgg", "path:Gold").
+	indexClaimed : { [string]: boolean },
+
+	-- v16 (Sammel-Update, Paket 6.2): ausgezahlte besondere Meilensteine
+	-- (EconomyConfig.SPECIAL_MILESTONES, einmalig pro Konto, auch rueckwirkend).
+	specialClaimed : { [string]: boolean },
+
 	-- Welcher Server den Spielstand gerade haelt (siehe Util/SessionLock).
 	-- Nur serverseitig, geht nie an den Client. nil = niemand; das ist der
 	-- Stand nach einem sauberen Verlassen und bei jedem alten Spielstand,
@@ -570,6 +607,7 @@ export type PlayerDataUpdate = {
 	createdAt    : number?,
 	uiSeen       : { [string]: boolean }?,   -- HBB Paket 3
 	shop         : ShopView?,                -- HBB Paket 10
+	indexClaimed : { [string]: boolean }?,   -- v16: Paket 7
 }
 
 -- v15: was der Client fuer das Login-Bonus-Fenster braucht (fertig
@@ -940,7 +978,12 @@ local function createDefaultPlayerData(): PlayerData
 		-- Level 1-60, Tower statt PIT-Level (towers, island.towerProgress,
 		-- island.pitRefund), Login-Bonus (daily). Die Migration RECHNET um
 		-- (Veredler-Level, PIT-Erstattung, alter Rekord) — deshalb Sprung.
-		version    = 15,  -- v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v16 (Sammel-Update 05.10.): island.stageBest (Rebirth nach Stage),
+		-- island.incubator (Inkubator), indexClaimed (Index-Belohnungen),
+		-- specialClaimed (besondere Meilensteine). EINE gemeinsame Migration;
+		-- sie legt nur an und saeet stageBest aus towerProgress, fasst keine
+		-- Waehrung an.
+		version    = 16,  -- v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -981,6 +1024,9 @@ local function createDefaultPlayerData(): PlayerData
 
 			towerProgress = {},
 			pitRefund     = 0,
+
+			stageBest = {},                       -- v16: Paket 4.1
+			incubator = { level = 1, slots = {} },  -- v16: Paket 8
 		},
 
 		stats = {
@@ -1021,6 +1067,9 @@ local function createDefaultPlayerData(): PlayerData
 			lastClaimDay = 0,
 			streak       = 0,
 		},
+
+		indexClaimed   = {},   -- v16: Paket 7
+		specialClaimed = {},   -- v16: Paket 6.2
 
 		quests = {
 			chainClaimed = 0,

@@ -81,6 +81,7 @@ local Feedback         = require(UI:WaitForChild("Feedback"))
 local Moment           = require(UI:WaitForChild("Moment"))
 local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
 local HomeButton       = require(UI:WaitForChild("HomeButton"))
+local RebirthButton    = require(UI:WaitForChild("RebirthButton"))   -- Sammel-Update 2.7
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -142,6 +143,7 @@ Moment.init(screenGui)
 ReturnSummary.init(screenGui)
 -- HBB Paket 5: Heim-Knopf (erscheint nur weit weg vom eigenen Plot)
 HomeButton.init(screenGui)
+RebirthButton.init(screenGui)   -- Sammel-Update 2.7: fester Rebirth-Knopf
 
 -- v13: Quest-Karte links (braucht das Quest-Fenster, das oben angemeldet wird)
 QuestTracker.init(screenGui)
