@@ -169,6 +169,7 @@ export type Baerchi = {
 	rarity         : Rarity,
 	level          : number,   -- 1 - BaerchiConfig.MAX_LEVEL
 	xp             : number,   -- XP-Fortschritt zum naechsten Level
+	endlessLevel   : number?,  -- Paket 9: Level ueber MAX_LEVEL (nil = 0), bleibt ueber Rebirths
 	skillId        : SkillId,  -- aktiver Skill (durch Fusion ueberschreibbar)
 	isFusionResult : boolean,  -- fuer UI-Badge "FUSION"
 	fusionBonus    : number,   -- 0.0 = kein Bonus, 0.25 = +25% HP/ATK
@@ -245,7 +246,7 @@ export type Building = {
 -- Vier Tower mit eigener Stage-Zahl und eigenem Gegner-Wachstum, Zahlen in
 -- Config/TowerConfig. "I" Holz (30 Stages), "II" Stein (45), "III" Gold (60),
 -- "Final" Kristall (100).
-export type TowerId = "I" | "II" | "III" | "Final"
+export type TowerId = "I" | "II" | "III" | "Final" | "Endless"   -- Endless: HBB Paket 9
 
 -- Permanenter Tower-Fortschritt. Liegt bewusst AUSSERHALB von island (wie
 -- eggTree): ein Rebirth setzt die Insel zurueck, Rekorde und abgeholte
@@ -264,6 +265,7 @@ export type TowerState = {
 	claimed      : { [string]: { [string]: boolean } },
 	highestTower : string,
 	selected     : string,
+	endlessWeek  : { week: number, best: number }?, -- Paket 9: beste Endless-Stage der Woche
 }
 
 -- v15: Taeglicher Login-Bonus (Config/LoginBonusConfig). Tage zaehlen nach
@@ -462,6 +464,19 @@ export type SessionLock = {
 -- PlayerData — alles was im DataStore landet
 --------------------------------------------------------------------------------
 
+-- HBB Paket 10: Shop-Teil des Spielstands (Regeln: Modules/ShopRules)
+export type ShopState = {
+	freeGrabDay : number,     -- UTC-Tag des letzten Gratis-Griffs, -1 = nie
+	receipts    : { string }, -- zuletzt ausgezahlte Robux-Kauf-IDs
+}
+
+-- HBB Paket 10: was der Client fuer das Shop-Fenster braucht
+export type ShopView = {
+	freeReady  : boolean,
+	nextFreeIn : number,      -- Sekunden bis zum naechsten UTC-Tag
+	freeGold   : number,
+}
+
 export type PlayerData = {
 	-- Schema
 	version    : number,   -- fuer Migrationen beim Laden alter Daten
@@ -509,6 +524,9 @@ export type PlayerData = {
 	-- UiStateService; Ids siehe Modules/UnlockRules.ELEMENTS.
 	uiSeen : { [string]: boolean },
 
+	-- HBB Paket 10: Shop (Gratis-Griff, gemerkte Robux-Kaeufe)
+	shop : ShopState,
+
 	-- v13: Quest-Stand
 	quests : QuestState,
 
@@ -551,6 +569,7 @@ export type PlayerDataUpdate = {
 	stats        : { [string]: number }?,
 	createdAt    : number?,
 	uiSeen       : { [string]: boolean }?,   -- HBB Paket 3
+	shop         : ShopView?,                -- HBB Paket 10
 }
 
 -- v15: was der Client fuer das Login-Bonus-Fenster braucht (fertig
@@ -813,6 +832,7 @@ export type TowerMilestoneReward = {
 	eggType     : EggType?,
 	eggs        : number,
 	blueprints  : number,
+	endlessLevels : number?, -- Paket 9: +Endless-Level fuer den ausgeruesteten Baerchi
 }
 
 -- v15: eine Zeile einer Bestenliste (Server → Client).
@@ -968,7 +988,12 @@ local function createDefaultPlayerData(): PlayerData
 			totalRecycled       = 0,
 			totalHatched        = 0,
 			totalEventsCompleted = 0,
+			sessions             = 0,   -- HBB Paket 10: Sitzungen (Shop ab der 2.)
 		},
+
+		-- HBB Paket 10: Shop (Modules/ShopRules). freeGrabDay = UTC-Tag des
+		-- letzten Gratis-Griffs (-1 = nie), receipts = gemerkte Robux-Kauf-IDs.
+		shop = { freeGrabDay = -1, receipts = {} },
 
 		discovered = {},
 		uiSeen     = {},

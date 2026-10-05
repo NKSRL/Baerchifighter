@@ -106,6 +106,27 @@ local TOWERS: { TowerDef } = {
 	},
 }
 
+-- HBB Paket 9 (FeatureFlags.ENDLESS): der Endless-Tower "∞". Stage 1 ist so
+-- stark wie Final 101 (82 + 100 x 0,5 = 132) und waechst wie Final weiter.
+-- Offen, sobald Final 100 einmal geschafft ist (getStageCap mit `records`),
+-- ohne Rebirth-Deckel. 999 Stages = praktisch ohne Ende und passt in die
+-- Bestenlisten-Kodierung (Index x 1000 + Stage). Staerker wird man nur durch
+-- staerkere Baerchis: Endless-Level (BaerchiConfig.ENDLESS_*).
+-- Nur mit Schalter in TOWERS — ohne ist alles wie vorher (UI, Sims).
+if FeatureFlags.isOn("ENDLESS") then
+	table.insert(TOWERS, {
+		id = "Endless", index = 5, stages = 999,
+		startEquivalent = 132, equivalentPerStage = 0.5,
+		rewardFactor = 1,
+		goldPerFive = 40,
+		look = "Endless", color = Color3.fromRGB(255, 170, 230), numeral = "∞",
+	})
+end
+
+-- Endless: alle wie viele Endless-Stages (erstmals geschafft) der kaempfende
+-- Baerchi +1 Endless-Level bekommt (Entscheidung 05.10.: ja).
+TowerConfig.ENDLESS_LEVEL_EVERY = 10
+
 local BY_ID: { [string]: TowerDef } = {}
 for _, def in TOWERS do
 	BY_ID[def.id] = def
@@ -183,11 +204,21 @@ function TowerConfig.getCap(rebirthCount: number): (Types.TowerId, number)
 	return entry.tower, entry.stage
 end
 
+-- Ist Endless fuer diese Rekorde offen? (Final 100 einmal geschafft)
+function TowerConfig.isEndlessOpen(records: { [string]: number }?): boolean
+	local finalDef = BY_ID.Final
+	return BY_ID.Endless ~= nil and records ~= nil and (records.Final or 0) >= finalDef.stages
+end
+
 -- Deckel in DIESEM Tower: volle Stage-Zahl fuer Tower unter dem Deckel-Tower,
 -- der Deckel selbst fuer den Deckel-Tower, 0 fuer noch geschlossene Tower.
-function TowerConfig.getStageCap(rebirthCount: number, towerId: string): number
+-- `records` (Tower-Rekorde) braucht nur Endless: offen ab Final 100.
+function TowerConfig.getStageCap(rebirthCount: number, towerId: string, records: { [string]: number }?): number
 	local def = BY_ID[towerId]
 	if not def then return 0 end
+	if towerId == "Endless" then
+		return if TowerConfig.isEndlessOpen(records) then def.stages else 0
+	end
 	local capTower, capStage = TowerConfig.getCap(rebirthCount)
 	local capIndex = TowerConfig.getIndex(capTower)
 	if def.index < capIndex then return def.stages end
@@ -195,8 +226,8 @@ function TowerConfig.getStageCap(rebirthCount: number, towerId: string): number
 	return 0
 end
 
-function TowerConfig.isOpen(rebirthCount: number, towerId: string): boolean
-	return TowerConfig.getStageCap(rebirthCount, towerId) > 0
+function TowerConfig.isOpen(rebirthCount: number, towerId: string, records: { [string]: number }?): boolean
+	return TowerConfig.getStageCap(rebirthCount, towerId, records) > 0
 end
 
 -- Ab welchem Rebirth ein Tower offen ist (fuer die gesperrte Karte im UI).
@@ -308,6 +339,7 @@ export type Milestone = {
 	goldGummies : number,
 	eggs        : number,   -- Anzahl "hoechstes freies Ei"
 	blueprints  : number,
+	endlessLevels : number, -- Paket 9: +Endless-Level fuer den ausgeruesteten Baerchi
 }
 
 function TowerConfig.isMilestone(stage: number): boolean
@@ -320,7 +352,7 @@ function TowerConfig.getMilestone(towerId: string, stage: number): Milestone?
 		return nil
 	end
 
-	local result: Milestone = { gummies = 0, goldGummies = 0, eggs = 0, blueprints = 0 }
+	local result: Milestone = { gummies = 0, goldGummies = 0, eggs = 0, blueprints = 0, endlessLevels = 0 }
 	if stage <= TowerConfig.MILESTONE_GUMMY_UNTIL then
 		result.gummies = TowerConfig.MILESTONE_GUMMY_FACTOR * TowerConfig.getStageReward(towerId, stage)
 	end
@@ -340,6 +372,9 @@ function TowerConfig.getMilestone(towerId: string, stage: number): Milestone?
 		end
 	elseif result.gummies == 0 and result.eggs == 0 and result.goldGummies == 0 then
 		result.goldGummies = TowerConfig.MILESTONE_GOLD_SMALL * def.goldPerFive
+	end
+	if towerId == "Endless" and stage % TowerConfig.ENDLESS_LEVEL_EVERY == 0 then
+		result.endlessLevels = 1
 	end
 	return result
 end
@@ -389,11 +424,18 @@ end
 -- ueber die Stage-Zahl des Towers verteilt (Tower I: eine Etage pro Stage).
 TowerConfig.RUN_MAX_FLOORS = 30
 
+-- Fuer Hoehen-Anzeigen: Endless hat 999 Stages "ohne Ende", wird aber wie
+-- ein 100er-Tower gestaucht — sonst blieben Arena und Schau-Turm flach.
+local function displayStages(def: TowerDef): number
+	return if def.id == "Endless" then 100 else def.stages
+end
+
 function TowerConfig.getRunFloor(towerId: string, stage: number): number
 	local def = BY_ID[towerId] or TOWERS[1]
 	if stage <= 1 then return 0 end
-	local floors = math.min(TowerConfig.RUN_MAX_FLOORS, def.stages)
-	return math.clamp(math.floor((stage - 1) * floors / def.stages + 0.5), 0, floors)
+	local stages = displayStages(def)
+	local floors = math.min(TowerConfig.RUN_MAX_FLOORS, stages)
+	return math.clamp(math.floor((stage - 1) * floors / stages + 0.5), 0, floors)
 end
 
 -- Der staendige Angeber-Turm auf der Arena-Insel: Hoehe = Rekord im hoechsten
@@ -403,7 +445,7 @@ TowerConfig.SHOWCASE_MAX_FLOORS = 12
 function TowerConfig.getShowcaseFloors(towerId: string, record: number): number
 	local def = BY_ID[towerId] or TOWERS[1]
 	if record <= 0 then return 1 end
-	return math.clamp(math.ceil(record * TowerConfig.SHOWCASE_MAX_FLOORS / def.stages), 1, TowerConfig.SHOWCASE_MAX_FLOORS)
+	return math.clamp(math.ceil(record * TowerConfig.SHOWCASE_MAX_FLOORS / displayStages(def)), 1, TowerConfig.SHOWCASE_MAX_FLOORS)
 end
 
 --------------------------------------------------------------------------------

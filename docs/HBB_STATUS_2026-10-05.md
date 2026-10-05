@@ -11,7 +11,8 @@
 | 6 Timer/Board | Code fertig (Timer, erste Pause, Live-Board, Wespen-Nest) | nein |
 | 7 Boss-Stufen | Code fertig | nein |
 | 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. Charm-Gold: 12 Würfe/Tag (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
-| 9, 10 | offen; 9 braucht einen freigegebenen Entwurf, 10 teilt sich die 12 Würfe/Tag mit den Tages-Quests | – |
+| 9 Endless | Code fertig (Tower ∞ ab Final 100, Endless-Level je Bärchi, Bestenliste Endless + Woche mit Krone) – `docs/HBB_PAKET_9_ENDLESS_2026-10-05.md`; `ENDLESS` an | nein |
+| 10 Shop | Code fertig (Gratis-Griff, Robux-Pakete vorbereitet, IDs fehlen) – `docs/HBB_PAKET_10_SHOP_2026-10-05.md` | nein |
 
 ## Playtest 05.10.2026
 Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredler → Honig-Teich mit Brunnen-Looks: `docs/HBB_HONIG_TEICH_2026-10-05.md`.

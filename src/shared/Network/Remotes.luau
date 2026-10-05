@@ -320,6 +320,8 @@ local RequestMarkUiSeen = getOrCreateEvent("RequestMarkUiSeen")
 -- ausser der Spieler traegt Waben (dann ActionFailed).
 -- Args: (keine)
 local RequestGoHome = getOrCreateEvent("RequestGoHome")
+-- HBB Paket 10: Shop — Gratis-Griff (Client -> Server, keine Argumente)
+local RequestClaimFreeGrab = getOrCreateEvent("RequestClaimFreeGrab")
 
 -- ============================================================
 -- Client → Server Functions (brauchen eine Antwort)
@@ -396,6 +398,7 @@ return {
 	RequestLogUiEvent      = RequestLogUiEvent,
 	RequestMarkUiSeen      = RequestMarkUiSeen,
 	RequestGoHome          = RequestGoHome,
+	RequestClaimFreeGrab   = RequestClaimFreeGrab,
 
 	-- Functions
 	GetPlayerData          = GetPlayerData,

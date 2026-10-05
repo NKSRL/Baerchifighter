@@ -297,6 +297,12 @@ function FusionService.fuse(
 		mutation         = BaerchiConfig.pickHigherMutation(a.mutation, b.mutation),
 	})
 
+	-- Paket 9: das hoehere Endless-Level bleibt erhalten.
+	if newBaerchi then
+		local endless = math.max(a.endlessLevel or 0, b.endlessLevel or 0)
+		newBaerchi.endlessLevel = if endless > 0 then endless else nil
+	end
+
 	if not newBaerchi then
 		fail(player, Loc.msg("err.fuse_result_failed"))
 		return

@@ -47,6 +47,8 @@ function PitResumeDialog.getProgress(data: Types.PlayerDataUpdate): number?
 	return nil
 end
 
+-- Start-Stage und Gummi-Kosten einer Option — dieselbe Rechnung wie
+-- CombatService.getResumeOffer (TowerConfig). Oeffentlich fuer FightStartPrompt.
 local function offer(data: Types.PlayerDataUpdate, choice: Choice): (number, number)
 	if choice == "Fresh" then
 		return 1, 0
@@ -99,6 +101,10 @@ local function fill()
 				hp, maxHp, math.floor(hp / math.max(1, maxHp) * 100 + 0.5))
 		end
 	end
+end
+
+function PitResumeDialog.offer(data: Types.PlayerDataUpdate, choice: Choice): (number, number)
+	return offer(data, choice)
 end
 
 function PitResumeDialog.close()

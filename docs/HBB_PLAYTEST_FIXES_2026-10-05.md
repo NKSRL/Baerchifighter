@@ -21,3 +21,13 @@
 5. Plot-Schild von vorn: Name frei lesbar.
 6. Ei-Baum: Basis-Ei hat keinen Presse-Knopf mehr.
 7. Event-Tafel über dem Mast, keine springende Zeile.
+
+## Nachtrag: Lauf-Start immer bei Stage 1 (Entscheidung 05.10.)
+Vorher startete der Fight-Knopf mit vorhandenem letzten Lauf **ohne Frage ab 65 %** und buchte dafür still Gummies ab (HBB Paket 2).
+Jetzt (`FIGHT_RESUME_PROMPT`): Beim Klick erscheint über der Leiste ein kleines Feld „Ab Stage X weiter“ mit Gummi-Kosten und einem 7-Sekunden-Balken.
+- Kein Klick → Feld weg, Lauf ab Stage 1.
+- „Stage 1“ oder zweiter Fight-Klick → sofort ab Stage 1.
+- Nicht bezahlbar → Knopf grau.
+
+Kosten und Start-Stage kommen aus derselben Rechnung wie beim Server (`PitResumeDialog.offer` = `CombatService.getResumeOffer`). Stages schafft man damit durch stärkere Bärchis; der Sprung nach oben ist eine bewusste Entscheidung.
+Studio: Lauf bis Stage 10 → zurück → Fight: Feld „Ab Stage 10 weiter“, 7 s warten → Lauf startet bei 1.

@@ -121,7 +121,9 @@ function MapLayout.leaderboardBoards(): { { listId: string?, angleDegrees: numbe
 	if FeatureFlags.isOn("MAP_V2_BOARDS") then
 		local boards = {}
 		for _, b in MapConfig.LEADERBOARD_BOARDS_V2 do
-			table.insert(boards, { listId = b.listId :: string?, angleDegrees = b.angleDegrees })
+			if b.flag == nil or FeatureFlags.isOn(b.flag) then
+				table.insert(boards, { listId = b.listId :: string?, angleDegrees = b.angleDegrees })
+			end
 		end
 		return boards
 	end

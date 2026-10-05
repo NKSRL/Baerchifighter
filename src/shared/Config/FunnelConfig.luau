@@ -81,7 +81,7 @@ return {
 		Hatch = true, Inventory = true, Baerchi = true, Fusion = true,
 		Charms = true, Combat = true, Rebirth = true, Language = true,
 		Quests = true, EggTree = true, Leaderboard = true, Profile = true,
-		DailyBonus = true,
+		DailyBonus = true, Shop = true,
 		Building_Beehive = true, Building_HoneyRefiner = true, Building_HoneyPond = true,
 	} :: { [string]: boolean },
 

@@ -91,6 +91,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "HomeService",        module = ServerScriptService.Services.HomeService },
 	-- HBB Paket 6: Live-Kampf-Board auf der Hauptinsel
 	{ name = "LiveBoardService",   module = ServerScriptService.Services.LiveBoardService },
+	-- HBB Paket 10: Shop (Gratis-Griff, Robux-Goldpakete)
+	{ name = "ShopService",        module = ServerScriptService.Services.ShopService },
 
 	-- Kein Spiel-Service: die Studio-Test-Schnittstelle
 	{ name = "DebugService", module = ServerScriptService.Services.DebugService },

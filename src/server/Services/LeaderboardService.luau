@@ -3,9 +3,10 @@
 -- ServerScriptService/Services/LeaderboardService.luau
 --
 -- Einzige Zustaendigkeit:
---   - Die drei Bestenlisten (v15): Tower, Rebirths, Sammlung. Werte schreiben
---     (gedrosselt), Top-Listen lesen (gecacht), dem Client auf Anfrage geben
---     und die Tafel am Spawn beschriften.
+--   - Die Bestenlisten (v15): Tower, Rebirths, Sammlung; mit Paket 9 auch
+--     Endless und Endless-Woche. Werte schreiben (gedrosselt), Top-Listen
+--     lesen (gecacht), dem Client auf Anfrage geben, die Tafeln beschriften
+--     und die Top 10 der Vorwoche kroenen (Plot-Schild, MapService).
 --
 -- REGEL (seit v15, steht auch im Briefing): dieser Service ist der EINZIGE, der
 -- OrderedDataStores benutzt — so wie PlayerService der einzige mit dem
@@ -49,12 +50,18 @@ local _lastWriteAt: { [number]: number } = {}
 local _session: { [string]: { [number]: number } } = {}
 local _names: { [number]: string } = {}
 
+-- Nach Store-NAME (EndlessWeek hat jede Woche einen neuen).
 local _stores: { [string]: OrderedDataStore } = {}
 local _storesChecked = false
 local _storesOk = false
 
 local _lastRead = 0
 local _boardIndex = 0
+
+-- Paket 9: Krone = Top CROWN_TOP_N der Vorwoche. `_crownWeek` = fuer welche
+-- (laufende) Woche `_crowned` gilt; nil = noch nicht gelesen.
+local _crowned: { [number]: boolean } = {}
+local _crownWeek: number? = nil
 
 --------------------------------------------------------------------------------
 -- Werte
@@ -76,6 +83,14 @@ function LeaderboardService.valueOf(data: Types.PlayerData, listId: string): num
 		return math.max(0, math.floor(data.rebirthCount))
 	elseif listId == "Collection" then
 		return countKeys(data.discovered)
+	elseif listId == "Endless" then
+		return math.max(0, math.floor(data.towers.records.Endless or 0))
+	elseif listId == "EndlessWeek" then
+		local entry = data.towers.endlessWeek
+		if entry and entry.week == LeaderboardConfig.weekOf(os.time()) then
+			return math.max(0, math.floor(entry.best))
+		end
+		return 0
 	end
 	return 0
 end
@@ -84,12 +99,29 @@ end
 -- DataStore (nur hier!)
 --------------------------------------------------------------------------------
 
+local function currentStoreName(listId: string): string
+	return LeaderboardConfig.storeName(listId, LeaderboardConfig.weekOf(os.time()))
+end
+
+-- Store nach Namen (einmal geholt, dann gecacht). nil = nicht verfuegbar.
+local function storeByName(name: string): OrderedDataStore?
+	local store = _stores[name]
+	if store then return store end
+	local ok, result = pcall(function()
+		return DataStoreService:GetOrderedDataStore(name)
+	end)
+	if not ok then return nil end
+	_stores[name] = result
+	return result
+end
+
 local function getStores(): boolean
 	if _storesChecked then return _storesOk end
 	_storesChecked = true
 	local ok, err = pcall(function()
 		for _, listId in LeaderboardConfig.LISTS do
-			_stores[listId] = DataStoreService:GetOrderedDataStore(LeaderboardConfig.STORE_NAMES[listId])
+			local name = currentStoreName(listId)
+			_stores[name] = DataStoreService:GetOrderedDataStore(name)
 		end
 	end)
 	_storesOk = ok
@@ -144,21 +176,24 @@ local function writePlayer(player: Player, force: boolean)
 
 	for _, listId in LeaderboardConfig.LISTS do
 		local value = LeaderboardService.valueOf(data, listId)
+		-- Nach Store-Namen gemerkt: in einer neuen Woche wird neu geschrieben.
+		local name = currentStoreName(listId)
 
-		-- Sitzungsliste immer pflegen (Studio-Ersatz und Fallback).
-		local session = _session[listId] or {}
-		_session[listId] = session
+		-- Sitzungsliste immer pflegen (Studio-Ersatz und Fallback). Die
+		-- Wochenliste beginnt zum Wochenwechsel leer.
+		local session = _session[name] or {}
+		_session[name] = session
 		session[userId] = value
 
-		if written[listId] ~= value then
+		if written[name] ~= value then
 			if getStores() then
-				if hasBudget(Enum.DataStoreRequestType.SetIncrementSortedAsync) then
-					local store = _stores[listId]
+				local store = storeByName(name)
+				if store and hasBudget(Enum.DataStoreRequestType.SetIncrementSortedAsync) then
 					local ok, err = pcall(function()
 						store:SetAsync(tostring(userId), value)
 					end)
 					if ok then
-						written[listId] = value
+						written[name] = value
 						changed = true
 					else
 						-- Studio ohne API-Zugriff: GetOrderedDataStore klappt, jeder
@@ -168,7 +203,7 @@ local function writePlayer(player: Player, force: boolean)
 					end
 				end
 			else
-				written[listId] = value
+				written[name] = value
 				changed = true
 			end
 		end
@@ -185,7 +220,7 @@ end
 
 local function sessionTop(listId: string): { Entry }
 	local rows: { { userId: number, value: number } } = {}
-	for userId, value in _session[listId] or {} do
+	for userId, value in _session[currentStoreName(listId)] or {} do
 		if value > 0 then
 			table.insert(rows, { userId = userId, value = value })
 		end
@@ -202,31 +237,75 @@ local function sessionTop(listId: string): { Entry }
 	return entries
 end
 
+-- Liest die Top `count` eines Stores. nil = gerade nicht moeglich.
+local function readStore(name: string, count: number): { Entry }?
+	if not hasBudget(Enum.DataStoreRequestType.GetSortedAsync) then
+		return nil
+	end
+	local store = storeByName(name)
+	if not store then return nil end
+	local ok, result = pcall(function()
+		local pages = store:GetSortedAsync(false, count)
+		return pages:GetCurrentPage()
+	end)
+	if not ok then
+		warn("[LeaderboardService] Lesen fehlgeschlagen — ab jetzt Sitzungsliste:", name, result)
+		_storesOk = false
+		return nil
+	end
+	local entries: { Entry } = {}
+	for _, item in result :: { any } do
+		local userId = tonumber(item.key)
+		local value = tonumber(item.value) or 0
+		-- Paket 9: Nullen (z. B. Endless noch nicht offen) stehen nicht in der Liste.
+		if userId and value > 0 then
+			table.insert(entries, { rank = #entries + 1, userId = userId, name = nameOf(userId), value = value })
+		end
+	end
+	return entries
+end
+
 local function readList(listId: string): { Entry }?
 	if not getStores() then
 		return sessionTop(listId)
 	end
-	if not hasBudget(Enum.DataStoreRequestType.GetSortedAsync) then
-		return nil
-	end
-	local store = _stores[listId]
-	local ok, result = pcall(function()
-		local pages = store:GetSortedAsync(false, LeaderboardConfig.TOP_N)
-		return pages:GetCurrentPage()
-	end)
-	if not ok then
-		warn("[LeaderboardService] Lesen fehlgeschlagen — ab jetzt Sitzungsliste:", listId, result)
-		_storesOk = false
+	local entries = readStore(currentStoreName(listId), LeaderboardConfig.TOP_N)
+	if entries == nil and not _storesOk then
 		return sessionTop(listId)
 	end
-	local entries: { Entry } = {}
-	for rank, item in result :: { any } do
-		local userId = tonumber(item.key)
-		if userId then
-			table.insert(entries, { rank = rank, userId = userId, name = nameOf(userId), value = tonumber(item.value) or 0 })
+	return entries
+end
+
+-- Paket 9: Krone fuer die Top 10 der VORWOCHE (eine Woche lang). Ohne
+-- DataStore (Studio) gibt es keine Vorwoche — dann kroenen die Top 10 der
+-- laufenden Sitzungsliste, damit sich das testen laesst.
+local function applyCrowns()
+	for _, player in Players:GetPlayers() do
+		MapService.setOwnerCrown(player, _crowned[player.UserId] == true)
+	end
+end
+
+local function refreshCrowns()
+	if not table.find(LeaderboardConfig.LISTS, "EndlessWeek") then return end
+	local week = LeaderboardConfig.weekOf(os.time())
+	local entries: { Entry }?
+	if getStores() then
+		if _crownWeek == week then return end
+		entries = readStore(LeaderboardConfig.storeName("EndlessWeek", week - 1), LeaderboardConfig.CROWN_TOP_N)
+	end
+	if entries == nil and not (getStores() and _storesOk) then
+		entries = sessionTop("EndlessWeek")
+	end
+	if entries == nil then return end   -- spaeter nochmal versuchen
+
+	_crowned = {}
+	for _, entry in entries do
+		if entry.rank <= LeaderboardConfig.CROWN_TOP_N then
+			_crowned[entry.userId] = true
 		end
 	end
-	return entries
+	_crownWeek = week
+	applyCrowns()
 end
 
 local function refreshAll()
@@ -237,6 +316,11 @@ local function refreshAll()
 			_cache[listId] = { entries = entries, updatedAt = os.time() }
 		end
 	end
+	refreshCrowns()
+end
+
+function LeaderboardService.isCrowned(userId: number): boolean
+	return _crowned[userId] == true
 end
 
 --------------------------------------------------------------------------------
@@ -249,6 +333,8 @@ function LeaderboardService.formatValue(listId: string, value: number): string
 		local towerId, stage = TowerConfig.fromLeaderboardValue(value)
 		local def = TowerConfig.get(towerId) or TowerConfig.TOWERS[1]
 		return string.format("Tower %s · %d", def.numeral, stage)
+	elseif listId == "Endless" or listId == "EndlessWeek" then
+		return string.format("∞ · %d", value)
 	end
 	return tostring(value)
 end
@@ -257,6 +343,8 @@ local BOARD_TITLES: { [string]: string } = {
 	Tower      = "TOP 10  ·  TOWER",
 	Rebirths   = "TOP 10  ·  REBIRTHS",
 	Collection = "TOP 10  ·  INDEX",
+	Endless    = "TOP 10  ·  ENDLESS ∞",
+	EndlessWeek = "TOP 10  ·  ∞ WEEK  ·  ♛",
 }
 
 local function paintList(listId: string)
@@ -274,7 +362,11 @@ end
 local function paintBoard()
 	if MapService.hasLeaderboardBoard(LeaderboardConfig.LISTS[1]) then
 		for _, listId in LeaderboardConfig.LISTS do
-			paintList(listId)
+			-- Paket 9: eine Liste ohne eigene Tafel landete sonst auf der
+			-- wechselnden (die es dann nicht gibt) — einfach auslassen.
+			if MapService.hasLeaderboardBoard(listId) then
+				paintList(listId)
+			end
 		end
 		return
 	end
@@ -334,6 +426,11 @@ function LeaderboardService.init()
 	-- abgekoppelt.
 	PlayerService.onPlayerLeaving(function(player, _data)
 		task.spawn(writePlayer, player, true)
+	end)
+
+	-- Paket 9: Krone gleich beim Betreten, nicht erst beim naechsten Lesen.
+	PlayerService.onPlayerReady(function(player, _data)
+		MapService.setOwnerCrown(player, _crowned[player.UserId] == true)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

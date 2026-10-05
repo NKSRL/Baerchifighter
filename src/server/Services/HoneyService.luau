@@ -54,6 +54,7 @@ local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local DebugConfig      = require(ReplicatedStorage.Config.DebugConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)  -- Paket 9: Endless offen?
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService     = require(ServerScriptService.Services.MapService)
@@ -227,7 +228,9 @@ end
 
 -- Versucht den Baerchi zu leveln wenn genug XP vorhanden.
 -- Liegt hier, weil Honig die einzige XP-Quelle im Spiel ist.
-local function tryLevelUp(baerchi: Types.Baerchi): boolean
+-- Paket 9: `endlessOpen` (Final 100 geschafft) — dann fliessen XP auf
+-- MAX_LEVEL ins Endless-Level statt zu verfallen.
+local function tryLevelUp(baerchi: Types.Baerchi, endlessOpen: boolean): boolean
 	local leveled = false
 
 	while baerchi.level < BaerchiConfig.MAX_LEVEL
@@ -237,8 +240,14 @@ local function tryLevelUp(baerchi: Types.Baerchi): boolean
 		leveled        = true
 	end
 
-	-- Auf Max-Level sammelt sich sonst unendlich XP an
-	if baerchi.level >= BaerchiConfig.MAX_LEVEL then
+	if baerchi.level >= BaerchiConfig.MAX_LEVEL and endlessOpen then
+		while baerchi.xp >= BaerchiConfig.xpForEndlessLevel(baerchi.endlessLevel or 0) do
+			baerchi.xp          -= BaerchiConfig.xpForEndlessLevel(baerchi.endlessLevel or 0)
+			baerchi.endlessLevel = (baerchi.endlessLevel or 0) + 1
+			leveled              = true
+		end
+	elseif baerchi.level >= BaerchiConfig.MAX_LEVEL then
+		-- Auf Max-Level sammelt sich sonst unendlich XP an
 		baerchi.xp = 0
 	end
 
@@ -311,7 +320,7 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 	baerchi.currentHp  = hpNow
 	baerchi.xp        += xp
 
-	local leveled = tryLevelUp(baerchi)
+	local leveled = tryLevelUp(baerchi, TowerConfig.isEndlessOpen(data.towers.records))
 
 	-- Nach einem Level-Up ist maxHp groesser. Die aktuellen HP bleiben stehen
 	-- (kein Gratis-Vollheilung), der Baerchi ist danach also relativ gesehen

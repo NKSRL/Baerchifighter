@@ -44,6 +44,15 @@ local FLAGS: { [string]: boolean } = {
 	-- Bericht: docs/HBB_HONIG_TEICH_2026-10-05.md
 	HONEY_POND_V2      = true,
 
+	-- Entscheidung 05.10.: Laeufe starten immer bei Stage 1. Ab der letzten
+	-- Stage nur per Klick gegen Gummies (kleines Feld, 7 s, UI/FightStartPrompt).
+	FIGHT_RESUME_PROMPT = true,
+
+	-- HBB Paket 10: Shop mit Gratis-Griff (GoldGummies) und Robux-Paketen
+	-- (Pakete erst sichtbar, wenn ShopConfig eine Product-ID hat).
+	-- Bericht: docs/HBB_PAKET_10_SHOP_2026-10-05.md
+	SHOP_V1            = true,
+
 	-- Playtest 05.10.: Basis-Eier (unbegrenzt beim Haendler) nicht pressbar
 	PRESS_NO_BASIC_EGG = true,
 
@@ -59,8 +68,9 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 8/9: neue Pacing-Werte. Bleibt aus, bis der Mensch die Tabelle
 	-- freigegeben hat (Stopp-Punkt im Plan).
 	PACING_V2         = false,
-	-- Paket 9: Final 101+ nur nach Freigabe des Entwurfs
-	ENDLESS           = false,
+	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
+	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
+	ENDLESS           = true,
 }
 
 local FeatureFlags = {}

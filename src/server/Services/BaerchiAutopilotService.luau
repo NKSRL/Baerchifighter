@@ -32,6 +32,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local Types            = require(ReplicatedStorage.Network.Types)
 
 local FigureWalker  = require(ServerScriptService.Util.FigureWalker)
@@ -87,8 +88,8 @@ local function shouldEat(data: Types.PlayerData, baerchi: Types.Baerchi): boolea
 	end
 
 	-- Voll geheilt: nur noch fuers Leveln weiteressen, und nur solange das
-	-- ueberhaupt noch etwas bringt.
-	return baerchi.level < BaerchiConfig.MAX_LEVEL
+	-- ueberhaupt noch etwas bringt (Paket 9: mit offenem Endless immer).
+	return baerchi.level < BaerchiConfig.MAX_LEVEL or TowerConfig.isEndlessOpen(data.towers.records)
 end
 
 local function runEatCycle(player: Player, baerchiUid: string)

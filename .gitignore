@@ -25,3 +25,6 @@ desktop.ini
 
 # Sicherungskopien vor grossen Umbauten (nur lokal)
 /_backup_*/
+
+# Python-Cache
+__pycache__/
