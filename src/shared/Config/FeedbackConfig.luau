@@ -46,6 +46,10 @@ local CLASSES: { [string]: Class } = {
 	level_up           = "ICON",    -- "Lv 5" ueber dem Baerchi
 	feed               = "ICON",    -- XP-Zahl ueber dem Baerchi
 	egg_pressed        = "ICON",
+	-- Sammel-Update 05.10.
+	index_reward       = "MOMENT",  -- Paket 7: Index-Belohnung abgeholt
+	special_milestone  = "MOMENT",  -- Paket 6.2: Ascensions-Ei aus besonderem Meilenstein
+	incubator          = "ICON",    -- Paket 8: Ei in den Inkubator gelegt / beschleunigt
 	comb_delivered     = "ICON",
 	recycler_upgraded  = "ICON",
 	tower_result       = "ICON",

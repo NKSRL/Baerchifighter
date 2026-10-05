@@ -40,9 +40,14 @@ local Types         = require(ReplicatedStorage.Network.Types)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 
+local BaerchiMesh   = require(ReplicatedStorage.Modules.BaerchiMesh)   -- Sammel-Update 2.2: Baerchi gross zeigen
+local Loc           = require(ReplicatedStorage.Localization.Loc)
+
 local Theme = require(script.Parent.Theme)
 local EggIcon = require(script.Parent.EggIcon)
 local Toast = require(script.Parent.Toast)
+-- Sammel-Update: fehlte, Notify.emit beim Fehlschlag waere ein Laufzeitfehler.
+local Notify = require(script.Parent.Notify)
 
 local HatchAnimation = {}
 
@@ -53,7 +58,14 @@ local HatchAnimation = {}
 local DROP_SECONDS        = 0.4
 local WOBBLE_STAGE_SECONDS = 0.45   -- pro Wackel-Stufe (3 Stufen = ~1,4 s)
 local CHARGE_SECONDS      = 0.3
-local REVEAL_SECONDS      = 1.2
+-- Sammel-Update 2.2 ("Ei-Oeffnen geht zu schnell weg"): das Ergebnis bleibt
+-- mindestens REVEAL_MIN_SECONDS stehen (vorher 1,2 s + 0,8 s) und schliesst
+-- danach erst durch Tippen oder nach REVEAL_AUTO_CLOSE Sekunden.
+local REVEAL_SECONDS      = 2.5
+local REVEAL_MIN_TAP      = 0.8     -- frueher als das schliesst auch ein Tipp nicht
+local REVEAL_AUTO_CLOSE   = 7.0
+local CARD_SIZE           = Vector2.new(360, 330)
+local MODEL_VIEW_HEIGHT   = 150
 local FADE_SECONDS        = 0.25
 local RESULT_TIMEOUT      = 5       -- Sekunden ohne Server-Antwort, dann Abbruch
 local SKIP_AFTER          = 1.0     -- ab hier beschleunigt ein Tap aufs Ergebnis
@@ -357,32 +369,73 @@ local function buildReveal(scene: Scene, result: Types.HatchResult): Frame
 	end
 
 	if result.isNew then
-		local new = cardLabel("New", "NEU!", 10, 22, Theme.COLORS.goldGummy)
+		local new = cardLabel("New", Loc.t("ui.hatch.new"), 10, 22, Theme.COLORS.goldGummy)
 		Theme.outlineText(new)
 	end
 
-	local title = (if mutation then BaerchiConfig.getMutationDisplayName(mutation):upper() .. "  " else "")
-		.. (if def then def.displayName else baerchi.configId)
-	local titleLabel = cardLabel("Title", title, 38, 34, color)
+	-- Sammel-Update 2.2 (Luccini: "Baerchen bei Eioeffnung zeigen"): der
+	-- Baerchi selbst, gross und drehend, in einem ViewportFrame.
+	local view = Instance.new("ViewportFrame")
+	view.Name                   = "Model"
+	view.AnchorPoint            = Vector2.new(0.5, 0)
+	view.Position               = UDim2.new(0.5, 0, 0, 34)
+	view.Size                   = UDim2.new(1, -40, 0, MODEL_VIEW_HEIGHT)
+	view.BackgroundTransparency = 1
+	view.ZIndex                 = 58
+	view.Ambient                = Color3.fromRGB(200, 200, 210)
+	view.LightColor             = Color3.fromRGB(255, 250, 235)
+	view.Parent                 = card
+	local okModel, model = pcall(function()
+		return BaerchiMesh.build(Vector3.zero, rarityColor, baerchi.rarity,
+			if mutation then BaerchiConfig.getMutationColor(mutation) else nil)
+	end)
+	if okModel and model then
+		model.Parent = view
+		local cf, size = model:GetBoundingBox()
+		local camera = Instance.new("Camera")
+		camera.FieldOfView = 30
+		local radius = math.max(size.X, size.Y, size.Z)
+		local distance = radius / (2 * math.tan(math.rad(camera.FieldOfView / 2))) * 1.1
+		camera.Parent = view
+		view.CurrentCamera = camera
+		-- Langsam drehen, solange die Karte steht (Ende: Karte zerstoert).
+		local center = cf.Position
+		local spin = 0
+		local conn: RBXScriptConnection? = nil
+		conn = RunService.RenderStepped:Connect(function(dt)
+			if not view.Parent then
+				if conn then conn:Disconnect() end
+				return
+			end
+			spin += dt * 0.9
+			local dir = Vector3.new(math.sin(spin), 0.3, math.cos(spin)).Unit
+			camera.CFrame = CFrame.lookAt(center + dir * distance, center)
+		end)
+	end
+
+	local title = (if mutation then Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)):upper() .. "  " else "")
+		.. Loc.name("baerchi." .. baerchi.configId .. ".name", if def then def.displayName else baerchi.configId)
+	local base = 34 + MODEL_VIEW_HEIGHT
+	local titleLabel = cardLabel("Title", title, base + 2, 34, color)
 	Theme.outlineText(titleLabel)
 
-	cardLabel("Rarity", string.upper(baerchi.rarity), 78, 24, rarityColor)
+	cardLabel("Rarity", string.upper(Loc.t("rarity." .. baerchi.rarity)), base + 40, 24, rarityColor)
 
-	local eggDef = EggConfig.data[result.eggType]
-	local sub = cardLabel("Sub", string.format("Lv. %d%s\naus %s",
-		baerchi.level,
-		if mutation then string.format("  •  %s x%.2g", BaerchiConfig.getMutationDisplayName(mutation), BaerchiConfig.getMutationMultiplier(mutation)) else "",
-		if eggDef then eggDef.displayName else tostring(result.eggType)
-	), 108, 40, Theme.COLORS.textDim)
+	local eggName = Loc.name("egg." .. tostring(result.eggType) .. ".name", tostring(result.eggType))
+	local sub = cardLabel("Sub", Loc.t("ui.hatch.sub", {
+		level = baerchi.level,
+		mutation = if mutation then string.format("  •  %s x%.2g", Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)), BaerchiConfig.getMutationMultiplier(mutation)) else "",
+		egg = eggName,
+	}), base + 66, 40, Theme.COLORS.textDim)
 	sub.Font       = Theme.FONT_BODY
 	sub.TextScaled = false
 	sub.TextSize   = 15
 
-	local tapHint = cardLabel("Tap", "Tippen zum Schliessen", 156, 16, Theme.COLORS.textDim)
+	local tapHint = cardLabel("Tap", Loc.t("ui.hatch.tap_close"), CARD_SIZE.Y - 22, 16, Theme.COLORS.textDim)
 	tapHint.TextScaled = false
-	tapHint.TextSize   = 12
+	tapHint.TextSize   = 13
 
-	tween(card, 0.28, { Size = UDim2.fromOffset(340, 184) }, Enum.EasingStyle.Back)
+	tween(card, 0.28, { Size = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y) }, Enum.EasingStyle.Back)
 	return card
 end
 
@@ -422,7 +475,7 @@ local function play(job: Job)
 
 	while not job.result and not job.failed do
 		if os.clock() - job.started > RESULT_TIMEOUT then
-			job.failed = "Keine Antwort vom Server — das Ei ist noch im Lager"
+			job.failed = Loc.t("err.hatch_timeout")
 			break
 		end
 		RunService.RenderStepped:Wait()
@@ -433,7 +486,7 @@ local function play(job: Job)
 		connection:Disconnect()
 		if not job.silent then
 			Notify.emit("hatch_failed", function()
-				Toast.show(job.failed or "Oeffnen fehlgeschlagen", Theme.COLORS.bad)
+				Toast.show(job.failed or Loc.t("err.hatch_failed"), Theme.COLORS.bad)
 			end)
 		end
 		tween(scene.backdrop, FADE_SECONDS, { BackgroundTransparency = 1 })
@@ -492,9 +545,15 @@ local function play(job: Job)
 	-- Nach dem Burst darf ein Tap die Karte sofort schliessen.
 	_skip = false
 	local revealStart = os.clock()
-	local minimum = REVEAL_SECONDS + (if intensity.beam then 0.6 elseif intensity.shake then 0.3 else 0)
-	while os.clock() - revealStart < minimum + 0.8 do
-		if _skip and os.clock() - revealStart > 0.3 then break end
+	-- Sammel-Update 2.2: steht mindestens REVEAL_SECONDS (plus Zuschlag fuer
+	-- seltene), ein Tipp schliesst ab REVEAL_MIN_TAP, sonst nach REVEAL_AUTO_CLOSE.
+	-- Warten in der Schlange weitere Eier, geht es nach der Mindestzeit weiter.
+	local minimum = REVEAL_SECONDS + (if intensity.beam then 0.8 elseif intensity.shake then 0.4 else 0)
+	while true do
+		local shown = os.clock() - revealStart
+		if _skip and shown > REVEAL_MIN_TAP then break end
+		if shown >= REVEAL_AUTO_CLOSE then break end
+		if shown >= minimum and #_queue > 1 then break end
 		RunService.RenderStepped:Wait()
 	end
 

@@ -226,16 +226,24 @@ function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerc
 	-- Kommentar-Kopf dort).
 	local labelAnchor = (model:FindFirstChild("head", true) :: BasePart?) or model.PrimaryPart
 	if labelAnchor then
+		-- Sammel-Update 1.4 ("Naechstes Ei in: ist im Baerchi und braucht mehr
+		-- Space"): breiter und hoeher (laengere Texte auf Franzoesisch/
+		-- Spanisch), und der Abstand kommt aus der echten Oberkante der Figur
+		-- (welt-ausgerichtet) statt aus der am body gedrehten Bounding-Box —
+		-- das Schild sitzt damit immer UEBER dem Kopf, nie darin.
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name        = "Label"
-		billboard.Size        = UDim2.fromScale(6, 3.0)
-		billboard.StudsOffset = Vector3.new(0, BaerchiMesh.getHeight(model) * 0.55 + 0.6, 0)
+		billboard.Size        = UDim2.fromScale(MapConfig.FIGURE_LABEL.width, MapConfig.FIGURE_LABEL.height)
+		local _, topY = BaerchiMesh.worldBoundsY(model)
+		local anchorY = labelAnchor.Position.Y
+		local aboveHead = if topY then math.max(0, (topY :: number) - anchorY) else BaerchiMesh.getHeight(model) * 0.55
+		billboard.StudsOffset = Vector3.new(0, aboveHead + MapConfig.FIGURE_LABEL.height * 0.5 + MapConfig.FIGURE_LABEL.gap, 0)
 		billboard.AlwaysOnTop = false
 		billboard.MaxDistance = MapConfig.BAERCHI_CLICK_DISTANCE
 		billboard.Adornee     = labelAnchor
 		billboard.Parent      = labelAnchor
 
-		local name = MapParts.newTextLabel("Name", billboard, UDim2.fromScale(1, 0.36), UDim2.fromScale(0, 0))
+		local name = MapParts.newTextLabel("Name", billboard, UDim2.fromScale(1, 0.34), UDim2.fromScale(0, 0))
 		name.Text = string.format(
 			"%s%s  Lv.%d",
 			-- Das Namensschild ist die zweite Stelle, an der eine Mutation
@@ -253,9 +261,10 @@ function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerc
 			name.TextColor3 = BaerchiConfig.getMutationColor(baerchi.mutation)
 		end
 
-		MapParts.newTextLabel("Health", billboard, UDim2.fromScale(1, 0.32), UDim2.fromScale(0, 0.36))
+		MapParts.newTextLabel("Health", billboard, UDim2.fromScale(1, 0.28), UDim2.fromScale(0, 0.34))
 
-		local eggTimer = MapParts.newTextLabel("EggTimer", billboard, UDim2.fromScale(1, 0.32), UDim2.fromScale(0, 0.68))
+		-- Ei-Timer bekommt die groesste Zeile: er ist der laengste Text.
+		local eggTimer = MapParts.newTextLabel("EggTimer", billboard, UDim2.fromScale(1, 0.38), UDim2.fromScale(0, 0.62))
 		eggTimer.TextColor3 = Color3.fromRGB(255, 224, 140)   -- Ei-Gold, passend zur HUD-Farbwelt
 		eggTimer.Text        = ""   -- EggTimerController fuellt das im ersten Tick
 	end

@@ -44,6 +44,11 @@ UnlockRules.ELEMENTS = {
 	"button_event", "tile_leaderboard", "tile_daily", "pill_gold",
 	"tile_tree", "tab_upgrade", "charms", "recycling",
 	"pill_rank", "pill_rebirth", "index", "tile_shop",
+	"tile_incubator",   -- Sammel-Update 05.10. (Paket 8): ab dem ersten Kampf
+	"tile_building",    -- Sammel-Update 05.10. (Paket 3.5): Gebaeude verbessern, ab dem ersten Kampf
+	-- Sammel-Update 05.10. (Paket 3.4): einmalige Waehrungs-Hinweise. Nie von
+	-- selbst "sichtbar" (Bedingung false), nur als gesehen-Markierung.
+	"hint_gummies", "hint_gold",
 }
 
 -- Schwellen (Default-Annahmen aus dem Plan, im Bericht benannt)
@@ -94,7 +99,7 @@ local function condition(view: View, id: string): boolean
 	local hatched = stat(view, "totalHatched")
 	local rebirths = view.rebirthCount or 0
 
-	if id == "button_event" or id == "tile_leaderboard" or id == "tile_daily" then
+	if id == "button_event" or id == "tile_leaderboard" or id == "tile_daily" or id == "tile_incubator" or id == "tile_building" then
 		return fought or rebirths > 0
 	elseif id == "pill_gold" then
 		return (view.goldGummies or 0) > 0

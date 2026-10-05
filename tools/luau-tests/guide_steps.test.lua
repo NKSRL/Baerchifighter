@@ -33,12 +33,17 @@ v.island.eggStock.BasicEgg = 2
 check("Baerchi da -> fight", GuideSteps.current(v), "fight")
 
 v.island.towerProgress = { I = 3 }
-check("gekaempft, keine Eier -> event", GuideSteps.current(v), "event")
+-- Sammel-Update 3.5: Waben -> Gebaeude -> Event
+check("gekaempft, keine Eier -> combs", GuideSteps.current(v), "combs")
 
 v.island.laidEggs = { { uid = "e1" } }
 check("gelegtes Ei -> collect", GuideSteps.current(v), "collect")
 
 v.island.laidEggs = {}
+v.stats.totalCombsDelivered = 2
+check("Waben abgegeben -> upgrade", GuideSteps.current(v), "upgrade")
+v.island.buildings = { HoneyPond = { level = 2 } }
+check("Gebaeude verbessert -> event", GuideSteps.current(v), "event")
 v.stats.totalEventsCompleted = 1
 check("Event geschafft -> fertig", GuideSteps.current(v), nil)
 
@@ -73,11 +78,12 @@ local rec = fresh()
 rec.island.baerchis = { a = {} }
 rec.towers.records = { I = 4 }
 rec.island.towerProgress = nil
-check("Rekord zaehlt als Kampf", GuideSteps.current(rec), "event")
+check("Rekord zaehlt als Kampf", GuideSteps.current(rec), "combs")
 
 -- Monotonie: eine wachsende Folge darf nie zu einem frueheren Schritt zurueck
 -- "collect" ist ein Einschub zwischen Kampf und Event: gleicher Rang wie "event"
-local order = { hatch = 1, merchant = 1, fight = 2, collect = 3, event = 3 }
+-- Sammel-Update 3.5: combs/upgrade liegen zwischen Kampf und Event
+local order = { hatch = 1, merchant = 1, fight = 2, collect = 3, combs = 3, upgrade = 4, event = 5 }
 local seq = fresh()
 local last = 0
 local states = {
@@ -86,6 +92,8 @@ local states = {
 	function(s) s.island.towerProgress = { I = 1 } end,
 	function(s) s.island.laidEggs = { {} } end,
 	function(s) s.island.laidEggs = {} end,
+	function(s) s.stats.totalCombsDelivered = 1 end,
+	function(s) s.island.buildings = { HoneyPond = { level = 2 } } end,
 	function(s) s.stats.totalEventsCompleted = 1 end,
 }
 local monotone = true

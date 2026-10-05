@@ -636,6 +636,47 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		end
 	end
 
+	-- ============================================================
+	-- v16: SAMMEL-UPDATE 05.10. (eine gemeinsame Migration)
+	-- ============================================================
+	-- Nur Anlegen, keine Waehrung. Am Feld erkennbar und damit wiederholbar.
+	--   island.stageBest   Rebirth nach Stage (Paket 4.1). Fuer Staende VOR
+	--                      v16 aus towerProgress gesaeet (dort steht die
+	--                      zuletzt BETRETENE Stage, geschafft ist eine
+	--                      weniger) — wer kurz vor dem alten Gummy-Rebirth
+	--                      stand, muss nicht bei null anfangen.
+	--   island.incubator   Paket 8, Level 1, keine Eier
+	--   indexClaimed       Paket 7, leer (rueckwirkend abholbar)
+	--   specialClaimed     Paket 6.2, leer (SpecialMilestoneService zahlt
+	--                      beim Join rueckwirkend aus)
+	if typeof(island.stageBest) ~= "table" then
+		local best: { [string]: number } = {}
+		if (data.version or 0) < 16 and typeof(island.towerProgress) == "table" then
+			for towerId, entered in island.towerProgress :: any do
+				local n = (tonumber(entered) or 0) - 1
+				if typeof(towerId) == "string" and n > 0 then
+					best[towerId] = n
+				end
+			end
+		end
+		island.stageBest = best
+	end
+	local incubator = (island :: any).incubator
+	if typeof(incubator) ~= "table" then
+		island.incubator = { level = 1, slots = {}, breeders = {} }
+	else
+		if typeof(incubator.level) ~= "number" or incubator.level < 1 then incubator.level = 1 end
+		if typeof(incubator.slots) ~= "table" then incubator.slots = {} end
+		-- INCUBATOR_BREED: Liste der bruetenden Baerchis (fehlt in v16-Staenden)
+		if typeof(incubator.breeders) ~= "table" then incubator.breeders = {} end
+	end
+	if typeof((data :: any).indexClaimed) ~= "table" then
+		data.indexClaimed = {}
+	end
+	if typeof((data :: any).specialClaimed) ~= "table" then
+		data.specialClaimed = {}
+	end
+
 	-- Zum Schluss die Versionsnummer nachziehen. Sie steuert heute keine der
 	-- Migrationen oben — die pruefen alle einzeln auf fehlende Felder und
 	-- laufen deshalb harmlos bei jedem Laden. Sie ist trotzdem wichtig: sobald

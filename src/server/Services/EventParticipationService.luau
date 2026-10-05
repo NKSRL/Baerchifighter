@@ -72,6 +72,7 @@ local EggService      = require(ServerScriptService.Services.EggService)
 local CombRecyclerService = require(ServerScriptService.Services.CombRecyclerService)
 local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 local Loc           = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 
 local EventParticipationService = {}
 
@@ -86,6 +87,11 @@ local EventParticipationService = {}
 -- Bewusste Folge: waehrend der Teilnahme isst der Baerchi nicht. Das ist der
 -- Preis fuers Hinschicken und macht die Entscheidung erst zu einer.
 local LOCK_HOLDER = "EventParticipation"
+
+-- Sammel-Update 1.1: so lange darf eine UFO-Entfuehrung hoechstens dauern
+-- (Hochziehen 2 s + Transport 3 s + Warten + Absetzen 1,5 s, grosszuegig
+-- aufgerundet). Danach greift der Waechter in tick().
+local ABDUCT_WATCHDOG_SECONDS = EventConfig.UFO.ABDUCT_WAIT_SECONDS + 30
 
 -- Der Weg von einem Plot (Ring-Radius 212) in die Mitte ist lang. Mit der
 -- normalen MapConfig.WALK_SPEED waere man ueber zehn Sekunden unterwegs —
@@ -172,8 +178,7 @@ local function notifyPresence(player: Player, atEvent: boolean, baerchiUid: stri
 end
 
 local function footPosOf(model: Model): Vector3
-	local box, size = model:GetBoundingBox()
-	return Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
 
 -- Der Standplatz dieses Spielers auf dem Podest: auf der Seite, aus der er
@@ -502,7 +507,7 @@ local function awardBonus(
 	data: Types.PlayerData,
 	baerchi: Types.Baerchi,
 	bonus: EventConfig.EventBonus?
-): (string?, Types.MutationId?)
+): (Types.LocMsg?, Types.MutationId?)
 
 	if not bonus then
 		return nil, nil
@@ -527,9 +532,9 @@ local function awardBonus(
 		end
 
 		if added <= 0 then
-			return "Honig-Lager waren schon voll", nil
+			return Loc.msg("msg.event.honey_full"), nil
 		end
-		return string.format("+%d Honig", added), nil
+		return Loc.msg("msg.event.honey", { n = added }), nil
 	end
 
 	-- EIER ins Lager, nicht in einen Brut-Slot: die Brut startet der Spieler
@@ -556,22 +561,21 @@ local function awardBonus(
 		end
 		data.island.eggStock[eggType] = (data.island.eggStock[eggType] or 0) + amount
 
-		local eggDef = EggConfig.data[eggType]
-		local text = string.format("+%dx %s", amount, if eggDef then eggDef.displayName else eggType)
-		if isJump then
-			text ..= " (Sprung-Ei!)"
-		end
+		-- Sammel-Update 2.4: Text als LocMsg, der Client uebersetzt.
+		local text = Loc.msg(if isJump then "msg.event.eggs_jump" else "msg.event.eggs", {
+			n = amount, egg = Loc.msg("egg." .. eggType .. ".name"),
+		})
 
 		-- Blaupause (Koenigshuegel, Schatzgraeber mit 5 Funden)
 		if (bonus.blueprintChance or 0) > 0 and math.random() < (bonus.blueprintChance :: number) then
 			EggTreeService.grantBlueprint(player, data, 1)
-			text ..= "  +1 Blaupause!"
+			text = Loc.join(text, Loc.msg("msg.event.blueprint"))
 		end
 
 		-- Notfall-Ei (zusaetzlich, siehe EventConfig.EMERGENCY_BASIC_EGG_CHANCE)
 		if math.random() < EventConfig.EMERGENCY_BASIC_EGG_CHANCE then
 			data.island.eggStock.BasicEgg = (data.island.eggStock.BasicEgg or 0) + 1
-			text ..= "  +1 Basis-Ei"
+			text = Loc.join(text, Loc.msg("msg.event.eggs", { n = 1, egg = Loc.msg("egg.BasicEgg.name") }))
 		end
 
 		return text, nil
@@ -585,7 +589,7 @@ local function awardBonus(
 		if final <= 0 then
 			return nil, nil
 		end
-		return string.format("+%d Gummies", final), nil
+		return Loc.msg("msg.event.gummies", { n = final }), nil
 	end
 
 	if bonus.kind == "goldGummies" then
@@ -593,7 +597,7 @@ local function awardBonus(
 		if final <= 0 then
 			return nil, nil
 		end
-		return string.format("+%d GoldGummies", final), nil
+		return Loc.msg("msg.event.gold", { n = final }), nil
 	end
 
 	-- MUTATION: zwei getrennte Wuerfe. Erst die Event-Chance (kommt ueberhaupt
@@ -614,17 +618,11 @@ local function awardBonus(
 		-- eintauschen. Der Fehlversuch wird trotzdem gemeldet — ein Treffer,
 		-- der nichts veraendert, saehe sonst aus wie ein verschlucktes Ergebnis.
 		if better == baerchi.mutation then
-			return string.format(
-				"Mutations-Wurf: %s — schwaecher als seine, bleibt wie es ist",
-				BaerchiConfig.getMutationDisplayName(rolled)
-			), nil
+			return Loc.msg("msg.event.mutation_weaker", { m = Loc.msg("mutation." .. rolled .. ".name") }), nil
 		end
 
 		baerchi.mutation = better
-		return string.format(
-			"MUTATION: %s!",
-			BaerchiConfig.getMutationDisplayName(better :: Types.MutationId)
-		), better
+		return Loc.msg("msg.event.mutation", { m = Loc.msg("mutation." .. (better :: string) .. ".name") }), better
 	end
 
 	return nil, nil
@@ -653,9 +651,9 @@ local function awardExtras(
 	data: Types.PlayerData,
 	baerchi: Types.Baerchi,
 	result: EventHandlers.Reward
-): ({ Types.LocMsg }, string?, string?)
+): ({ Types.LocMsg }, Types.LocMsg?, string?)
 	local notes: { Types.LocMsg } = {}
-	local eggText: string? = nil
+	local eggText: Types.LocMsg? = nil
 
 	if result.extraEgg then
 		eggText = awardBonus(player, data, baerchi, result.extraEgg)
@@ -666,7 +664,7 @@ local function awardExtras(
 	if result.tierBonus then
 		local tierText = awardBonus(player, data, baerchi, result.tierBonus)
 		if tierText then
-			eggText = if eggText then eggText .. "  •  " .. tierText else tierText
+			eggText = if eggText then Loc.join(eggText, tierText) else tierText
 		end
 	end
 	if (result.tierEggs or 0) > 0 then
@@ -753,6 +751,12 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		end
 		FunnelService.step(player, "F09_FirstEventCompleted")
 		data.stats.totalEventsCompleted = (data.stats.totalEventsCompleted or 0) + 1
+		-- Sammel-Update 05.10. (Paket 6.2): Boss-Siege zaehlen (besonderer
+		-- Meilenstein, SpecialMilestoneService zahlt beim naechsten Datenstand).
+		if result.bossVictory then
+			local stats = data.stats :: any
+			stats.bossVictories = (stats.bossVictories or 0) + 1
+		end
 
 		local bonus: EventConfig.EventBonus? = nil
 		if result.egg then
@@ -768,7 +772,7 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		-- des Handlers.
 		local notes, extraEggText, rarityUp = awardExtras(player, data, baerchi, result)
 		if extraEggText then
-			bonusText = if bonusText then bonusText .. "  •  " .. extraEggText else extraEggText
+			bonusText = if bonusText then Loc.join(bonusText, extraEggText) else extraEggText
 		end
 		if player.Parent ~= nil then
 			if result.notice then
@@ -839,7 +843,7 @@ local function onEventEnded(finished: EventConfig.EventDef)
 			"[EventParticipationService]", player.Name,
 			"|", finished.id,
 			"→", statText,
-			if bonusText then "| " .. bonusText else ""
+			if bonusText then "| " .. Loc.resolve(bonusText) else ""
 		)
 	end
 
@@ -859,7 +863,7 @@ end
 --------------------------------------------------------------------------------
 
 -- Meldung an den Spieler waehrend eines Events (Toast beim Client).
-local function toast(player: Player, text: string)
+local function toast(player: Player, text: string | Types.LocMsg)
 	if player.Parent == nil then
 		return
 	end
@@ -876,6 +880,71 @@ local function toast(player: Player, text: string)
 	Remotes.EventStatGained:FireClient(player, gain)
 end
 
+--------------------------------------------------------------------------------
+-- UFO_REJOIN: befristete Schwaechung nach dem UFO-Absetzen
+--------------------------------------------------------------------------------
+-- Nur Laufzeit (nicht gespeichert): uid -> os.clock(), bis zu der das Level in
+-- Event-Duellen mit EventConfig.UFO.DROP_WEAKEN_LEVEL_FACTOR zaehlt. Die Figur
+-- traegt das Attribut "WeakUntil" (Serverzeit), damit der Client es zeigen kann.
+local _weakUntil: { [string]: number } = {}
+
+local function isWeakened(baerchiUid: string): boolean
+	local untilAt = _weakUntil[baerchiUid]
+	if not untilAt then return false end
+	if os.clock() >= untilAt then
+		_weakUntil[baerchiUid] = nil
+		return false
+	end
+	return true
+end
+
+local function weakenedLevel(baerchiUid: string, level: number): number
+	if not isWeakened(baerchiUid) then return level end
+	return math.max(1, math.floor(level * EventConfig.UFO.DROP_WEAKEN_LEVEL_FACTOR))
+end
+
+local function weaken(player: Player, baerchiUid: string, seconds: number)
+	if not FeatureFlags.isOn("UFO_REJOIN") or seconds <= 0 then return end
+	_weakUntil[baerchiUid] = os.clock() + seconds
+	local figure = MapService.getBaerchiModel(player, baerchiUid)
+	if figure then
+		figure:SetAttribute("WeakUntil", workspace:GetServerTimeNow() + seconds)
+		-- Sichtbar fuer alle (sprachneutral): "💫 ½ Lv 42s" ueber dem Kopf.
+		local root = figure.PrimaryPart or figure:FindFirstChildWhichIsA("BasePart")
+		local old = figure:FindFirstChild("WeakLabel")
+		if old then old:Destroy() end
+		if root then
+			local gui = Instance.new("BillboardGui")
+			gui.Name        = "WeakLabel"
+			gui.Size        = UDim2.fromOffset(120, 28)
+			gui.StudsOffset = Vector3.new(0, 7.5, 0)
+			gui.AlwaysOnTop = true
+			gui.MaxDistance = 120
+			gui.Adornee     = root
+			local text = Instance.new("TextLabel")
+			text.Size                   = UDim2.fromScale(1, 1)
+			text.BackgroundTransparency = 1
+			text.Font                   = Enum.Font.GothamBold
+			text.TextScaled             = true
+			text.TextColor3             = Color3.fromRGB(190, 170, 255)
+			text.TextStrokeTransparency = 0.2
+			text.Parent = gui
+			gui.Parent = figure
+			local untilAt = _weakUntil[baerchiUid]
+			task.spawn(function()
+				while gui.Parent and _weakUntil[baerchiUid] == untilAt and os.clock() < untilAt do
+					text.Text = string.format("💫 ½ Lv %ds", math.ceil(untilAt - os.clock()))
+					task.wait(1)
+				end
+				gui:Destroy()
+			end)
+		end
+	end
+	if player.Parent ~= nil then
+		Remotes.EventNotice:FireClient(player, Loc.msg("msg.ufo.weakened", { s = seconds }), "info")
+	end
+end
+
 -- Setzt die Figur wieder aufs Plot und beendet die Teilnahme (UFO-Absetzen).
 local function finishHome(presence: any)
 	local player: Player = presence.player
@@ -886,6 +955,11 @@ local function finishHome(presence: any)
 	end
 
 	if figure then
+		-- Sammel-Update 1.1: ERST das Atmen abmelden, dann setzen. Sonst
+		-- springt idleBob -> stopIdle die Figur auf ihre alte Ruhelage zurueck
+		-- (z.B. mitten im Event-Pit) und sie "atmet" dort weiter, obwohl sie
+		-- laut Daten schon zu Hause ist — genau das eingefrorene Bild.
+		FigureFX.stopIdle(figure)
 		FigurePlacement.place(figure, presence.homeFoot, figure:GetPivot().Rotation)
 		FigureFX.idleBob(figure, {
 			height = MapConfig.IDLE_BOB_HEIGHT,
@@ -938,14 +1012,14 @@ local function applyUfoReward(presence: any)
 		)
 	end
 
-	local parts: { string } = {}
-	if #gained > 0 then
-		table.insert(parts, "+1 " .. table.concat(gained, "/"))
-	else
-		table.insert(parts, "alle Stats am Maximum")
-	end
+	-- Sammel-Update 2.4: als LocMsg (Stat-Kuerzel sind in allen Sprachen gleich)
+	local text: Types.LocMsg = if #gained > 0
+		then Loc.msg("msg.ufo.reward_stats", { stats = table.concat(gained, "/") })
+		else Loc.msg("msg.ufo.reward_maxed")
 	if rarityUp then
-		table.insert(parts, string.format("RARITY UP: %s -> %s!", oldRarity, rarityUp))
+		text = Loc.join(text, Loc.msg("msg.event.rarity_up", {
+			from = Loc.msg("rarity." .. oldRarity), to = Loc.msg("rarity." .. rarityUp),
+		}))
 	end
 
 	local gain: any = {
@@ -954,7 +1028,7 @@ local function applyUfoReward(presence: any)
 		statKey    = nil,
 		newLevel   = 0,
 		cap        = PromotionConfig.getStatCap(baerchi.rarity),
-		bonusText  = "UFO: " .. table.concat(parts, "  •  "),
+		bonusText  = text :: any,
 		mutation   = nil,
 		midEvent   = true,
 		rarityUp   = rarityUp,
@@ -966,7 +1040,7 @@ local function applyUfoReward(presence: any)
 
 	MapService.celebrateBaerchi(player, presence.baerchiUid, BaerchiConfig.getRarityColor(baerchi.rarity))
 
-	print("[EventParticipationService]", player.Name, "| UFO:", table.concat(parts, " | "))
+	print("[EventParticipationService]", player.Name, "| UFO:", Loc.resolve(text))
 end
 
 local function buildApi(token: number): any
@@ -1008,14 +1082,22 @@ local function buildApi(token: number): any
 	api.level = function(part: any): number
 		local data = PlayerService.getData(part.player)
 		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
-		return if baerchi then baerchi.level else 1
+		return if baerchi then weakenedLevel(part.baerchiUid, baerchi.level) else 1
 	end
 
 	-- Kampfstaerke fuer Duelle: ATK * maxHp (wie CombatCalculator).
 	api.power = function(part: any): number
 		local data = PlayerService.getData(part.player)
-		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
-		if not baerchi then return 1 end
+		local found = if data then data.island.baerchis[part.baerchiUid] else nil
+		if not found then return 1 end
+		local baerchi: any = found
+		-- UFO_REJOIN: geschwaecht = mit halbem Level rechnen (Kopie, die
+		-- gespeicherten Daten bleiben unberuehrt).
+		local level = weakenedLevel(part.baerchiUid, baerchi.level)
+		if level ~= baerchi.level then
+			baerchi = table.clone(baerchi)
+			baerchi.level = level
+		end
 		local def = BaerchiConfig.getById(baerchi.configId)
 		if def then
 			local ok, stats = pcall(CombatCalculator.getEffectiveStats, baerchi, def.baseStats)
@@ -1035,6 +1117,14 @@ local function buildApi(token: number): any
 
 	api.finishHome = finishHome
 	api.ufoReward  = applyUfoReward
+
+	-- UFO_REJOIN: nach dem Absetzen geschwaecht (Level halbiert, befristet).
+	api.weaken = function(part: any, seconds: number)
+		weaken(part.player, part.baerchiUid, seconds)
+	end
+	api.isWeakened = function(part: any): boolean
+		return isWeakened(part.baerchiUid)
+	end
 
 	-- v17: Eier direkt ins Lager (UFO-Abwurf), ueber EggService.
 	api.grantEgg = function(player: Player, eggType: Types.EggType, amount: number): boolean
@@ -1151,6 +1241,19 @@ local function tick()
 	for player, presence in _present do
 		local data = PlayerService.getData(player)
 
+		-- Sammel-Update 1.1 (UFO-Einfrieren): Waechter fuer die Entfuehrung.
+		-- Haengt der Ablauf (Fehler ausserhalb des pcall, Thread gestorben),
+		-- blieb der Baerchi bisher fuer immer "entfuehrt": Schloss gehalten,
+		-- kein Legen, kein Honig-Teich. Nach der laengsten moeglichen Dauer
+		-- plus Puffer wird er hier sicher heimgesetzt.
+		if presence.abducting and presence.abductedAt
+			and os.clock() - presence.abductedAt > ABDUCT_WATCHDOG_SECONDS then
+			warn("[EventParticipationService] Entfuehrung haengt, setze heim:", player.Name)
+			presence.abducting = false
+			pcall(finishHome, presence)
+			continue
+		end
+
 		local lost = data == nil
 			or player.Parent == nil
 			or ActivityLock.owner(player) ~= LOCK_HOLDER
@@ -1181,6 +1284,24 @@ function EventParticipationService.getPhase(player: Player): string?
 		return if _walkDir[player] == "to" and not _cancelTo[player] then "ToEvent" else "Returning"
 	end
 	return nil
+end
+
+-- Sammel-Update 05.10. (Paket 5.2): wer steht gerade mit welcher Figur am
+-- Event (fuer PitBrawlService). Nur lesend; "busy" = laeuft/kaempft gerade,
+-- dann greift die Figur niemanden an.
+function EventParticipationService.getParticipants(): { { player: Player, figure: Model, busy: boolean } }
+	local list = {}
+	for player, presence in _present do
+		local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
+		if figure and figure.Parent and not presence.abducting then
+			table.insert(list, { player = player, figure = figure, busy = presence.busy == true })
+		end
+	end
+	return list
+end
+
+function EventParticipationService.isPresent(player: Player): boolean
+	return _present[player] ~= nil
 end
 
 -- v12: wird der Baerchi gerade vom UFO entfuehrt? (Event-Knopf gesperrt)

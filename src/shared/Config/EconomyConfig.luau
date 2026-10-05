@@ -24,6 +24,11 @@ local FeatureFlags = require(script.Parent.FeatureFlags)
 
 -- Gummies-Kosten fuer Rebirth n (Index = rebirthCount + 1).
 --
+-- SAMMEL-UPDATE 05.10. (Paket 4.1): Der Rebirth kostet KEINE Gummies mehr —
+-- Bedingung ist eine Tower-Stage (TowerConfig.getRebirthRequirement). Die
+-- Tabelle bleibt nur fuer alte Simulationen (egg_tree_sim, pacing_v2_vorschlag)
+-- stehen; RebirthService und RebirthDialog lesen sie nicht mehr.
+--
 -- v15: NEU KALIBRIERT fuer das Tower-System (tools/sim/progression_pacing.lua,
 -- Profil "Normal" 90 min/Tag). Mit dem Tower-Einkommen waeren die alten Preise
 -- (10.000 / 35.000 / ...) nach Minuten bezahlt gewesen. Ziel-Dauer eines
@@ -113,6 +118,31 @@ local REBIRTH_MILESTONES: { [number]: RebirthMilestone } = {
 	[50]  = { eggs = { { eggType = "OmegaEgg", count = 1 }, { eggType = "EternityEgg", count = 2 } }, unlock = { "OmegaEgg" } },
 	[75]  = { eggs = { { eggType = "OmegaEgg", count = 2 } } },
 	[100] = { eggs = { { eggType = "OmegaEgg", count = 3 } } },
+}
+
+-- Sammel-Update 05.10. (Paket 6.2): BESONDERE MEILENSTEINE. Die zweite (und
+-- neben REBIRTH_MILESTONES einzige) Quelle fuer Ascensions-Eier. Einmalig pro
+-- Konto, auch rueckwirkend (SpecialMilestoneService prueft beim Join und bei
+-- jeder Datenaenderung). Standard-Vorschlag aus Abschnitt 11.2:
+--   Tower III Stage 60 -> 1, Final Stage 100 -> 2, erster Boss-Sieg -> 1.
+-- "Ganzer Index -> 2" steht in IndexRewardConfig (Gesamt-Belohnung, zaehlt
+-- als besonderer Meilenstein, wird aber im Index abgeholt).
+--   kind = "tower"  Rekord in `tower` >= `stage`
+--   kind = "stat"   data.stats[`stat`] >= `atLeast`
+export type SpecialMilestone = {
+	id      : string,
+	kind    : string,
+	tower   : string?,
+	stage   : number?,
+	stat    : string?,
+	atLeast : number?,
+	eggs    : { { eggType: Types.EggType, count: number } },
+}
+
+local SPECIAL_MILESTONES: { SpecialMilestone } = {
+	{ id = "tower_III_60", kind = "tower", tower = "III",   stage = 60,  eggs = { { eggType = "AscensionEgg", count = 1 } } },
+	{ id = "final_100",    kind = "tower", tower = "Final", stage = 100, eggs = { { eggType = "AscensionEgg", count = 2 } } },
+	{ id = "first_boss",   kind = "stat",  stat = "bossVictories", atLeast = 1, eggs = { { eggType = "AscensionEgg", count = 1 } } },
 }
 
 -- Fuer alte Stellen, die nur die Ascensions-Eier kennen (wird von
@@ -464,6 +494,7 @@ return {
 	getRebirthCost        = getRebirthCost,
 	getRebirthMult        = getRebirthMult,
 	getAscensionEggReward = getAscensionEggReward,
+	SPECIAL_MILESTONES    = SPECIAL_MILESTONES,   -- Sammel-Update 6.2
 	getHoneyXp            = getHoneyXp,
 	getFusionStatBonus    = getFusionStatBonus,
 	getBaerchiBaseValue   = getBaerchiBaseValue,

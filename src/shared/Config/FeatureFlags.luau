@@ -71,6 +71,32 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
 	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
 	ENDLESS           = true,
+
+	-- Sammel-Update 05.10. (docs/SAMMEL_UPDATE_UMGESETZT_2026-10-05.md):
+	-- Paket 8: Inkubator auf dem Plot. Aus = Eier gehen wie vorher sofort auf,
+	-- der Inkubator wird weder gebaut noch angeboten.
+	INCUBATOR         = true,
+	-- Paket 7: Index-Belohnungen (Abholen im Index).
+	INDEX_REWARDS     = true,
+	-- Paket 5.2: Kampf um die Mitte — gegnerische Event-Baerchis stossen
+	-- Spieler ohne eigenen Baerchi im Event-Pit.
+	PIT_BRAWL         = true,
+	-- Paket 3.8: Bereichs-Schilder (zwei Woerter) auf der Hauptinsel.
+	AREA_SIGNS        = true,
+	-- Wunsch 05.10.: Baerchi darf mehrmals ins selbe UFO; nach dem Absetzen
+	-- ist sein Level fuer EventConfig.UFO.DROP_WEAKEN_SECONDS halbiert.
+	-- Aus = wie vorher (wer schon an Bord war, geht heim).
+	UFO_REJOIN        = true,
+	-- Wunsch 05.10.: aufgeraeumtes HUD. Honig-Brunnen nur vor Ort verbessern
+	-- (E, kein Fenster, Schild mit Level und Preis), keine Kacheln "Verbessern"
+	-- und "Inkubator" mehr, Quests als kleiner Knopf neben dem Zahnrad, Shop
+	-- daneben (eine Zeile), groessere Kacheln rechts.
+	HUD_ROW_V2        = true,
+	-- Wunsch 05.10.: Inkubator = Baerchi hineinsetzen, er bruetet je nach
+	-- Rarity im Takt zusaetzliche Eier (IncubatorConfig.BREED_*). Eier gehen
+	-- wieder sofort auf (kein Brueten von Eiern mehr). Aus = Ei-Inkubator wie
+	-- im Sammel-Update.
+	INCUBATOR_BREED   = true,
 }
 
 local FeatureFlags = {}

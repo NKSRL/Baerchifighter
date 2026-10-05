@@ -55,6 +55,7 @@ local CombSlots   = require(ServerScriptService.Util.CombSlots)
 
 local MapService          = require(ServerScriptService.Services.MapService)
 local CombRecyclerService = require(ServerScriptService.Services.CombRecyclerService)
+local PlayerService = require(ServerScriptService.Services.PlayerService)   -- Sammel-Update 3.5
 
 local CombService = {}
 
@@ -94,6 +95,9 @@ local _carried: { [Player]: Carried } = {}
 -- wieder an: ein Spieler, der nie Waben getragen hat, behaelt, was immer ein
 -- anderes System ihm gesetzt hat.
 local _slowed: { [Player]: boolean } = {}
+-- Sammel-Update 05.10. (Paket 5.2): kurze Aufheb-Pause nach einem Stoss im
+-- Kampf um die Mitte (PitBrawlService).
+local _pickupPausedUntil: { [Player]: number } = {}
 
 local _random = Random.new()
 
@@ -374,6 +378,7 @@ end
 --------------------------------------------------------------------------------
 
 local function tryPickup(player: Player, root: BasePart)
+	if os.clock() < (_pickupPausedUntil[player] or 0) then return end   -- Paket 5.2
 	local carried = getCarried(player)
 	if #carried.items >= CombConfig.MAX_CARRY then return end
 
@@ -412,6 +417,14 @@ local function deliver(player: Player)
 	-- geladen), behaelt der Spieler seinen Stapel und es wird beim naechsten
 	-- Takt erneut versucht.
 	if not CombRecyclerService.deposit(player, units) then return end
+
+	-- Sammel-Update 05.10. (Paket 3.5): Zaehler fuer die Einfuehrung
+	-- ("Waben im Recycler abgeben"). Monoton, im Spielstand.
+	local data = PlayerService.getData(player)
+	if data then
+		local stats = data.stats :: any
+		stats.totalCombsDelivered = (stats.totalCombsDelivered or 0) + count
+	end
 
 	-- Jede abgegebene Wabe kommt nach der Respawn-Zeit zurueck ins Pit.
 	local delay = CombConfig.getRespawnDelay(CombRecyclerService.getLevel(player))
@@ -497,6 +510,11 @@ end
 --------------------------------------------------------------------------------
 
 -- Wie viele Waben liegen gerade im Pit (fuer Debug und Tests).
+-- Sammel-Update 05.10. (Paket 5.2): Waben-Aufheben kurz pausieren.
+function CombService.pausePickup(player: Player, seconds: number)
+	_pickupPausedUntil[player] = math.max(_pickupPausedUntil[player] or 0, os.clock() + seconds)
+end
+
 function CombService.getWorldCount(): number
 	return #_world
 end

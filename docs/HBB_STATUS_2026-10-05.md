@@ -31,3 +31,11 @@ Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredle
 
 ## Zusammenführen mit dem Heim-Repo
 Nur `src/`, `tools/check_feedback.py`, `tools/luau-tests/*` und `docs/` übernehmen. `default.project.json` ist rekonstruiert – die vom Heim-PC behalten. Danach dort alle Prüfwerkzeuge laufen lassen und in `migration.test.lua` die Fälle `uiSeen` und `stats.totalEventsCompleted` ergänzen.
+
+## Sammel-Update 05.10.2026 (Cloud)
+Alle Pakete 1–8 aus `OPUS_PROMPT_SAMMEL_UPDATE_2026-10-05.md` umgesetzt, außer 6.3 (Entwurf zur Freigabe: `docs/SAMMEL_6_3_EIKAUF_ENTWURF_2026-10-05.md`) und 8.2 Option 2 (Radius erst nach Bildschirmfoto).
+Bericht: `docs/SAMMEL_UPDATE_UMGESETZT_2026-10-05.md`. **Datenversion 16.** Neue Schalter: `INCUBATOR`, `INDEX_REWARDS`, `PIT_BRAWL`, `AREA_SIGNS`.
+Neue Tests: `rebirth_rules`, `migration_v16`, `incubator` (run_local). In Studio nicht getestet.
+
+## HUD, Inkubator mit Bärchi, UFO-Wiederkehr (Cloud, 05.10.2026)
+Auf dem Sammel-Update aufgesetzt. Bericht: `docs/HBB_HUD_INKUBATOR_UFO_2026-10-05.md`. Neue Schalter: `HUD_ROW_V2` (Brunnen nur vor Ort mit Level-Schild, Zeile ⚙ · Quests · Shop, größere Kacheln), `INCUBATOR_BREED` (Bärchi brütet Eier, Eier gehen wieder sofort auf), `UFO_REJOIN` (mehrmals ins UFO, danach 60 s halbes Level). Alle Prüfungen grün, in Studio nicht getestet.

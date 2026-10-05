@@ -17,6 +17,8 @@
 -- Nur ein Panel gleichzeitig: auf einem Handy ist gestapeltes UI unbedienbar,
 -- und der Spieler soll nie raten muessen welches Fenster gerade zuhoert.
 
+local UserInputService = game:GetService("UserInputService")
+
 local PanelManager = {}
 
 -- open ist bewusst variadisch getypt: manche Panels brauchen Argumente
@@ -134,5 +136,41 @@ function PanelManager.toggle(name: string, ...: any)
 	end
 	PanelManager.open(name, ...)
 end
+
+--------------------------------------------------------------------------------
+-- Sammel-Update 2.1: Tippen ausserhalb schliesst
+--------------------------------------------------------------------------------
+-- Ein kurzer Tipp/Klick in die WELT (nicht auf eine Oberflaeche: dann ist
+-- gameProcessed true) schliesst das offene Fenster. Bewusst ueber
+-- UserInputService statt eines bildschirmfuellenden Knopfs hinter dem
+-- Fenster: der wuerde Menueleiste und HUD blockieren. Ein Wischen (Kamera
+-- drehen) zaehlt nicht — nur kurz (< TAP_SECONDS) und kaum bewegt.
+-- Fenster, die ausdruecklich offen bleiben muessen, stehen in KEEP_OPEN.
+local TAP_SECONDS = 0.35
+local TAP_MOVE_PX = 14
+local KEEP_OPEN: { [string]: boolean } = { Hatch = true, Rebirth = true }
+
+local _tapStart: { [any]: { at: number, pos: Vector3 } } = {}
+
+local function isTapInput(input: InputObject): boolean
+	return input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+end
+
+UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+	if processed or not isTapInput(input) or not _openName then return end
+	_tapStart[input] = { at = os.clock(), pos = input.Position }
+end)
+
+UserInputService.InputEnded:Connect(function(input: InputObject, _processed: boolean)
+	local start = _tapStart[input]
+	_tapStart[input] = nil
+	if not start then return end
+	local name = _openName
+	if not name or KEEP_OPEN[name] then return end
+	if os.clock() - start.at > TAP_SECONDS then return end
+	if (input.Position - start.pos).Magnitude > TAP_MOVE_PX then return end
+	PanelManager.close(name)
+end)
 
 return PanelManager

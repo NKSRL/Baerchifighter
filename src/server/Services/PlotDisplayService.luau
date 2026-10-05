@@ -70,6 +70,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
+local IncubatorRules = require(ReplicatedStorage.Modules.IncubatorRules)   -- Paket 8
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
@@ -78,6 +79,7 @@ local MapService    = require(ServerScriptService.Services.MapService)
 local PlotDisplayService = {}
 
 type Signatures = {
+	incubator : string,   -- Sammel-Update Paket 8
 	structure : string,
 	state     : string,
 	buildings : string,
@@ -178,8 +180,28 @@ local function towerSignature(data: Types.PlayerData): string
 	return string.format("%s:%d", towerId, record)
 end
 
+-- Sammel-Update Paket 8: Inkubator — belegte Plaetze (Ei + Zeitmarken),
+-- Level und Platz-Zahl. Fortschritt rechnet der Client selbst.
+local function incubatorSignature(data: Types.PlayerData): string
+	local incubator = data.island.incubator
+	if not incubator then return "" end
+	local parts: { string } = { tostring(incubator.level), tostring(IncubatorRules.slotCountFor(data)) }
+	for _, entry in incubator.slots do
+		table.insert(parts, string.format("%d=%s@%d", entry.slot, entry.eggType, entry.finishAt))
+	end
+	-- INCUBATOR_BREED: Baerchis in den Plaetzen (Figur, Takt, letzte Brut)
+	for _, entry in incubator.breeders or {} do
+		local baerchi = data.island.baerchis[entry.uid]
+		table.insert(parts, string.format("b%d=%s:%s:%s@%d", entry.slot, entry.uid,
+			if baerchi then baerchi.rarity else "?", if baerchi then tostring(baerchi.mutation) else "",
+			entry.lastEggAt))
+	end
+	return table.concat(parts, "|")
+end
+
 local function allSignatures(data: Types.PlayerData): Signatures
 	return {
+		incubator = incubatorSignature(data),
 		structure = structureSignature(data),
 		state     = stateSignature(data),
 		buildings = buildingSignature(data),
@@ -249,6 +271,10 @@ local function refresh(player: Player, data: Types.PlayerData)
 		MapService.updateRecycler(player, data.island)
 	end
 
+	if previous.incubator ~= current.incubator then
+		MapService.updateIncubator(player, data.island, IncubatorRules.slotCountFor(data))
+	end
+
 	-- v15: neuer Look -> genau dieses Gebaeude neu bauen (mit Show). Nach einem
 	-- Rebirth faellt der Look zurueck; rebuildIsland hat die Insel dann schon
 	-- komplett neu gebaut, updateBuildingLooks findet nichts mehr zu tun.
@@ -273,6 +299,11 @@ function PlotDisplayService.init()
 		local data = PlayerService.getData(player)
 		return if data then data.island else nil
 	end)
+	-- Sammel-Update Paket 8: Platz-Zahl des Inkubators (Level, Rebirths, Index).
+	MapService.setIncubatorSlotProvider(function(player: Player): number
+		local data = PlayerService.getData(player)
+		return if data then IncubatorRules.slotCountFor(data) else 1
+	end)
 
 	PlayerService.onPlayerReady(function(player, data)
 		-- Die Figuren und Schilder stehen zu diesem Zeitpunkt schon
@@ -289,6 +320,7 @@ function PlotDisplayService.init()
 		MapService.updateBaerchiStates(player, data.island)
 		MapService.updateLaidEggs(player, data.island)
 		MapService.updateRecycler(player, data.island)
+		MapService.updateIncubator(player, data.island, IncubatorRules.slotCountFor(data))
 
 		local signatures = allSignatures(data)
 		applyTower(player, signatures.tower, false)
