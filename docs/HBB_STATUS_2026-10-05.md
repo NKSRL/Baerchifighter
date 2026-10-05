@@ -6,12 +6,15 @@
 | 1 Feedback | Code fertig | nein (Laptop gesperrt) |
 | 2 Führung | Code fertig | nein |
 | 3 Freischaltung | Code fertig | nein |
-| 4 Upgrade/Kampfwert | Teil (kein echter Tab, kein Aufklapper) | nein |
+| 4 Upgrade/Kampfwert | Code fertig (zweispaltige Karte, Einzelwerte im Aufklapper; kein eigener Tab) | nein |
 | 5 Map | Code fertig (Händler, Heim-Knopf, Schau-Turm, 3 Tafeln, Arena-Sprint) – `docs/HBB_PAKET_5_6_MAP_2026-10-05.md` | nein |
 | 6 Timer/Board | Code fertig (Timer, erste Pause, Live-Board, Wespen-Nest) | nein |
 | 7 Boss-Stufen | Code fertig | nein |
 | 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. Charm-Gold: 12 Würfe/Tag (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
 | 9, 10 | offen; 9 braucht einen freigegebenen Entwurf, 10 teilt sich die 12 Würfe/Tag mit den Tages-Quests | – |
+
+## Playtest 05.10.2026
+Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Offen: Entscheidung Stock/Veredler → Honig-Teich.
 
 ## Nachtrag Cloud-Sitzung 05.10.2026
 - Repo enthält jetzt auch `tools/sim/*` und `tools/check_*.py` (vom Heim-PC); es fehlen weiterhin `tools/luau-tests/run.mjs`, `migration.test.lua` und die übrigen Node-Tests.
