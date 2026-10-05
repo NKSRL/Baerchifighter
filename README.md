@@ -24,6 +24,25 @@ rojo serve
 
 Rojo 7.7.0, verwaltet über Aftman (`aftman.toml`). Doku: <https://rojo.space/docs>
 
+## Neuer Rechner / Studio ist neuer als GitHub
+
+Rojo installieren (einmalig, PowerShell im Projektordner):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\setup_rojo.ps1
+```
+
+Wurde direkt in Studio gearbeitet: In Studio *Datei → Als Datei speichern unter*
+→ `RBL.rbxl` in diesen Ordner, dann
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\sync_from_studio.ps1
+```
+
+Das sichert `src/`, schreibt den Studio-Stand per `rojo syncback` zurück, zeigt
+die Änderungen und lädt sie nach Rückfrage auf GitHub hoch. Erst danach
+`rojo serve` starten — sonst überschreibt Rojo die neueren Studio-Skripte.
+
 ## Vor dem Studio-Start prüfen
 
 Im Ordner `tools/` liegen Skripte, die die häufigsten Fehler finden, bevor
