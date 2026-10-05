@@ -23,6 +23,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local IncubatorRules   = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
+local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig) -- Sammel-Update 7
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
+local Workspace        = game:GetService("Workspace")
 
 local Theme        = require(script.Parent.Theme)
 local UiScale      = require(script.Parent.UiScale)
@@ -36,6 +40,7 @@ local TILE_ELEMENT: { [string]: string } = {
 	Hatch = "tile_eggs", Inventory = "tile_bears", EggTree = "tile_tree",
 	Leaderboard = "tile_leaderboard", DailyBonus = "tile_daily",
 	Shop = "tile_shop",
+	Incubator = "tile_incubator",   -- Sammel-Update Paket 8
 }
 
 local MenuBar = {}
@@ -75,15 +80,43 @@ type Tile = {
 }
 
 local _tiles: { Tile } = {}
+local buildAllEntries: () -> { Entry }
 
 --------------------------------------------------------------------------------
 -- Die Eintraege
 --------------------------------------------------------------------------------
 
 local function buildEntries(): { Entry }
+	local list = buildAllEntries()
+	if not FeatureFlags.isOn("INCUBATOR") then
+		for i = #list, 1, -1 do
+			if list[i].panel == "Incubator" then table.remove(list, i) end
+		end
+	end
+	return list
+end
+
+function buildAllEntries(): { Entry }
 	return {
 		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI", icon = "egg" },
-		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear" },
+		-- Sammel-Update 05.10. (Paket 7): "!" = eine Index-Belohnung ist abholbar.
+		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear",
+			live = function(data: Types.PlayerDataUpdate)
+				if not FeatureFlags.isOn("INDEX_REWARDS") then return "BA", false end
+				return "BA", #IndexRewardConfig.claimable(data.discovered, data.indexClaimed) > 0
+			end },
+		-- Sammel-Update 05.10. (Paket 8): Inkubator ("!" = ein Ei ist fertig).
+		{ panel = "Incubator", title = function() return Loc.t("ui.incubator.tile") end, color = Theme.COLORS.growth, symbol = "⏳", icon = "incubator",
+			live = function(data: Types.PlayerDataUpdate)
+				local incubator = data.island.incubator
+				if not incubator then return "⏳", false end
+				local now = Workspace:GetServerTimeNow()
+				local ready = false
+				for _, entry in incubator.slots do
+					if IncubatorRules.isReady(entry, now) then ready = true end
+				end
+				return "⏳", ready
+			end },
 		-- v14: Ei-Baum. Das "!" zeigt eine ungenutzte Blaupause an.
 		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM", icon = "tree",
 			live = function(data: Types.PlayerDataUpdate)

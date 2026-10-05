@@ -750,6 +750,12 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		end
 		FunnelService.step(player, "F09_FirstEventCompleted")
 		data.stats.totalEventsCompleted = (data.stats.totalEventsCompleted or 0) + 1
+		-- Sammel-Update 05.10. (Paket 6.2): Boss-Siege zaehlen (besonderer
+		-- Meilenstein, SpecialMilestoneService zahlt beim naechsten Datenstand).
+		if result.bossVictory then
+			local stats = data.stats :: any
+			stats.bossVictories = (stats.bossVictories or 0) + 1
+		end
 
 		local bonus: EventConfig.EventBonus? = nil
 		if result.egg then

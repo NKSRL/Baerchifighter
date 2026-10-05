@@ -542,6 +542,9 @@ export type PlayerData = {
 		-- HBB Paket 2: Events, an deren Ende der Baerchi belohnt wurde
 		-- (Fuehrung: "erstes Event geschafft"). Alte Staende starten bei 0.
 		totalEventsCompleted : number,
+		-- Sammel-Update 05.10. (Paket 6.2): Boss-Siege mit eigenem Schaden
+		-- (besonderer Meilenstein "erster Boss-Sieg"). Alte Staende starten bei 0.
+		bossVictories : number,
 	},
 
 	-- v13: Index. Jede configId, die der Spieler je besessen hat (auch nach
@@ -914,6 +917,24 @@ export type PlayerProfileCard = {
 	top          : { ProfileBaerchi },
 }
 
+-- v16 (Sammel-Update, Paket 6.2): ein besonderer Meilenstein wurde
+-- ausgezahlt (Toast). id = Schluessel in EconomyConfig.SPECIAL_MILESTONES.
+export type SpecialMilestoneResult = {
+	id   : string,
+	eggs : { { eggType: EggType, count: number } },
+}
+
+-- v16 (Sammel-Update, Paket 7): eine Index-Belohnung wurde abgeholt (Toast).
+export type IndexRewardResult = {
+	rewardId       : string,
+	gummies        : number,
+	goldGummies    : number,
+	eggType        : EggType?,
+	eggs           : number,
+	blueprints     : number,
+	incubatorSlots : number,
+}
+
 -- v15: Ergebnis des Login-Bonus (Toast).
 export type DailyBonusResult = {
 	day         : number,
@@ -1038,6 +1059,7 @@ local function createDefaultPlayerData(): PlayerData
 			totalRecycled       = 0,
 			totalHatched        = 0,
 			totalEventsCompleted = 0,
+			bossVictories        = 0,   -- v16: Paket 6.2
 			sessions             = 0,   -- HBB Paket 10: Sitzungen (Shop ab der 2.)
 		},
 

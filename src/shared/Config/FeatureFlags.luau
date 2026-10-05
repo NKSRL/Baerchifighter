@@ -71,6 +71,18 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
 	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
 	ENDLESS           = true,
+
+	-- Sammel-Update 05.10. (docs/SAMMEL_UPDATE_UMGESETZT_2026-10-05.md):
+	-- Paket 8: Inkubator auf dem Plot. Aus = Eier gehen wie vorher sofort auf,
+	-- der Inkubator wird weder gebaut noch angeboten.
+	INCUBATOR         = true,
+	-- Paket 7: Index-Belohnungen (Abholen im Index).
+	INDEX_REWARDS     = true,
+	-- Paket 5.2: Kampf um die Mitte — gegnerische Event-Baerchis stossen
+	-- Spieler ohne eigenen Baerchi im Event-Pit.
+	PIT_BRAWL         = true,
+	-- Paket 3.8: Bereichs-Schilder (zwei Woerter) auf der Hauptinsel.
+	AREA_SIGNS        = true,
 }
 
 local FeatureFlags = {}

@@ -361,6 +361,16 @@ local function applyTab()
 		button.TextColor3       = if active then Theme.COLORS.outline else Theme.COLORS.text
 	end
 
+	-- Sammel-Update 05.10. (Paket 7): "!" am Index-Reiter, solange eine
+	-- Belohnung abholbar ist.
+	local indexButton = _tabButtons.Index
+	if indexButton then
+		local badge = indexButton:FindFirstChild("RewardBadge")
+		if badge and badge:IsA("GuiObject") then
+			badge.Visible = IndexView.claimableCount() > 0
+		end
+	end
+
 	if _tab == "Pets" then
 		BaerchiInventory.refresh()
 	end
@@ -437,6 +447,20 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	end
 	addTab("Pets",  "ui.inventory.tab_pets",  1)
 	addTab("Index", "ui.inventory.tab_index", 2)
+	do
+		local indexButton = _tabButtons.Index
+		local badge = Theme.panel("RewardBadge", indexButton, Theme.COLORS.bad)
+		badge.AnchorPoint = Vector2.new(1, 0)
+		badge.Position = UDim2.new(1, 4, 0, -6)
+		badge.Size = UDim2.fromOffset(20, 20)
+		badge.ZIndex = 4
+		badge.Visible = false
+		Theme.corner(badge, 10)
+		local bang = Theme.label("Bang", badge, "!")
+		bang.Size = UDim2.fromScale(1, 1)
+		bang.TextXAlignment = Enum.TextXAlignment.Center
+		bang.ZIndex = 5
+	end
 
 	-- Beide Seiten teilen sich die Flaeche unter den Reitern.
 	local pages = Theme.container("Pages", body)
@@ -521,6 +545,11 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	-- Bestandsaenderungen: sichtbar sofort nachziehen, sonst nur merken
 	ClientState.onChanged(function()
 		local current = _root
+		local indexButton = _tabButtons.Index
+		local badge = if indexButton then indexButton:FindFirstChild("RewardBadge") else nil
+		if badge and badge:IsA("GuiObject") then
+			badge.Visible = IndexView.claimableCount() > 0
+		end
 		if current and current.Visible then
 			BaerchiInventory.refresh()
 		else

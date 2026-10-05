@@ -25,6 +25,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Types          = require(ReplicatedStorage.Network.Types)
 local Remotes        = require(ReplicatedStorage.Network.Remotes)
 local EggConfig      = require(ReplicatedStorage.Config.EggConfig)
+local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
+local IncubatorRules = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
 local BaerchiConfig  = require(ReplicatedStorage.Config.BaerchiConfig)
 local GachaRoller    = require(ReplicatedStorage.Modules.GachaRoller)
 local BaerchiFactory = require(ReplicatedStorage.Modules.BaerchiFactory)
@@ -49,12 +51,23 @@ end
 -- Oeffnet ein Ei des Typs aus dem Lager. Gibt das Ergebnis zurueck (fuer den
 -- DebugService) oder nil, wenn es nicht ging — der Spieler bekommt dann
 -- ein ActionFailed.
-function EggService.openEgg(player: Player, eggType: Types.EggType): Types.HatchResult?
+--
+-- Sammel-Update 05.10. (Paket 8): Eier ab Gold-Stufe gehen nur noch ueber den
+-- Inkubator auf (IncubatorRules.requiresIncubator). Der Inkubator selbst ruft
+-- diese Funktion beim Abholen mit `fromIncubator = true` — das Schluepfen
+-- (Gacha, Mutation, Index, Quests, Auto-Ausruesten) bleibt so an EINER Stelle.
+function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubator: boolean?): Types.HatchResult?
 	local data = PlayerService.getData(player)
 	if not data then return nil end
 
 	if not EggConfig.data[eggType] then
 		fail(player, "RequestHatchEgg", Loc.msg("err.egg_unknown_type"))
+		return nil
+	end
+
+	if not fromIncubator and FeatureFlags.isOn("INCUBATOR")
+		and IncubatorRules.requiresIncubator(eggType, IncubatorRules.isUnlocked(data)) then
+		fail(player, "RequestHatchEgg", Loc.msg("err.egg_needs_incubator", { egg = Loc.msg("egg." .. eggType .. ".name") }))
 		return nil
 	end
 

@@ -80,6 +80,9 @@ export type Reward = {
 	bossTier       : number?,
 	tierBonus      : EventConfig.EventBonus?,
 	tierEggs       : number?,                   -- Basis-Eier der Stufe
+	-- Sammel-Update 05.10. (Paket 6.2): Boss besiegt und dieser Spieler hat
+	-- Schaden gemacht (besonderer Meilenstein "erster Boss-Sieg").
+	bossVictory    : boolean?,
 }
 
 export type Session = {

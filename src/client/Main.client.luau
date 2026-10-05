@@ -55,6 +55,7 @@ local LaidEggMeshController = require(Controllers:WaitForChild("LaidEggMeshContr
 local UiEventLogger      = require(Controllers:WaitForChild("UiEventLogger"))
 local GuideController    = require(Controllers:WaitForChild("GuideController"))
 local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
+local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
@@ -82,6 +83,7 @@ local Moment           = require(UI:WaitForChild("Moment"))
 local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
 local HomeButton       = require(UI:WaitForChild("HomeButton"))
 local RebirthButton    = require(UI:WaitForChild("RebirthButton"))   -- Sammel-Update 2.7
+local IncubatorPanel   = require(UI:WaitForChild("IncubatorPanel"))  -- Sammel-Update 8
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -131,6 +133,7 @@ LeaderboardPanel.init(screenGui)
 ProfilePanel.init(screenGui)
 DailyBonusPanel.init(screenGui)
 ShopPanel.init(screenGui)          -- HBB Paket 10 (nur mit SHOP_V1)
+IncubatorPanel.init(screenGui)     -- Sammel-Update Paket 8
 
 Hud.init(screenGui)
 MenuBar.init(screenGui)
@@ -154,6 +157,7 @@ PetBar.init(screenGui)
 ResultFeed.init()
 WorldController.init()
 EggTimerController.init()
+IncubatorController.init()   -- Sammel-Update Paket 8
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
 -- v15: Waben im Event-Pit und Recycler (braucht Toast, ClientState und die Welt)
