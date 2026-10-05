@@ -50,6 +50,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types         = require(ReplicatedStorage.Network.Types)
+local FigurePlacement  = require(ServerScriptService.Util.FigurePlacement)   -- Sammel-Update 1.2
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
@@ -96,8 +97,7 @@ end
 --------------------------------------------------------------------------------
 
 local function footPosOf(model: Model): Vector3
-	local box, size = model:GetBoundingBox()
-	return Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
 
 -- Der Ort, an dem das naechste Ei landet: neben dem Baerchi, wo er GERADE

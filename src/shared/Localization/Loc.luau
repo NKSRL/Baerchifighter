@@ -419,6 +419,13 @@ function Loc.msg(key: string, args: { [string]: any }?): LocMsg
 	return { k = key, a = args }
 end
 
+-- Sammel-Update 2.4: zwei Meldungen zu einer ("A  •  B"). Der Server haengt
+-- so Teil-Ertraege aneinander, ohne selbst einen Satz zu bauen — der Trenner
+-- steht im Text (Schluessel "msg.join") und damit bei der Sprache.
+function Loc.join(a: any, b: any): LocMsg
+	return { k = "msg.join", a = { a = a, b = b } }
+end
+
 function Loc.isMsg(value: any): boolean
 	return typeof(value) == "table" and typeof((value :: any).k) == "string"
 end

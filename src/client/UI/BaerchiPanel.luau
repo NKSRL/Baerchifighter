@@ -1044,14 +1044,14 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 			if typed.rarityUp then
 				local rarity = typed.rarityUp :: string
 				Notify.emit("event_mid_rarity", function()
-					Toast.success(typed.bonusText or "")
+					Toast.success(Loc.resolve(typed.bonusText or ""))
 				end, function()
 					Moment.show("rarity", Theme.rarityColor(rarity :: any), "ui.moment.rarity")
 				end)
 			elseif typed.bonusText then
-				local text = typed.bonusText :: string
+				local text = typed.bonusText :: any
 				Notify.emit("event_mid", function()
-					Toast.info(text)
+					Toast.info(Loc.resolve(text))
 				end)
 			end
 			return
@@ -1063,36 +1063,31 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		-- `bonusText` fehlt bei den reinen Trainings-Events. Deshalb hier
 		-- zusammensetzen statt eines festen Satzes.
 		local eventDef  = EventConfig.getById(typed.eventId)
-		local eventName = if eventDef then eventDef.displayName else typed.eventId
+		local eventName = Loc.name("event." .. typed.eventId .. ".name", if eventDef then eventDef.displayName else typed.eventId)
 
 		local parts: { string } = {}
 
 		local statKey = typed.statKey
 		if statKey then
-			table.insert(parts, string.format(
-				"%s Stufe %d / %d",
-				PromotionConfig.STAT_LABELS[statKey] or statKey,
-				typed.newLevel, typed.cap
-			))
+			table.insert(parts, Loc.t("msg.event.stat_level", {
+				stat = PromotionConfig.STAT_LABELS[statKey] or statKey,
+				level = typed.newLevel, cap = typed.cap,
+			}))
 		end
 
 		if typed.bonusText then
-			table.insert(parts, typed.bonusText)
+			table.insert(parts, Loc.resolve(typed.bonusText))
 		end
 
 		if #parts == 0 then
-			table.insert(parts, "alle Stats stehen schon am Maximum")
+			table.insert(parts, Loc.t("msg.event.all_maxed"))
 		end
 
 		-- HBB Paket 1: neuer Weg = Mutation als grosser Moment, Stat-Stufe
 		-- als Zahl ueber dem Baerchi. Eier/Gummies des Bonus fliegen ueber
 		-- den Datenstand (UI/Feedback).
 		Notify.emit("event_end", function()
-			Toast.success(string.format(
-				"%s vorbei: %s",
-				eventName,
-				table.concat(parts, "  •  ")
-			))
+			Toast.success(Loc.t("msg.event.ended", { event = eventName, text = table.concat(parts, "  •  ") }))
 		end, function()
 			local mutation = typed.mutation
 			if mutation then

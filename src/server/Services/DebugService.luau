@@ -145,6 +145,7 @@ local EggTree                   = require(ReplicatedStorage.Modules.EggTree)
 local CombatConfig              = require(ReplicatedStorage.Config.CombatConfig)
 
 -- v12
+local ActivityLock = require(ServerScriptService.Util.ActivityLock)  -- Paket 1.1: Lock-Halter ausgeben
 local PetModeService            = require(ServerScriptService.Services.PetModeService)
 local PitArenaService           = require(ServerScriptService.Services.PitArenaService)
 
@@ -477,6 +478,9 @@ commands.petmode = function(player, data)
 		pit         = pitPhase,
 		stage       = stage,
 		event       = EventParticipationService.getPhase(player),
+		-- Sammel-Update Paket 1.1: wer haelt die Figur gerade? (UFO-Einfrieren)
+		lockHalter  = ActivityLock.owner(player) or "frei",
+		entfuehrt   = EventParticipationService.isAbducting(player),
 		towerProgress = data.island.towerProgress,
 		eggStock    = data.island.eggStock,
 		gummies     = data.gummies,

@@ -874,6 +874,15 @@ local BAERCHI_FALLBACK_HEIGHT = 2
 -- Namensschilder ueber den Figuren — weiter weg waeren sie ohnehin Pixelbrei.
 local BAERCHI_CLICK_DISTANCE = 40
 
+-- Sammel-Update 05.10.: neue Werte stehen in DIESER einen Tabelle statt als
+-- eigene `local` — MapConfig steht bei ~191 lokalen Namen, Roblox erlaubt 200
+-- (tools/check_locals.py). Jeder Eintrag wird unten einzeln exportiert.
+local UPDATE_1005 = {
+	-- Paket 1.4: Namensschild ueber dem Baerchi (Name, HP, Ei-Timer).
+	-- Vorher 6 x 3 Studs, der Ei-Timer war zu klein und sass im Kopf.
+	FIGURE_LABEL = { width = 9, height = 3.6, gap = 0.4 },
+}
+
 -- Wie durchsichtig ein erschoepfter Baerchi (0 HP) dargestellt wird.
 -- Bewusst nicht zu viel: er soll matt wirken, nicht wie ein Geist.
 local BAERCHI_EXHAUSTED_TRANSPARENCY = 0.45
@@ -1489,6 +1498,7 @@ return {
 	BAERCHI_HOME_OFFSET             = BAERCHI_HOME_OFFSET,
 	BAERCHI_FALLBACK_HEIGHT         = BAERCHI_FALLBACK_HEIGHT,
 	BAERCHI_CLICK_DISTANCE          = BAERCHI_CLICK_DISTANCE,
+	FIGURE_LABEL                    = UPDATE_1005.FIGURE_LABEL,   -- Sammel-Update 1.4
 	BAERCHI_EXHAUSTED_TRANSPARENCY  = BAERCHI_EXHAUSTED_TRANSPARENCY,
 	FIGURE_REBUILD_RETRY_SECONDS    = FIGURE_REBUILD_RETRY_SECONDS,
 	FIGURE_REBUILD_TIMEOUT_SECONDS  = FIGURE_REBUILD_TIMEOUT_SECONDS,

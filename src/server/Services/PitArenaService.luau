@@ -442,8 +442,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 	-- selbst auf ihre Ruhelage zurueck.
 	FigureFX.stopIdle(figure)
 
-	local homeBox, homeSize = figure:GetBoundingBox()
-	local homeFoot = Vector3.new(homeBox.Position.X, homeBox.Position.Y - homeSize.Y * 0.5, homeBox.Position.Z)
+	local homeFoot = FigurePlacement.footOf(figure)   -- Sammel-Update 1.2
 	_home[player] = { model = figure, pivot = figure:GetPivot(), homeFoot = homeFoot }
 
 	local maxHp = math.max(1, run.maxHp)
@@ -505,8 +504,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			if recallWanted(player, token) then
 				sendResult(player, token)
 				setPhase(player, token, "Returning", nil)
-				local box, size = figure:GetBoundingBox()
-				local here = Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+				local here = FigurePlacement.footOf(figure)
 				FigureWalker.walk(figure, here, homeFoot, {
 					speed       = arenaWalkSpeed(),
 					bobPerStud  = arenaBobPerStud(),
