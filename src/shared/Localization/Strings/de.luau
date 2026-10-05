@@ -240,8 +240,8 @@ return {
 	["quest.c_fight1.hint"] = "Druecke unten auf Kampf, um deinen Baerchi in die PIT zu schicken.",
 	["quest.c_fight5.title"] = "Gewinne 5 Kaempfe",
 	["quest.c_fight5.hint"] = "Kaempfe weiter in der PIT - jede geschaffte Stage zaehlt.",
-	["quest.c_upgrade.title"] = "Baue ein Gebaeude aus",
-	["quest.c_upgrade.hint"] = "Geh zu einem Gebaeude auf deinem Plot und druecke E zum Ausbauen.",
+	["quest.c_upgrade.title"] = "Verbessere ein Gebäude",
+	["quest.c_upgrade.hint"] = "Geh zu einem Gebäude auf deinem Plot und drücke E zum Verbessern.",
 	["quest.c_hatch5.title"] = "Oeffne 5 Eier",
 	["quest.c_hatch5.hint"] = "Eier liegen auch auf deinem Plot herum - lauf drueber, um sie einzusammeln.",
 	["quest.c_discover5.title"] = "Entdecke 5 Baerchis",
@@ -507,4 +507,10 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "Erst die Waben abgeben!",
 	["err.home_unavailable"] = "Dein Plot ist gerade nicht erreichbar",
+	-- Sammel-Update 05.10.2026
+	["msg.egg_bought"] = "{egg} gekauft — liegt im Lager",
+	["msg.eggs_collected_all"] = "{n} Eier eingesammelt",
+	["msg.egg_collected"] = "{egg} eingesammelt  ({n} im Lager)",
+	["msg.offline_eggs"] = "{n} Eier während deiner Abwesenheit gelegt",
+	["msg.offline_eggs_full"] = "Lager voll – öfter vorbeischauen!",
 }

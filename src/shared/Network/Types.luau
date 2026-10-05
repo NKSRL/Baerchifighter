@@ -966,7 +966,11 @@ local function createDefaultPlayerData(): PlayerData
 			},
 			baerchis     = {},
 			eggStock     = {
-				BasicEgg = 3,  -- Starter-Eier fuer den ersten Join
+				-- Sammel-Update 05.10. (Paket 6.4, "mehr Eier am Anfang"): 3 -> 6.
+				-- Die ersten Minuten sollen mehrere Schluepf-Momente haben, bevor das
+				-- Legen uebernimmt. Ein Rebirth setzt das Lager NICHT zurueck (siehe
+				-- RebirthService), Veteranen bekommen also nichts doppelt.
+				BasicEgg = 6,  -- Starter-Eier fuer den ersten Join
 			},
 			equippedUid  = nil,   -- noch kein Baerchi da, der ausgeruestet sein koennte
 

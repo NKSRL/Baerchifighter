@@ -500,4 +500,10 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "¡Primero entrega tus panales!",
 	["err.home_unavailable"] = "Tu parcela no está disponible ahora",
+	-- Sammel-Update 05.10.2026
+	["msg.egg_bought"] = "{egg} comprado — está en tu almacén",
+	["msg.eggs_collected_all"] = "{n} huevos recogidos",
+	["msg.egg_collected"] = "{egg} recogido  ({n} en el almacén)",
+	["msg.offline_eggs"] = "{n} huevos puestos mientras no estabas",
+	["msg.offline_eggs_full"] = "Almacén lleno – ¡pásate más a menudo!",
 }

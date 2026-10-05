@@ -500,4 +500,10 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "Dépose d'abord tes rayons !",
 	["err.home_unavailable"] = "Ton île est inaccessible pour le moment",
+	-- Sammel-Update 05.10.2026
+	["msg.egg_bought"] = "{egg} acheté — il est dans ta réserve",
+	["msg.eggs_collected_all"] = "{n} œufs ramassés",
+	["msg.egg_collected"] = "{egg} ramassé  ({n} en réserve)",
+	["msg.offline_eggs"] = "{n} œufs pondus pendant ton absence",
+	["msg.offline_eggs_full"] = "Réserve pleine – passe plus souvent !",
 }

@@ -998,20 +998,19 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		if typed.eggUid == "merchant" then
 			-- Kauf beim versteckten Haendler (EggMerchantService)
 			Notify.emit("egg_bought", function()
-				Toast.success(string.format("%s gekauft — liegt im Lager",
-					if def then def.displayName else typed.eggType))
+				Toast.success(Loc.t("msg.egg_bought", {
+					egg = Loc.name("egg." .. typed.eggType .. ".name", if def then def.displayName else typed.eggType) }))
 			end)
 		elseif typed.eggUid == "" then
 			Notify.emit("egg_collected_all", function()
-				Toast.success(string.format("%d Eier eingesammelt", typed.inStock))
+				Toast.success(Loc.t("msg.eggs_collected_all", { n = typed.inStock }))
 			end)
 		else
 			Notify.emit("egg_collected", function()
-				Toast.success(string.format(
-					"%s eingesammelt  (%d im Lager)",
-					if def then def.displayName else typed.eggType,
-					typed.inStock
-				))
+				Toast.success(Loc.t("msg.egg_collected", {
+					egg = Loc.name("egg." .. typed.eggType .. ".name", if def then def.displayName else typed.eggType),
+					n   = typed.inStock,
+				}))
 			end)
 		end
 	end)
@@ -1021,11 +1020,14 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		local typed = report :: Types.OfflineEggReport
 
 		Notify.emit("offline_eggs", function()
-			Toast.success(string.format(
-				"%d Eier waehrend deiner Abwesenheit gelegt%s",
-				typed.laid,
-				if typed.skipped then " (Platz war voll)" else ""
-			))
+			-- Paket 6.1: "Lager voll", wenn die Offline-Grenze gegriffen hat
+			if typed.laid <= 0 then
+				Toast.info(Loc.t("msg.offline_eggs_full"))
+			elseif typed.skipped then
+				Toast.success(Loc.t("msg.offline_eggs", { n = typed.laid }) .. "  " .. Loc.t("msg.offline_eggs_full"))
+			else
+				Toast.success(Loc.t("msg.offline_eggs", { n = typed.laid }))
+			end
 		end, function()
 			if typed.laid > 0 then
 				ReturnSummary.addEggs(typed.secondsAway, typed.laid)

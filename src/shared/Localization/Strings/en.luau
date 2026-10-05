@@ -499,4 +499,10 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "Drop off your combs first!",
 	["err.home_unavailable"] = "Your plot is not reachable right now",
+	-- Sammel-Update 05.10.2026
+	["msg.egg_bought"] = "{egg} bought — it's in your storage",
+	["msg.eggs_collected_all"] = "{n} eggs collected",
+	["msg.egg_collected"] = "{egg} collected  ({n} in storage)",
+	["msg.offline_eggs"] = "{n} eggs laid while you were away",
+	["msg.offline_eggs_full"] = "Storage full – check in more often!",
 }

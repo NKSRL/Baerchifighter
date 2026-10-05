@@ -99,7 +99,7 @@ end
 local st = EggTree.newState()
 for eggId in EggConfig.data do
 	local r = EggTree.resolveLaid(st, eggId)
-	check(EggTree.isUnlocked(st, r) or r == "AscensionEgg", eggId .. " faellt auf gesperrtes " .. r)
+	check(EggTree.isUnlocked(st, r), eggId .. " faellt auf gesperrtes " .. r)
 end
 
 -- Tabelle ausgeben
