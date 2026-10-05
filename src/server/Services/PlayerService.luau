@@ -29,6 +29,8 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
 local QuestProgress   = require(ReplicatedStorage.Modules.QuestProgress)
+local ShopRules     = require(ReplicatedStorage.Modules.ShopRules)
+local ShopConfig    = require(ReplicatedStorage.Config.ShopConfig)
 local MapService      = require(ServerScriptService.Services.MapService)
 local RateLimiter     = require(ServerScriptService.Util.RateLimiter)
 local PlayerMigration = require(ServerScriptService.Util.PlayerMigration)
@@ -291,12 +293,12 @@ end
 -- Schreibt den Spielstand. release = true beim Verlassen und beim Shutdown:
 -- dann wird die Sitzungs-Sperre freigegeben, damit der naechste Server sofort
 -- laden kann, statt auf ihren Ablauf zu warten.
-local function saveToDataStore(player: Player, data: Types.PlayerData, release: boolean)
+local function saveToDataStore(player: Player, data: Types.PlayerData, release: boolean): boolean
 	-- Konnte der Spielstand nicht geladen werden, wird auch nicht gespeichert.
 	-- Siehe loadFromDataStore: sonst ueberschreibt eine Standard-Datei den
 	-- echten Spielstand.
 	if _noSave[player] then
-		return
+		return false
 	end
 
 	-- Zeitstempel VOR dem Schreiben setzen. UpdateAsync haelt den Thread an;
@@ -311,7 +313,7 @@ local function saveToDataStore(player: Player, data: Types.PlayerData, release: 
 
 	if not store then
 		_sessionStore[key] = data
-		return
+		return true
 	end
 
 	-- UpdateAsync statt SetAsync: es liest den gespeicherten Stand, bevor es
@@ -344,6 +346,9 @@ local function saveToDataStore(player: Player, data: Types.PlayerData, release: 
 			"liegt bei einem anderen Server — diese Sitzung speichert nicht mehr."
 		)
 	end
+
+	-- HBB Paket 10: Rueckmeldung fuer Robux-Kaeufe (ShopService.processReceipt)
+	return success and not lostLock
 end
 
 -- v15: wer die Login-Bonus-Sicht baut (LoginBonusService haengt sich ein —
@@ -361,6 +366,18 @@ end
 
 -- Baut das Client-Paket aus den Serverdaten.
 -- Stats bleiben bewusst draussen (kein Leak sensibler Serverdaten).
+-- HBB Paket 10: Sicht fuer das Shop-Fenster
+local function shopView(data: Types.PlayerData): Types.ShopView?
+	local shop = (data :: any).shop
+	if not shop then return nil end
+	local now = os.time()
+	return {
+		freeReady  = ShopRules.freeReady(shop, now),
+		nextFreeIn = ShopRules.secondsUntilNextDay(now),
+		freeGold   = ShopConfig.FREE_GRAB_GOLD,
+	}
+end
+
 local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 	return {
 		gummies      = data.gummies,
@@ -379,6 +396,7 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		stats        = data.stats :: any,
 		createdAt    = data.createdAt,
 		uiSeen       = data.uiSeen,   -- HBB Paket 3
+		shop         = shopView(data),  -- HBB Paket 10
 	}
 end
 
@@ -449,6 +467,17 @@ function PlayerService.saveNow(player: Player)
 	else
 		_pendingSave[player] = true
 	end
+end
+
+-- HBB Paket 10: SOFORT speichern und melden, ob es geklappt hat. Nur fuer
+-- Robux-Kaeufe: Roblox verlangt, dass ein Kauf gespeichert ist, bevor
+-- ProcessReceipt "gewaehrt" meldet. Umgeht bewusst MIN_SAVE_GAP (Kaeufe sind
+-- selten). Blockiert, bis UpdateAsync fertig ist.
+function PlayerService.saveConfirmed(player: Player): boolean
+	local data = _playerData[player]
+	if not data then return false end
+	_pendingSave[player] = nil
+	return saveToDataStore(player, data, false)
 end
 
 -- v15: LoginBonusService haengt hier ein, wie die Login-Bonus-Sicht im
@@ -560,6 +589,9 @@ local function onPlayerAdded(player: Player)
 			warn("[PlayerService] onDataLoaded-Callback fehlgeschlagen:", err)
 		end
 	end
+
+	-- HBB Paket 10: jede geladene Sitzung zaehlt (Shop ab der zweiten)
+	data.stats.sessions = (data.stats.sessions or 0) + 1
 
 	for _, callback in _onPlayerReady do
 		local ok, err = pcall(callback, player, data)

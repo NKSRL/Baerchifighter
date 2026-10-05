@@ -73,8 +73,10 @@ local CHAIN: { QuestDef } = {
 -- Entscheidung Projektinhaber 05.10.: 12 Charm-Wuerfe pro Tag. Bei 25 Gold je
 -- Wurf (CharmConfig.ROLL_COST_GOLD_GUMMIES) = 300 Gold = 100 je Tages-Quest.
 -- Acht Legendary-Charms (~730 Wuerfe) dann nach ~60 Tagen. Kommt der
--- Gratis-Griff im Shop (Paket 10), wird diese Zahl um seinen Anteil kleiner.
-local DAILY_GOLD = 100
+-- Gratis-Griff im Shop (Paket 10), wird diese Zahl um seinen Anteil kleiner:
+-- mit SHOP_V1 3 x 75 + Gratis-Griff 75 (ShopConfig.FREE_GRAB_GOLD) = 300.
+-- tools/luau-tests/shop.test.lua prueft die Summe.
+local DAILY_GOLD = if FeatureFlags.isOn("SHOP_V1") then 75 else 100
 local DAILY: { QuestDef } = {
 	{ id = "d_hatch3",  metric = "hatched",       target = 3,    reward = { gummies = 150, goldGummies = DAILY_GOLD } },
 	{ id = "d_fight8",  metric = "fightsWon",     target = 8,    reward = { gummies = 250, goldGummies = DAILY_GOLD } },

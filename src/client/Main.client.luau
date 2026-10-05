@@ -58,6 +58,7 @@ local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintContr
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
+local ShopPanel        = require(UI:WaitForChild("ShopPanel"))
 local Hud              = require(UI:WaitForChild("Hud"))
 local MenuBar          = require(UI:WaitForChild("MenuBar"))
 local BaerchiPanel     = require(UI:WaitForChild("BaerchiPanel"))
@@ -128,6 +129,7 @@ EggTreePanel.init(screenGui)
 LeaderboardPanel.init(screenGui)
 ProfilePanel.init(screenGui)
 DailyBonusPanel.init(screenGui)
+ShopPanel.init(screenGui)          -- HBB Paket 10 (nur mit SHOP_V1)
 
 Hud.init(screenGui)
 MenuBar.init(screenGui)

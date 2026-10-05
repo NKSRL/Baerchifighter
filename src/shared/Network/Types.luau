@@ -462,6 +462,19 @@ export type SessionLock = {
 -- PlayerData — alles was im DataStore landet
 --------------------------------------------------------------------------------
 
+-- HBB Paket 10: Shop-Teil des Spielstands (Regeln: Modules/ShopRules)
+export type ShopState = {
+	freeGrabDay : number,     -- UTC-Tag des letzten Gratis-Griffs, -1 = nie
+	receipts    : { string }, -- zuletzt ausgezahlte Robux-Kauf-IDs
+}
+
+-- HBB Paket 10: was der Client fuer das Shop-Fenster braucht
+export type ShopView = {
+	freeReady  : boolean,
+	nextFreeIn : number,      -- Sekunden bis zum naechsten UTC-Tag
+	freeGold   : number,
+}
+
 export type PlayerData = {
 	-- Schema
 	version    : number,   -- fuer Migrationen beim Laden alter Daten
@@ -509,6 +522,9 @@ export type PlayerData = {
 	-- UiStateService; Ids siehe Modules/UnlockRules.ELEMENTS.
 	uiSeen : { [string]: boolean },
 
+	-- HBB Paket 10: Shop (Gratis-Griff, gemerkte Robux-Kaeufe)
+	shop : ShopState,
+
 	-- v13: Quest-Stand
 	quests : QuestState,
 
@@ -551,6 +567,7 @@ export type PlayerDataUpdate = {
 	stats        : { [string]: number }?,
 	createdAt    : number?,
 	uiSeen       : { [string]: boolean }?,   -- HBB Paket 3
+	shop         : ShopView?,                -- HBB Paket 10
 }
 
 -- v15: was der Client fuer das Login-Bonus-Fenster braucht (fertig
@@ -968,7 +985,12 @@ local function createDefaultPlayerData(): PlayerData
 			totalRecycled       = 0,
 			totalHatched        = 0,
 			totalEventsCompleted = 0,
+			sessions             = 0,   -- HBB Paket 10: Sitzungen (Shop ab der 2.)
 		},
+
+		-- HBB Paket 10: Shop (Modules/ShopRules). freeGrabDay = UTC-Tag des
+		-- letzten Gratis-Griffs (-1 = nie), receipts = gemerkte Robux-Kauf-IDs.
+		shop = { freeGrabDay = -1, receipts = {} },
 
 		discovered = {},
 		uiSeen     = {},

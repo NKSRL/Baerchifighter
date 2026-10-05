@@ -52,8 +52,12 @@ UnlockRules.UPGRADE_HATCHED    = 2
 UnlockRules.CHARMS_TOWER_I     = 15
 UnlockRules.RECYCLE_HATCHED    = 21   -- "mehr als 20 Baerchis" (monotoner Ersatz)
 UnlockRules.INDEX_DISCOVERED   = 3
--- Paket 10: Shop ab der zweiten Sitzung. Bis dahin immer aus.
+-- Paket 10: Shop ab der zweiten Sitzung (stats.sessions, PlayerService zaehlt).
+-- SHOP_ENABLED spiegelt FeatureFlags.SHOP_V1: dieses Modul hat bewusst keine
+-- requires (laeuft im reinen Luau-Test), deshalb setzen ShopService (Server)
+-- und ShopPanel (Client) den Wert beim Start.
 UnlockRules.SHOP_ENABLED       = false
+UnlockRules.SHOP_SESSIONS      = 2
 
 local ALWAYS: { [string]: boolean } = {
 	pill_gummies = true, tile_eggs = true, tile_bears = true, button_fight = true,
@@ -111,7 +115,9 @@ local function condition(view: View, id: string): boolean
 	elseif id == "index" then
 		return count(view.discovered) >= UnlockRules.INDEX_DISCOVERED
 	elseif id == "tile_shop" then
-		return UnlockRules.SHOP_ENABLED
+		local stats = view.stats
+		local sessions = if stats then (stats.sessions or 0) else 0
+		return UnlockRules.SHOP_ENABLED and sessions >= UnlockRules.SHOP_SESSIONS
 	end
 	return false
 end

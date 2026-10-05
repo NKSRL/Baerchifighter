@@ -35,6 +35,7 @@ local Unlock       = require(script.Parent.Unlock)
 local TILE_ELEMENT: { [string]: string } = {
 	Hatch = "tile_eggs", Inventory = "tile_bears", EggTree = "tile_tree",
 	Leaderboard = "tile_leaderboard", DailyBonus = "tile_daily",
+	Shop = "tile_shop",
 }
 
 local MenuBar = {}
@@ -95,6 +96,13 @@ local function buildEntries(): { Entry }
 			live = function(data: Types.PlayerDataUpdate)
 				local daily = data.daily
 				return if daily then tostring(daily.day) else "7", daily ~= nil and daily.claimable
+			end },
+		-- HBB Paket 10: Shop ("!" = Gratis-Griff heute noch offen). Sichtbar ab
+		-- der 2. Sitzung und nur mit SHOP_V1 (UnlockRules "tile_shop").
+		{ panel = "Shop", title = function() return Loc.t("ui.menu.shop") end, color = Theme.COLORS.goldGummy, symbol = "GG", icon = "goldgummy",
+			live = function(data: Types.PlayerDataUpdate)
+				local shop = data.shop
+				return "GG", shop ~= nil and shop.freeReady
 			end },
 	}
 end

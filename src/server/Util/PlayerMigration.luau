@@ -54,6 +54,13 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	-- Neue Stats-Felder (dynamischer Key → bewusst ueber any, sonst meckert --!strict)
 	local stats     = data.stats    :: any
 	local defStats  = default.stats :: any
+
+	-- HBB Paket 10: Sitzungszaehler. Ein Konto, das schon aelter als 10 min
+	-- ist, war mindestens einmal da — es zaehlt als 1, damit Veteranen den
+	-- Shop schon bei diesem Join (= Sitzung 2, PlayerService zaehlt hoch) sehen.
+	if stats.sessions == nil then
+		stats.sessions = if os.time() - (data.createdAt or os.time()) >= 600 then 1 else 0
+	end
 	for key, value in defStats do
 		if stats[key] == nil then
 			stats[key] = value
@@ -106,6 +113,15 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	-- (keine Badge-Flut fuer Veteranen). Kein Versions-Sprung.
 	if data.uiSeen == nil then
 		data.uiSeen = {}
+	end
+
+	-- HBB Paket 10: Shop-Teil. Leer nachruesten, kaputte Felder reparieren.
+	local shop = (data :: any).shop
+	if typeof(shop) ~= "table" then
+		(data :: any).shop = default.shop
+	else
+		if typeof(shop.freeGrabDay) ~= "number" then shop.freeGrabDay = -1 end
+		if typeof(shop.receipts) ~= "table" then shop.receipts = {} end
 	end
 
 	if data.quests == nil then

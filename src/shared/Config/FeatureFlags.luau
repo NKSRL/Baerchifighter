@@ -44,6 +44,11 @@ local FLAGS: { [string]: boolean } = {
 	-- Bericht: docs/HBB_HONIG_TEICH_2026-10-05.md
 	HONEY_POND_V2      = true,
 
+	-- HBB Paket 10: Shop mit Gratis-Griff (GoldGummies) und Robux-Paketen
+	-- (Pakete erst sichtbar, wenn ShopConfig eine Product-ID hat).
+	-- Bericht: docs/HBB_PAKET_10_SHOP_2026-10-05.md
+	SHOP_V1            = true,
+
 	-- Playtest 05.10.: Basis-Eier (unbegrenzt beim Haendler) nicht pressbar
 	PRESS_NO_BASIC_EGG = true,
 

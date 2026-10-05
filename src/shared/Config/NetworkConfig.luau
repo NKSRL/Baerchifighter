@@ -73,6 +73,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestMarkUiSeen      = 0.30,
 	-- HBB Paket 5: Heim-Knopf. Teleport — nicht im Sekundentakt.
 	RequestGoHome          = 3.00,
+	RequestClaimFreeGrab   = 1.00,   -- HBB Paket 10
 
 	-- v15: Bestenliste und Inspektor. Der Server antwortet aus dem Cache bzw.
 	-- aus dem Speicher; die Bremse schuetzt nur vor Spam.
