@@ -15,7 +15,7 @@
 -- als Aequivalenz-Stage = Level + Ausbau-Bonus (Rarity/Promotion/Charms/Stats,
 -- siehe POWER_BONUS).
 --
--- Ziele (README 4.4 / Prompt 2): Look 2 (L10) 45-60 min, Look 3 (L20) Tag 2-3,
+-- Ziele (README 4.4 / Prompt 2, HBB Paket 8): Look 2 (L10) 20-45 min, Look 3 (L20) Tag 2-3,
 -- Look 4 (L30) ~Woche 1, Look 5 (L45) Woche 2-3, Look 6 (L60) Woche 5-8;
 -- Rebirth 1 nach ~2-3 Spieltagen, Final Stage 100 nicht vor ~Woche 8
 -- (jeweils Profil "Normal").
@@ -350,7 +350,8 @@ local function within(name, minutes, loH, hiH)
 end
 local p = normalResult
 __log("")
-within("Normal: Look 2 in 30-75 min",                 p.lookAt[10], 0.5, 1.25)
+-- HBB Paket 8: Look 2 soll in die erste Sitzung fallen (Roblox: 20-30 min)
+within("Normal: Look 2 in 20-45 min",                 p.lookAt[10], 20 / 60, 0.75)
 within("Normal: Look 3 an Tag 2-3 (1,5-4,5 h)",       p.lookAt[20], 1.5, 4.5)
 within("Normal: Look 4 ~Woche 1 (6-13,5 h)",          p.lookAt[30], 6, 13.5)
 within("Normal: Look 5 Woche 2-3 (13,5-31,5 h)",      p.lookAt[45], 13.5, 31.5)

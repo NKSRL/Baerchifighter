@@ -223,6 +223,7 @@ return {
 	["ui.quest.claim_short"] = "Abholen",
 	["ui.quest.reward_gummies"] = "+{n} Gummies",
 	["ui.quest.reward_with_egg"] = "+{n} Gummies und ein {egg}",
+	["ui.quest.reward_gold"] = "+{n} GoldGummies",
 	["ui.quest.toast"] = "Quest geschafft: {text}",
 	["err.quest_unknown"] = "Unbekannte Quest",
 	["err.quest_already_claimed"] = "Schon abgeholt",

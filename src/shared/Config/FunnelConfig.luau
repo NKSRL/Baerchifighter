@@ -12,6 +12,8 @@
 -- und Panel-Namen kennen muss, um gar nicht erst Unsinn zu senden. Geprueft
 -- wird trotzdem nur auf dem Server.
 
+local EconomyConfig = require(script.Parent.EconomyConfig)
+
 -- Reihenfolge = Schrittnummer im Trichter. Nie umsortieren, sobald Daten
 -- im Dashboard liegen: Roblox ordnet nach der Nummer.
 local STEPS: { string } = {
@@ -35,6 +37,20 @@ end
 return {
 	STEPS      = STEPS,
 	STEP_INDEX = STEP_INDEX,
+
+	-- HBB Paket 8: WANN passiert etwas in der ersten Sitzung? Jeder Schritt
+	-- (ausser F01/F10) und jeder Pacing-Meilenstein unten meldet zusaetzlich
+	-- das Custom Event TIME_EVENT: Wert = Sekunden seit Join, CustomField01 =
+	-- Name, CustomField02 = "S1" (erste Sitzung, Wert = aktive Zeit) oder
+	-- "S2+" (spaetere Sitzung, Wert 0 — nur der Anteil zaehlt). Der Sim
+	-- (tools/sim/progression_pacing.lua) sagt fuer Look 2 ~28 min voraus.
+	TIME_EVENT = "SecondsSinceJoin",
+	-- Gebaeude-Meilensteine: erreicht, sobald irgendein Gebaeude dieses Level
+	-- hat. Nicht im Trichter, weil die Reihenfolge nicht feststeht.
+	PACING_MILESTONES = {
+		{ name = "P_FirstUpgrade", buildingLevel = 2 },
+		{ name = "P_Look2",        buildingLevel = EconomyConfig.LOOK_THRESHOLDS[2] },
+	} :: { { name: string, buildingLevel: number } },
 
 	-- Nur Konten, die juenger sind, landen im Trichter: er soll den ersten
 	-- Eindruck messen, nicht Veteranen.

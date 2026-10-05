@@ -10,14 +10,15 @@
 | 5 Map | Teil (Händler, Heim-Knopf); Schau-Turm, 3 Tafeln, Weg zur Arena offen | nein |
 | 6 Timer/Board | Teil (Timer, erste Pause); Live-Board offen | nein |
 | 7 Boss-Stufen | Code fertig | nein |
-| 8 Pacing | **Tabelle fertig, wartet auf Freigabe** (`docs/HBB_PAKET_8_TABELLE_2026-10-05.md`, 3 Fragen); `PACING_V2` aus | – (reine Config) |
-| 9, 10 | warten auf Freigabe Paket 8 | – |
+| 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. **Offen: Charm-Gold vs. Endgame** (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
+| 9, 10 | warten auf Entscheidung Charm-Gold (beeinflusst Final 100 / Endless und Shop-Gratis-Griff) | – |
 
 ## Nachtrag Cloud-Sitzung 05.10.2026
 - Repo enthält jetzt auch `tools/sim/*` und `tools/check_*.py` (vom Heim-PC); es fehlen weiterhin `tools/luau-tests/run.mjs`, `migration.test.lua` und die übrigen Node-Tests.
 - `run_local.py` führt alle `tools/sim/*.lua` aus (alle zehn grün) und meldet `FAIL` per Exit-Code 1.
 - `check_feedback.py` war rot (Fehlalarm durch den längeren Paket-7-Rückruf): Belohnungs-Momente nach `EventFXController.playRewardMoment` ausgelagert, Verhalten gleich.
-- Alle Prüfungen grün: Syntax (alle `.luau`), 4 Luau-Tests, `check_feedback/members/consistency/loc/decor`.
+- Alle Prüfungen grün: Syntax (alle `.luau`), 5 Luau-Tests (neu: `gold_rules.test.lua`), alle Sims, `check_feedback/members/consistency/loc/decor`.
+- Studio-Einspielung offen: geänderte Skripte seit dem Laptop-Export siehe `git diff a85f360 --stat -- src`.
 
 ## Wo der Code liegt
 - Laptop: `Dokumente\Neuer Ordner\RBL` (Git-Repo, Tag `pre-ui-v2` = Stand vor HBB).

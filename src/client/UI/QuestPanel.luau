@@ -48,13 +48,18 @@ function QuestPanel.rewardText(questId: string): string
 	if not def then return "" end
 
 	local eggType = def.reward.eggType
-	if eggType then
-		return Loc.t("ui.quest.reward_with_egg", {
+	local text = if eggType
+		then Loc.t("ui.quest.reward_with_egg", {
 			n   = def.reward.gummies,
 			egg = Loc.name("egg." .. eggType .. ".name", eggType),
 		})
+		else Loc.t("ui.quest.reward_gummies", { n = def.reward.gummies })
+	-- GOLD_CHARMS_ONLY: Tages-Quests zeigen ihr Gold dazu
+	local gold = QuestConfig.goldReward(def)
+	if gold > 0 then
+		text ..= "  " .. Loc.t("ui.quest.reward_gold", { n = gold })
 	end
-	return Loc.t("ui.quest.reward_gummies", { n = def.reward.gummies })
+	return text
 end
 
 function QuestPanel.claim(entry: Types.QuestEntry)

@@ -215,6 +215,7 @@ return {
 	["ui.quest.claim_short"] = "Claim",
 	["ui.quest.reward_gummies"] = "+{n} Gummies",
 	["ui.quest.reward_with_egg"] = "+{n} Gummies and a {egg}",
+	["ui.quest.reward_gold"] = "+{n} GoldGummies",
 	["ui.quest.toast"] = "Quest complete: {text}",
 	["err.quest_unknown"] = "Unknown quest",
 	["err.quest_already_claimed"] = "Already claimed",

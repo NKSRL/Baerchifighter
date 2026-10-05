@@ -399,6 +399,7 @@ export type QuestReward = {
 	questId : string,
 	gummies : number,
 	eggType : EggType?,
+	goldGummies : number?,   -- GOLD_CHARMS_ONLY: Tages-Quests
 }
 
 --------------------------------------------------------------------------------

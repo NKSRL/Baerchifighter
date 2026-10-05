@@ -1,5 +1,10 @@
 # HBB Paket 8 – Pacing-Tabelle zur Freigabe – 05.10.2026
 
+> **Nachtrag (Entscheidungen):** Gold nur noch aus Tages-Quests und nur für Charms → `docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md` (umgesetzt, neue Pacing-Zahlen dort).
+> Frage 1: Look-2-Ziel jetzt 20–45 min. Frage 2: A hinfällig, B nicht mehr empfohlen (Look 4 fiele auf 5,1 h).
+> Frage 3: ja, umgesetzt: `FunnelService` meldet Sekunden seit Join je Schritt und für `P_FirstUpgrade`/`P_Look2` (Custom Event `SecondsSinceJoin`).
+> Der Rest dieses Dokuments ist der Stand **vor** diesen Entscheidungen.
+
 **STOPP-PUNKT.** Keine Spielzahl wurde geändert, `PACING_V2` bleibt `false`.
 Der Mensch entscheidet über die drei Fragen unten; erst danach werden Werte eingebaut.
 

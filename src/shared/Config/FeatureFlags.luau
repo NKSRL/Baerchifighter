@@ -40,6 +40,12 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 7: Boss-Belohnung nach Stufen
 	BOSS_TIERS        = true,
 
+	-- GoldGummies nur noch aus Tages-Quests (spaeter: Gratis-Griff im Shop)
+	-- und nur noch fuer Charms. Keine Gold-Kosten bei Gebaeuden/Recycler, kein
+	-- Gold aus Tower-Laeufen, Meilensteinen oder Login-Bonus.
+	-- Bericht: docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md
+	GOLD_CHARMS_ONLY  = true,
+
 	-- Paket 8/9: neue Pacing-Werte. Bleibt aus, bis der Mensch die Tabelle
 	-- freigegeben hat (Stopp-Punkt im Plan).
 	PACING_V2         = false,

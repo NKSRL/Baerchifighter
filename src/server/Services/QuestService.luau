@@ -155,17 +155,22 @@ function QuestService.claim(player: Player, kind: any, questId: any)
 		data.island.eggStock[eggType] = (data.island.eggStock[eggType] or 0) + 1
 	end
 
+	-- GOLD_CHARMS_ONLY: einzige GoldGummies-Quelle (ohne Flag 0)
+	local gold = QuestConfig.goldReward(def)
+	local goldPaid = if gold > 0 then EconomyService.awardGoldGummies(player, gold) else 0
+
 	local reward: Types.QuestReward = {
 		questId = questId,
 		gummies = paid,
 		eggType = eggType,
+		goldGummies = if goldPaid > 0 then goldPaid else nil,
 	}
 	Remotes.QuestRewardReceived:FireClient(player, reward)
 
 	PlayerService.markDirty(player)
 	PlayerService.saveNow(player)
 
-	print("[QuestService]", player.Name, "holt", questId, "ab | +", paid, "Gummies", eggType or "")
+	print("[QuestService]", player.Name, "holt", questId, "ab | +", paid, "Gummies |", goldPaid, "Gold", eggType or "")
 end
 
 --------------------------------------------------------------------------------
