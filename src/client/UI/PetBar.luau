@@ -31,6 +31,7 @@ local Theme           = require(script.Parent.Theme)
 local UiScale         = require(script.Parent.UiScale)
 local Icons           = require(script.Parent.Icons)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
+local FightStartPrompt = require(script.Parent.FightStartPrompt)
 local ClientState     = require(script.Parent.Parent.Controllers.ClientState)
 local Unlock          = require(script.Parent.Unlock)
 
@@ -256,6 +257,24 @@ local function onFightClicked()
 	-- Fortsetzungs-Frage.
 	local data = ClientState.get()
 
+	-- Entscheidung 05.10. (FIGHT_RESUME_PROMPT): Standard ist IMMER Stage 1.
+	-- Der Einstieg ab der letzten Stage gegen Gummies ist ein kleines Feld,
+	-- das nach 7 s von selbst verschwindet (dann Stage 1). Ein zweiter
+	-- Fight-Klick waehrend das Feld offen ist, startet sofort bei Stage 1.
+	if FeatureFlags.isOn("FIGHT_RESUME_PROMPT") then
+		if FightStartPrompt.isOpen() then
+			FightStartPrompt.chooseFresh()
+			return
+		end
+		local opened = FightStartPrompt.open(function(choice)
+			Remotes.RequestPetMode:FireServer("Fight", choice)
+		end)
+		if not opened then
+			Remotes.RequestPetMode:FireServer("Fight", "Fresh")
+		end
+		return
+	end
+
 	-- HBB Paket 2: keine Frage mehr. Mit gespeichertem Lauf geht es
 	-- kostenlos ab 65 % weiter; der bezahlte Einstieg ab der letzten Stage
 	-- ist ein eigener kleiner Knopf im Tower-Fenster (CombatPanel). Der
@@ -350,6 +369,7 @@ function PetBar.init(screenGui: ScreenGui)
 
 	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO")
 	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X")
+	FightStartPrompt.init(screenGui, bar)
 
 	PitResumeDialog.init(screenGui)
 

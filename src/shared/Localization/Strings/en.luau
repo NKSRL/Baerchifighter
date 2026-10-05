@@ -460,6 +460,8 @@ return {
 	["ui.shop.free_next"] = "Back in {time}",
 	["ui.shop.buy"] = "Buy",
 	["ui.shop.more_soon"] = "More coming soon!",
+	["ui.fight.resume"] = "Continue at stage {stage}",
+	["ui.fight.fresh"] = "Stage 1",
 	["ui.daily.title"]                 = "Daily bonus",
 	["ui.daily.day"]                   = "Day {day}",
 	["ui.daily.egg"]                   = "Egg",
