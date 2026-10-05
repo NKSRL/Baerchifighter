@@ -1,6 +1,6 @@
 # RBL / Honey Bear Brawl – Hinweise für Claude Code (Laptop)
 
-Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md`, dann den Bericht des Pakets, an dem du arbeitest (`docs/HBB_PAKET_*`).
+Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md` und `docs/SAMMEL_UPDATE_UMGESETZT_2026-10-05.md` (Datenversion 16), dann den Bericht des Pakets, an dem du arbeitest (`docs/HBB_PAKET_*`).
 
 ## Struktur
 - `src/shared` → ReplicatedStorage, `src/server` → ServerScriptService, `src/client` → StarterPlayerScripts
@@ -11,7 +11,7 @@ Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md`, dann den Beric
 - `luau-compile --null <datei>` (Syntax)
 - `python tools/check_locals.py` (Roblox erlaubt max. 200 lokale Namen pro Modul-Ebene; der luau-CLI meldet das NICHT)
 - `luau tools/luau-tests/guide_steps.test.lua`, `unlock_rules.test.lua`, `boss_tiers.test.lua`
-- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`
+- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, `rebirth_rules`, `migration_v16`, `incubator`
 - `python tools/check_feedback.py` (plus `check_members.py`, `check_consistency.py`, `check_loc.py`, `check_decor.py`); `check_members.py` endet auch bei Funden mit 0, Ausgabe lesen
 - Sims ohne Node: `python tools/luau-tests/run_local.py tools/sim/<name>.lua` (Exit 1 bei `FAIL`); Pflicht bei Balance-Änderungen: `progression_pacing.lua`, `tower_calibration.lua`
 - Luau-CLI: https://github.com/luau-lang/luau/releases (luau-windows.zip; Linux/Cloud: luau-ubuntu.zip)

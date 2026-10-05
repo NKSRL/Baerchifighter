@@ -7,7 +7,8 @@
 --   - Insel zuruecksetzen, Multiplikator neu setzen, Meilenstein-Eier vergeben
 --
 -- Was ein Rebirth kostet und was er einbringt:
---   Kosten     : EconomyConfig.getRebirthCost(rebirthCount)  (Gummies)
+--   Bedingung  : (Sammel-Update 05.10.) eine Tower-Stage in diesem Leben,
+--                TowerConfig.getRebirthRequirement — KEINE Gummies mehr
 --   Verloren   : alle Gebaeude-Level, der Fortsetzen-Stand der Tower,
 --                Gummies (zurueck auf REBIRTH_START_GUMMIES),
 --                Baerchi-LEVEL und -XP (siehe unten)
@@ -42,6 +43,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)   -- Paket 4.1: Rebirth nach Stage
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
@@ -88,18 +90,21 @@ function RebirthService.rebirth(player: Player)
 	local data = PlayerService.getData(player)
 	if not data then return end
 
-	local cost = EconomyConfig.getRebirthCost(data.rebirthCount)
-	if data.gummies < cost then
-		fail(player, Loc.msg("err.rebirth_cost", { cost = cost, have = data.gummies }))
+	-- Sammel-Update 05.10. (Paket 4.1): kein Gummy-Preis mehr. Bedingung ist
+	-- eine Tower-Stage, in DIESEM Leben geschafft (island.stageBest, siehe
+	-- TowerConfig.getRebirthRequirement). Gummies verfallen beim Rebirth
+	-- trotzdem (resetGummies unten) — wer vorher alles ausgibt, verliert nichts.
+	if not TowerConfig.isRebirthReady(data.rebirthCount, data.island.stageBest, data.towers.records) then
+		local towerId, stage = TowerConfig.getRebirthRequirement(data.rebirthCount, data.towers.records)
+		local def = TowerConfig.get(towerId)
+		fail(player, Loc.msg("err.rebirth_stage", {
+			tower = if def then def.numeral else towerId,
+			stage = stage,
+			have  = (data.island.stageBest or {})[towerId] or 0,
+		}))
 		return
 	end
-
-	-- Abbuchen bevor irgendetwas zurueckgesetzt wird
-	local ok, reason = EconomyService.spendGummies(player, cost)
-	if not ok then
-		fail(player, reason)
-		return
-	end
+	local cost = 0   -- nur noch fuer das Protokoll unten
 
 	-- v14: ALLE Eier ueberleben den Reset (vorher nur Ascension). Seit kein
 	-- Ei mehr kaufbar ist, waere jedes andere ein echter Verlust. Was noch
@@ -131,10 +136,19 @@ function RebirthService.rebirth(player: Player)
 
 	-- Insel auf Werkszustand
 	local freshIsland = PlayerService.buildDefaultIsland()
-	-- Die 3 Start-Basis-Eier gibt es nur fuer neue Spieler, nicht pro Rebirth.
+	-- Die Start-Basis-Eier gibt es nur fuer neue Spieler, nicht pro Rebirth.
 	freshIsland.eggStock = keptStock
 	freshIsland.baerchis    = keptBaerchis
 	freshIsland.equippedUid = keptEquippedUid
+	-- Sammel-Update Paket 8 (Umbau 05.10.): die Plaetze bleiben (Baerchi und
+	-- wartende Eier), das Ausbau-Level faellt zurueck (Geldsenke vor dem
+	-- Rebirth). Plaetze ueber der neuen Platz-Zahl oder mit einem Baerchi, der
+	-- den Rebirth nicht mitmacht, raeumt IncubatorService im naechsten Takt
+	-- (Eier ins Lager).
+	local oldIncubator = data.island.incubator
+	if oldIncubator and freshIsland.incubator then
+		freshIsland.incubator.slots = oldIncubator.slots
+	end
 	data.island = freshIsland
 
 	-- Progression hochzaehlen

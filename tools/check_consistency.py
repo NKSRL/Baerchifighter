@@ -162,6 +162,27 @@ for f in sorted(ROOT.rglob("*.luau")):
     if ":GetOrderedDataStore(" in src and f.stem != "LeaderboardService":
         issues.append(f"GetOrderedDataStore ausserhalb von LeaderboardService: {f.relative_to(ROOT)}")
 
+# ---------- 9. Ascension-Quellen (Sammel-Update 05.10., Paket 6.2) ----------
+# Ascension-Eier haben genau zwei Quellen: Rebirth-Meilensteine und die
+# besonderen Meilensteine (EconomyConfig) - dazu die Gesamt-Index-Belohnung
+# (IndexRewardConfig), die als besonderer Meilenstein zaehlt. Kein Baerchi
+# legt sie, kein Event, keine Quest, kein Login-Bonus, kein Tower-Meilenstein.
+ASC = ("AscensionEgg", "TranscendenceEgg", "EternityEgg", "OmegaEgg")
+ASC_ALLOWED = {
+    "shared/Config/EconomyConfig.luau", "shared/Config/EggConfig.luau",
+    "shared/Config/IndexRewardConfig.luau", "shared/Network/Types.luau",
+    "shared/Modules/EggTree.luau", "shared/Modules/EggLook.luau",
+}
+for f in sorted(ROOT.rglob("*.luau")):
+    rel = f.relative_to(ROOT).as_posix()
+    if rel in ASC_ALLOWED or rel.startswith("client/") or "/Localization/" in "/" + rel:
+        continue
+    body = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
+    for egg in ASC:
+        if re.search(r'"' + egg + r'"', body):
+            issues.append(f"Ascension-Quelle: {rel} nennt {egg} (erlaubt nur Rebirth- und besondere Meilensteine)")
+print("Ascension-Quellen geprueft.")
+
 print("=" * 62)
 if issues:
     print(f"{len(issues)} Befund(e):\n")

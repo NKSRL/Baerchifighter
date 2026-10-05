@@ -324,6 +324,27 @@ local RequestGoHome = getOrCreateEvent("RequestGoHome")
 local RequestClaimFreeGrab = getOrCreateEvent("RequestClaimFreeGrab")
 
 -- ============================================================
+-- Sammel-Update 05.10.
+-- ============================================================
+-- Paket 4.3: Tower-Wiedergabe beschleunigen. Args: speed (1 | 2 | 4 | 0 = sofort)
+local RequestPitSpeed = getOrCreateEvent("RequestPitSpeed")
+-- Paket 7: Index-Belohnung abholen. Args: rewardId (IndexRewardConfig)
+local RequestClaimIndexReward = getOrCreateEvent("RequestClaimIndexReward")
+-- Paket 7: Belohnung ausgezahlt (S->C, Toast). Args: Types.IndexRewardResult
+local IndexRewardReceived = getOrCreateEvent("IndexRewardReceived")
+-- Paket 6.2: besonderer Meilenstein ausgezahlt (S->C). Args: Types.SpecialMilestoneResult
+local SpecialMilestoneReceived = getOrCreateEvent("SpecialMilestoneReceived")
+-- Paket 8 (Umbau 05.10.): Inkubator. Start (baerchiUid = einsetzen),
+-- Abholen (keine Args, alle Eier ins Lager), Remove (slot), Ausbauen (keine Args).
+local RequestIncubatorStart   = getOrCreateEvent("RequestIncubatorStart")
+local RequestIncubatorCollect = getOrCreateEvent("RequestIncubatorCollect")
+local RequestIncubatorRemove  = getOrCreateEvent("RequestIncubatorRemove")   -- Umbau 05.10.: Baerchi herausnehmen
+local RequestUpgradeIncubator = getOrCreateEvent("RequestUpgradeIncubator")
+-- Paket 8: S->C Hinweis "Platz belegt / fertig / abgeholt" (Feedback, Ton).
+-- Args: { slot: number, kind: "insert" | "remove" | "collect" | "upgrade", count: number }
+local IncubatorChanged = getOrCreateEvent("IncubatorChanged")
+
+-- ============================================================
 -- Client → Server Functions (brauchen eine Antwort)
 -- ============================================================
 
@@ -399,6 +420,17 @@ return {
 	RequestMarkUiSeen      = RequestMarkUiSeen,
 	RequestGoHome          = RequestGoHome,
 	RequestClaimFreeGrab   = RequestClaimFreeGrab,
+
+	-- Sammel-Update 05.10.
+	RequestPitSpeed          = RequestPitSpeed,
+	RequestClaimIndexReward  = RequestClaimIndexReward,
+	IndexRewardReceived      = IndexRewardReceived,
+	SpecialMilestoneReceived = SpecialMilestoneReceived,
+	RequestIncubatorStart    = RequestIncubatorStart,
+	RequestIncubatorCollect  = RequestIncubatorCollect,
+	RequestIncubatorRemove   = RequestIncubatorRemove,
+	RequestUpgradeIncubator  = RequestUpgradeIncubator,
+	IncubatorChanged         = IncubatorChanged,
 
 	-- Functions
 	GetPlayerData          = GetPlayerData,

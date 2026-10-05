@@ -166,7 +166,11 @@ do
 	check("C2 Honig zusammengelegt (3 + 2, gedeckelt)", b.HoneyPond.honey, math.min(5, cap))
 
 	check("C3 Erstattung 16000", out.island.pitRefund, 16000)
-	check("C4 Rekord Tower I = 20", out.towers.records[TowerConfig.FIRST_TOWER], 20)
+	-- Sammel-Update 05.10. (Paket 4.2): Tower I waechst staerker je Stage
+	-- (1.15 statt 1.0) — der alte Stand mit Aequivalenz 20 landet deshalb
+	-- etwas tiefer (bei 1.0 waren es genau 20).
+	local perStage = TowerConfig.get(TowerConfig.FIRST_TOWER).equivalentPerStage
+	check("C4 Rekord Tower I = Aequivalenz 20", out.towers.records[TowerConfig.FIRST_TOWER], 1 + math.floor(19 / perStage + 1e-6))
 	check("C4 hoechster Tower = erster", out.towers.highestTower, TowerConfig.FIRST_TOWER)
 	check("C4 Auswahl = erster Tower", out.towers.selected, TowerConfig.FIRST_TOWER)
 

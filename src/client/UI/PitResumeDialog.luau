@@ -15,6 +15,7 @@
 -- bleibt zu Hause.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Loc = require(game:GetService("ReplicatedStorage").Localization.Loc)   -- Sammel-Update 2.4
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
@@ -66,10 +67,11 @@ local function offer(data: Types.PlayerDataUpdate, choice: Choice): (number, num
 	return stage, TowerConfig.getResumeCost(towerId, stage, data.rebirthMult)
 end
 
+-- Sammel-Update 2.4: Schluessel statt fester Texte
 local LABELS: { [Choice]: string } = {
-	Fresh   = "Von vorn",
-	Percent = "Ab 65 % des letzten Laufs",
-	Last    = "Ab der letzten Stufe",
+	Fresh   = "ui.resume.fresh",
+	Percent = "ui.resume.percent",
+	Last    = "ui.resume.last",
 }
 
 local function fill()
@@ -81,8 +83,8 @@ local function fill()
 		local affordable = cost <= data.gummies
 
 		button.Text = string.format("%s  —  Stage %d  —  %s",
-			LABELS[choice], stage,
-			if cost > 0 then Theme.formatNumber(cost) .. " Gummies" else "kostenlos")
+			Loc.t(LABELS[choice]), stage,
+			if cost > 0 then Theme.formatNumber(cost) .. " Gummies" else Loc.t("ui.resume.free"))
 		Theme.setEnabled(button, affordable)
 	end
 
@@ -95,10 +97,11 @@ local function fill()
 		if baerchi and def then
 			local maxHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
 			local hp = math.clamp(baerchi.currentHp or maxHp, 0, maxHp)
-			hpLabel.Text = string.format("Tower %s  •  Letzter Lauf: Stage %d  •  HP %d / %d (%d%%)",
-				(TowerConfig.get(selectedTower(data)) or TowerConfig.TOWERS[1]).numeral,
-				reached or 0,
-				hp, maxHp, math.floor(hp / math.max(1, maxHp) * 100 + 0.5))
+			hpLabel.Text = Loc.t("ui.resume.status", {
+				tower = (TowerConfig.get(selectedTower(data)) or TowerConfig.TOWERS[1]).numeral,
+				stage = reached or 0,
+				hp = hp, max = maxHp, pct = math.floor(hp / math.max(1, maxHp) * 100 + 0.5),
+			})
 		end
 	end
 end
@@ -136,7 +139,7 @@ function PitResumeDialog.init(screenGui: ScreenGui)
 	root.ZIndex = 20
 	_root = root
 
-	Theme.dialogHeader(root, "Wo soll er einsteigen?", PitResumeDialog.close)
+	Theme.dialogHeader(root, Loc.t("ui.resume.title"), PitResumeDialog.close)
 
 	local body = Theme.dialogBody(root)
 	local layout = Theme.listLayout(body, 8)

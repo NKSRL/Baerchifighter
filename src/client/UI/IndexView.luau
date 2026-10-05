@@ -24,6 +24,9 @@ local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local IndexCalculator = require(ReplicatedStorage.Modules.IndexCalculator)
 local BaerchiMesh     = require(ReplicatedStorage.Modules.BaerchiMesh)
+local Remotes           = require(ReplicatedStorage.Network.Remotes)
+local FeatureFlags      = require(ReplicatedStorage.Config.FeatureFlags)
+local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig)   -- Sammel-Update 7
 
 local Theme       = require(script.Parent.Theme)
 local UiScale     = require(script.Parent.UiScale)
@@ -309,7 +312,114 @@ local function currentSignature(): string
 		for id in data.discovered do table.insert(keys, id) end
 	end
 	table.sort(keys)
-	return table.concat(keys, ",") .. "|" .. Loc.getLanguage()
+	-- Sammel-Update 7: abgeholte Belohnungen aendern die Knoepfe
+	local claimed: { string } = {}
+	local claimedMap = if data then (data :: any).indexClaimed else nil
+	if claimedMap then
+		for id in claimedMap do table.insert(claimed, id) end
+	end
+	table.sort(claimed)
+	return table.concat(keys, ",") .. "|" .. table.concat(claimed, ",") .. "|" .. Loc.getLanguage()
+end
+
+--------------------------------------------------------------------------------
+-- Sammel-Update 05.10. (Paket 7): Index-Belohnungen
+--------------------------------------------------------------------------------
+
+local function claimedMap(): { [string]: boolean }
+	local data = ClientState.get()
+	return (if data then (data :: any).indexClaimed else nil) or {}
+end
+
+local function discoveredMap(): { [string]: boolean }
+	local data = ClientState.get()
+	return (if data then data.discovered else nil) or {}
+end
+
+-- Wie viele Belohnungen gerade abholbar sind (fuer das "!" am Index).
+function IndexView.claimableCount(): number
+	if not FeatureFlags.isOn("INDEX_REWARDS") then return 0 end
+	return #IndexRewardConfig.claimable(discoveredMap(), claimedMap())
+end
+
+-- Kurztext der Belohnung ("+2 Gold-Ei · +4.000 Gummies").
+local function rewardText(entry: IndexRewardConfig.Entry): string
+	local r = entry.reward
+	local parts: { string } = {}
+	if r.eggs > 0 and r.eggType then
+		table.insert(parts, string.format("+%d %s", r.eggs, Loc.name("egg." .. r.eggType .. ".name", r.eggType)))
+	end
+	if r.gummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(r.gummies) .. " G") end
+	if r.goldGummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(r.goldGummies) .. " Gold") end
+	if r.blueprints > 0 then table.insert(parts, Loc.t("ui.index_reward.blueprint", { n = r.blueprints })) end
+	if r.incubatorSlots > 0 then table.insert(parts, Loc.t("ui.index_reward.slot", { n = r.incubatorSlots })) end
+	return table.concat(parts, "  ·  ")
+end
+
+-- Abholen-Knopf bzw. Haken rechts in einer Zeile. Gibt nil zurueck, wenn es
+-- fuer diese Kollektion nichts zu zeigen gibt (Schalter aus).
+local function claimWidget(parent: Instance, entry: IndexRewardConfig.Entry): GuiObject?
+	if not FeatureFlags.isOn("INDEX_REWARDS") then return nil end
+	if claimedMap()[entry.id] then
+		local done = Theme.label("Claimed", parent, "✔")
+		done.TextColor3 = Theme.COLORS.good
+		done.TextXAlignment = Enum.TextXAlignment.Center
+		return done
+	end
+	local complete = IndexRewardConfig.isComplete(entry, discoveredMap())
+	local button = Theme.button("Claim", parent, Loc.t("ui.index_reward.claim"), Theme.COLORS.good)
+	button.TextColor3 = Theme.COLORS.outline
+	Theme.setEnabled(button, complete)
+	button.Activated:Connect(function()
+		if not complete then return end
+		Remotes.RequestClaimIndexReward:FireServer(entry.id)
+	end)
+	return button
+end
+
+-- Eine Zeile "Sammlung": Name, Fortschritt (3/5), Belohnung, Knopf.
+local function collectionRow(parent: Instance, order: number, entry: IndexRewardConfig.Entry, title: string)
+	local row = Theme.panel("Reward_" .. entry.id, parent, Theme.COLORS.panel)
+	row.Size = UDim2.new(1, -8, 0, 46)
+	row.LayoutOrder = order
+	local have, total = IndexRewardConfig.progress(entry, discoveredMap())
+	local name = Theme.label("Name", row, string.format("%s  (%d/%d)", title, have, total))
+	name.Position = UDim2.new(0, 10, 0, 3)
+	name.Size = UDim2.new(1, -130, 0, 22)
+	local reward = Theme.bodyText("Reward", row, rewardText(entry))
+	reward.Position = UDim2.new(0, 10, 0, 24)
+	reward.Size = UDim2.new(1, -130, 0, 18)
+	reward.TextColor3 = Theme.COLORS.goldGummy
+	local widget = claimWidget(row, entry)
+	if widget then
+		widget.AnchorPoint = Vector2.new(1, 0.5)
+		widget.Position = UDim2.new(1, -8, 0.5, 0)
+		widget.Size = UDim2.fromOffset(104, 32)
+	end
+end
+
+local function buildCollections(scroller: Instance)
+	if not FeatureFlags.isOn("INDEX_REWARDS") then return end
+	local block = Theme.container("Collections", scroller)
+	block.LayoutOrder = 0
+	block.Size = UDim2.new(1, -8, 0, 0)
+	block.AutomaticSize = Enum.AutomaticSize.Y
+	Theme.listLayout(block, 4).HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+	local head = Theme.container("Head", block)
+	head.LayoutOrder = 0
+	head.Size = UDim2.new(1, 0, 0, 22)
+	Theme.sectionLabel("Title", head, Loc.t("ui.index_reward.collections")).Size = UDim2.fromScale(1, 1)
+
+	for _, entry in IndexRewardConfig.ENTRIES do
+		if entry.kind == "path" then
+			collectionRow(block, entry.order, entry, Loc.t("ui.index_reward.path", { path = Loc.name("path." .. entry.key, entry.key) }))
+		elseif entry.kind == "rarity" then
+			collectionRow(block, entry.order, entry, Loc.t("ui.index_reward.rarity", { rarity = Loc.name("rarity." .. entry.key, entry.key) }))
+		elseif entry.kind == "all" then
+			collectionRow(block, entry.order, entry, Loc.t("ui.index_reward.all"))
+		end
+	end
 end
 
 function IndexView.refresh(force: boolean?)
@@ -338,6 +448,9 @@ function IndexView.refresh(force: boolean?)
 	if summary then
 		summary.Text = Loc.t("ui.index.progress", { found = found, total = total })
 	end
+
+	-- Sammel-Update 7: Pfad-, Rarity- und Gesamt-Belohnungen oben
+	buildCollections(scroller)
 
 	for order, node in tree do
 		local eggDef = EggConfig.data[node.eggId :: Types.EggType]
@@ -368,6 +481,26 @@ function IndexView.refresh(force: boolean?)
 			.. "  (" .. sectionFound .. "/" .. #node.drops .. ")")
 		title.Position = UDim2.new(0, 28, 0, 0)
 		title.Size     = UDim2.new(1, -30, 1, 0)
+
+		-- Sammel-Update 7: Belohnung dieser Ei-Reihe (Abholen / Haken)
+		local eggEntry = IndexRewardConfig.get("egg:" .. node.eggId)
+		if eggEntry then
+			local widget = claimWidget(head, eggEntry)
+			if widget then
+				head.Size = UDim2.new(1, 0, 0, 30)
+				title.Size = UDim2.new(1, -150, 1, 0)
+				widget.AnchorPoint = Vector2.new(1, 0.5)
+				widget.Position = UDim2.new(1, -4, 0.5, 0)
+				widget.Size = UDim2.fromOffset(110, 26)
+				local hint = Theme.bodyText("RewardHint", head, rewardText(eggEntry))
+				hint.AnchorPoint = Vector2.new(1, 0.5)
+				hint.Position = UDim2.new(1, -120, 0.5, 0)
+				hint.Size = UDim2.fromOffset(170, 26)
+				hint.TextXAlignment = Enum.TextXAlignment.Right
+				hint.TextColor3 = Theme.COLORS.goldGummy
+				title.Size = UDim2.new(1, -330, 1, 0)
+			end
+		end
 
 		local grid = Theme.container("Grid", section)
 		grid.LayoutOrder   = 2

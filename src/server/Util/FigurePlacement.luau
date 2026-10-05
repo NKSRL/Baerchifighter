@@ -35,6 +35,9 @@
 -- importierten Mesh selbst ungedreht ist — waere er das nicht, staenden schon
 -- die Figuren auf dem Plot schief.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local BaerchiMesh       = require(ReplicatedStorage.Modules.BaerchiMesh)
+
 local FigurePlacement = {}
 
 -- Ab welchem Abstand ein Blickziel ueberhaupt eine Richtung ergibt. Darunter
@@ -46,14 +49,30 @@ local LOOK_EPSILON = 1e-3
 function FigurePlacement.place(model: Model, footPos: Vector3, facing: CFrame)
 	model:PivotTo(CFrame.new(model:GetPivot().Position) * facing.Rotation)
 
+	-- Sammel-Update 1.2: Unterkante WELT-ausgerichtet aus den sichtbaren
+	-- Teilen (BaerchiMesh.worldBottomY), nicht aus der am body gedrehten
+	-- Bounding-Box — sonst steckten kleine Figuren in den Tower-Platten.
 	local boxCFrame, size = model:GetBoundingBox()
 	local bottomCenter = Vector3.new(
 		boxCFrame.Position.X,
-		boxCFrame.Position.Y - size.Y * 0.5,
+		BaerchiMesh.worldBottomY(model) or (boxCFrame.Position.Y - size.Y * 0.5),
 		boxCFrame.Position.Z
 	)
 
 	model:PivotTo(model:GetPivot() + (footPos - bottomCenter))
+end
+
+-- Sammel-Update 1.2: Fusspunkt einer Figur (Mitte unten, Unterkante
+-- welt-ausgerichtet). Muss zu place() passen: place(m, footOf(m), ...) darf
+-- die Figur nicht verschieben — sonst wandert sie bei jedem Schritt.
+-- Alle Dienste, die "wo steht die Figur" fragen, nehmen diese Funktion.
+function FigurePlacement.footOf(model: Model): Vector3
+	local boxCFrame, size = model:GetBoundingBox()
+	return Vector3.new(
+		boxCFrame.Position.X,
+		BaerchiMesh.worldBottomY(model) or (boxCFrame.Position.Y - size.Y * 0.5),
+		boxCFrame.Position.Z
+	)
 end
 
 -- Wie place(), aber die Blickrichtung ergibt sich aus einem Zielpunkt: das

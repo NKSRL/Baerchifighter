@@ -63,7 +63,9 @@ local PondBuilder    = require(MapBuild.PondBuilder)
 local ArenaBuilder   = require(MapBuild.ArenaBuilder)
 local FigureBuilder  = require(MapBuild.FigureBuilder)
 local LaidEggBuilder = require(MapBuild.LaidEggBuilder)
+local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local RecyclerBuilder = require(MapBuild.RecyclerBuilder)
+local IncubatorBuilder = require(MapBuild.IncubatorBuilder)   -- Sammel-Update Paket 8
 
 --------------------------------------------------------------------------------
 -- Interner Zustand
@@ -99,6 +101,8 @@ local _islandDataProvider: ((Player) -> Types.IslandData?)? = nil
 -- IslandData) — PlotDisplayService setzt beides; gemerkt wird es hier, damit
 -- ein Neuaufbau des Plots (Rebirth) Turm und Symbol sofort wieder mitbaut.
 local _showcase: { [Player]: ArenaBuilder.ShowcaseView } = {}
+-- Sammel-Update Paket 8: Platz-Zahl des Inkubators (siehe setIncubatorSlotProvider)
+local _incubatorSlots: (Player) -> number = function(_player: Player): number return 1 end
 type Badge = { text: string, color: Color3 }
 local _badge: { [Player]: Badge } = {}
 local _crown: { [Player]: boolean } = {}   -- Paket 9: Top 10 der Endless-Woche
@@ -122,6 +126,11 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	ArenaBuilder.buildPit(plotModel, slot)
 	PondBuilder.buildPond(plotModel, slot, islandData)
 	RecyclerBuilder.build(plotModel, slot, islandData.recycler)
+	-- Sammel-Update Paket 8: Inkubator (Plaetze liefert der Daten-Lieferant,
+	-- weil sie auch an Rebirths und Index haengen, die nicht in der Insel stehen).
+	if FeatureFlags.isOn("INCUBATOR") and islandData.incubator then
+		IncubatorBuilder.build(plotModel, slot, islandData, _incubatorSlots(owner))
+	end
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
 
@@ -435,6 +444,14 @@ end
 
 -- Aktualisiert das Level-Attribut einer Gebaeude-Part (fuer Client-UI).
 -- Wird nach einem Gebaeude-Upgrade aufgerufen; baut nichts neu.
+-- Sammel-Update: Weltposition eines Gebaeudes auf dem Plot des Spielers (nil = keins).
+function MapService.getBuildingPosition(player: Player, buildingId: string): Vector3?
+	local model = _plotModels[player]
+	local part = if model then model:FindFirstChild(buildingId) else nil
+	if part and part:IsA("Model") then return part:GetPivot().Position end   -- z. B. der Inkubator
+	return if part and part:IsA("BasePart") then part.Position else nil
+end
+
 function MapService.updateBuildingLevel(player: Player, buildingId: Types.BuildingId, level: number)
 	local model = _plotModels[player]
 	if not model then return end
@@ -503,6 +520,27 @@ function MapService.updateBuildingSigns(player: Player, islandData: Types.Island
 	-- Haengt an denselben Werten wie die Gebaeude-Schilder — deshalb hier
 	-- gleich mit erledigt statt eines eigenen Aufrufers in PlotDisplayService.
 	MapService.updatePondFill(player, islandData)
+end
+
+-- Sammel-Update Paket 8: Inkubator-Stand schreiben (Eier, Zeitmarken,
+-- verfuegbare Plaetze). Billig; fehlt das Modell, wird es gebaut.
+function MapService.updateIncubator(player: Player, islandData: Types.IslandData, slotCount: number)
+	if not FeatureFlags.isOn("INCUBATOR") or not islandData.incubator then return end
+	local model = _plotModels[player]
+	local slot  = _playerSlot[player]
+	if not model or not slot then return end
+	local existing = model:FindFirstChild(IncubatorConfig.MODEL_NAME)
+	if existing and existing:IsA("Model") then
+		IncubatorBuilder.writeState(existing, islandData, slotCount)
+	else
+		IncubatorBuilder.build(model, slot, islandData, slotCount)
+	end
+end
+
+-- Liefert die Platz-Zahl des Inkubators (setzt PlotDisplayService, weil sie
+-- auch an Rebirths und Index-Belohnungen haengt).
+function MapService.setIncubatorSlotProvider(provider: (Player) -> number)
+	_incubatorSlots = provider
 end
 
 -- Schreibt Level, Warteschlange und Lampe des Waben-Recyclers neu.

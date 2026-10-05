@@ -99,6 +99,7 @@ local function newLife(p)
 	p.baerchiLevel = 1
 	p.baerchiXp = 0
 	p.capReached = false
+	p.lifeBest = {}   -- Sammel-Update 4.1: beste Stage je Tower in diesem Leben
 end
 
 local function honeyPerMinute(p)
@@ -185,7 +186,22 @@ local function doEndlessRun(p)
 	return true
 end
 
+-- Sammel-Update 4.1: was der Baerchi in diesem Leben in jedem offenen Tower
+-- schaffen wuerde (der Spieler kann jeden waehlen; die Rebirth-Bedingung
+-- zaehlt ueber die Aequivalenz in jedem Tower).
+local function trackLifeBest(p)
+	for _, def in TowerConfig.TOWERS do
+		if TowerConfig.getStageCap(p.rebirths, def.id, p.records) > 0 then
+			local cleared = reach(p, def.id)
+			if cleared > (p.lifeBest[def.id] or 0) then
+				p.lifeBest[def.id] = cleared
+			end
+		end
+	end
+end
+
 local function doRun(p)
+	trackLifeBest(p)
 	if doEndlessRun(p) then return end
 	-- Erst den Rekord im Deckel-Tower schieben (dafuer spielt man), sonst der
 	-- Tower mit dem meisten Ertrag pro Lauf (nur bis zum Deckel bezahlt).
@@ -274,9 +290,11 @@ local function shop(p)
 end
 
 local function tryRebirth(p)
-	if not p.capReached then return end
-	local cost = EconomyConfig.getRebirthCost(p.rebirths)
-	if p.gummies < cost then return end
+	-- Sammel-Update 05.10. (Paket 4.1): Rebirth kostet nichts mehr, Bedingung
+	-- ist eine Stage in diesem Leben (TowerConfig.getRebirthRequirement).
+	if not TowerConfig.isRebirthReady(p.rebirths, p.lifeBest, p.records) then return end
+	local reqTower, reqStage = TowerConfig.getRebirthRequirement(p.rebirths, p.records)
+	local cost = reqTower .. "/" .. reqStage
 	table.insert(p.lives, {
 		n = p.rebirths, endMin = p.minutes, cost = cost,
 		maxLevel = maxBuildingLevel(p),
@@ -392,11 +410,11 @@ for _, profile in PROFILES do
 	end
 	__log(string.format("Final-Tower Stage 100      | %s", fmtTime(p.final100, profile.minutesPerDay)))
 	__log("")
-	__log("Leben | Ende (h) | Dauer (h) | Rebirth-Kosten | " .. table.concat(SHOP_KEYS, "/") .. " | Einkommen/min am Ende | Gold")
+	__log("Leben | Ende (h) | Dauer (h) | Bedingung      | " .. table.concat(SHOP_KEYS, "/") .. " | Einkommen/min am Ende | Gold")
 	local lastEnd = 0
 	for _, life in p.lives do
 		__log(string.format("%5d | %8.1f | %9.1f | %14s | %23s | %21s | %d", life.n, life.endMin / 60,
-			(life.endMin - lastEnd) / 60, string.format("%.3g", life.cost), life.levels, string.format("%.3g", life.income), life.gold))
+			(life.endMin - lastEnd) / 60, tostring(life.cost), life.levels, string.format("%.3g", life.income), life.gold))
 		lastEnd = life.endMin
 	end
 	__log("")
@@ -420,10 +438,17 @@ __log("")
 -- HBB Paket 8: Look 2 soll in die erste Sitzung fallen (Roblox: 20-30 min)
 within("Normal: Look 2 in 20-45 min",                 p.lookAt[10], 20 / 60, 0.75)
 within("Normal: Look 3 an Tag 2-3 (1,5-4,5 h)",       p.lookAt[20], 1.5, 4.5)
-within("Normal: Look 4 ~Woche 1 (6-13,5 h)",          p.lookAt[30], 6, 13.5)
-within("Normal: Look 5 Woche 2-3 (13,5-31,5 h)",      p.lookAt[45], 13.5, 31.5)
+-- Sammel-Update 05.10.: der erste Rebirth kommt frueher (Stage statt
+-- Gummy-Preis, Entscheidung 11.4) und mit ihm der Multiplikator — Look 4/5
+-- ruecken nach vorn. Gewollt ("am Anfang passiert zu wenig", Paket 3.9);
+-- die Fenster sind deshalb nach unten erweitert.
+within("Normal: Look 4 Woche 1 (3,5-13,5 h)",         p.lookAt[30], 3.5, 13.5)
+within("Normal: Look 5 Woche 1-3 (9-31,5 h)",         p.lookAt[45], 9, 31.5)
 within("Normal: Look 6 Woche 5-8 (52,5-84 h)",        p.lookAt[60], 52.5, 84)
-within("Normal: Rebirth 1 nach ~2-3 Spieltagen (1,5-4,5 h)", p.rebirthAt[1], 1.5, 4.5)
+-- Sammel-Update 05.10. (Paket 4.1/11.4): Rebirth 1 haengt an Tower I Stage 30
+-- und soll spuerbar, aber in der ersten bis zweiten Sitzung kommen
+-- (Annahme 30-45 min bei 60 min/Tag; Fenster 0,5-1,5 h aktive Zeit).
+within("Normal: Rebirth 1 in 0,5-1,5 h (Tower I Stage 30)", p.rebirthAt[1], 0.5, 1.5)
 within("Normal: Final Stage 100 nicht vor Woche 8 (>= 73,5 h)", p.final100 or 1e9, 73.5, 1e9)
 -- Paket 9: Endless. Vielspieler soll in Woche 16 grob bei Stage 180-200
 -- (Endless 80-100) stehen und Woche fuer Woche weiterkommen; wer Endless
@@ -433,9 +458,11 @@ if TowerConfig.isEndlessOpen({ Final = 100 }) then
 		if profile.name == "Viel" then
 			local weekly = profile.weekly
 			local last = weekly[#weekly]
-			local ok = last.endlessRecord >= 80 and last.endlessRecord <= 100
-			if ok then __log("ok  ", "Viel: Endless Woche 16 bei 80-100 (" .. last.endlessRecord .. ")")
-			else fails += 1; __log("FAIL", "Viel: Endless Woche 16 bei 80-100", last.endlessRecord) end
+			-- Sammel-Update 05.10.: Final 100 kommt mit den Stage-Rebirths etwas
+			-- frueher, Endless laeuft entsprechend weiter (80-130).
+			local ok = last.endlessRecord >= 80 and last.endlessRecord <= 130
+			if ok then __log("ok  ", "Viel: Endless Woche 16 bei 80-130 (" .. last.endlessRecord .. ")")
+			else fails += 1; __log("FAIL", "Viel: Endless Woche 16 bei 80-130", last.endlessRecord) end
 			local stuck = false
 			for i = 2, #weekly do
 				if weekly[i - 1].endlessRecord > 0 and weekly[i].endlessRecord <= weekly[i - 1].endlessRecord then

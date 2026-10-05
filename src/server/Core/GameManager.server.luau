@@ -50,6 +50,11 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "EggMerchantService", module = ServerScriptService.Services.EggMerchantService },
 	{ name = "EggLayService",      module = ServerScriptService.Services.EggLayService },
 	{ name = "EggTreeService",     module = ServerScriptService.Services.EggTreeService },
+	-- Sammel-Update 05.10.: Inkubator (Paket 8), Index-Belohnungen (Paket 7),
+	-- besondere Meilensteine (Paket 6.2)
+	{ name = "IncubatorService",        module = ServerScriptService.Services.IncubatorService },
+	{ name = "IndexRewardService",      module = ServerScriptService.Services.IndexRewardService },
+	{ name = "SpecialMilestoneService", module = ServerScriptService.Services.SpecialMilestoneService },
 
 	-- Kampf
 	{ name = "PitArenaService", module = ServerScriptService.Services.PitArenaService },
@@ -61,6 +66,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Events
 	{ name = "EventService",              module = ServerScriptService.Services.EventService },
 	{ name = "EventParticipationService", module = ServerScriptService.Services.EventParticipationService },
+	-- Sammel-Update 05.10. (Paket 5.2): Kampf um die Mitte
+	{ name = "PitBrawlService",           module = ServerScriptService.Services.PitBrawlService },
 
 	-- Waben: Sammeln im Event-Pit und der Recycler auf dem Plot
 	{ name = "CombRecyclerService", module = ServerScriptService.Services.CombRecyclerService },

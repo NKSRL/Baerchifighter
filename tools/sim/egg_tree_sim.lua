@@ -191,7 +191,7 @@ end
 for day = 1, DAYS do
 	-- Offline-Eier (gelegt seit gestern, max 12)
 	local eq = chooseEquip()
-	local offlineEggs = math.min(12, math.floor((24 - ONLINE_H) * 3600 / (intervalOf(eq) * EggConfig.OFFLINE_SLOWDOWN)))
+	local offlineEggs = math.min(EggConfig.OFFLINE_MAX_EGGS, math.floor((24 - ONLINE_H) * 3600 / (intervalOf(eq) * EggConfig.OFFLINE_SLOWDOWN)))
 	if day > 1 then
 		for _ = 1, offlineEggs do hatch(layOne(eq)) end
 		evaluate()

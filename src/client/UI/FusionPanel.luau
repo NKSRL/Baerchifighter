@@ -34,6 +34,7 @@
 -- Abgelehnt wird trotzdem serverseitig: die Vorschau kann veraltet sein.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Loc = require(game:GetService("ReplicatedStorage").Localization.Loc)   -- Sammel-Update 2.4
 
 local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
@@ -138,14 +139,14 @@ local function buildPreview(a: Types.Baerchi?, b: Types.Baerchi?): Preview
 	end
 
 	if a.uid == b.uid then
-		return { ok = false, headline = "Zwei verschiedene Baerchis noetig", detail = "" }
+		return { ok = false, headline = Loc.t("ui.fusion.two_needed"), detail = "" }
 	end
 
 	if a.rarity ~= b.rarity then
 		return {
 			ok = false,
-			headline = "Rarity passt nicht",
-			detail   = "Beide Baerchis muessen dieselbe Rarity haben (" .. a.rarity .. " / " .. b.rarity .. ").",
+			headline = Loc.t("ui.fusion.rarity_mismatch"),
+			detail   = Loc.t("ui.fusion.rarity_mismatch_detail", { a = Loc.t("rarity." .. a.rarity), b = Loc.t("rarity." .. b.rarity) }),
 		}
 	end
 
@@ -157,13 +158,11 @@ local function buildPreview(a: Types.Baerchi?, b: Types.Baerchi?): Preview
 	-- v14: keine hoehere Rarity mehr — die Art des levelhoeheren Inputs.
 	local keep = if b.level > a.level then b else a
 	local keepDef = BaerchiConfig.getById(keep.configId)
-	local headline = string.format("%s  (%s)", keepDef and keepDef.displayName or keep.configId, keep.rarity)
+	local headline = string.format("%s  (%s)",
+		Loc.name("baerchi." .. keep.configId .. ".name", keepDef and keepDef.displayName or keep.configId),
+		Loc.t("rarity." .. keep.rarity))
 
-	local detail = string.format(
-		"Level %d  —  Stat-Bonus +%d%%\nDie Rarity bleibt gleich. Basiswerte und Stat-Stufen: pro Stat der bessere der beiden.\nPromotion und Charms fangen bei Null an.",
-		resultLevel,
-		math.floor(bonus * 100 + 0.5)
-	)
+	local detail = Loc.t("ui.fusion.detail", { level = resultLevel, bonus = math.floor(bonus * 100 + 0.5) })
 
 	return { ok = true, headline = headline, detail = detail }
 end
@@ -291,7 +290,8 @@ local function showResult(result: Types.FusionResult)
 	local name    = def and def.displayName or baerchi.configId
 
 	Notify.emit("fusion_result", function()
-		Toast.success(string.format("Fusion: %s (%s) Lv. %d", name, baerchi.rarity, baerchi.level))
+		Toast.success(string.format("Fusion: %s (%s) Lv. %d",
+			Loc.name("baerchi." .. baerchi.configId .. ".name", name), Loc.t("rarity." .. baerchi.rarity), baerchi.level))
 	end)
 
 	local root = _root
@@ -353,7 +353,7 @@ function FusionPanel.init(screenGui: ScreenGui)
 		_slotLabels[slot] = label
 	end
 
-	local arrow = Theme.label("Arrow", selectView, "wird zu")
+	local arrow = Theme.label("Arrow", selectView, Loc.t("ui.fusion.becomes"))
 	arrow.Position       = UDim2.new(0, 4, 0, 58)
 	arrow.Size           = UDim2.new(1, -8, 0, 18)
 	arrow.TextXAlignment = Enum.TextXAlignment.Center
@@ -401,8 +401,7 @@ function FusionPanel.init(screenGui: ScreenGui)
 	_lockView = lockView
 
 	local lockHint = Theme.bodyText("LockHint", lockView,
-		"Genau EINE Eigenschaft darf von einem bestimmten Baerchi kommen — auch die schlechtere. "
-		.. "Alles auf 'auto' nimmt jeweils das Bessere.")
+		Loc.t("ui.fusion.lock_hint"))
 	lockHint.Position = UDim2.new(0, 4, 0, 0)
 	lockHint.Size     = UDim2.new(1, -8, 0, 40)
 
@@ -499,7 +498,7 @@ function FusionPanel.init(screenGui: ScreenGui)
 	resultView.Visible = false
 	_resultView = resultView
 
-	local resultHint = Theme.label("Hint", resultView, "Fusion geglueckt")
+	local resultHint = Theme.label("Hint", resultView, Loc.t("ui.fusion.success"))
 	resultHint.Position       = UDim2.new(0, 4, 0, 6)
 	resultHint.Size           = UDim2.new(1, -8, 0, 22)
 	resultHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -517,7 +516,7 @@ function FusionPanel.init(screenGui: ScreenGui)
 	resultSub.TextXAlignment = Enum.TextXAlignment.Center
 	_resultSub = resultSub
 
-	local done = Theme.button("Done", resultView, "Zum Inventar", Theme.COLORS.accent)
+	local done = Theme.button("Done", resultView, Loc.t("ui.fusion.to_inventory"), Theme.COLORS.accent)
 	done.AnchorPoint = Vector2.new(0.5, 1)
 	done.Position    = UDim2.new(0.5, -4, 1, 0)
 	done.Size        = UDim2.new(1, -8, 0, 36)

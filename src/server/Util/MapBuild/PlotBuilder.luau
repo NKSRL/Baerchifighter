@@ -273,6 +273,14 @@ function PlotBuilder.buildHoneyDots(body: BasePart, ground: CFrame, slots: numbe
 	end
 end
 
+-- 1234567 -> "1.234.567" (Server-Schild, fuer alle gleich; keine Sprache).
+local function formatThousands(n: number): string
+	local text = tostring(math.floor(n))
+	local result = text:reverse():gsub("(%d%d%d)", "%1."):reverse()
+	if result:sub(1, 1) == "." then result = result:sub(2) end
+	return result
+end
+
 -- Alles am Gebaeude, was sich im Betrieb aendert: Schildtext, Honig-Tropfen
 -- und der Vorrats-Wert fuer den Fuetter-Prompt. Getrennt vom Aufbau, weil das
 -- bei JEDER Honig-Aenderung laeuft (siehe updateBuildingSigns) und deshalb
@@ -307,6 +315,28 @@ function PlotBuilder.writeBuildingState(part: BasePart, buildingData: Types.Buil
 	local sign = part:FindFirstChild("Sign")
 	if not sign or not sign:IsA("BillboardGui") then return end
 
+	-- Sammel-Update (Rueckmeldung 05.10.): ueber der Honig-Fontaene stehen nur
+	-- Level und Preis des naechsten Upgrades — sprachneutral, damit jeder
+	-- sieht, wie weit er ist und was als Naechstes kostet.
+	if buildingData.id == "HoneyPond" then
+		local titleLabel = sign:FindFirstChild("Title")
+		if titleLabel and titleLabel:IsA("TextLabel") then
+			titleLabel.Text = string.format("Lv. %d", buildingData.level)
+		end
+		local stockLabel = sign:FindFirstChild("Stock")
+		if stockLabel and stockLabel:IsA("TextLabel") then
+			local nextDef = BuildingBehavior.getUpgrade(buildingData.id, buildingData.level + 1)
+			if nextDef then
+				local gold = if nextDef.costGoldGummies > 0 then string.format(" + %d 🟡", nextDef.costGoldGummies) else ""
+				stockLabel.Text = string.format("⬆ %s G%s", formatThousands(nextDef.costGummies), gold)
+			else
+				stockLabel.Text = "★ MAX"
+			end
+			stockLabel.TextColor3 = Color3.fromRGB(255, 224, 140)
+		end
+		return
+	end
+
 	local title = sign:FindFirstChild("Title")
 	if title and title:IsA("TextLabel") then
 		title.Text = string.format("%s  Lv.%d", config.displayName, buildingData.level)
@@ -314,7 +344,7 @@ function PlotBuilder.writeBuildingState(part: BasePart, buildingData: Types.Buil
 
 	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
-		stock.Text = string.format("Honig %d / %d", honey, capacity)
+		stock.Text = string.format("🍯 %d / %d", honey, capacity)   -- sprachneutral (2.4)
 
 		-- Volles Lager faellt farblich auf: dann steht die Produktion und es
 		-- wird Zeit, zurueckzukommen und zu fuettern.

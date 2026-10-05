@@ -164,6 +164,13 @@ function TowerService.recordRun(player: Player, data: Types.PlayerData, towerId:
 	local cap = TowerService.getStageCap(data, towerId)
 	local counted = math.min(highestWon, cap)
 
+	-- Sammel-Update 05.10. (Paket 4.1): beste Stage dieses Lebens fuer die
+	-- Rebirth-Bedingung. Ungedeckelt: die Bedingung liegt ohnehin unter dem
+	-- Deckel, und ein Spieler, der darueber kaempft, hat sie erst recht erfuellt.
+	local island = data.island
+	if typeof(island.stageBest) ~= "table" then island.stageBest = {} end
+	island.stageBest[towerId] = math.max(island.stageBest[towerId] or 0, highestWon)
+
 	local newRecord: number? = nil
 	local previous = data.towers.records[towerId] or 0
 	if counted > previous then

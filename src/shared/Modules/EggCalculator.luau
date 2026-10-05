@@ -89,7 +89,9 @@ function EggCalculator.getLayIntervalSeconds(baerchi: Types.Baerchi, offline: bo
 	local mutationBonus = BaerchiConfig.getMutationBonus(baerchi.mutation)
 	speed *= (1 + mutationBonus.egg)
 
-	local interval = base / math.max(speed, 0.01)
+	-- Paket 6.5: niedrige Rarities legen schneller (EggConfig.LAY_RARITY_FACTOR).
+	local rarityFactor = EggConfig.LAY_RARITY_FACTOR[def.rarity] or 1
+	local interval = base * rarityFactor / math.max(speed, 0.01)
 
 	if offline then
 		interval *= EggConfig.OFFLINE_SLOWDOWN

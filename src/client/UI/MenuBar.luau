@@ -23,6 +23,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig) -- Sammel-Update 7
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 
 local Theme        = require(script.Parent.Theme)
 local UiScale      = require(script.Parent.UiScale)
@@ -35,17 +37,18 @@ local Unlock       = require(script.Parent.Unlock)
 local TILE_ELEMENT: { [string]: string } = {
 	Hatch = "tile_eggs", Inventory = "tile_bears", EggTree = "tile_tree",
 	Leaderboard = "tile_leaderboard", DailyBonus = "tile_daily",
-	Shop = "tile_shop",
 }
 
 local MenuBar = {}
 
 -- Groessen. TILE ist gleichzeitig die Antippflaeche — darunter wird es auf dem
 -- Handy zur Geduldsprobe.
-local TILE   = 54
-local LABEL  = 16
-local GAP    = 6
-local WIDTH  = 76
+-- Rueckmeldung 05.10.: weniger Kacheln (Verbessern und Inkubator laufen nur
+-- noch vor Ort, Shop und Quests sitzen oben links) -> groesser.
+local TILE   = 70
+local LABEL  = 18
+local GAP    = 8
+local WIDTH  = 92
 
 -- Was eine Kachel anzeigt: `value` ist die Beschriftung IN der Kachel,
 -- `alert` laesst das rote Ausrufezeichen erscheinen.
@@ -80,10 +83,18 @@ local _tiles: { Tile } = {}
 -- Die Eintraege
 --------------------------------------------------------------------------------
 
+-- Rueckmeldung 05.10.: "Verbessern" (Honig-Fontaene) und "Inkubator" gibt es
+-- nur noch vor Ort, Shop und Quests sitzen oben links (HudRow). Hier bleiben
+-- Eier, Baerchis, Ei-Baum, Bestenliste und Login-Bonus.
 local function buildEntries(): { Entry }
 	return {
 		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI", icon = "egg" },
-		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear" },
+		-- Sammel-Update 05.10. (Paket 7): "!" = eine Index-Belohnung ist abholbar.
+		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear",
+			live = function(data: Types.PlayerDataUpdate)
+				if not FeatureFlags.isOn("INDEX_REWARDS") then return "BA", false end
+				return "BA", #IndexRewardConfig.claimable(data.discovered, data.indexClaimed) > 0
+			end },
 		-- v14: Ei-Baum. Das "!" zeigt eine ungenutzte Blaupause an.
 		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM", icon = "tree",
 			live = function(data: Types.PlayerDataUpdate)
@@ -96,13 +107,6 @@ local function buildEntries(): { Entry }
 			live = function(data: Types.PlayerDataUpdate)
 				local daily = data.daily
 				return if daily then tostring(daily.day) else "7", daily ~= nil and daily.claimable
-			end },
-		-- HBB Paket 10: Shop ("!" = Gratis-Griff heute noch offen). Sichtbar ab
-		-- der 2. Sitzung und nur mit SHOP_V1 (UnlockRules "tile_shop").
-		{ panel = "Shop", title = function() return Loc.t("ui.menu.shop") end, color = Theme.COLORS.goldGummy, symbol = "GG", icon = "goldgummy",
-			live = function(data: Types.PlayerDataUpdate)
-				local shop = data.shop
-				return "GG", shop ~= nil and shop.freeReady
 			end },
 	}
 end

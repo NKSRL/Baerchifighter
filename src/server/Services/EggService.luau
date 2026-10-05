@@ -49,6 +49,9 @@ end
 -- Oeffnet ein Ei des Typs aus dem Lager. Gibt das Ergebnis zurueck (fuer den
 -- DebugService) oder nil, wenn es nicht ging — der Spieler bekommt dann
 -- ein ActionFailed.
+--
+-- Rueckmeldung 05.10.: alle Eier gehen wieder sofort auf. Der Inkubator
+-- bruetet jetzt zusaetzliche Eier (IncubatorService), statt Eier zu sperren.
 function EggService.openEgg(player: Player, eggType: Types.EggType): Types.HatchResult?
 	local data = PlayerService.getData(player)
 	if not data then return nil end

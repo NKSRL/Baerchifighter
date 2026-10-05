@@ -50,6 +50,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Types         = require(ReplicatedStorage.Network.Types)
+local FigurePlacement  = require(ServerScriptService.Util.FigurePlacement)   -- Sammel-Update 1.2
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
@@ -96,8 +97,7 @@ end
 --------------------------------------------------------------------------------
 
 local function footPosOf(model: Model): Vector3
-	local box, size = model:GetBoundingBox()
-	return Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
 
 -- Der Ort, an dem das naechste Ei landet: neben dem Baerchi, wo er GERADE
@@ -163,10 +163,11 @@ end
 -- Aendert die Daten, aber loest KEIN markDirty aus: beim Offline-Nachholen
 -- entstehen mehrere Eier hintereinander, und ein Sync pro Ei waere sinnlose
 -- Netzlast. Der Aufrufer synchronisiert einmal am Ende.
-local function layOne(player: Player, data: Types.PlayerData, baerchi: Types.Baerchi): boolean
+local function layOne(player: Player, data: Types.PlayerData, baerchi: Types.Baerchi, cap: number?): boolean
 	local island = data.island
 
-	if #island.laidEggs >= EggConfig.MAX_UNCOLLECTED_EGGS then
+	-- cap: Offline-Nachholen legt nur bis EggConfig.OFFLINE_MAX_EGGS (Paket 6.1).
+	if #island.laidEggs >= (cap or EggConfig.MAX_UNCOLLECTED_EGGS) then
 		return false
 	end
 
@@ -258,8 +259,9 @@ local function catchUp(player: Player, data: Types.PlayerData, offline: boolean)
 	local laid    = 0
 	local blocked = false
 
+	local cap = if offline then EggConfig.OFFLINE_MAX_EGGS else EggConfig.MAX_UNCOLLECTED_EGGS
 	for _ = 1, due do
-		if layOne(player, data, baerchi) then
+		if layOne(player, data, baerchi, cap) then
 			laid += 1
 		else
 			blocked = true
@@ -473,7 +475,9 @@ function EggLayService.init()
 		local secondsAway = os.time() - (data.lastSeenAt or os.time())
 		local laid, blocked = catchUp(player, data, true)
 
-		if laid > 0 then
+		-- Paket 6.1: auch melden, wenn die Offline-Grenze alles gebremst hat
+		-- (0 gelegt, Lager voll) — sonst wundert sich der Spieler, warum nichts kam.
+		if laid > 0 or (blocked and secondsAway >= 60) then
 			local report: Types.OfflineEggReport = {
 				laid        = laid,
 				skipped     = blocked,

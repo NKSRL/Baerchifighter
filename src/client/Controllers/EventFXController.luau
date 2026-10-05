@@ -400,7 +400,8 @@ local function onHit(info: any)
 		end)
 	end
 	Notify.emit("boss_hit", function()
-		Toast.show(Loc.t("ui.boss.hit"), Theme.COLORS.bad)
+		-- Sammel-Update 5.2: Stoss eines gegnerischen Baerchis im Pit
+		Toast.show(Loc.t(if info.source == "brawl" then "ui.brawl.hit" else "ui.boss.hit"), Theme.COLORS.bad)
 	end)
 end
 

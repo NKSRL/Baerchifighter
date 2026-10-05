@@ -157,9 +157,41 @@ end
 -- footPos steht. Die Fusshoehe kommt damit aus dem echten Mesh und nicht aus
 -- einer Konfig-Zahl — das funktioniert unabhaengig davon wie gross oder klein
 -- das exportierte Modell tatsaechlich ist.
+--
+-- Sammel-Update 1.2 ("kleine Figuren stecken in den Tower-Platten"):
+-- Model:GetBoundingBox() ist nach dem PrimaryPart (body) ausgerichtet, nicht
+-- nach der Welt. Ist der body eines importierten Modells gekippt (bei den
+-- Rarity-eigenen Modellen unterschiedlich), ist size.Y gar nicht die Hoehe —
+-- die berechnete Unterkante liegt dann zu hoch oder zu tief, und kleine
+-- Figuren verschwinden in der Platte. Die Unterkante kommt deshalb aus den
+-- WELT-ausgerichteten Grenzen jedes sichtbaren Teils (worldBottomY).
+function BaerchiMesh.worldBoundsY(model: Model): (number?, number?)
+	local bottom: number? = nil
+	local top: number? = nil
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d.Transparency < 1 then
+			local cf, sz = d.CFrame, d.Size
+			local halfY = 0.5 * (
+				math.abs(cf.RightVector.Y) * sz.X
+				+ math.abs(cf.UpVector.Y) * sz.Y
+				+ math.abs(cf.LookVector.Y) * sz.Z
+			)
+			local lo, hi = cf.Position.Y - halfY, cf.Position.Y + halfY
+			if bottom == nil or lo < (bottom :: number) then bottom = lo end
+			if top == nil or hi > (top :: number) then top = hi end
+		end
+	end
+	return bottom, top
+end
+
+function BaerchiMesh.worldBottomY(model: Model): number?
+	local bottom = BaerchiMesh.worldBoundsY(model)
+	return bottom
+end
+
 local function standOn(model: Model, footPos: Vector3)
 	local boundingCFrame, size = model:GetBoundingBox()
-	local bottomY = boundingCFrame.Position.Y - size.Y * 0.5
+	local bottomY = BaerchiMesh.worldBottomY(model) or (boundingCFrame.Position.Y - size.Y * 0.5)
 	local offset  = footPos - Vector3.new(boundingCFrame.Position.X, bottomY, boundingCFrame.Position.Z)
 	model:PivotTo(model:GetPivot() + offset)
 end

@@ -125,7 +125,7 @@ local function refresh()
 	end
 
 	if _petState ~= "Home" then
-		label.Text = "Eier pausiert (unterwegs)"
+		label.Text = Loc.t("ui.egg.paused")
 		return
 	end
 

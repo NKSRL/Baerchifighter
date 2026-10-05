@@ -49,7 +49,10 @@ selbst ist durch Attrappen ersetzt. Details: `luau-tests/README.md`.
 | `sim/pit_balance.lua` | Tabelle: erreichbare Stages je Rarity und Tower (keine Prüfung) |
 | `sim/tower_calibration.lua` | Zielwerte der Tower (L1 Common ~3 Stages, Omega max Final 70–100, 100 Stages < 50 ms) |
 | `sim/progression_pacing.lua` | Pacing-Ziele (Look 2–6, Rebirth 1, Final 100 nicht vor Woche 8) für 30/90/240 min pro Tag |
-| `sim/egg_tree_sim.lua` | Tabelle: Spieltage bis zur Freischaltung je Knoten (keine Prüfung) |
+| `sim/egg_tree_sim.lua` | Tabelle: Spieltage bis zur Freischaltung je Knoten (keine Prüfung; rechnet die Rebirth-Gates noch mit den alten Gummy-Kosten) |
+| `luau-tests/rebirth_rules.test.lua` | Sammel-Update 4.1: Rebirth nach Stage, Bedingung in offenem Tower, steigt nie ab |
+| `luau-tests/migration_v16.test.lua` | Spielstand v15 → v16 (stageBest, Inkubator, indexClaimed, specialClaimed), keine Währung angefasst |
+| `luau-tests/incubator.test.lua` | Inkubator-Zeitrechnung inkl. Offline, Plätze, Sofort-Öffnen; Index-Belohnungen |
 
 Die Typprüfung (`--!strict`) machen diese Tests nicht, das bleibt Studio.
 

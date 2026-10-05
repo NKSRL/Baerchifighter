@@ -36,6 +36,7 @@ local EGG_HEIGHT = 84
 
 local _root: Frame?              = nil
 local _scroller: ScrollingFrame? = nil
+local _signature = ""
 
 --------------------------------------------------------------------------------
 -- Reihenfolge der Eier
@@ -97,7 +98,9 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	count.TextXAlignment = Enum.TextXAlignment.Right
 	count.TextColor3     = Theme.COLORS.good
 
-	local button = Theme.bigButton("Open", card, "Oeffnen", Theme.COLORS.accent)
+	-- Rueckmeldung 05.10.: alle Eier gehen wieder sofort auf (der Inkubator
+	-- bruetet jetzt zusaetzliche Eier, statt Eier zu sperren).
+	local button = Theme.bigButton("Open", card, Loc.t("ui.hatch.open"), Theme.COLORS.accent)
 	button.Position = UDim2.new(1, -128, 0, 38)
 	button.Size     = UDim2.new(0, 116, 0, 32)
 
@@ -122,6 +125,18 @@ function HatchPanel.refresh()
 	local data = ClientState.get()
 	if not data then return end
 
+	-- Sammel-Update 1.3-Muster: nur neu bauen, wenn sich das Lager (oder die
+	-- Sprache) aendert — sonst zerstoert jeder Datenstand den Knopf unter dem
+	-- Finger, und der Tipp kommt nicht an.
+	local parts = { Loc.getLanguage() }
+	for _, eggType in EGG_ORDER do
+		local n = data.island.eggStock[eggType] or 0
+		if n > 0 then table.insert(parts, eggType .. n) end
+	end
+	local signature = table.concat(parts, "|")
+	if signature == _signature then return end
+	_signature = signature
+
 	for _, child in scroller:GetChildren() do
 		if child:IsA("Frame") or child:IsA("TextLabel") then
 			child:Destroy()
@@ -138,8 +153,7 @@ function HatchPanel.refresh()
 	end
 
 	if shown == 0 then
-		local empty = Theme.bodyText("Empty", scroller,
-			"Keine Eier im Lager.\nDein ausgeruesteter Baerchi legt welche auf deinem Plot — einfach einsammeln.")
+		local empty = Theme.bodyText("Empty", scroller, Loc.t("ui.hatch.empty"))
 		empty.Size        = UDim2.new(1, -8, 0, 60)
 		empty.LayoutOrder = 1
 	end
@@ -154,6 +168,7 @@ local function openInternal(...: any)
 	if not root then return end
 
 	root.Visible = true
+	_signature = ""
 	HatchPanel.refresh()
 end
 
@@ -177,7 +192,7 @@ function HatchPanel.init(screenGui: ScreenGui)
 	)
 	_root = root
 
-	local header = Theme.dialogHeader(root, "Eier", function()
+	local header = Theme.dialogHeader(root, Loc.t("ui.menu.eggs"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 

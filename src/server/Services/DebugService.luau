@@ -65,6 +65,8 @@
 --   D:Invoke("tower", "II", 20)     -- Tower II waehlen und ab Stage 20 kaempfen (Fortsetzung gratis)
 --   D:Invoke("towerrecord", "III", 45) -- Rekord setzen (Meilensteine bis dorthin werden ausgezahlt)
 --   D:Invoke("rebirthcap")          -- Deckel des aktuellen Rebirths in allen Towern
+--   D:Invoke("stagebest", "I", 30)  -- Sammel-Update: beste Stage dieses Lebens (Rebirth-Bedingung)
+--   D:Invoke("incubator", "done")   -- Sammel-Update: Inkubator-Stand, "done" = alle Plaetze voll gebruetet
 --   D:Invoke("dailyshift", 1)       -- Login-Bonus: so tun, als waeren 1 Tag(e) vergangen
 --   D:Invoke("lbflush")             -- Bestenlisten sofort schreiben und neu lesen
 --   D:Invoke("parts")               -- Teile auf der eigenen Insel zaehlen (Budget 250)
@@ -145,6 +147,7 @@ local EggTree                   = require(ReplicatedStorage.Modules.EggTree)
 local CombatConfig              = require(ReplicatedStorage.Config.CombatConfig)
 
 -- v12
+local ActivityLock = require(ServerScriptService.Util.ActivityLock)  -- Paket 1.1: Lock-Halter ausgeben
 local PetModeService            = require(ServerScriptService.Services.PetModeService)
 local PitArenaService           = require(ServerScriptService.Services.PitArenaService)
 
@@ -164,6 +167,7 @@ local JackpotRoll               = require(ServerScriptService.Util.JackpotRoll)
 
 -- HBB Paket 0
 local FunnelService             = require(ServerScriptService.Services.FunnelService)
+local IncubatorService          = require(ServerScriptService.Services.IncubatorService)   -- Umbau 05.10.
 
 local DebugService = {}
 
@@ -430,6 +434,31 @@ commands.rebirthcap = function(_player, data)
 	return { rebirths = data.rebirthCount, deckelTower = capTower, deckelStage = capStage, proTower = caps }
 end
 
+-- Sammel-Update 05.10. (Paket 4.1): beste Stage dieses Lebens setzen und die
+-- Rebirth-Bedingung zeigen. D:Invoke("stagebest", "I", 30)
+commands.stagebest = function(player, data, towerId: any, stage: any)
+	if typeof(towerId) == "string" and TowerConfig.get(towerId) then
+		data.island.stageBest[towerId] = math.max(0, math.floor(tonumber(stage) or 0))
+		PlayerService.markDirty(player)
+	end
+	local reqTower, reqStage = TowerConfig.getRebirthRequirement(data.rebirthCount, data.towers.records)
+	return {
+		stageBest  = data.island.stageBest,
+		bedingung  = reqTower .. "/" .. reqStage,
+		bereit     = TowerConfig.isRebirthReady(data.rebirthCount, data.island.stageBest, data.towers.records),
+	}
+end
+
+-- Sammel-Update 05.10. (Paket 8, Umbau): Inkubator-Stand; "done" bruetet
+-- alle belegten Plaetze sofort voll.
+commands.incubator = function(player, data, action: any)
+	local incubator = data.island.incubator
+	if action == "done" then
+		IncubatorService.debugFill(player)
+	end
+	return { level = incubator.level, plaetze = incubator.slots }
+end
+
 -- v15: Login-Bonus — so tun, als waeren `days` Tage vergangen
 commands.dailyshift = function(player, _data, days: any)
 	return LoginBonusService.debugShift(player, math.floor(tonumber(days) or 1))
@@ -477,6 +506,9 @@ commands.petmode = function(player, data)
 		pit         = pitPhase,
 		stage       = stage,
 		event       = EventParticipationService.getPhase(player),
+		-- Sammel-Update Paket 1.1: wer haelt die Figur gerade? (UFO-Einfrieren)
+		lockHalter  = ActivityLock.owner(player) or "frei",
+		entfuehrt   = EventParticipationService.isAbducting(player),
 		towerProgress = data.island.towerProgress,
 		eggStock    = data.island.eggStock,
 		gummies     = data.gummies,
