@@ -3,8 +3,8 @@
 -- ServerScriptService/Services/IslandService.luau
 --
 -- Einzige Zustaendigkeit:
---   - Insel-Struktur veraendern: Gebaeude-Level, PIT-Level und welcher
---     Baerchi ausgeruestet ist
+--   - Insel-Struktur veraendern: Gebaeude-Level und welcher Baerchi
+--     ausgeruestet ist (v15: das PIT-Level ist entfallen, siehe TowerService)
 --   - Die zugehoerigen Client-Requests entgegennehmen und validieren
 --   - Nach einer Aenderung die sichtbare Insel via MapService nachziehen
 --
@@ -12,7 +12,7 @@
 -- entscheidet nur WAS gekauft wird und was danach in der Welt passieren muss.
 --
 -- Equip-Baerchi gehoert hier rein statt in einen eigenen Service: es ist
--- genau wie die Gebaeude- und PIT-Upgrades eine Aenderung an der
+-- genau wie die Gebaeude-Upgrades eine Aenderung an der
 -- Insel-STRUKTUR (welcher Baerchi ueberhaupt in der Welt steht), keine neue
 -- Zustaendigkeit fuer sich.
 
@@ -22,7 +22,6 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
-local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
@@ -35,9 +34,8 @@ local IslandService = {}
 -- Gueltige BuildingIds als Menge — Client-Strings duerfen nie ungeprueft
 -- als Types.BuildingId weiterverwendet werden.
 local VALID_BUILDINGS: { [string]: boolean } = {
-	Beehive    = true,
-	HoneyPot   = true,
-	HoneyPress = true,
+	Beehive      = true,
+	HoneyRefiner = true,
 }
 
 local function fail(player: Player, action: string, reason: Types.LocMsg?)
@@ -65,34 +63,6 @@ function IslandService.upgradeBuilding(player: Player, buildingId: Types.Buildin
 	PlayerService.saveNow(player)
 
 	print("[IslandService]", player.Name, "| Gebaeude:", buildingId, "→ Level", newLevel)
-end
-
---------------------------------------------------------------------------------
--- PIT-Level-Kauf
---------------------------------------------------------------------------------
-
-function IslandService.upgradePit(player: Player)
-	local ok, reason, newLevel = EconomyService.upgradePit(player)
-	if not ok then
-		fail(player, "RequestUpgradePit", reason)
-		return
-	end
-
-	-- v12: der gespeicherte letzte Lauf gilt nur fuer das alte PIT-Level (dort
-	-- standen andere Gegner in denselben Stage-Nummern). Ohne Loeschen wuerde
-	-- die Fortsetzungs-Frage einen Einstieg anbieten, der nicht mehr passt.
-	local data = PlayerService.getData(player)
-	if data then
-		data.island.pitProgress = nil
-		PlayerService.markDirty(player)
-	end
-
-	-- Plattform sichtbar hochziehen
-	MapService.updatePitLevel(player, newLevel)
-	PlayerService.saveNow(player)
-
-	print("[IslandService]", player.Name, "| PIT-Level →", newLevel,
-		"| Kosten:", EconomyConfig.getPitUpgradeCost(newLevel))
 end
 
 --------------------------------------------------------------------------------
@@ -177,10 +147,6 @@ function IslandService.init()
 			return
 		end
 		IslandService.upgradeBuilding(player, buildingId :: Types.BuildingId)
-	end)
-
-	RateLimiter.connect(Remotes.RequestUpgradePit, "RequestUpgradePit", function(player)
-		IslandService.upgradePit(player)
 	end)
 
 	RateLimiter.connect(Remotes.RequestEquipBaerchi, "RequestEquipBaerchi", function(player, baerchiUid: any)

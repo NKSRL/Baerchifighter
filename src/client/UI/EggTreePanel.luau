@@ -28,6 +28,7 @@ local EggTree         = require(ReplicatedStorage.Modules.EggTree)
 local IndexCalculator = require(ReplicatedStorage.Modules.IndexCalculator)
 
 local Theme          = require(script.Parent.Theme)
+local EggIcon = require(script.Parent.EggIcon)
 local PanelManager   = require(script.Parent.PanelManager)
 local HatchAnimation = require(script.Parent.HatchAnimation)
 local ClientState    = require(script.Parent.Parent.Controllers.ClientState)
@@ -158,6 +159,8 @@ local function buildTree(canvas: ScrollingFrame)
 	end
 
 	for eggId, def in EggConfig.data do
+		-- Sonder-Eier (EggConfig: special) haben keinen Platz im Baum.
+		if not LAYOUT[eggId] then continue end
 		local c = nodeCenter(eggId)
 		local frame = Theme.panel("Node_" .. eggId, canvas, Theme.COLORS.panel)
 		frame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -166,24 +169,17 @@ local function buildTree(canvas: ScrollingFrame)
 		frame.ZIndex = 13
 		local stroke = frame:FindFirstChildOfClass("UIStroke") :: UIStroke
 
-		local swatch = Instance.new("Frame")
-		swatch.Name = "Swatch"
-		swatch.Size = UDim2.fromOffset(26, 34)
-		swatch.Position = UDim2.new(0, 8, 0.5, -17)
-		swatch.BackgroundColor3 = def.color
-		swatch.BorderSizePixel = 0
-		swatch.ZIndex = 14
-		swatch.Parent = frame
-		Theme.corner(swatch, 13)
-		Theme.stroke(swatch, Theme.COLORS.outline, 2)
+		local swatch = EggIcon.make(frame, eggId, 38, 14)
+		swatch.AnchorPoint = Vector2.new(0, 0.5)
+		swatch.Position = UDim2.new(0, 6, 0.5, 0)
 
 		local name = Theme.label("Name", frame, eggName(eggId))
-		name.Position = UDim2.fromOffset(40, 6)
+		name.Position = UDim2.fromOffset(42, 6)
 		name.Size = UDim2.new(1, -46, 0, 22)
 		name.ZIndex = 14
 
 		local count = Theme.label("Count", frame, "")
-		count.Position = UDim2.fromOffset(40, 32)
+		count.Position = UDim2.fromOffset(42, 32)
 		count.Size = UDim2.new(1, -46, 0, 20)
 		count.TextColor3 = Theme.COLORS.good
 		count.ZIndex = 14

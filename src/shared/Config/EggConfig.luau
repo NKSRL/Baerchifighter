@@ -45,6 +45,12 @@ export type EggDef = {
 	-- brauchen — dieselbe Begruendung wie bei BaerchiConfig.RARITY_COLORS.
 	color       : Color3,
 	shortName   : string,   -- kurze Beschriftung ueber dem gelegten Ei
+
+	-- v17: SONDER-EI ausserhalb des Baums (UFO-Jackpot). Hat keinen
+	-- TREE-Eintrag, wird nie freigeschaltet, nie gelegt, nie gepresst und nie
+	-- als "hoechstes Ei" oder Sprung-Ei gewaehlt. Man bekommt es nur direkt
+	-- (Jackpot) und kann es wie jedes Ei aus dem Lager oeffnen.
+	special     : boolean?,
 }
 
 --------------------------------------------------------------------------------
@@ -97,6 +103,10 @@ local RARITY_DIST: { [Types.EggType]: { [string]: number } } = {
 	TranscendenceEgg = { Secret = 60, Godly = 38, Eternal = 2 },
 	EternityEgg      = { Godly = 80, Eternal = 19, Omega = 1 },
 	OmegaEgg         = { Eternal = 70, Omega = 30 },
+	-- v17: UFO-Jackpot (Sonder-Ei). Breit gestreut von Epic bis Godly: fuer
+	-- Fruehspieler ein Riesensprung, fuer Spaetspieler eine echte Chance auf
+	-- ein Late-Game-Pet (Cosmic+ 8 %). Ø ~ Mythic. ANNAHME, eine Zeile.
+	UfoJackpotEgg    = { Epic = 30, Legendary = 30, Mythic = 20, Divine = 12, Cosmic = 5, Secret = 2.5, Godly = 0.5 },
 }
 
 -- Gewicht eines Baerchis innerhalb seiner Rarity: 3, wenn sein Pfad zum
@@ -227,6 +237,16 @@ local EGGS: { [Types.EggType]: EggDef } = {
 		id = "OmegaEgg", displayName = "Omega-Ei", path = "Ascension", parent = "EternityEgg", tier = 11, sortOrder = 20,
 		description = "Das letzte Ei. 30% Omega.",
 		color = Color3.fromRGB(255, 255, 255), shortName = "Omega", hatchTable = {},
+	},
+
+	-- ============================================================
+	-- SONDER-EIER (v17, nicht im Baum)
+	-- ============================================================
+	UfoJackpotEgg = {
+		id = "UfoJackpotEgg", displayName = "UFO-Jackpot-Ei", path = "Event", parent = nil, tier = 0, sortOrder = 21,
+		description = "Vom UFO abgeworfen. Ein ganz seltener Fund.",
+		color = Color3.fromRGB(255, 214, 60), shortName = "Jackpot", hatchTable = {},
+		special = true,
 	},
 }
 
@@ -364,10 +384,13 @@ end
 
 buildHatchTables()
 
--- Alle Ei-IDs in Anzeige-Reihenfolge.
+-- Alle Ei-IDs des BAUMS in Anzeige-Reihenfolge (ohne Sonder-Eier: Baum,
+-- Freischaltung, Sprung-Ei und Panel kennen nur diese).
 local function getOrderedIds(): { Types.EggType }
 	local ids: { Types.EggType } = {}
-	for eggId in EGGS do table.insert(ids, eggId) end
+	for eggId, egg in EGGS do
+		if not egg.special then table.insert(ids, eggId) end
+	end
 	table.sort(ids, function(a, b) return EGGS[a].sortOrder < EGGS[b].sortOrder end)
 	return ids
 end
@@ -404,7 +427,7 @@ end
 -- waehlt der Spieler, ob Gold- oder Void-Pfad.
 local PRESS = {
 	cost          = 5,
-	blockedPaths  = { Ascension = true },
+	blockedPaths  = { Ascension = true, Event = true },
 }
 
 -- Hilfsfunktion: Hatch-Table als normalisierte Gewichtungs-Liste
@@ -565,9 +588,24 @@ local MERCHANT = {
 	maxBuyDistance   = 14,
 }
 
+-- HBB Paket 5 (MAP_V2_MERCHANT): sichtbarer Standort des Haendlers. Auf dem
+-- Ring zwischen Event-Pit-Zaun (Radius 50) und Bestenlisten-Tafel (Radius 80,
+-- 22,5 Grad), mittig zwischen zwei Stegen (alle 45 Grad, Luecke +-9 Grad):
+-- jeder, der zum Event laeuft, kommt daran vorbei. Abstand zur Tafel ca. 59
+-- Studs, zum Pit-Zaun ca. 16 Studs. Mit dem Flag aus gilt MERCHANT oben.
+-- Das Schild ueber dem Stand zeigt nur ein Ei (Bild, kein Text).
+local MERCHANT_V2 = {
+	angleDegrees = 67.5,
+	radius       = 66,
+	signImage    = "rbxassetid://136964848925363",   -- dasselbe Ei wie UI/Icons.egg
+	signHeight   = 9,
+	signSize     = 5,     -- Studs
+}
+
 return {
 	data               = EGGS,
 	MERCHANT           = MERCHANT,
+	MERCHANT_V2        = MERCHANT_V2,
 	getNormalizedTable = getNormalizedTable,
 
 	-- v14: Ei-Baum
@@ -578,6 +616,10 @@ return {
 	getOrderedIds      = getOrderedIds,
 	getChildren        = getChildren,
 	getNextInPath      = getNextInPath,
+	isSpecial          = function(eggType: Types.EggType): boolean
+		local egg = EGGS[eggType]
+		return egg ~= nil and egg.special == true
+	end,
 
 	LAY_LEVEL_GAIN           = LAY_LEVEL_GAIN,
 	LAY_STAT_LEVEL_GAIN      = LAY_STAT_LEVEL_GAIN,

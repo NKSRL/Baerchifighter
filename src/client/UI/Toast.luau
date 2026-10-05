@@ -17,6 +17,7 @@ local Types   = require(ReplicatedStorage.Network.Types)
 local Remotes = require(ReplicatedStorage.Network.Remotes)
 local Loc     = require(ReplicatedStorage.Localization.Loc)
 local Theme   = require(script.Parent.Theme)
+local Notify  = require(script.Parent.Notify)
 
 local Toast = {}
 
@@ -136,7 +137,9 @@ function Toast.init(screenGui: ScreenGui)
 	-- `reason` ist eine LocMsg (Schluessel + Zahlen) — oder, bei Altlasten, ein
 	-- fertiger String. Loc.resolve nimmt beides.
 	Remotes.ActionFailed.OnClientEvent:Connect(function(action: any, reason: any)
-		Toast.show(Loc.resolve(reason), Theme.COLORS.bad)
+		Notify.emit("action_failed", function()
+			Toast.show(Loc.resolve(reason), Theme.COLORS.bad)
+		end)
 	end)
 
 	print("[Toast] Initialisiert")

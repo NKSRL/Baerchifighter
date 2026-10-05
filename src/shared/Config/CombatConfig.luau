@@ -2,8 +2,16 @@
 -- CombatConfig.luau
 -- ReplicatedStorage/Config/CombatConfig.luau
 --
--- Alle Zahlen der PIT-Gegner an einer Stelle.
--- CombatService baut daraus die Gegner und rechnet selbst nichts aus.
+-- Einzige Zustaendigkeit:
+--   - Die Grundformel der Kampf-Gegner: Grundwerte, Wachstum pro
+--     "Aequivalenz-Stage" und der Ausgleich fuer den DEF-Ausbau.
+--
+-- Seit v15 (Tower-System) gibt es kein PIT-Level mehr. Welche Gegnerstaerke
+-- in welcher Stage welches Towers steht, rechnet Config/TowerConfig: jede
+-- Stage eines Towers bekommt eine AEQUIVALENZ-STAGE (die Stage von Tower I mit
+-- derselben Staerke), und daraus baut getEnemyStatsForEquivalent hier den
+-- Gegner. Tower I Stage N IST Aequivalenz-Stage N — die Kalibrierung unten
+-- ("Level N schafft etwa N Stages") gilt fuer Tower I also unveraendert.
 --
 -- ============================================================
 -- WIE EIN PIT-LAUF FUNKTIONIERT
@@ -14,11 +22,10 @@
 -- Stage verliert oder bei 0 HP ankommt; danach steht er erschoepft auf dem
 -- Plot und muss mit Honig hochgefuettert werden.
 --
--- Zwei Achsen machen die Gegner staerker:
---   1. PIT_LEVEL_GROWTH — das kauft der Spieler bewusst (hoeheres PIT-Level
---      heisst staerkere Gegner UND mehr Gummies pro Stage).
---   2. Stage-Wachstum innerhalb eines Laufs — das passiert automatisch und
---      begrenzt, wie weit man mit einem gegebenen Baerchi kommt.
+-- Bis v14 machten zwei Achsen die Gegner staerker: das gekaufte PIT-Level
+-- (PIT_LEVEL_GROWTH, nur noch fuer die Migration alter Rekorde da) und das
+-- Stage-Wachstum innerhalb eines Laufs. Seit v15 gibt es nur noch die zweite
+-- — welcher Tower welche Stages hat, steht in TowerConfig.
 --
 -- Das Stage-Wachstum liegt bewusst knapp UNTER dem Level-Wachstum der
 -- Baerchis (BaerchiConfig.STAT_GROWTH_PER_LEVEL = 10%): jedes Level bringt
@@ -39,7 +46,8 @@
 --   100% HP → 10 Stages   50% HP → 7 Stages   25% HP → 4 Stages
 -- Genau dieser Unterschied ist der Grund, vor einem Lauf erst zu fuettern.
 --
--- Auf hoeheren PIT-Leveln (Level-10-Baerchi): PIT 3 → 6 Stages, PIT 5 → 4.
+-- (Bis v14: auf hoeheren PIT-Leveln, Level-10-Baerchi: PIT 3 → 6 Stages,
+-- PIT 5 → 4. Seit v15 gibt es dafuer Tower II, III und Final, siehe TowerConfig.)
 
 export type EnemyStats = {
 	maxHp  : number,
@@ -71,9 +79,9 @@ local ENEMY_BASE: EnemyStats = {
 -- Level-Wachstum der Baerchis).
 local STAGE_GROWTH = 0.09
 
--- Zuwachs pro PIT-Level (additiv auf den Grundwert: Level 3 = +50%).
--- Ein Level-10-Baerchi schafft damit auf PIT 1 zehn Stages, auf PIT 3 noch
--- sechs, auf PIT 5 noch vier — dafuer gibt jede Stage deutlich mehr Gummies.
+-- v15: NUR NOCH FUER DIE MIGRATION. Zuwachs pro altem PIT-Level (additiv auf
+-- den Grundwert: Level 3 = +50%). TowerConfig.legacyPitToTower rechnet damit
+-- einen alten PIT-Rekord in die gleich starke Tower-Stage um.
 local PIT_LEVEL_GROWTH = 0.25
 
 -- ============================================================
@@ -123,28 +131,52 @@ local ENEMY_ATK_SOFTENING = 0.95
 local ENEMY_SPD_PER_STAGE = 0.02
 
 -- Sicherheitsnetz gegen Endlos-Laeufe: selbst ein voellig ueberlegener
--- Baerchi hoert hier auf. Rein technisch, kein Balancing-Wert.
-local MAX_STAGES_PER_RUN = 60
+-- Baerchi hoert hier auf. Rein technisch, kein Balancing-Wert. Seit v15 so
+-- gross wie der laengste Tower (Final, 100 Stages); die eigentliche Grenze
+-- eines Laufs ist die Stage-Zahl des gewaehlten Towers (TowerConfig).
+local MAX_STAGES_PER_RUN = 100
 
--- Gesamtfaktor auf HP und ATK eines Gegners.
-local function getEnemyGrowth(pitLevel: number, stage: number): number
-	local levelPart = 1 + PIT_LEVEL_GROWTH * (math.max(pitLevel, 1) - 1)
-	local stagePart = math.pow(1 + STAGE_GROWTH, math.max(stage, 1) - 1)
-	return levelPart * stagePart
+-- Gesamtfaktor auf HP und ATK eines Gegners mit dieser Aequivalenz-Stage
+-- (Tower I Stage N = Aequivalenz N). Darf eine Kommazahl sein: Tower II, III
+-- und Final wachsen langsamer als 1 Aequivalenz pro Stage.
+local function getGrowthForEquivalent(equivalent: number): number
+	return math.pow(1 + STAGE_GROWTH, math.max(equivalent, 1) - 1)
 end
 
--- Fertige Gegner-Werte fuer eine Stage. CombatService macht daraus nur noch
--- einen CombatSnapshot.
-local function getEnemyStats(pitLevel: number, stage: number): EnemyStats
-	local growth = getEnemyGrowth(pitLevel, stage)
+-- Fertige Gegner-Werte fuer eine Aequivalenz-Stage. TowerConfig rechnet die
+-- Aequivalenz aus Tower und Stage, CombatService macht daraus nur noch einen
+-- CombatSnapshot.
+--
+-- Die SPD folgt derselben Aequivalenz: ein Gegner so stark wie Tower-I-Stage
+-- 80 ist auch so schnell wie einer dort — dieselbe Regel wie bis v14 ("Stage
+-- S hat die SPD eines Level-S-Baerchis").
+local function getEnemyStatsForEquivalent(equivalent: number): EnemyStats
+	local growth = getGrowthForEquivalent(equivalent)
 
 	return {
 		maxHp   = math.max(1, math.floor(ENEMY_BASE.maxHp * growth)),
 		atk     = math.max(1, math.floor(ENEMY_BASE.atk * growth * ENEMY_ATK_SOFTENING)),
-		spd     = ENEMY_BASE.spd + ENEMY_SPD_PER_STAGE * (math.max(stage, 1) - 1),
+		spd     = ENEMY_BASE.spd + ENEMY_SPD_PER_STAGE * (math.max(equivalent, 1) - 1),
 		pwr     = ENEMY_BASE.pwr,
 		skillId = ENEMY_BASE.skillId,
 	}
+end
+
+-- v15: NUR NOCH FUER MIGRATION UND ALTE SIMULATIONEN. Gegnerstaerke des alten
+-- PIT (PIT-Level x Stage). TowerConfig.legacyPitToTower sucht damit die
+-- gleich starke Tower-Stage.
+local function getLegacyPitGrowth(pitLevel: number, stage: number): number
+	local levelPart = 1 + PIT_LEVEL_GROWTH * (math.max(pitLevel, 1) - 1)
+	return levelPart * getGrowthForEquivalent(stage)
+end
+
+-- Alte Schnittstelle (bis v14): PIT-Level 1 Stage N = Tower I Stage N. Bleibt
+-- fuer Debug und alte Sims stehen; ein PIT-Level > 1 wird ueber seine
+-- Aequivalenz-Stage abgebildet.
+local function getEnemyStats(pitLevel: number, stage: number): EnemyStats
+	local growth = getLegacyPitGrowth(pitLevel, stage)
+	local equivalent = 1 + math.log(growth) / math.log(1 + STAGE_GROWTH)
+	return getEnemyStatsForEquivalent(equivalent)
 end
 
 return {
@@ -155,6 +187,8 @@ return {
 	MAX_STAGES_PER_RUN      = MAX_STAGES_PER_RUN,
 	ENEMY_SPD_PER_STAGE     = ENEMY_SPD_PER_STAGE,
 
-	getEnemyGrowth = getEnemyGrowth,
-	getEnemyStats  = getEnemyStats,
+	getGrowthForEquivalent     = getGrowthForEquivalent,
+	getEnemyStatsForEquivalent = getEnemyStatsForEquivalent,
+	getLegacyPitGrowth         = getLegacyPitGrowth,
+	getEnemyStats              = getEnemyStats,
 }

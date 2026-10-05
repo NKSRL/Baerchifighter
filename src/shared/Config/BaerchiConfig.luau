@@ -882,6 +882,8 @@ local PATHS: { { id: Types.PathId, color: Color3, goal: string } } = {
 	{ id = "Void",      color = Color3.fromRGB(150,  90, 230), goal = "rare" },
 	{ id = "Kosmos",    color = Color3.fromRGB( 92,  72, 255), goal = "all" },
 	{ id = "Ascension", color = Color3.fromRGB(196, 128, 255), goal = "rebirth" },
+	-- v17: Sonder-Eier aus Events (kein Baerchi hat diesen Pfad)
+	{ id = "Event",     color = Color3.fromRGB(255, 214,  60), goal = "event" },
 }
 
 local function getPathColor(path: string?): Color3

@@ -3,11 +3,15 @@
 -- StarterPlayerScripts/UI/BuildingPanel.luau
 --
 -- Einzige Zustaendigkeit:
---   - Fuer JEDES Gebaeude ein eigenes Menue bauen und aktuell halten
---     (plus eines fuer die Kampfplattform)
+--   - Fuer JEDES Honig-Gebaeude ein eigenes Menue bauen und aktuell halten
+--
+-- v15: zwei Gebaeude (Bienenstock, Honig-Veredler), Level 1-60 mit Look-Stufe
+-- und Meilenstein-Faehigkeiten. Das fruehere Menue der Kampfplattform
+-- (PIT-Level) ist entfallen — die Tower-Wahl liegt im CombatPanel. Der Recycler
+-- wird an seinem eigenen Prompt ausgebaut (CombController).
 --
 -- ============================================================
--- WARUM VIER MENUES STATT EINER LISTE
+-- WARUM EIGENE MENUES STATT EINER LISTE
 -- ============================================================
 -- Bis v7 gab es EIN Panel mit drei untereinander gestapelten Karten. Das war
 -- richtig, solange die drei Gebaeude dasselbe taten — man wollte sie ja
@@ -43,6 +47,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc              = require(ReplicatedStorage.Localization.Loc)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
@@ -61,9 +66,8 @@ local BuildingPanel = {}
 -- ihn in der Welt), Farbe aus Theme.buildingColor (dieselbe faerbt die
 -- Fuetter-Knoepfe auf der Baerchi-Karte).
 local BUILDINGS: { { id: Types.BuildingId } } = {
-	{ id = "Beehive"    },
-	{ id = "HoneyPot"   },
-	{ id = "HoneyPress" },
+	{ id = "Beehive"      },
+	{ id = "HoneyRefiner" },
 }
 
 -- Alles, was ein einzelnes Menue zum Aktualisieren braucht.
@@ -76,6 +80,7 @@ type Menu = {
 	nowText    : TextLabel,
 	nextText   : TextLabel,
 	priceText  : TextLabel,
+	abilities  : TextLabel,
 	upgrade    : TextButton,
 	feed       : TextButton?,
 }
@@ -87,8 +92,26 @@ local _menus: { [string]: Menu } = {}
 --------------------------------------------------------------------------------
 
 local function displayName(buildingId: string): string
+	local key = "building." .. buildingId .. ".name"
+	if Loc.has(key) then
+		return Loc.t(key)
+	end
 	local config = MapConfig.BUILDING_OFFSETS[buildingId]
 	return if config then config.displayName else buildingId
+end
+
+-- v15: Meilenstein-Faehigkeiten als eine Zeile ("Lv.10 Auto-Abnahme ✓ ·
+-- Lv.30 Goldene Tropfen (bald)").
+local function abilitiesText(buildingId: string, level: number): string
+	local parts: { string } = {}
+	for _, ability in BuildingBehavior.getAbilities(buildingId) do
+		local name = Loc.t("ability." .. ability.id)
+		local state = if not ability.implemented then Loc.t("ui.ability.soon")
+			elseif level >= ability.level then "✓"
+			else ""
+		table.insert(parts, string.format("Lv.%d %s %s", ability.level, name, state))
+	end
+	return table.concat(parts, "  ·  ")
 end
 
 local function priceText(costGummies: number, costGoldGummies: number): string
@@ -234,6 +257,12 @@ local function buildMenu(
 	priceLabel.TextSize = 16
 	priceLabel.TextScaled = false
 
+	-- v15: Meilenstein-Faehigkeiten dieses Gebaeudes
+	local abilityRow  = row(30)
+	local abilityText = Theme.bodyText("Abilities", abilityRow, "")
+	abilityText.Size       = UDim2.fromScale(1, 1)
+	abilityText.TextColor3 = Theme.COLORS.textDim
+
 	-- Die Knoepfe ganz unten, in der Reihenfolge, in der man sie braucht.
 	local upgradeRow = row(44)
 	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, "AUSBAUEN", accent)
@@ -258,6 +287,7 @@ local function buildMenu(
 		nowText    = nowText,
 		nextText   = nextText,
 		priceText  = priceLabel,
+		abilities  = abilityText,
 		upgrade    = upgrade,
 		feed       = feedButton,
 	}
@@ -280,7 +310,10 @@ local function refreshBuilding(buildingId: Types.BuildingId)
 	local capacity = math.max(1, BuildingBehavior.getCapacity(buildingId, level))
 
 	menu.levelBadge.Text = tostring(level)
-	menu.subLabel.Text   = string.format("STUFE %d VON %d", level, EconomyConfig.MAX_BUILDING_LEVEL)
+	menu.subLabel.Text   = Loc.t("ui.building.level_look", {
+		level = level, max = EconomyConfig.MAX_BUILDING_LEVEL, look = BuildingBehavior.getLook(level),
+	})
+	menu.abilities.Text  = abilitiesText(buildingId, level)
 
 	menu.honeyFill.Size = UDim2.fromScale(math.clamp(honey / capacity, 0, 1), 1)
 	menu.honeyText.Text = string.format("%d / %d", honey, capacity)
@@ -312,59 +345,11 @@ local function refreshBuilding(buildingId: Types.BuildingId)
 	end
 end
 
-local function refreshArena()
-	local menu = _menus[PanelManager.ARENA_PANEL]
-	if not menu or not menu.root.Visible then return end
-
-	local data = ClientState.get()
-	if not data then return end
-
-	local level   = data.island.pitLevel
-	local nextPit = level + 1
-
-	menu.levelBadge.Text = tostring(level)
-	menu.subLabel.Text   = string.format("STUFE %d VON %d", level, EconomyConfig.MAX_PIT_LEVEL)
-
-	-- Die Arena hat kein Lager — der Balken zeigt stattdessen, wie weit sie
-	-- ausgebaut ist. Sonst staende dort eine leere Leiste ohne Bedeutung.
-	menu.honeyFill.Size = UDim2.fromScale(math.clamp(level / EconomyConfig.MAX_PIT_LEVEL, 0, 1), 1)
-	menu.honeyText.Text = string.format("Stufe %d / %d", level, EconomyConfig.MAX_PIT_LEVEL)
-
-	menu.nowText.Text = string.format(
-		"Ca. %s Gummies pro Sieg.",
-		Theme.formatNumber(EconomyConfig.getPitReward(level, data.rebirthMult))
-	)
-
-	local cost = if nextPit <= EconomyConfig.MAX_PIT_LEVEL
-		then EconomyConfig.getPitUpgradeCost(nextPit)
-		else nil
-
-	if cost then
-		local affordable = canPay(data, cost, 0)
-
-		menu.nextText.Text = string.format(
-			"Staerkere Gegner, ca. %s Gummies pro Sieg.",
-			Theme.formatNumber(EconomyConfig.getPitReward(nextPit, data.rebirthMult))
-		)
-		menu.priceText.Text       = priceText(cost, 0)
-		menu.priceText.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.bad
-
-		menu.upgrade.Text = "AUSBAUEN"
-		Theme.setEnabled(menu.upgrade, affordable)
-	else
-		menu.nextText.Text  = "Hoechste Stufe erreicht."
-		menu.priceText.Text = ""
-		menu.upgrade.Text   = "VOLL AUSGEBAUT"
-		Theme.setEnabled(menu.upgrade, false)
-	end
-end
-
--- Oeffentlich, damit ClientState alle vier auf einmal nachziehen kann.
+-- Oeffentlich, damit ClientState alle Menues auf einmal nachziehen kann.
 function BuildingPanel.refresh()
 	for _, entry in BUILDINGS do
 		refreshBuilding(entry.id)
 	end
-	refreshArena()
 end
 
 --------------------------------------------------------------------------------
@@ -406,34 +391,11 @@ function BuildingPanel.init(screenGui: ScreenGui)
 		})
 	end
 
-	-- Die Kampfplattform bekommt dasselbe Geruest, aber ohne Honig: sie war
-	-- bisher die vierte Karte im Gebaeude-Panel und haette sonst gar kein
-	-- Zuhause mehr.
-	local arenaMenu = buildMenu(
-		screenGui, PanelManager.ARENA_PANEL, "Kampfplattform", Theme.COLORS.bad, false,
-		function()
-			Remotes.RequestUpgradePit:FireServer()
-		end,
-		nil
-	)
-
-	_menus[PanelManager.ARENA_PANEL] = arenaMenu
-
-	PanelManager.register(PanelManager.ARENA_PANEL, {
-		open = function()
-			arenaMenu.root.Visible = true
-			refreshArena()
-		end,
-		close = function()
-			arenaMenu.root.Visible = false
-		end,
-	})
-
 	ClientState.onChanged(function()
 		BuildingPanel.refresh()
 	end)
 
-	print("[BuildingPanel] Initialisiert |", #BUILDINGS, "Gebaeude-Menues + Arena")
+	print("[BuildingPanel] Initialisiert |", #BUILDINGS, "Gebaeude-Menues")
 end
 
 return BuildingPanel

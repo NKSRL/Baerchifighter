@@ -25,6 +25,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local EggConfig = require(ReplicatedStorage.Config.EggConfig)
 local MapConfig = require(ReplicatedStorage.Config.MapConfig)
 local Remotes   = require(ReplicatedStorage.Network.Remotes)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)  -- HBB Paket 5
 
 local EggService = require(ServerScriptService.Services.EggService)
 
@@ -61,11 +62,13 @@ end
 -- Wo der Stand steht: auf dem Ring um die Weltmitte, mit der Theke zur Mitte.
 local function standCFrame(): CFrame
 	local merchant = EggConfig.MERCHANT
-	local angle    = math.rad(merchant.angleDegrees)
+	-- HBB Paket 5: sichtbarer Platz am Weg zum Event-Pit
+	local place = if FeatureFlags.isOn("MAP_V2_MERCHANT") then EggConfig.MERCHANT_V2 else merchant
+	local angle    = math.rad(place.angleDegrees)
 	local position = Vector3.new(
-		MapConfig.CENTER.X + merchant.radius * math.cos(angle),
+		MapConfig.CENTER.X + place.radius * math.cos(angle),
 		MapConfig.PLATFORM_TOP_Y,
-		MapConfig.CENTER.Z + merchant.radius * math.sin(angle)
+		MapConfig.CENTER.Z + place.radius * math.sin(angle)
 	)
 	return CFrame.lookAt(position, Vector3.new(MapConfig.CENTER.X, position.Y, MapConfig.CENTER.Z))
 end
@@ -112,6 +115,26 @@ local function buildStand(): BasePart
 	mesh.Scale    = Vector3.new(1, 1, 1)
 	mesh.Parent   = egg
 	egg.CanCollide = false
+
+	-- HBB Paket 5: Ei-Schild ueber dem Stand (Billboard mit Bild, kein Text),
+	-- damit man den Haendler von weitem erkennt. Keine Teile, kein Licht.
+	if FeatureFlags.isOn("MAP_V2_MERCHANT") then
+		local sign = EggConfig.MERCHANT_V2
+		local board = Instance.new("BillboardGui")
+		board.Name = "EggSign"
+		board.Size = UDim2.new(sign.signSize, 0, sign.signSize, 0)
+		board.StudsOffset = Vector3.new(0, sign.signHeight - 1.3, 0)
+		board.LightInfluence = 0
+		board.MaxDistance = 400
+		board.Adornee = counter
+		board.Parent = counter
+		local image = Instance.new("ImageLabel")
+		image.BackgroundTransparency = 1
+		image.Size = UDim2.fromScale(1, 1)
+		image.Image = sign.signImage
+		image.ScaleType = Enum.ScaleType.Fit
+		image.Parent = board
+	end
 
 	model.PrimaryPart = counter
 	model.Parent = workspace

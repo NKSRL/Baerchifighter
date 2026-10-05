@@ -139,6 +139,29 @@ for f in sorted(ROOT.rglob("*.luau")):
     if first != "--!strict":
         issues.append(f"Datei beginnt nicht mit --!strict: {f.relative_to(ROOT)} (erste Zeile: {first[:40]!r})")
 
+# ---------- 7. Tower-IDs (v15) ----------
+# Types.TowerId muss genau die Tower aus TowerConfig.TOWERS nennen, und jeder
+# Tower braucht seinen Namen in den Strings (tower.<id>.name).
+tm = re.search(r"export type TowerId\s*=([^\n]*)", types_src)
+tower_types = set(re.findall(r'"(\w+)"', tm.group(1))) if tm else set()
+tower_cfg = set(re.findall(r'id\s*=\s*"(\w+)",\s*index\s*=', read("shared/Config/TowerConfig.luau")))
+if not tower_types or tower_types != tower_cfg:
+    issues.append(f"Tower-IDs weichen ab: Types.TowerId {sorted(tower_types)} / TowerConfig {sorted(tower_cfg)}")
+de_strings = read("shared/Localization/Strings/de.luau")
+for tid in sorted(tower_cfg):
+    if f'["tower.{tid}.name"]' not in de_strings:
+        issues.append(f"Tower {tid} hat keinen Namen in Strings/de (tower.{tid}.name)")
+
+# ---------- 8. DataStore-Regel (v15) ----------
+# Spieler-DataStore NUR in PlayerService, OrderedDataStores NUR in
+# LeaderboardService. Sonst konkurrieren zwei Module um dasselbe Budget.
+for f in sorted(ROOT.rglob("*.luau")):
+    src = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
+    if ":GetDataStore(" in src and f.stem != "PlayerService":
+        issues.append(f"GetDataStore ausserhalb von PlayerService: {f.relative_to(ROOT)}")
+    if ":GetOrderedDataStore(" in src and f.stem != "LeaderboardService":
+        issues.append(f"GetOrderedDataStore ausserhalb von LeaderboardService: {f.relative_to(ROOT)}")
+
 print("=" * 62)
 if issues:
     print(f"{len(issues)} Befund(e):\n")

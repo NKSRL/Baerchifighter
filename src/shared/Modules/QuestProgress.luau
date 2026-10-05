@@ -44,8 +44,12 @@ local function total(metric: QuestConfig.Metric, data: Types.PlayerData): number
 			best = math.max(best, building.level)
 		end
 		return best
-	elseif metric == "pitLevel" then
-		return data.island.pitLevel
+	elseif metric == "towerStage" then
+		local best = 0
+		for _, record in data.towers.records do
+			best = math.max(best, record)
+		end
+		return best
 	end
 	return 0
 end

@@ -6,9 +6,10 @@
 --   - Vor einem PIT-Lauf fragen, wo eingestiegen wird: von vorn, ab 65 % des
 --     letzten Laufs oder ab der letzten erreichten Stage (gegen Gummies).
 --
--- Erscheint nur, wenn es auf dem AKTUELLEN PIT-Level einen gespeicherten
--- letzten Lauf gibt (island.pitProgress), auch nach einer Niederlage oder
--- einem Zurueckholen. Startstage und Kosten rechnet EconomyConfig — dieselben
+-- v15: pro Tower. Erscheint nur, wenn es im GEWAEHLTEN Tower einen
+-- gespeicherten letzten Lauf gibt (island.towerProgress), auch nach einer
+-- Niederlage oder einem Zurueckholen. Startstage und Kosten rechnet
+-- TowerConfig — dieselben
 -- Funktionen benutzt der Server beim Abbuchen. Nicht bezahlbare Optionen sind
 -- sichtbar, aber nicht klickbar. Abbrechen schliesst den Dialog, der Baerchi
 -- bleibt zu Hause.
@@ -16,8 +17,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
-local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
-local CombatConfig     = require(ReplicatedStorage.Config.CombatConfig)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
@@ -33,11 +33,16 @@ local _hpLabel: TextLabel? = nil
 local _options: { [Choice]: TextButton } = {}
 local _onChoose: ((Choice) -> ())? = nil
 
--- Der letzte Lauf, wenn er fuer das aktuelle PIT-Level gilt.
-function PitResumeDialog.getProgress(data: Types.PlayerDataUpdate): Types.PitProgress?
-	local progress = data.island.pitProgress
-	if progress and progress.pitLevel == data.island.pitLevel and progress.reachedStage >= 1 then
-		return progress
+local function selectedTower(data: Types.PlayerDataUpdate): string
+	return if data.towers then data.towers.selected else TowerConfig.FIRST_TOWER
+end
+
+-- Die letzte erreichte Stage im gewaehlten Tower (nil = kein Lauf gespeichert).
+function PitResumeDialog.getProgress(data: Types.PlayerDataUpdate): number?
+	local progress = data.island.towerProgress
+	local reached = if progress then progress[selectedTower(data)] else nil
+	if typeof(reached) == "number" and reached >= 1 then
+		return reached
 	end
 	return nil
 end
@@ -46,15 +51,17 @@ local function offer(data: Types.PlayerDataUpdate, choice: Choice): (number, num
 	if choice == "Fresh" then
 		return 1, 0
 	end
-	local progress = PitResumeDialog.getProgress(data)
-	if not progress then
+	local reached = PitResumeDialog.getProgress(data)
+	if not reached then
 		return 1, 0
 	end
+	local towerId = selectedTower(data)
+	local def = TowerConfig.get(towerId)
 	local stage = if choice == "Last"
-		then progress.reachedStage
-		else EconomyConfig.getPitResumePercentStage(progress.reachedStage)
-	stage = math.clamp(stage, 1, CombatConfig.MAX_STAGES_PER_RUN)
-	return stage, EconomyConfig.getPitResumeCost(data.island.pitLevel, stage, data.rebirthMult)
+		then reached
+		else TowerConfig.getResumePercentStage(reached)
+	stage = math.clamp(stage, 1, if def then def.stages else 1)
+	return stage, TowerConfig.getResumeCost(towerId, stage, data.rebirthMult)
 end
 
 local LABELS: { [Choice]: string } = {
@@ -82,12 +89,13 @@ local function fill()
 		local uid = data.island.equippedUid
 		local baerchi = if uid then data.island.baerchis[uid] else nil
 		local def = if baerchi then BaerchiConfig.getById(baerchi.configId) else nil
-		local progress = PitResumeDialog.getProgress(data)
+		local reached = PitResumeDialog.getProgress(data)
 		if baerchi and def then
 			local maxHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
 			local hp = math.clamp(baerchi.currentHp or maxHp, 0, maxHp)
-			hpLabel.Text = string.format("Letzter Lauf: Stage %d  •  HP %d / %d (%d%%)",
-				if progress then progress.reachedStage else 0,
+			hpLabel.Text = string.format("Tower %s  •  Letzter Lauf: Stage %d  •  HP %d / %d (%d%%)",
+				(TowerConfig.get(selectedTower(data)) or TowerConfig.TOWERS[1]).numeral,
+				reached or 0,
 				hp, maxHp, math.floor(hp / math.max(1, maxHp) * 100 + 0.5))
 		end
 	end

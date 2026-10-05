@@ -28,16 +28,16 @@
 --   D:Invoke("list")
 --   D:Invoke("fuse", uidA, uidB)
 --   D:Invoke("recycle", uid)
---   D:Invoke("building", "Beehive", 5)
---   D:Invoke("pit", 5)
+--   D:Invoke("building", "Beehive", 5)   -- Level 1-60 (v15), Look folgt automatisch
+--   D:Invoke("building", "HoneyRefiner", 60)
 --   D:Invoke("hatch", "BasicEgg")   -- legt ein Ei ins Lager und oeffnet es sofort (v12)
 --   D:Invoke("egg", "GoldenEgg", 5) -- 5 Eier ins Lager legen (ohne zu oeffnen)
---   D:Invoke("pitprogress", 12)     -- letzten PIT-Lauf auf Stage 12 setzen (Fortsetzungs-Test)
+--   D:Invoke("pitprogress", 12)     -- letzten Lauf im gewaehlten Tower auf Stage 12 setzen (Fortsetzungs-Test)
 --   D:Invoke("petmode")             -- aktueller Zustand der Pet-Leiste
 --   D:Invoke("pm", "Fight", "Last")  -- wie ein Klick auf die Pet-Leiste
 --   D:Invoke("honey")               -- alle Honig-Lager sofort voll
 --   D:Invoke("feed", uid, 20)       -- 20x fuettern (heilt + gibt XP)
---   D:Invoke("fight", uid)          -- kompletter PIT-Lauf ueber alle Stages
+--   D:Invoke("fight", uid)          -- kompletter Lauf im gewaehlten Tower
 --   D:Invoke("rebirth")
 --
 -- v8 (Promotion / Charms / Event-Teilnahme):
@@ -56,6 +56,27 @@
 --   D:Invoke("collect")         -- alles einsammeln
 --   D:Invoke("eggtime", 60)     -- Zeitmarke 60 Minuten zurueck, Tick legt nach
 --
+-- v15 (Waben im Event-Pit, Recycler):
+--   D:Invoke("combs", 20)           -- 20 Waben sofort ins Pit legen (Stand ausgeben)
+--   D:Invoke("queue", 50)           -- 50 Wabeneinheiten in die Recycler-Warteschlange
+--   D:Invoke("recycler", 5)         -- Recycler-Level setzen (ohne Kosten), Stand ausgeben
+--
+-- v15 (Tower, Gebaeude 1-60, Angeben, Login-Bonus):
+--   D:Invoke("tower", "II", 20)     -- Tower II waehlen und ab Stage 20 kaempfen (Fortsetzung gratis)
+--   D:Invoke("towerrecord", "III", 45) -- Rekord setzen (Meilensteine bis dorthin werden ausgezahlt)
+--   D:Invoke("rebirthcap")          -- Deckel des aktuellen Rebirths in allen Towern
+--   D:Invoke("dailyshift", 1)       -- Login-Bonus: so tun, als waeren 1 Tag(e) vergangen
+--   D:Invoke("lbflush")             -- Bestenlisten sofort schreiben und neu lesen
+--   D:Invoke("parts")               -- Teile auf der eigenen Insel zaehlen (Budget 250)
+--   D:Invoke("v14save")             -- Spielstand im alten v14-Format simulieren + migrieren
+--
+-- v17 (lebendige Events):
+--   D:Invoke("startevent", "Ufo")   -- UFO-Patrouille mit Abwuerfen
+--   D:Invoke("jackpot")             -- naechster UFO-Abwurf ist sicher ein Jackpot (Stand des Pity-Zaehlers)
+--   D:Invoke("combtheme", "HotEgg") -- Wabenthema setzen ("off" = normal)
+--   D:Invoke("launch", 10)          -- 10 Waben einfliegen lassen (Vulkan aus der Mitte)
+--   D:Invoke("startevent", "WaspQueen") -- Boss-Event sofort (laeuft sonst nur jeden 2. Durchlauf)
+--
 -- v14 (Mega Egg Tree):
 --   D:Invoke("tree")                 -- alle 20 Knoten mit Bedingungen und Stand
 --   D:Invoke("unlock", "SunEgg")     -- einen Knoten freischalten ("all" = alle)
@@ -67,6 +88,11 @@
 --   D:Invoke("skilltest", "OmegaBaerchi", 30) -- einen Kampf mit Runden-Log
 --   D:Invoke("snapshot")             -- Spielstand merken (fuer Tests)
 --   D:Invoke("restore")              -- gemerkten Spielstand zurueckschreiben
+--
+-- HBB Paket 0 (Test-Zustaende, erst "snapshot"):
+--   D:Invoke("state", "fresh")       -- neues Konto, Trichter F01–F10 misst
+--   D:Invoke("state", "hatch10")     -- dazu zehn geoeffnete Basis-Eier
+--   D:Invoke("state", "tower1")      -- dazu Tower I geschafft (Rekord 30)
 --
 -- Ein kompletter Event-Durchlauf ohne acht Minuten Wartezeit:
 --   D:Invoke("skipevent")   → Pause endet, Event laeuft
@@ -91,6 +117,7 @@ local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiFactory   = require(ReplicatedStorage.Modules.BaerchiFactory)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local EggCalculator    = require(ReplicatedStorage.Modules.EggCalculator)
+local CombConfig       = require(ReplicatedStorage.Config.CombConfig)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
@@ -120,6 +147,23 @@ local CombatConfig              = require(ReplicatedStorage.Config.CombatConfig)
 -- v12
 local PetModeService            = require(ServerScriptService.Services.PetModeService)
 local PitArenaService           = require(ServerScriptService.Services.PitArenaService)
+
+-- v15 (Waben)
+local CombService               = require(ServerScriptService.Services.CombService)
+local CombRecyclerService       = require(ServerScriptService.Services.CombRecyclerService)
+
+-- v15 (Tower, Angeben, Login-Bonus)
+local TowerConfig               = require(ReplicatedStorage.Config.TowerConfig)
+local TowerService              = require(ServerScriptService.Services.TowerService)
+local LeaderboardService        = require(ServerScriptService.Services.LeaderboardService)
+local LoginBonusService         = require(ServerScriptService.Services.LoginBonusService)
+local PlayerMigration           = require(ServerScriptService.Util.PlayerMigration)
+
+-- v17 (lebendige Events)
+local JackpotRoll               = require(ServerScriptService.Util.JackpotRoll)
+
+-- HBB Paket 0
+local FunnelService             = require(ServerScriptService.Services.FunnelService)
 
 local DebugService = {}
 
@@ -172,9 +216,9 @@ commands.info = function(player, data)
 		goldGummies  = data.goldGummies,
 		rebirthCount = data.rebirthCount,
 		rebirthMult  = data.rebirthMult,
-		pitLevel     = data.island.pitLevel,
 		baerchis     = countBaerchis(data),
-		pitProgress  = data.island.pitProgress,
+		towers       = data.towers,
+		towerProgress = data.island.towerProgress,
 		buildings    = buildings,
 		eggStock     = data.island.eggStock,
 	}
@@ -290,16 +334,7 @@ commands.building = function(player, data, buildingId: any, level: any)
 	MapService.updateBuildingLevel(player, buildingId, building.level)
 	PlayerService.markDirty(player)
 
-	return { building = buildingId, level = building.level }
-end
-
--- PIT-Level direkt setzen (umgeht die Kosten) und Plattform neu bauen
-commands.pit = function(player, data, level: any)
-	data.island.pitLevel = math.clamp(tonumber(level) or 1, 1, EconomyConfig.MAX_PIT_LEVEL)
-	MapService.updatePitLevel(player, data.island.pitLevel)
-	PlayerService.markDirty(player)
-
-	return { pitLevel = data.island.pitLevel }
+	return { building = buildingId, level = building.level, look = BuildingBehavior.getLook(building.level) }
 end
 
 -- v12: Ei ins Lager legen und sofort oeffnen (es gibt keine Brut mehr)
@@ -336,16 +371,103 @@ commands.egg = function(player, data, eggType: any, count: any)
 	return { lager = data.island.eggStock }
 end
 
--- v12: gespeicherten letzten PIT-Lauf setzen (0 = loeschen)
+-- v12/v15: gespeicherten letzten Lauf im gewaehlten Tower setzen (0 = loeschen)
 commands.pitprogress = function(player, data, stage: any)
 	local reached = math.floor(tonumber(stage) or 0)
-	if reached <= 0 then
-		data.island.pitProgress = nil
-	else
-		data.island.pitProgress = { pitLevel = data.island.pitLevel, reachedStage = reached }
+	local towerId = data.towers.selected
+	data.island.towerProgress[towerId] = if reached > 0 then reached else nil
+	PlayerService.markDirty(player)
+	return { tower = towerId, towerProgress = data.island.towerProgress }
+end
+
+-- v15: Tower waehlen (auch einen noch geschlossenen) und ab `stage` kaempfen.
+-- Die Fortsetzungs-Kosten werden vorher gutgeschrieben (Test ohne Grind).
+commands.tower = function(player, data, towerId: any, stage: any)
+	local id = tostring(towerId or "I")
+	local def = TowerConfig.get(id)
+	if not def then
+		return { error = "Unbekannter Tower: " .. id .. " (I, II, III, Final)" }
+	end
+	local uid = data.island.equippedUid
+	if not uid then
+		return { error = "Kein Baerchi ausgeruestet" }
+	end
+	TowerService.debugOpenAll(data)
+	data.towers.selected = id
+	local start = math.clamp(math.floor(tonumber(stage) or 1), 1, def.stages)
+	local choice = "Fresh"
+	if start > 1 then
+		data.island.towerProgress[id] = start
+		local _, cost = CombatService.getResumeOffer(data, id, "Last")
+		if cost > 0 then EconomyService.awardGummiesFlat(player, cost) end
+		choice = "Last"
 	end
 	PlayerService.markDirty(player)
-	return { pitProgress = data.island.pitProgress }
+	task.spawn(PetModeService.request, player, "Fight", choice :: any)
+	return {
+		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id),
+		gegnerStage1 = TowerConfig.getEnemyStats(id, start),
+	}
+end
+
+-- v15: Tower-Rekord direkt setzen (Meilensteine bis dorthin werden ausgezahlt)
+commands.towerrecord = function(player, data, towerId: any, stage: any)
+	local id = tostring(towerId or "I")
+	if not TowerConfig.get(id) then
+		return { error = "Unbekannter Tower: " .. id }
+	end
+	TowerService.debugSetRecord(player, id, tonumber(stage) or 0)
+	return { towers = data.towers }
+end
+
+-- v15: Deckel des aktuellen Rebirths
+commands.rebirthcap = function(_player, data)
+	local caps: { [string]: number } = {}
+	for _, def in TowerConfig.TOWERS do
+		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id)
+	end
+	local capTower, capStage = TowerConfig.getCap(data.rebirthCount)
+	return { rebirths = data.rebirthCount, deckelTower = capTower, deckelStage = capStage, proTower = caps }
+end
+
+-- v15: Login-Bonus — so tun, als waeren `days` Tage vergangen
+commands.dailyshift = function(player, _data, days: any)
+	return LoginBonusService.debugShift(player, math.floor(tonumber(days) or 1))
+end
+
+-- v15: Bestenlisten sofort schreiben und neu lesen
+commands.lbflush = function(_player, _data)
+	return LeaderboardService.flush()
+end
+
+-- v15: Teile auf der eigenen Insel zaehlen (Budget: 250 ohne Baerchi-Figuren)
+commands.parts = function(player, _data)
+	return MapService.countParts(player) or { error = "kein Plot" }
+end
+
+-- v15: den aktuellen Spielstand in ein v14-Format zuruckverwandeln (Topf L7,
+-- Presse L4, PIT 5, letzter Lauf Stage 12) und durch die Migration schicken —
+-- das Ergebnis wird NICHT uebernommen, nur angezeigt (Migrations-Probe).
+commands.v14save = function(_player, data)
+	local HttpServiceLocal = game:GetService("HttpService")
+	local copy = HttpServiceLocal:JSONDecode(HttpServiceLocal:JSONEncode(data))
+	copy.version = 14
+	copy.towers = nil
+	copy.daily = nil
+	copy.island.towerProgress = nil
+	copy.island.pitRefund = nil
+	copy.island.pitLevel = 5
+	copy.island.pitProgress = { pitLevel = 5, reachedStage = 12 }
+	copy.island.buildings.HoneyRefiner = nil
+	copy.island.buildings.HoneyPot   = { id = "HoneyPot",   level = 7, honey = 4, lastProducedAt = os.time() }
+	copy.island.buildings.HoneyPress = { id = "HoneyPress", level = 4, honey = 5, lastProducedAt = os.time() }
+	local migrated = PlayerMigration.applyDefaults(copy)
+	return {
+		version   = migrated.version,
+		veredler  = migrated.island.buildings.HoneyRefiner,
+		erstattung = migrated.island.pitRefund,
+		rekorde   = migrated.towers.records,
+	}
 end
 
 commands.petmode = function(player, data)
@@ -355,7 +477,7 @@ commands.petmode = function(player, data)
 		pit         = pitPhase,
 		stage       = stage,
 		event       = EventParticipationService.getPhase(player),
-		pitProgress = data.island.pitProgress,
+		towerProgress = data.island.towerProgress,
 		eggStock    = data.island.eggStock,
 		gummies     = data.gummies,
 		lastEggAt   = data.island.lastEggAt,
@@ -374,6 +496,85 @@ end
 
 -- Alle Honig-Lager sofort fuellen (umgeht die Wartezeit).
 -- Ohne das dauert jeder Level-Test 20 Sekunden pro Honig.
+
+-- v15: Waben im Event-Pit legen und Zustand ausgeben
+commands.combs = function(player, data, n: any)
+	local count = if typeof(n) == "number" then math.clamp(math.floor(n), 0, 100) else 0
+	if count > 0 then
+		CombService.debugSpawn(count)
+	end
+
+	local recycler = data.island.recycler
+	local slots = CombService.getSlotInfo()
+	return {
+		wabenImPit    = CombService.getWorldCount(),
+		getragen      = CombService.getCarriedCount(player),
+		getragenAlle  = slots.held,
+		respawnQueue  = slots.queued,
+		slotLimit     = slots.limit,
+		recyclerLevel = recycler.level,
+		warteschlange = recycler.queued,
+	}
+end
+
+-- v17: naechsten UFO-Abwurf als Jackpot erzwingen; Stand des Pity-Zaehlers
+commands.jackpot = function(_player, _data)
+	JackpotRoll.ufo.forceNext = true
+	return {
+		naechsterIstJackpot = true,
+		abwuerfeSeitJackpot = JackpotRoll.ufo.sinceLast,
+		abwuerfeGesamt      = JackpotRoll.ufo.total,
+		jackpotsGesamt      = JackpotRoll.ufo.jackpots,
+		pity                = EventConfig.UFO.JACKPOT_PITY_DROPS,
+	}
+end
+
+-- v17: Wabenthema setzen ("off" = normal)
+commands.combtheme = function(_player, _data, themeId: any)
+	local id = if typeof(themeId) == "string" and themeId ~= "off" then themeId else nil
+	CombService.setTheme(id)
+	local slots = CombService.getSlotInfo()
+	return { thema = CombService.getTheme() or "normal", wabenImPit = slots.world, slotLimit = slots.limit }
+end
+
+-- v17: Waben einfliegen lassen (wie ein Vulkan-Ausbruch aus der Pit-Mitte)
+commands.launch = function(_player, _data, n: any)
+	local count = if typeof(n) == "number" then math.clamp(math.floor(n), 1, 30) else 10
+	local origin = MapService.getEventPitPosition() + Vector3.new(0, 2, 0)
+	return { gestartet = CombService.launchCombs(count, origin), slots = CombService.getSlotInfo() }
+end
+
+-- v15: Wabeneinheiten direkt in die Warteschlange des Recyclers legen
+commands.queue = function(player, data, n: any)
+	local units = if typeof(n) == "number" then math.clamp(math.floor(n), 0, 100000) else 0
+	if units > 0 then
+		CombRecyclerService.deposit(player, units)
+	end
+
+	local recycler = data.island.recycler
+	return {
+		warteschlange = recycler.queued,
+		level         = recycler.level,
+		gummies       = data.gummies,
+	}
+end
+
+-- v15: Recycler-Level direkt setzen (ohne Kosten)
+commands.recycler = function(player, data, level: any)
+	local recycler = data.island.recycler
+	if typeof(level) == "number" then
+		recycler.level = CombConfig.clampLevel(level)
+		PlayerService.markDirty(player)
+	end
+
+	return {
+		level         = recycler.level,
+		gummiesJeEinheit = CombConfig.getPayPerUnit(recycler.level),
+		einheitenProSek  = CombConfig.getSpeed(recycler.level),
+		warteschlange = recycler.queued,
+	}
+end
+
 commands.honey = function(player, data)
 	local filled: { [string]: number } = {}
 
@@ -729,6 +930,67 @@ commands.restore = function(player, data)
 	return { ok = true }
 end
 
+-- HBB Paket 0: feste Test-Zustaende fuer Playtests und Studio-Testschritte.
+--   fresh   = Startstand eines neuen Kontos (createdAt = jetzt → Trichter misst)
+--   hatch10 = fresh + zehn geoeffnete Basis-Eier
+--   tower1  = hatch10 + Tower I geschafft (Rekord 30, Meilensteine ausgezahlt)
+--
+-- Studio spielt gegen den ECHTEN DataStore. Deshalb verlangt der Befehl einen
+-- vorherigen "snapshot"; zurueck geht es mit "restore". Der Snapshot liegt nur
+-- im Speicher dieses Servers — vor "Stop" also restore aufrufen.
+--
+-- Der Baerchi sollte zu Hause stehen (kein Kampf, kein Event), sonst haelt ein
+-- anderer Service noch die alte Figur.
+local TEST_STATES = { fresh = true, hatch10 = true, tower1 = true }
+local TEST_HATCH_COUNT = 10
+local TEST_TOWER_RECORD = 30
+
+commands.state = function(player, data, name: any)
+	local stateName = tostring(name or "")
+	if not TEST_STATES[stateName] then
+		return { error = "Unbekannter Zustand: " .. stateName, verfuegbar = { "fresh", "hatch10", "tower1" } }
+	end
+	if not _snapshot then
+		return { error = "Erst D:Invoke(\"snapshot\") — Studio schreibt in den echten Spielstand" }
+	end
+
+	-- 1. fresh: alles ersetzen ausser Sitzungs-Sperre und Sprache
+	local session  = (data :: any).session
+	local language = data.language
+	local fresh = PlayerService.buildDefaultData()
+	for k in data :: any do (data :: any)[k] = nil end
+	for k, v in fresh :: any do (data :: any)[k] = v end
+	;(data :: any).session = session
+	data.language = language
+	MapService.rebuildIsland(player, data.island)
+	FunnelService.debugReset(player)
+
+	-- 2. hatch10: ueber den echten Weg oeffnen, damit Zaehler, Index und
+	-- Auto-Ausruesten genau wie im Spiel laufen.
+	if stateName == "hatch10" or stateName == "tower1" then
+		data.island.eggStock.BasicEgg = (data.island.eggStock.BasicEgg or 0) + TEST_HATCH_COUNT
+		for _ = 1, TEST_HATCH_COUNT do
+			EggService.openEgg(player, "BasicEgg")
+		end
+	end
+
+	-- 3. tower1: Rekord setzen, Meilensteine wie bei "towerrecord"
+	if stateName == "tower1" then
+		TowerService.debugSetRecord(player, "I", TEST_TOWER_RECORD)
+	end
+
+	PlayerService.markDirty(player)
+	PlayerService.saveNow(player)
+	return {
+		ok = true,
+		zustand = stateName,
+		baerchis = countBaerchis(data),
+		lager = data.island.eggStock,
+		rekorde = data.towers.records,
+		hinweis = "Zurueck mit D:Invoke(\"restore\")",
+	}
+end
+
 -- Ein einzelner Kampf mit Runden-Log (Faehigkeiten pruefen).
 commands.skilltest = function(_player, _data, configId: any, stage: any)
 	local b = BaerchiFactory.create(tostring(configId), { level = 20 })
@@ -753,7 +1015,7 @@ commands.help = function()
 	return {
 		"info", "give <gummies> <gold>", "list",
 		"add <configId> <level> [mutation]", "stats <uid>",
-		"building <id> <level>", "pit <level>",
+		"building <id> <level>",
 		"hatch <eggType>", "egg <eggType> [anzahl]", "pitprogress <stage>", "honey", "feed <uid> <times>",
 		"fight <uid>",
 		"fuse <uidA> <uidB> [ability|level|eggs] [A|B]",
@@ -773,6 +1035,18 @@ commands.help = function()
 		"tree", "unlock <eggType|all>", "hatched <eggType> <n>", "blueprint [n]",
 		"useblueprint <eggType>", "press <eggType> [Gold|Kristall|Void]", "setrebirth <n>",
 		"skilltest <configId> [stage]", "snapshot", "restore",
+		-- HBB Paket 0
+		"state <fresh|hatch10|tower1>  (erst snapshot!)",
+
+		-- v15
+		"combs [anzahl]", "queue <einheiten>", "recycler [level]",
+
+		-- v15 (Tower/Gebaeude/Angeben/Login-Bonus)
+		"tower <I|II|III|Final> <stage>", "towerrecord <id> <stage>", "rebirthcap",
+		"dailyshift <tage>", "lbflush", "parts", "v14save",
+
+		-- v17
+		"jackpot", "combtheme <themeId|off>", "launch [anzahl]",
 	}
 end
 

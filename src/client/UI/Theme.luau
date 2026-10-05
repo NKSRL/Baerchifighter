@@ -13,10 +13,12 @@
 -- mit denselben Werten, und die duerfen nicht auseinanderlaufen.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService      = game:GetService("TweenService")
 
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local Types         = require(ReplicatedStorage.Network.Types)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
+local RarityBandConfig = require(ReplicatedStorage.Config.RarityBandConfig)  -- HBB Paket 4
 
 local Theme = {}
 
@@ -79,9 +81,23 @@ end
 -- Bienenstock = Vorrat, Honigtopf = Heilung, Honig-Presse = Wachstum.
 local BUILDING_COLORS: { [string]: Color3 } = {
 	Beehive    = Theme.COLORS.volume,
-	HoneyPot   = Theme.COLORS.healing,
-	HoneyPress = Theme.COLORS.growth,
+	HoneyRefiner = Theme.COLORS.growth,
 }
+
+-- HBB Paket 4: Farben der fuenf Rarity-Baender (Zuordnung in
+-- Config/RarityBandConfig). Kraeftig und weit auseinander, damit ein Kind
+-- sie ohne Text unterscheidet.
+Theme.BAND_COLORS = {
+	Color3.fromRGB(176, 190, 204),   -- 1 grau
+	Color3.fromRGB( 46, 155, 255),   -- 2 blau
+	Color3.fromRGB(255, 176,  32),   -- 3 gold
+	Color3.fromRGB(168,  85, 247),   -- 4 lila
+	Color3.fromRGB(255,  70, 110),   -- 5 rot-pink
+}
+
+function Theme.bandColor(rarity: string): Color3
+	return Theme.BAND_COLORS[RarityBandConfig.bandOf(rarity)] or Theme.BAND_COLORS[1]
+end
 
 function Theme.buildingColor(buildingId: string): Color3
 	return BUILDING_COLORS[buildingId] or Theme.COLORS.accent
@@ -126,7 +142,11 @@ end
 --
 -- `rotation` in Grad: 90 = von oben nach unten (Standard).
 function Theme.gradient(parent: Instance, top: Color3, bottom: Color3, rotation: number?): UIGradient
-	local gradient = Instance.new("UIGradient")
+	-- Ein vorhandener Verlauf wird ueberschrieben statt gestapelt: zwei
+	-- UIGradients multiplizieren sich und machen den Knopf dunkel. So kann
+	-- Theme.button schon einen Grundverlauf setzen, und bigButton oder eine
+	-- Kachel faerbt ihn nur um.
+	local gradient = parent:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, top),
 		ColorSequenceKeypoint.new(1, bottom),
@@ -177,7 +197,58 @@ function Theme.panel(name: string, parent: Instance, color: Color3?): Frame
 
 	Theme.corner(frame)
 	Theme.stroke(frame)
+	-- Leichter Verlauf: eine flache Flaeche wirkt wie ein Platzhalter, mit
+	-- hellerer Oberkante wie ein Spielelement.
+	-- (Ein UIGradient MULTIPLIZIERT sich auf die Hintergrundfarbe: weiss =
+	-- unveraendert, grau = dunkler. Deshalb neutrale Farben, nicht shade().)
+	Theme.gradient(frame, Color3.fromRGB(255, 255, 255), Color3.fromRGB(196, 196, 208))
 	return frame
+end
+
+-- Heller Glanzstreifen auf der oberen Haelfte eines Knopfes — der kleine
+-- Kniff, der aus einem Rechteck einen "Cartoon-Knopf" macht. Faengt keine
+-- Klicks ab (Frame, nicht aktiv).
+function Theme.shine(parent: GuiObject, radius: number?): Frame
+	local shine = Instance.new("Frame")
+	shine.Name                   = "Shine"
+	shine.AnchorPoint            = Vector2.new(0.5, 0)
+	shine.Position               = UDim2.new(0.5, 0, 0, 3)
+	shine.Size                   = UDim2.new(1, -10, 0.42, 0)
+	shine.BackgroundColor3       = Color3.new(1, 1, 1)
+	shine.BackgroundTransparency = 0.82
+	shine.BorderSizePixel        = 0
+	shine.Active                 = false
+	shine.Parent                 = parent
+	Theme.corner(shine, radius or 8)
+	return shine
+end
+
+-- Weiches Anwachsen beim Drueberfahren, Eindruecken beim Druecken. Ein
+-- UIScale statt Size, damit Layouts und Tweens an der Groesse unberuehrt bleiben.
+local PRESS_TWEEN = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+function Theme.pressable(button: GuiButton, hover: number?)
+	local grow = hover or 1.06
+	local scale = Instance.new("UIScale")
+	scale.Name   = "PressScale"
+	scale.Parent = button
+
+	local function to(target: number)
+		TweenService:Create(scale, PRESS_TWEEN, { Scale = target }):Play()
+	end
+
+	button.MouseEnter:Connect(function()
+		if button.Active then to(grow) end
+	end)
+	button.MouseLeave:Connect(function()
+		to(1)
+	end)
+	button.MouseButton1Down:Connect(function()
+		if button.Active then to(0.93) end
+	end)
+	button.MouseButton1Up:Connect(function()
+		if button.Active then to(grow) end
+	end)
 end
 
 function Theme.label(name: string, parent: Instance, text: string?): TextLabel
@@ -239,6 +310,15 @@ function Theme.button(name: string, parent: Instance, text: string, color: Color
 	constraint.MinTextSize = 8
 	constraint.Parent      = button
 
+	-- Cartoon-Look: Verlauf + Glanzstreifen + Hover/Druck-Animation.
+	-- AutoButtonColor aus: der Standard-Abdunkler faerbt sonst den ganzen
+	-- Verlauf grau; die Animation uebernimmt das Feedback.
+	-- Neutraler Verlauf (multipliziert sich auf die Knopffarbe, siehe panel).
+	Theme.gradient(button, Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 190, 200))
+	Theme.shine(button, 9)
+	button.AutoButtonColor = false
+	Theme.pressable(button)
+
 	return button
 end
 
@@ -296,7 +376,10 @@ function Theme.setEnabled(button: TextButton, enabled: boolean)
 	end
 
 	button.Active          = enabled
-	button.AutoButtonColor = enabled
+	local shine = button:FindFirstChild("Shine")
+	if shine and shine:IsA("GuiObject") then
+		shine.Visible = enabled
+	end
 	button.BackgroundColor3 = if enabled then (stored :: Color3) else Theme.COLORS.disabled
 	button.TextTransparency = if enabled then 0 else 0.4
 
@@ -334,7 +417,7 @@ export type Progress = {
 
 -- Fortschrittsbalken mit Text darueber (Brut-Timer, XP, Kampf-HP).
 function Theme.progress(parent: Instance, fillColor: Color3?): Progress
-	local track = Theme.panel("Track", parent, Theme.COLORS.panel)
+	local track = Theme.panel("Track", parent, Theme.COLORS.panelDeep)
 	track.ClipsDescendants = true   -- damit der Fuellbalken die Rundung nicht ueberragt
 
 	local fill = Instance.new("Frame")
@@ -344,11 +427,14 @@ function Theme.progress(parent: Instance, fillColor: Color3?): Progress
 	fill.BorderSizePixel   = 0
 	fill.Parent            = track
 	Theme.corner(fill, 12)
+	Theme.gradient(fill, Color3.fromRGB(255, 255, 255), Color3.fromRGB(170, 170, 185))
+	Theme.shine(fill, 6).Size = UDim2.new(1, -8, 0.4, 0)
 
 	local text = Theme.label("Text", track, "")
 	text.Size           = UDim2.fromScale(1, 1)
 	text.TextXAlignment = Enum.TextXAlignment.Center
-	text.ZIndex         = 2
+	text.ZIndex         = 3
+	Theme.outlineText(text, 2)
 
 	return { track = track, fill = fill, text = text }
 end
@@ -378,17 +464,32 @@ end
 -- Kopfzeile eines Dialogs: Titel links, Schliessen-Kreuz rechts.
 -- Gibt das Titel-Label zurueck, damit der Aufrufer es spaeter aendern kann.
 function Theme.dialogHeader(root: Frame, title: string, onClose: () -> ()): TextLabel
+	-- Farbiger Titelbalken hinter der Kopfzeile (zuerst gebaut, liegt darum
+	-- unter Titel und Kreuz).
+	local band = Instance.new("Frame")
+	band.Name             = "TitleBand"
+	band.Position         = UDim2.new(0, 6, 0, 5)
+	band.Size             = UDim2.new(1, -12, 0, 42)
+	band.BackgroundColor3 = Color3.fromRGB(122, 104, 204)
+	band.BorderSizePixel  = 0
+	band.Parent           = root
+	Theme.corner(band, 12)
+	Theme.stroke(band, Theme.COLORS.outline, 2)
+	Theme.gradient(band, Color3.fromRGB(255, 255, 255), Color3.fromRGB(176, 170, 215))
+	Theme.shine(band, 8).Size = UDim2.new(1, -12, 0.36, 0)
+
 	local header = Theme.container("Header", root)
-	header.Position = UDim2.new(0, 14, 0, 10)
+	header.Position = UDim2.new(0, 14, 0, 11)
 	header.Size     = UDim2.new(1, -28, 0, 30)
 
 	local label = Theme.label("Title", header, title)
-	label.Size = UDim2.new(1, -40, 1, 0)
+	label.Size = UDim2.new(1, -44, 1, 0)
+	Theme.outlineText(label, 2)
 
-	local close = Theme.button("Close", header, "X", Theme.COLORS.panelLight)
+	local close = Theme.button("Close", header, "X", Theme.COLORS.bad)
 	close.AnchorPoint = Vector2.new(1, 0.5)
 	close.Position    = UDim2.new(1, 0, 0.5, 0)
-	close.Size        = UDim2.new(0, 32, 0, 26)
+	close.Size        = UDim2.new(0, 34, 0, 30)
 	close.TextColor3  = Theme.COLORS.text
 	close.Activated:Connect(onClose)
 

@@ -29,6 +29,16 @@ local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
+local Unlock       = require(script.Parent.Unlock)   -- HBB Paket 3
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local CombatRating = require(ReplicatedStorage.Modules.CombatRating)
+
+-- HBB Paket 4: "⚔ 1,2K" statt HP/ATK in der Zeile
+local function ratingText(baerchi: Types.Baerchi): string
+	local value, suffix = CombatRating.short(CombatRating.of(baerchi))
+	local digits = if suffix ~= "" and value < 100 then 1 else 0
+	return "⚔ " .. (if digits > 0 then Loc.formatDecimal(value, digits) else Loc.formatNumber(math.floor(value))) .. suffix
+end
 local IndexView    = require(script.Parent.IndexView)
 
 local BaerchiInventory = {}
@@ -108,7 +118,9 @@ local function describeStats(baerchi: Types.Baerchi): string
 end
 
 local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
-	local color = Theme.rarityColor(baerchi.rarity)
+	local upgradeUi = FeatureFlags.isOn("UI_V2_UPGRADE_TAB")
+	-- HBB Paket 4: Farbband statt zwoelf Einzelfarben
+	local color = if upgradeUi then Theme.bandColor(baerchi.rarity) else Theme.rarityColor(baerchi.rarity)
 	local def   = BaerchiConfig.getById(baerchi.configId)
 
 	local data     = ClientState.get()
@@ -160,15 +172,15 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 	sub.Size       = UDim2.new(1, -120, 0, 16)
 	sub.TextColor3 = if mutation then BaerchiConfig.getMutationColor(mutation) else color
 
-	local stats = Theme.label("Stats", row, describeStats(baerchi))
+	local stats = Theme.label("Stats", row, if upgradeUi then ratingText(baerchi) else describeStats(baerchi))
 	stats.AnchorPoint    = Vector2.new(1, 0.5)
 	stats.Position       = UDim2.new(1, -10, 0.5, 0)
 	stats.Size           = UDim2.new(0, 84, 1, -10)
 	stats.TextXAlignment = Enum.TextXAlignment.Right
 	stats.TextScaled     = false
-	stats.TextSize       = 13
-	stats.Font           = Theme.FONT_BODY
-	stats.TextColor3     = Theme.COLORS.textDim
+	stats.TextSize       = if upgradeUi then 20 else 13
+	stats.Font           = if upgradeUi then Theme.FONT else Theme.FONT_BODY
+	stats.TextColor3     = if upgradeUi then Theme.COLORS.text else Theme.COLORS.textDim
 
 	-- Die ganze Zeile ist der Knopf: ein durchsichtiger Button darueber.
 	-- So bleibt der Aufbau der Zeile frei von Button-Eigenheiten.
@@ -277,6 +289,13 @@ end
 --------------------------------------------------------------------------------
 
 local function applyTab()
+	-- HBB Paket 3: der Index-Reiter erscheint ab drei entdeckten Arten
+	local indexTab = _tabButtons.Index
+	if indexTab then
+		Unlock.apply("index", indexTab)
+		if not indexTab.Visible and _tab == "Index" then _tab = "Pets" end
+	end
+
 	local listPage = _listPage
 	if listPage then
 		listPage.Visible = _tab == "Pets"
@@ -349,6 +368,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		button.LayoutOrder = order
 		Loc.bind(button, key)
 		button.Activated:Connect(function()
+			if tab == "Index" then Unlock.markSeen("index") end
 			_tab = tab
 			applyTab()
 		end)

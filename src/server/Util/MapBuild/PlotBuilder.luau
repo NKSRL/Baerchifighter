@@ -3,11 +3,14 @@
 -- ServerScriptService/Util/MapBuild/PlotBuilder.luau
 --
 -- Einzige Zustaendigkeit:
---   - Das Grundgeruest eines Spieler-Plots (Beet, Zaun, Schild) und die drei
---     Gebaeude mit Schild und Honig-Tropfen bauen und beschriften
+--   - Das Grundgeruest eines Spieler-Plots (Beet, Zaun, Schild) und die
+--     Honig-Gebaeude mit Schild und Honig-Tropfen bauen und beschriften
 --
 -- Gebaeude bestehen aus einem unsichtbaren Koerper (Name, Level, Schild,
--- Client-Prompt) und der deklarativen Deko aus MapConfig.BUILDING_DECOR.
+-- Client-Prompt) und der deklarativen Deko aus MapConfig.BUILDING_DECOR plus
+-- den Zusaetzen ihres Looks (v15, MapConfig.getBuildingDecor). Der Look steht
+-- als Attribut "Look" am Koerper — MapService baut ein Gebaeude nur neu, wenn
+-- sich der Look aendert.
 --
 -- Teil von MapService: nur MapService (und die Builder untereinander)
 -- benutzen dieses Modul. Es aendert keine Spielerdaten.
@@ -67,6 +70,8 @@ function PlotBuilder.buildFence(plotModel: Model, slot: number)
 end
 
 -- Schild an der zur Mitte zeigenden Kante mit dem Namen des Besitzers.
+-- v15: darunter ein kleines Tower-Symbol (hoechster Tower, siehe
+-- writeOwnerBadge) — gesetzt von MapService, sobald der Tower-Stand bekannt ist.
 function PlotBuilder.buildPlotSign(plotModel: Model, slot: number, ownerName: string)
 	local plotCFrame = MapParts.plotCFrame(slot)
 	local halfZ = MapConfig.PLOT_SIZE.Z * 0.5
@@ -102,10 +107,25 @@ function PlotBuilder.buildPlotSign(plotModel: Model, slot: number, ownerName: st
 	surface.Adornee     = board
 	surface.Parent      = board
 
-	local label = MapParts.newTextLabel("Owner", surface, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0))
+	local label = MapParts.newTextLabel("Owner", surface, UDim2.fromScale(1, 0.72), UDim2.fromScale(0, 0))
 	label.TextColor3             = Color3.fromRGB(70, 50, 30)
 	label.TextStrokeTransparency = 1
 	label.Text                   = ownerName
+
+	local badge = MapParts.newTextLabel("TowerBadge", surface, UDim2.fromScale(1, 0.28), UDim2.fromScale(0, 0.72))
+	badge.TextStrokeTransparency = 1
+	badge.Text                   = ""
+end
+
+-- v15: Tower-Symbol unter dem Besitzernamen ("◆ III · 42"). Billig, nur Text.
+function PlotBuilder.writeOwnerBadge(plotModel: Model, text: string, color: Color3)
+	local board = plotModel:FindFirstChild("SignBoard")
+	local surface = board and board:FindFirstChild("SignText")
+	local badge = surface and surface:FindFirstChild("TowerBadge")
+	if badge and badge:IsA("TextLabel") then
+		badge.Text       = text
+		badge.TextColor3 = color
+	end
 end
 
 -- Die Plot-Platte samt Zaun und Schild.
@@ -190,9 +210,9 @@ end
 -- Ursprung wie fuer die Deko.
 --
 -- `slots` ist das GROESSTE Lager, das dieses Gebaeude je haben kann — nicht
--- sein aktuelles. Seit v7 waechst das Lager des Bienenstocks mit dem Level,
--- und die Tropfen entstehen nur einmal beim Aufbau. Ueberzaehlige Tropfen
--- stoeren nicht: sichtbar ist ein Tropfen erst, wenn wirklich Honig drin liegt
+-- sein aktuelles —, seit v15 aber hoechstens MapConfig.HONEY_DOT_MAX (das Lager
+-- des Bienenstocks waechst bis 39). Ueberzaehlige Tropfen stoeren nicht:
+-- sichtbar ist ein Tropfen erst, wenn wirklich Honig drin liegt
 -- (writeBuildingState).
 function PlotBuilder.buildHoneyDots(body: BasePart, ground: CFrame, slots: number)
 	if slots <= 0 then return end
@@ -250,11 +270,16 @@ function PlotBuilder.writeBuildingState(part: BasePart, buildingData: Types.Buil
 
 	-- Ein Tropfen pro eingelagertem Honig. Es koennen mehr Tropfen dastehen als
 	-- das aktuelle Lager fasst (gebaut wird nach dem Maximal-Lager) — die
-	-- ueberzaehligen bleiben unsichtbar.
-	for i = 1, BuildingBehavior.getMaxCapacity(buildingData.id) do
+	-- ueberzaehligen bleiben unsichtbar. v15: ist das Lager groesser als
+	-- HONEY_DOT_MAX, steht ein Tropfen fuer einen ANTEIL (voll = alle an).
+	local dotCount = math.min(BuildingBehavior.getMaxCapacity(buildingData.id), MapConfig.HONEY_DOT_MAX)
+	local lit = if capacity <= MapConfig.HONEY_DOT_MAX
+		then honey
+		else math.ceil(honey * MapConfig.HONEY_DOT_MAX / math.max(1, capacity))
+	for i = 1, dotCount do
 		local dot = part:FindFirstChild("HoneyDot" .. i)
 		if dot and dot:IsA("BasePart") then
-			dot.Transparency = if i <= honey then 0 else 1
+			dot.Transparency = if i <= lit then 0 else 1
 		end
 	end
 
@@ -313,15 +338,17 @@ function PlotBuilder.buildBuilding(plotModel: Model, slot: number, buildingData:
 		config.offset.Z
 	)
 
-	local decor = MapConfig.BUILDING_DECOR[buildingData.id]
-	if decor then
-		MapParts.buildDecor(part, ground, decor)
-	end
+	-- v15: Grund-Deko plus die Zusaetze des aktuellen Looks.
+	local look  = BuildingBehavior.getLook(buildingData.level)
+	local decor = MapConfig.getBuildingDecor(buildingData.id, look)
+	MapParts.buildDecor(part, ground, decor)
 
-	PlotBuilder.buildHoneyDots(part, ground, BuildingBehavior.getMaxCapacity(buildingData.id))
+	PlotBuilder.buildHoneyDots(part, ground,
+		math.min(BuildingBehavior.getMaxCapacity(buildingData.id), MapConfig.HONEY_DOT_MAX))
 
 	-- Level als Attribut: der Client kann es direkt auslesen ohne eigenes Remote
 	part:SetAttribute("BuildingLevel", buildingData.level)
+	part:SetAttribute("Look", look)
 
 	-- Schild ueber dem Gebaeude: Name, Level und Honig-Lagerstand. Ohne das
 	-- muesste man fuer die Frage "ist schon wieder Honig da?" jedes Mal ein

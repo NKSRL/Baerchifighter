@@ -53,11 +53,14 @@ export type EggType =
 	| "TranscendenceEgg"
 	| "EternityEgg"
 	| "OmegaEgg"
+	-- Sonder-Eier ausserhalb des Baums (EggConfig: special = true)
+	| "UfoJackpotEgg"
 
 -- v14: die Pfade des Ei-Baums. Ein Pfad ist kein Upgrade, sondern ein
 -- Spielziel (Gold = stark, Kristall = schnell, Void = selten, Kosmos =
 -- Allrounder, Ascension = Rebirth). Siehe BaerchiConfig.PATHS.
 export type PathId = "Stamm" | "Gold" | "Kristall" | "Void" | "Kosmos" | "Ascension"
+	| "Event"   -- Sonder-Eier aus Events (nicht im Baum, nie freischaltbar)
 
 -- v11: MUTATION-SYSTEM (ersetzt das binaere isInverted-Feld).
 --
@@ -83,18 +86,19 @@ export type MutationId =
 -- Baerchi verfuettert heilt ihn und gibt XP — die einzige XP-Quelle im Spiel
 -- (Kaempfe geben keine XP mehr).
 --
--- Seit v7 hat jedes der drei eine EIGENE Rolle, und nur noch eine Datei weiss
--- welche: Config/BuildingBehavior.luau. Kurz:
---   Beehive     Vorrat    — groesseres Lager, schnellere Produktion
---   HoneyPot    Heilung   — SEIN Honig heilt mehr HP
---   HoneyPress  Wachstum  — hebt die XP JEDES Honigs, egal woher er kommt
+-- Seit v15 (Gebaeude Option B) sind es noch ZWEI Honig-Gebaeude, und nur eine
+-- Datei weiss, was sie koennen: Config/BuildingBehavior.luau. Kurz:
+--   Beehive       Vorrat   — groesseres Lager, schnellere Produktion
+--   HoneyRefiner  Veredeln — sein Level hebt Heilung UND XP jedes Honigs
+--                            (verschmolzen aus Honigtopf und Honig-Presse;
+--                            "Honig-Veredler" ist ein Platzhalter-Name)
+-- Das dritte Gebaeude, der Waben-Recycler, liegt in island.recycler.
 --
--- Die Daten unten sind davon unberuehrt: was ein Gebaeude kann, ergibt sich
--- aus id + level. Deshalb brauchte v7 keine neuen Felder und keine Migration.
+-- Level 1-60 (EconomyConfig.MAX_BUILDING_LEVEL), Look-Stufe aus dem Level
+-- (BuildingBehavior.getLook).
 export type BuildingId =
-	| "Beehive"      -- Bienenstock
-	| "HoneyPot"     -- Honigtopf
-	| "HoneyPress"   -- Honig-Presse
+	| "Beehive"        -- Bienenstock
+	| "HoneyRefiner"   -- Honig-Veredler (Platzhalter-Name)
 -- Fusion ist seit v3 kein Gebaeude mehr — sie laeuft rein ueber GUI
 -- (FusionPanel/BaerchiInventory) und ist von Anfang an freigeschaltet.
 -- Recycling ist seit v4 ebenfalls eine reine GUI-Funktion mit festem Wert
@@ -209,7 +213,7 @@ export type Baerchi = {
 
 export type Building = {
 	id    : BuildingId,
-	level : number,   -- 1-10, bestimmt die XP pro Honig aus diesem Gebaeude
+	level : number,   -- 1 .. EconomyConfig.MAX_BUILDING_LEVEL (60)
 
 	-- Eingelagerter Honig, 0 .. EconomyConfig.HONEY_CAPACITY.
 	honey : number,
@@ -226,16 +230,38 @@ export type Building = {
 -- Migration (Util/PlayerMigration) legt laufende Bruten alter Spielstaende zurueck
 -- ins Lager.
 
--- v12: Stand des letzten PIT-Laufs fuer die Fortsetzungs-Frage.
+-- v15: TOWER-SYSTEM (ersetzt das PIT-Level).
 --
--- reachedStage ist die letzte Stage, in die der Baerchi EINGETRETEN ist
--- (verloren oder beim Zurueckholen die gerade gespielte). Gilt nur fuer das
--- PIT-Level, auf dem der Lauf stattfand: auf einem anderen Level stehen
--- andere Gegner in denselben Stage-Nummern. Ein PIT-Ausbau oder Rebirth
--- loescht den Eintrag.
-export type PitProgress = {
-	pitLevel     : number,
-	reachedStage : number,
+-- Vier Tower mit eigener Stage-Zahl und eigenem Gegner-Wachstum, Zahlen in
+-- Config/TowerConfig. "I" Holz (30 Stages), "II" Stein (45), "III" Gold (60),
+-- "Final" Kristall (100).
+export type TowerId = "I" | "II" | "III" | "Final"
+
+-- Permanenter Tower-Fortschritt. Liegt bewusst AUSSERHALB von island (wie
+-- eggTree): ein Rebirth setzt die Insel zurueck, Rekorde und abgeholte
+-- Meilensteine bleiben.
+--
+--   records      beste geschaffte Stage je Tower (zaehlt nur bis zum Deckel
+--                des jeweiligen Rebirths, siehe TowerConfig.getStageCap)
+--   claimed      abgeholte Meilenstein-Stages je Tower. Die Stage steht als
+--                TEXT-Schluessel ("5", "10"): eine Lua-Tabelle mit Luecken in
+--                Zahlen-Schluesseln laesst sich nicht im DataStore ablegen
+--                (derselbe Grund wie bei Baerchi.charms).
+--   highestTower hoechster je erreichte Tower (Look des Turms, Abzeichen)
+--   selected     der Tower, in den der Fight-Knopf schickt
+export type TowerState = {
+	records      : { [string]: number },
+	claimed      : { [string]: { [string]: boolean } },
+	highestTower : string,
+	selected     : string,
+}
+
+-- v15: Taeglicher Login-Bonus (Config/LoginBonusConfig). Tage zaehlen nach
+-- UTC (os.time() // 86400). streak = wie viele Tage des 7-Tage-Zyklus schon
+-- abgeholt sind (0-7); lastClaimDay = UTC-Tag der letzten Abholung (0 = nie).
+export type DailyState = {
+	lastClaimDay : number,
+	streak       : number,
 }
 
 -- Ein GELEGTES Ei: liegt sichtbar in der Welt und wartet darauf, angeklickt zu
@@ -259,8 +285,19 @@ export type LaidEgg = {
 	z       : number,
 }
 
+-- v15: der Waben-Recycler vor der Basis (siehe Config/CombConfig). Er nimmt die
+-- Waben, die der Spieler im Event-Pit gesammelt hat, in eine Warteschlange und
+-- verwandelt sie nach und nach in Gummies. Wie Building.lastProducedAt laeuft
+-- das ueber eine Zeitmarke und nicht ueber einen Timer, damit er auch offline
+-- weiterarbeitet.
+export type RecyclerData = {
+	level           : number,   -- 1 .. CombConfig.RECYCLER_MAX_LEVEL
+	queued          : number,   -- Wabeneinheiten, die noch verarbeitet werden muessen
+	progress        : number,   -- angefangene Einheit (0 .. <1), damit keine Bruchteile verloren gehen
+	lastProcessedAt : number,   -- os.time() der letzten Verrechnung
+}
+
 export type IslandData = {
-	pitLevel     : number,                    -- Schichtanzahl der Kampfplattform
 	buildings    : { [BuildingId]: Building },
 	baerchis     : { [string]: Baerchi },     -- key = Baerchi.uid
 	eggStock     : { [EggType]: number },     -- Eier im Lager (Legen, Events, Rebirth, Haendler)
@@ -284,9 +321,19 @@ export type IslandData = {
 	-- EggConfig.OFFLINE_SLOWDOWN) und es braucht keinen Server-Loop dafuer.
 	lastEggAt : number,
 
-	-- v12: letzter PIT-Lauf (Fortsetzungs-Frage). nil = kein Lauf auf diesem
-	-- PIT-Level gespeichert, der Dialog erscheint dann nicht.
-	pitProgress : PitProgress?,
+	-- v15: Waben-Recycler (Level 1-60 + Warteschlange).
+	recycler : RecyclerData,
+
+	-- v15: letzte erreichte Stage je Tower fuer die Fortsetzungs-Frage
+	-- (ersetzt pitProgress). Schluessel = TowerId. Gehoert zur Insel, weil ein
+	-- Rebirth den Baerchi auf Level 1 setzt und ein alter Einstieg dann
+	-- sinnlos waere.
+	towerProgress : { [string]: number },
+
+	-- v15: Erstattung fuer gekaufte PIT-Level (Migration v14 -> v15). Die
+	-- Migration schreibt den Betrag, TowerService zahlt ihn beim Join ueber
+	-- EconomyService aus und setzt das Feld auf 0.
+	pitRefund : number,
 }
 
 --------------------------------------------------------------------------------
@@ -432,19 +479,32 @@ export type PlayerData = {
 		totalFusions        : number,
 		totalRebirths       : number,
 		totalRecycled       : number,
-		highestPitLevel     : number,
 		totalHatched        : number,   -- v13: geoeffnete Eier (Quest-Zaehler)
+		-- HBB Paket 2: Events, an deren Ende der Baerchi belohnt wurde
+		-- (Fuehrung: "erstes Event geschafft"). Alte Staende starten bei 0.
+		totalEventsCompleted : number,
 	},
 
 	-- v13: Index. Jede configId, die der Spieler je besessen hat (auch nach
 	-- Recycling/Fusion/Rebirth). Wird nie geleert.
 	discovered : { [string]: boolean },
 
+	-- HBB Paket 3: welche Bedienelemente der Spieler schon gesehen hat
+	-- (Badge "!" nur fuer neue). Rein kosmetisch, gesetzt nur von
+	-- UiStateService; Ids siehe Modules/UnlockRules.ELEMENTS.
+	uiSeen : { [string]: boolean },
+
 	-- v13: Quest-Stand
 	quests : QuestState,
 
 	-- v14: Ei-Baum (ueberlebt Rebirths)
 	eggTree : EggTreeState,
+
+	-- v15: Tower-Rekorde und Meilensteine (ueberleben Rebirths)
+	towers : TowerState,
+
+	-- v15: taeglicher Login-Bonus
+	daily : DailyState,
 
 	-- Welcher Server den Spielstand gerade haelt (siehe Util/SessionLock).
 	-- Nur serverseitig, geht nie an den Client. nil = niemand; das ist der
@@ -470,6 +530,25 @@ export type PlayerDataUpdate = {
 	discovered   : { [string]: boolean },
 	quests       : QuestView,
 	eggTree      : EggTreeState,   -- v14
+	towers       : TowerState,     -- v15
+	daily        : DailyView,      -- v15
+	-- HBB Paket 2: fuer Fuehrung und Freischaltung (rein lesend im Client)
+	stats        : { [string]: number }?,
+	createdAt    : number?,
+	uiSeen       : { [string]: boolean }?,   -- HBB Paket 3
+}
+
+-- v15: was der Client fuer das Login-Bonus-Fenster braucht (fertig
+-- ausgewertet vom Server, siehe LoginBonusService.buildView).
+--   day        welcher Tag des Zyklus heute dran ist (1-7)
+--   claimable  heute noch nicht abgeholt
+--   streak     schon abgeholte Tage im laufenden Zyklus
+--   resetIn    Sekunden bis zum naechsten UTC-Tag
+export type DailyView = {
+	day       : number,
+	claimable : boolean,
+	streak    : number,
+	resetIn   : number,
 }
 
 -- Eine einzelne Kampf-AKTION (v14: Runden-Log). Bleibt serverseitig in
@@ -533,6 +612,10 @@ export type PitStageResult = {
 -- hochgefuettert werden.
 export type PitRunResult = {
 	baerchiUid    : string,
+	towerId       : string?,          -- v15: in welchem Tower der Lauf war
+	capStage      : number?,          -- v15: Deckel des Rebirths in diesem Tower (Belohnung/Rekord nur bis hier)
+	capReached    : boolean?,         -- v15: der Lauf hat den Deckel erreicht (Rebirth-Hinweis)
+	newRecord     : number?,          -- v15: neuer Tower-Rekord (nil = keiner)
 	startStage    : number,           -- v12: erste gespielte Stage (1 = von vorn, sonst Fortsetzung)
 	recalled      : boolean,          -- v12: true = vom Spieler nach einer Stage zurueckgeholt
 	corrected     : boolean?,         -- v12: true = nachgeschicktes, gekuerztes Ergebnis nach dem Zurueckholen
@@ -655,6 +738,36 @@ export type EventStatGain = {
 	rarityUp   : string?,
 }
 
+-- Telegraph einer Boss-Attacke (Server → alle Clients, Remotes.EventTelegraph).
+-- Die Wahrheit (wer getroffen wird) rechnet der Server zum Zeitpunkt hitAt;
+-- der Client zeichnet nur die Warnflaeche von jetzt bis hitAt.
+--   kind = "ring"    Kreisring um `center` zwischen `inner` und `outer`
+--   kind = "circles" Kreise mit Radius `radius` um jeden Punkt in `points`
+--   kind = "lane"    Bahn von `from` nach `to`, Breite `width`
+-- warnAt/hitAt sind Serverzeiten (workspace:GetServerTimeNow()).
+export type HazardTelegraph = {
+	kind   : "ring" | "circles" | "lane",
+	center : Vector3?,
+	inner  : number?,
+	outer  : number?,
+	points : { Vector3 }?,
+	radius : number?,
+	from   : Vector3?,
+	to     : Vector3?,
+	width  : number?,
+	warnAt : number,
+	hitAt  : number,
+}
+
+-- Treffer einer Boss-Attacke am eigenen Charakter (Server → ein Client,
+-- Remotes.EventHazardHit). Der Server hat entschieden; der Client fuehrt nur
+-- die Physik an seinem eigenen Charakter aus (er besitzt ihn).
+export type HazardHit = {
+	push        : Vector3,   -- Rueckstoss (Studs/s, waagerecht)
+	slowFactor  : number,    -- WalkSpeed-Faktor fuer slowSeconds
+	slowSeconds : number,
+}
+
 export type RebirthResult = {
 	newRebirthCount : number,
 	newMultiplier   : number,
@@ -674,6 +787,68 @@ export type EggPressResult = {
 	fromEgg : EggType,
 	toEgg   : EggType,
 	used    : number,
+}
+
+-- v15: ein Tower-Meilenstein wurde ausgezahlt (Toast).
+export type TowerMilestoneReward = {
+	towerId     : string,
+	stage       : number,
+	gummies     : number,   -- ohne Rebirth-Multiplikator
+	goldGummies : number,
+	eggType     : EggType?,
+	eggs        : number,
+	blueprints  : number,
+}
+
+-- v15: eine Zeile einer Bestenliste (Server → Client).
+export type LeaderboardEntry = {
+	rank   : number,
+	userId : number,
+	name   : string,
+	value  : number,
+}
+
+-- v15: eine Bestenliste. listId = "Tower" | "Rebirths" | "Collection".
+-- ownRank = Rang des Anfragenden (nil = nicht in den Top N).
+export type LeaderboardView = {
+	listId    : string,
+	entries   : { LeaderboardEntry },
+	ownRank   : number?,
+	ownValue  : number,
+	updatedAt : number,
+}
+
+-- v15: die Profilkarte eines anderen Spielers (Inspektor). Der Server baut sie
+-- aus den Daten im Speicher — rohe PlayerData gehen nie an fremde Clients.
+export type ProfileBaerchi = {
+	configId  : string,
+	rarity    : Rarity,
+	mutation  : MutationId?,
+	level     : number,
+	promotion : number,
+	power     : number,   -- grobe Staerke (fuer die Top-3-Sortierung)
+}
+
+export type PlayerProfileCard = {
+	userId       : number,
+	name         : string,
+	equipped     : ProfileBaerchi?,
+	highestTower : string,
+	towerRecord  : number,
+	rebirths     : number,
+	indexCount   : number,
+	indexTotal   : number,
+	top          : { ProfileBaerchi },
+}
+
+-- v15: Ergebnis des Login-Bonus (Toast).
+export type DailyBonusResult = {
+	day         : number,
+	gummies     : number,
+	goldGummies : number,
+	eggType     : EggType?,
+	eggs        : number,
+	blueprint   : boolean,
 }
 
 -- Offline-Ertrag beim Join (Server → Client, direkt nach dem ersten Sync).
@@ -726,7 +901,11 @@ local function createDefaultPlayerData(): PlayerData
 		-- v12: Brut-Slots entfallen (Eier werden sofort geoeffnet), die
 		-- Migration legt laufende Bruten zurueck ins Lager und ENTFERNT
 		-- island.hatchingEggs. Neu: island.pitProgress (optional).
-		version    = 14,  -- v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v15: Gebaeude Option B (Honigtopf + Honig-Presse -> HoneyRefiner),
+		-- Level 1-60, Tower statt PIT-Level (towers, island.towerProgress,
+		-- island.pitRefund), Login-Bonus (daily). Die Migration RECHNET um
+		-- (Veredler-Level, PIT-Erstattung, alter Rekord) — deshalb Sprung.
+		version    = 15,  -- v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -743,13 +922,11 @@ local function createDefaultPlayerData(): PlayerData
 		},
 
 		island = {
-			pitLevel  = 1,
-			-- Alle drei Honig-Gebaeude stehen ab dem ersten Join auf dem Plot
-			-- und fangen sofort an zu produzieren.
+			-- Beide Honig-Gebaeude stehen ab dem ersten Join auf dem Plot und
+			-- fangen sofort an zu produzieren.
 			buildings = {
-				Beehive    = { id = "Beehive",    level = 1, honey = 0, lastProducedAt = now },
-				HoneyPot   = { id = "HoneyPot",   level = 1, honey = 0, lastProducedAt = now },
-				HoneyPress = { id = "HoneyPress", level = 1, honey = 0, lastProducedAt = now },
+				Beehive      = { id = "Beehive",      level = 1, honey = 0, lastProducedAt = now },
+				HoneyRefiner = { id = "HoneyRefiner", level = 1, honey = 0, lastProducedAt = now },
 			},
 			baerchis     = {},
 			eggStock     = {
@@ -759,6 +936,11 @@ local function createDefaultPlayerData(): PlayerData
 
 			laidEggs  = {},
 			lastEggAt = now,
+
+			recycler = { level = 1, queued = 0, progress = 0, lastProcessedAt = now },
+
+			towerProgress = {},
+			pitRefund     = 0,
 		},
 
 		stats = {
@@ -768,11 +950,12 @@ local function createDefaultPlayerData(): PlayerData
 			totalFusions        = 0,
 			totalRebirths       = 0,
 			totalRecycled       = 0,
-			highestPitLevel     = 1,
 			totalHatched        = 0,
+			totalEventsCompleted = 0,
 		},
 
 		discovered = {},
+		uiSeen     = {},
 
 		eggTree = {
 			unlocked   = { BasicEgg = true, SugarEgg = true },
@@ -780,6 +963,18 @@ local function createDefaultPlayerData(): PlayerData
 			pressed    = {},
 			blueprints = 0,
 			bypass     = {},
+		},
+
+		towers = {
+			records      = {},
+			claimed      = {},
+			highestTower = "I",
+			selected     = "I",
+		},
+
+		daily = {
+			lastClaimDay = 0,
+			streak       = 0,
 		},
 
 		quests = {

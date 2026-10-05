@@ -6,7 +6,7 @@
 --   - Die einzige Schnittstelle zur gebauten Welt: Welt beim Start bauen
 --     lassen, Spieler-Plots vergeben, spawnen, neu aufbauen und despawnen,
 --     und die sichtbaren Teile aktuell halten (Schilder, Figur, Teich, Eier,
---     PIT-Turm, Event-Pit)
+--     Lauf-Turm, Tower-Turm, Event-Pit)
 --
 -- Das eigentliche BAUEN steht in den Modulen unter Util/MapBuild (MapParts,
 -- WorldBuilder, PlotBuilder, PondBuilder, ArenaBuilder, FigureBuilder,
@@ -22,8 +22,10 @@
 -- aussen), steht im Kopf von MapConfig.
 --
 -- ZWEI ARTEN VON AKTUALISIERUNG — bewusst getrennt:
---   * NEU BAUEN (updateBaerchis, updatePitLevel): teuer, nur wenn sich die
---     Struktur aendert (ein Baerchi kommt dazu, faellt weg oder steigt im Level).
+--   * NEU BAUEN (updateBaerchis, updateBuildingLooks, updateTowerShowcase):
+--     teuer, nur wenn sich die Struktur aendert (ein Baerchi kommt dazu, faellt
+--     weg oder steigt im Level; ein Gebaeude wechselt den Look; der Tower-Turm
+--     bekommt einen neuen Look oder Rekord).
 --   * IN-PLACE (updateBaerchiStates, updateBuildingSigns): billig, aendert nur
 --     Beschriftung und Transparenz an bereits stehenden Teilen. Dafuer gibt es
 --     die Trennung: HP und Honig aendern sich staendig, und dafuer jedes Mal
@@ -44,6 +46,8 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig = require(ReplicatedStorage.Config.MapConfig)
+local CombConfig = require(ReplicatedStorage.Config.CombConfig)
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types     = require(ReplicatedStorage.Network.Types)
 
 local ActivityLock = require(ServerScriptService.Util.ActivityLock)
@@ -57,6 +61,7 @@ local PondBuilder    = require(MapBuild.PondBuilder)
 local ArenaBuilder   = require(MapBuild.ArenaBuilder)
 local FigureBuilder  = require(MapBuild.FigureBuilder)
 local LaidEggBuilder = require(MapBuild.LaidEggBuilder)
+local RecyclerBuilder = require(MapBuild.RecyclerBuilder)
 
 --------------------------------------------------------------------------------
 -- Interner Zustand
@@ -87,6 +92,14 @@ local _pendingRebuild: { [Player]: boolean } = {}
 -- PlotDisplayService.init(); ohne sie faellt nur das Nachholen aus.
 local _islandDataProvider: ((Player) -> Types.IslandData?)? = nil
 
+-- v15: zuletzt gesetzter Tower-Turm und Tower-Symbol am Plot-Schild pro
+-- Spieler. MapService kennt die Tower-Daten nicht (sie liegen ausserhalb von
+-- IslandData) — PlotDisplayService setzt beides; gemerkt wird es hier, damit
+-- ein Neuaufbau des Plots (Rebirth) Turm und Symbol sofort wieder mitbaut.
+local _showcase: { [Player]: ArenaBuilder.ShowcaseView } = {}
+type Badge = { text: string, color: Color3 }
+local _badge: { [Player]: Badge } = {}
+
 --------------------------------------------------------------------------------
 -- Plot-Inhalt
 --------------------------------------------------------------------------------
@@ -99,10 +112,21 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	end
 
 	ArenaBuilder.buildBridge(plotModel, slot)
-	ArenaBuilder.buildPit(plotModel, slot, islandData.pitLevel)
+	ArenaBuilder.buildPit(plotModel, slot)
 	PondBuilder.buildPond(plotModel, slot, islandData)
+	RecyclerBuilder.build(plotModel, slot, islandData.recycler)
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
+
+	-- v15: Tower-Turm und Symbol, falls schon bekannt (nach einem Rebirth).
+	local view = _showcase[owner]
+	if view then
+		ArenaBuilder.buildShowcase(plotModel, slot, view)
+	end
+	local badge = _badge[owner]
+	if badge then
+		PlotBuilder.writeOwnerBadge(plotModel, badge.text, badge.color)
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -171,6 +195,8 @@ function MapService.despawnIsland(player: Player)
 	-- merkt das zwar selbst beim naechsten Durchlauf (kein Plot mehr), aber so
 	-- bleibt kein Eintrag fuer einen laengst gegangenen Spieler stehen.
 	_pendingRebuild[player] = nil
+	_showcase[player] = nil
+	_badge[player] = nil
 
 	local model = _plotModels[player]
 	if model then
@@ -185,17 +211,75 @@ function MapService.despawnIsland(player: Player)
 	end
 end
 
--- Wird aufgerufen wenn PIT-Level steigt (siehe IslandService.upgradePit).
--- Baut nur die Arena neu, nicht den ganzen Plot.
-function MapService.updatePitLevel(player: Player, newPitLevel: number)
+-- (v15: updatePitLevel ist entfallen — es gibt kein PIT-Level mehr. Der Turm
+-- auf der Arena-Insel zeigt jetzt den Tower-Rekord, siehe updateTowerShowcase.)
+
+-- v15: den Tower-Turm auf der Arena-Insel (neu) bauen. Aufrufer ist
+-- PlotDisplayService, und nur wenn sich Look oder Rekord geaendert haben
+-- (Signatur). `show` = der LOOK hat gewechselt: kurze Aufwertungs-Show (ein
+-- Partikel-Stoss an der Spitze, < 2 s).
+function MapService.updateTowerShowcase(player: Player, view: ArenaBuilder.ShowcaseView, show: boolean?)
+	_showcase[player] = view
+
 	local model = _plotModels[player]
-	if not model then return end
+	local slot  = _playerSlot[player]
+	if not model or not slot then return end
 
-	local slot = _playerSlot[player]
-	if not slot then return end
+	local built = ArenaBuilder.buildShowcase(model, slot, view)
+	if show then
+		local foot = ArenaBuilder.showcaseFoot(slot)
+		local height = MapConfig.TOWER_SHOWCASE.plinthHeight + view.floors * MapConfig.TOWER_SHOWCASE.floorHeight
+		FigureFX.burstAt(foot + Vector3.new(0, height + 2, 0), view.color, built, 60)
+	end
+end
 
-	ArenaBuilder.buildPit(model, slot, newPitLevel)
-	print("[MapService] PIT-Level aktualisiert fuer:", player.Name, "| Level:", newPitLevel)
+-- v15: Tower-Symbol unter dem Namen auf dem Plot-Schild ("◆ III · 42").
+function MapService.setOwnerBadge(player: Player, text: string, color: Color3)
+	_badge[player] = { text = text, color = color }
+	local model = _plotModels[player]
+	if model then
+		PlotBuilder.writeOwnerBadge(model, text, color)
+	end
+end
+
+-- Farbe der kurzen Aufwertungs-Show beim Look-Wechsel (v15).
+local LOOK_UPGRADE_COLOR = Color3.fromRGB(255, 220, 110)
+local LOOK_UPGRADE_SPARKS = 40
+
+-- v15: baut ein Gebaeude (oder den Recycler) NUR neu, wenn sich sein Look
+-- geaendert hat (Attribut "Look" am Koerper gegen BuildingBehavior.getLook).
+-- PlotDisplayService ruft das, wenn die Look-Signatur wechselt; Level-Aenderungen
+-- innerhalb eines Looks laufen ueber das billige updateBuildingSigns.
+-- `show` = kurze Aufwertungs-Show (ein Partikel-Stoss, < 2 s).
+function MapService.updateBuildingLooks(player: Player, islandData: Types.IslandData, show: boolean?)
+	local model = _plotModels[player]
+	local slot  = _playerSlot[player]
+	if not model or not slot then return end
+
+	local pool = PondBuilder.honeyPool(islandData)
+	for _, building in islandData.buildings do
+		local part = model:FindFirstChild(building.id)
+		local look = BuildingBehavior.getLook(building.level)
+		if part and part:IsA("BasePart") and part:GetAttribute("Look") ~= look then
+			local position = part.Position
+			part:Destroy()
+			PlotBuilder.buildBuilding(model, slot, building, pool)
+			if show then
+				FigureFX.burstAt(position, LOOK_UPGRADE_COLOR, model, LOOK_UPGRADE_SPARKS)
+			end
+		end
+	end
+
+	local body = model:FindFirstChild(CombConfig.RECYCLER_NAME)
+	local recyclerLook = BuildingBehavior.getLook(islandData.recycler.level)
+	if body and body:IsA("BasePart") and body:GetAttribute("Look") ~= recyclerLook then
+		local position = body.Position
+		body:Destroy()
+		RecyclerBuilder.build(model, slot, islandData.recycler)
+		if show then
+			FigureFX.burstAt(position, LOOK_UPGRADE_COLOR, model, LOOK_UPGRADE_SPARKS)
+		end
+	end
 end
 
 -- Haengt die Quelle fuer frische IslandData ein (siehe _islandDataProvider).
@@ -391,6 +475,18 @@ function MapService.updateBuildingSigns(player: Player, islandData: Types.Island
 	-- Haengt an denselben Werten wie die Gebaeude-Schilder — deshalb hier
 	-- gleich mit erledigt statt eines eigenen Aufrufers in PlotDisplayService.
 	MapService.updatePondFill(player, islandData)
+end
+
+-- Schreibt Level, Warteschlange und Lampe des Waben-Recyclers neu.
+-- Billig — der Weg fuer jede Aenderung der Warteschlange.
+function MapService.updateRecycler(player: Player, islandData: Types.IslandData)
+	local model = _plotModels[player]
+	if not model then return end
+
+	local body = model:FindFirstChild(CombConfig.RECYCLER_NAME)
+	if body and body:IsA("BasePart") then
+		RecyclerBuilder.writeState(body, islandData.recycler)
+	end
 end
 
 -- Die Anzeigetafel ueber der Arena. Bewusst ueber den exakten Pfad gesucht und
@@ -671,25 +767,6 @@ function MapService.setPitTowerLevel(player: Player, level: number)
 			+ MapConfig.PIT_BANNER_HEIGHT
 		anchor.CFrame = CFrame.new(center.X, topY, center.Z)
 	end
-
-	-- Die staendigen PIT-Level-Saeulen (buildPit, "PitPillar_i") sitzen auf
-	-- fester Hoehe knapp ueber PLATFORM_TOP_Y — genau der Bereich, den der
-	-- Turm mit seinen vollflaechigen Etagen-Scheiben (gleicher Radius wie die
-	-- Kampfflaeche) Stufe fuer Stufe ueberdeckt. Ohne diese Ausblendung
-	-- wuerden die Saeulen mit steigendem Turm zunehmend darin verschwinden
-	-- und nur noch mit der Spitze oben herausschauen — sieht wie
-	-- durchgeklippte Geometrie aus, ist aber nur diese Kollision zweier
-	-- Deko-Elemente aus verschiedenen Systemen (permanentes PIT-Level vs.
-	-- Lauf-Turm). Deshalb: sobald ein Turm steht, Saeulen weg; sobald er auf
-	-- 0 ist (kein Lauf aktiv), wieder da.
-	local hidePillars = wanted > 0
-	for _, child in container:GetChildren() do
-		if child:IsA("BasePart") and child.Name:match("^PitPillar_") then
-			child.Transparency = if hidePillars then 1 else 0
-			child.CanCollide   = not hidePillars
-			child.CanQuery     = not hidePillars
-		end
-	end
 end
 
 -- Hoehe (Y ueber PLATFORM_TOP_Y) der Kampfflaeche bei `level` bereits
@@ -698,6 +775,52 @@ end
 -- wie in buildTowerRing, hier aber ohne selbst eine Etage zu bauen.
 function MapService.getPitTowerFloorY(level: number): number
 	return MapConfig.PLATFORM_TOP_Y + math.max(0, level) * MapConfig.PIT_TOWER_STEP_HEIGHT
+end
+
+-- v15: die Bestenlisten-Tafel beschriften (Titel + bis zu
+-- LEADERBOARD_BOARD.lines Zeilen). Aufrufer ist LeaderboardService.
+local _leaderboardBoard: BasePart? = nil
+
+function MapService.writeLeaderboardBoard(title: string, lines: { string })
+	local board = _leaderboardBoard
+	if not board then return end
+	local surface = board:FindFirstChild("Board")
+	if not surface then return end
+
+	local titleLabel = surface:FindFirstChild("Title")
+	if titleLabel and titleLabel:IsA("TextLabel") then
+		titleLabel.Text = title
+	end
+	for i = 1, MapConfig.LEADERBOARD_BOARD.lines do
+		local line = surface:FindFirstChild("Line" .. i)
+		if line and line:IsA("TextLabel") then
+			line.Text = lines[i] or ""
+		end
+	end
+end
+
+-- v15: Teile auf der Insel eines Spielers zaehlen (Debug-Befehl "parts",
+-- Budget <= 250 pro Insel ohne Baerchi-Mesh). Getrennt nach Bereichen, damit man
+-- sieht, wo das Budget hingeht. Die Figuren (importierte Meshes) zaehlen extra.
+function MapService.countParts(player: Player): { [string]: number }?
+	local model = _plotModels[player]
+	if not model then return nil end
+
+	local result: { [string]: number } = { total = 0, figures = 0 }
+	for _, child in model:GetChildren() do
+		local count = if child:IsA("BasePart") then 1 else 0
+		for _, descendant in child:GetDescendants() do
+			if descendant:IsA("BasePart") then count += 1 end
+		end
+		local key = child.Name
+		if key == "Baerchis" then
+			result.figures += count
+		else
+			result[key] = (result[key] or 0) + count
+			result.total += count
+		end
+	end
+	return result
 end
 
 function MapService.init()
@@ -768,6 +891,10 @@ function MapService.init()
 
 	WorldBuilder.buildPlatform()
 	WorldBuilder.buildGlobalLighting()
+
+	-- v15: Bestenlisten-Tafel (LeaderboardService beschriftet sie)
+	local platform = workspace:FindFirstChild("Platform")
+	_leaderboardBoard = WorldBuilder.buildLeaderboardBoard(platform or workspace)
 
 	-- Sicherheitsnetz: falls PlayerService den Leave-Fall mal verpasst,
 	-- bleibt sonst ein Slot dauerhaft belegt.

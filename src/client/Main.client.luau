@@ -48,6 +48,13 @@ local ResultFeed         = require(Controllers:WaitForChild("ResultFeed"))
 local WorldController    = require(Controllers:WaitForChild("WorldController"))
 local EggTimerController = require(Controllers:WaitForChild("EggTimerController"))
 local SkillFXController  = require(Controllers:WaitForChild("SkillFXController"))
+local CombController     = require(Controllers:WaitForChild("CombController"))
+local AmbienceController = require(Controllers:WaitForChild("AmbienceController"))
+local EventFXController  = require(Controllers:WaitForChild("EventFXController"))
+local LaidEggMeshController = require(Controllers:WaitForChild("LaidEggMeshController"))
+local UiEventLogger      = require(Controllers:WaitForChild("UiEventLogger"))
+local GuideController    = require(Controllers:WaitForChild("GuideController"))
+local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local Hud              = require(UI:WaitForChild("Hud"))
@@ -65,6 +72,13 @@ local PetBar           = require(UI:WaitForChild("PetBar"))
 local QuestPanel       = require(UI:WaitForChild("QuestPanel"))
 local QuestTracker     = require(UI:WaitForChild("QuestTracker"))
 local EggTreePanel     = require(UI:WaitForChild("EggTreePanel"))
+local LeaderboardPanel = require(UI:WaitForChild("LeaderboardPanel"))
+local ProfilePanel     = require(UI:WaitForChild("ProfilePanel"))
+local DailyBonusPanel  = require(UI:WaitForChild("DailyBonusPanel"))
+local Feedback         = require(UI:WaitForChild("Feedback"))
+local Moment           = require(UI:WaitForChild("Moment"))
+local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
+local HomeButton       = require(UI:WaitForChild("HomeButton"))
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -105,9 +119,23 @@ LanguagePanel.init(screenGui)
 QuestPanel.init(screenGui)
 -- v14: Ei-Baum (oeffnet sich aus dem Ei-Menue)
 EggTreePanel.init(screenGui)
+-- v15: Bestenliste, Spieler-Profil (Inspector) und Login-Bonus. Vor MenuBar,
+-- damit die Menue-Kacheln die Panels schon angemeldet vorfinden.
+LeaderboardPanel.init(screenGui)
+ProfilePanel.init(screenGui)
+DailyBonusPanel.init(screenGui)
 
 Hud.init(screenGui)
 MenuBar.init(screenGui)
+
+-- HBB Paket 1: fliegende Icons, grosse Momente, Rueckkehr-Karte. Nach Hud
+-- und MenuBar (Ziele der Icons), vor ResultFeed (der Offline-Bericht des
+-- Joins kommt sonst an, bevor die Karte bereit ist).
+Feedback.init(screenGui)
+Moment.init(screenGui)
+ReturnSummary.init(screenGui)
+-- HBB Paket 5: Heim-Knopf (erscheint nur weit weg vom eigenen Plot)
+HomeButton.init(screenGui)
 
 -- v13: Quest-Karte links (braucht das Quest-Fenster, das oben angemeldet wird)
 QuestTracker.init(screenGui)
@@ -120,5 +148,19 @@ WorldController.init()
 EggTimerController.init()
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
+-- v15: Waben im Event-Pit und Recycler (braucht Toast, ClientState und die Welt)
+CombController.init(screenGui)
+-- v16: Himmels-Kulisse (Wolken, Schwebeinseln, Pollen, Schaum) nur auf dem Client
+AmbienceController.init()
+-- v17: lebendige Events (UFO-Patrouille, Abwuerfe, Boss, Telegraphen); braucht Toast
+EventFXController.init()
+-- v18: Ei-Mesh der gelegten Eier (EditableMesh gibt es nur auf dem Client)
+LaidEggMeshController.init()
+-- HBB Paket 0: Messpunkte der Oberflaeche (Panel auf/zu, Stillstand)
+UiEventLogger.init()
+-- HBB Paket 2: Fuehrung ohne Text (braucht MenuBar und PetBar als Anker)
+GuideController.init(screenGui)
+-- HBB Paket 3: ⬆ ueber bezahlbaren eigenen Gebaeuden
+UpgradeHintController.init()
 
 print("[Client] Bereit")

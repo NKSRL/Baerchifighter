@@ -5,6 +5,8 @@
 -- Einzige Zustaendigkeit:
 --   - Ein Ei aus dem Lager oeffnen: Gacha-Roll, Mutations-Wurf, neuer Baerchi
 --   - Den Kauf eines Basis-Eis beim versteckten Haendler abrechnen
+--   - v17: Eier als Belohnung ins Lager legen (grantEggs, z.B. UFO-Abwurf),
+--     damit Event-Code nie selbst in island.eggStock schreibt
 --
 -- Seit v12 (Ei-Baum-Konzept, Block A) gibt es KEINE Brutzeit mehr: ein Klick
 -- auf "Oeffnen" nimmt ein Ei aus island.eggStock und liefert sofort das
@@ -31,6 +33,7 @@ local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
 local IslandService  = require(ServerScriptService.Services.IslandService)
 local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
+local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local EggService = {}
@@ -117,6 +120,7 @@ function EggService.openEgg(player: Player, eggType: Types.EggType): Types.Hatch
 	}
 
 	Remotes.HatchResultReceived:FireClient(player, result)
+	FunnelService.step(player, "F03_FirstEggOpened")
 	PlayerService.markDirty(player)
 	PlayerService.saveNow(player)
 
@@ -150,6 +154,29 @@ function EggService.buyFromMerchant(player: Player): boolean
 	PlayerService.saveNow(player)
 
 	print("[EggService]", player.Name, "kauft", merchant.eggType, "beim Haendler fuer", merchant.priceGummies)
+	return true
+end
+
+--------------------------------------------------------------------------------
+-- v17: Eier als Belohnung ins Lager
+--------------------------------------------------------------------------------
+
+-- Legt `amount` Eier dieser Sorte ins Lager (gesperrte Baum-Eier und
+-- Sonder-Eier inklusive: oeffnen geht immer, siehe openEgg). Gibt false, wenn
+-- die Daten fehlen oder die Sorte unbekannt ist.
+function EggService.grantEggs(player: Player, eggType: Types.EggType, amount: number): boolean
+	local data = PlayerService.getData(player)
+	if not data then return false end
+	if not EggConfig.data[eggType] then
+		warn("[EggService] grantEggs: unbekannte Sorte", eggType)
+		return false
+	end
+	local n = math.max(0, math.floor(amount))
+	if n <= 0 then return true end
+
+	data.island.eggStock[eggType] = (data.island.eggStock[eggType] or 0) + n
+	PlayerService.markDirty(player)
+	PlayerService.saveNow(player)
 	return true
 end
 

@@ -12,7 +12,9 @@
 --   2. Gebaeude-Parts (Name = BuildingId, Attribute "BuildingLevel"/"HoneyPool")
 --      → ein hier erzeugter ProximityPrompt (E) oeffnet das Gebaeude-Panel
 --   3. Die Kampf-Plattform ("FightFloor" im Model "PitPlatform")
---      → Arena-Ausbau-Menue (die Kampf-Auswahl liegt in der PetBar), ueber einen hier erzeugten ProximityPrompt
+--      → v15: Tower-Wahl (CombatPanel), ueber einen hier erzeugten ProximityPrompt
+--   4. v15: FREMDE Spieler (Charakter) und fremde Plot-Schilder
+--      → Profilkarte (Inspektor, ProfilePanel), per Klick
 --
 -- Gelegte Eier sind ABSICHTLICH kein vierter Anker mehr: sie werden nicht
 -- mehr angeklickt, sondern serverseitig per Touched eingesammelt, sobald die
@@ -51,6 +53,9 @@
 local Players   = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Loc          = require(ReplicatedStorage.Localization.Loc)
+
 local Theme        = require(script.Parent.Parent.UI.Theme)
 local BaerchiPanel = require(script.Parent.Parent.UI.BaerchiPanel)
 local PanelManager = require(script.Parent.Parent.UI.PanelManager)
@@ -62,6 +67,12 @@ local LEVEL_ATTRIBUTE = "BuildingLevel"
 local OWNER_ATTRIBUTE = "PlotOwner"
 local PROMPT_DISTANCE = 14
 
+-- v15 Inspektor: Klick auf fremde Spieler oder fremde Plot-Schilder oeffnet
+-- die Profilkarte. Der ClickDetector entsteht nur lokal und heisst "Inspect",
+-- damit hookClickable ihn nicht fuer eine Baerchi-Figur haelt.
+local INSPECT_NAME     = "Inspect"
+local INSPECT_DISTANCE = 60
+
 -- Wegweiser auf den eigenen Plot. Die Plattform ist 480 Studs breit und
 -- ueberall gleich gruen; ohne diese Marke sucht man beim ersten Join acht
 -- Schilder ab, um das eigene zu finden. Reichweite deshalb so gross, dass sie
@@ -72,9 +83,8 @@ local HOME_MARKER_HEIGHT   = 7
 
 -- Gebaeude-Part-Namen wie MapService sie vergibt (= Types.BuildingId)
 local BUILDING_NAMES: { [string]: boolean } = {
-	Beehive    = true,
-	HoneyPot   = true,
-	HoneyPress = true,
+	Beehive      = true,
+	HoneyRefiner = true,
 }
 
 -- Bereits verbundene ClickDetectors, damit nichts doppelt haengt
@@ -125,6 +135,7 @@ end
 
 local function hookClickable(instance: Instance)
 	if not instance:IsA("ClickDetector") then return end
+	if instance.Name == INSPECT_NAME then return end
 	if tryHook(instance) then return end
 
 	-- Replikation ist nicht sortiert: der ClickDetector kann beim Client
@@ -240,6 +251,45 @@ local function addHomeMarker(board: BasePart)
 	label.Parent                 = marker
 end
 
+--------------------------------------------------------------------------------
+-- Inspektor (v15)
+--------------------------------------------------------------------------------
+
+-- Haengt einen lokalen ClickDetector an `parent` (Part oder Model), der die
+-- Profilkarte von `userId` oeffnet. Der Server prueft selbst, ob der Spieler
+-- auf diesem Server ist (ProfileService); hier geht es nur ums Oeffnen.
+local function addInspector(parent: Instance, userId: number)
+	if parent:FindFirstChild(INSPECT_NAME) then return end
+	if userId == Players.LocalPlayer.UserId then return end
+
+	local detector = Instance.new("ClickDetector")
+	detector.Name                  = INSPECT_NAME
+	detector.MaxActivationDistance = INSPECT_DISTANCE
+	detector.Parent                = parent
+
+	detector.MouseClick:Connect(function()
+		-- Am Schild beim Klick neu nachschlagen: ein Plot kann inzwischen einem
+		-- anderen Spieler gehoeren.
+		local target = if parent:IsA("BasePart") then (findPlotOwner(parent) or userId) else userId
+		if target == Players.LocalPlayer.UserId then return end
+		PanelManager.open("Profile", target)
+	end)
+end
+
+local function hookCharacter(other: Player, character: Model)
+	addInspector(character, other.UserId)
+end
+
+local function hookPlayer(other: Player)
+	if other == Players.LocalPlayer then return end
+	if other.Character then
+		hookCharacter(other, other.Character)
+	end
+	other.CharacterAdded:Connect(function(character)
+		hookCharacter(other, character)
+	end)
+end
+
 local function hookOwnedPart(instance: BasePart)
 	if instance.Name == "SignBoard" then
 		addHomeMarker(instance)
@@ -247,7 +297,7 @@ local function hookOwnedPart(instance: BasePart)
 	end
 
 	if instance.Name == "FightFloor" then
-		addPanelPrompt(instance, "Ausbauen", "Kampfplattform", PanelManager.ARENA_PANEL)
+		addPanelPrompt(instance, Loc.t("ui.tower.prompt_action"), Loc.t("ui.tower.prompt_object"), PanelManager.ARENA_PANEL)
 		return
 	end
 
@@ -301,13 +351,26 @@ local function hookWorldPart(instance: Instance)
 		return
 	end
 
+	-- v15: fremdes Plot-Schild → Profilkarte des Besitzers
+	if instance.Name == "SignBoard" then
+		local owner = findPlotOwner(instance)
+		if owner then
+			addInspector(instance, owner)
+			return
+		end
+	end
+
 	-- Besitzer noch unbekannt: das kann passieren wenn das Teil beim Client
 	-- ankommt bevor sein Plot-Model komplett da ist. Einmal im naechsten
 	-- Frame erneut versuchen, statt den Prompt fuer immer zu verlieren.
 	if findPlotOwner(instance) == nil then
 		task.defer(function()
-			if instance.Parent and isOwnPlot(instance) then
+			if not instance.Parent then return end
+			if isOwnPlot(instance) then
 				hookOwnedPart(instance)
+			elseif instance.Name == "SignBoard" then
+				local owner = findPlotOwner(instance)
+				if owner then addInspector(instance, owner) end
 			end
 		end)
 	end
@@ -331,6 +394,12 @@ function WorldController.init()
 	-- Und alles was der Server noch nachliefert. Die Figuren werden bei jeder
 	-- Bestandsaenderung neu gebaut, also passiert das staendig.
 	Workspace.DescendantAdded:Connect(hook)
+
+	-- v15 Inspektor: fremde Spielfiguren anklickbar machen
+	for _, other in Players:GetPlayers() do
+		hookPlayer(other)
+	end
+	Players.PlayerAdded:Connect(hookPlayer)
 
 	print("[WorldController] Initialisiert")
 end

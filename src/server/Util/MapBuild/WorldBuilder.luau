@@ -20,6 +20,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local SkyBuilder = require(ServerScriptService.Util.MapBuild.SkyBuilder)
+local ScenicBuilder = require(ServerScriptService.Util.MapBuild.ScenicBuilder)
 
 local WorldBuilder = {}
 
@@ -259,12 +261,67 @@ end
 --
 -- Bewusst idempotent (FindFirstChild-Pruefung wie buildPlatform): ein
 -- Server-Neustart im selben Studio-Prozess soll keine zweiten Kopien anlegen.
+-- v15: die Bestenlisten-Tafel auf der Hauptinsel (zwei Pfosten, ein Brett mit
+-- SurfaceGui: Titel + LEADERBOARD_BOARD.lines Zeilen). Beschriftet wird sie von
+-- LeaderboardService ueber MapService.writeLeaderboardBoard.
+function WorldBuilder.buildLeaderboardBoard(parent: Instance): BasePart
+	local cfg = MapConfig.LEADERBOARD_BOARD
+	local angle = math.rad(cfg.angleDegrees)
+	local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
+	local groundY = MapConfig.PLATFORM_TOP_Y
+	local base = MapConfig.CENTER + outward * cfg.radius
+	local center = Vector3.new(base.X, groundY + cfg.postHeight + cfg.size.Y * 0.5, base.Z)
+	local frame = CFrame.lookAt(center, center + outward)
+
+	local board = MapParts.newPart("LeaderboardBoard", cfg.size, frame, cfg.color, Enum.Material.Wood)
+	board.CanCollide = true
+	board.Parent = parent
+
+	for _, side in { -1, 1 } do
+		local postHeight = cfg.postHeight + cfg.size.Y
+		local post = MapParts.newPart(
+			"LeaderboardPost",
+			Vector3.new(0.8, postHeight, 0.8),
+			frame * CFrame.new(side * (cfg.size.X * 0.5 - 0.6), -cfg.size.Y * 0.5 - cfg.postHeight + postHeight * 0.5, 0.8),
+			cfg.color,
+			Enum.Material.Wood
+		)
+		post.CanCollide = true
+		post.Parent = parent
+	end
+
+	local surface = Instance.new("SurfaceGui")
+	surface.Name          = "Board"
+	surface.Face          = Enum.NormalId.Front
+	surface.PixelsPerStud = 30
+	surface.Adornee       = board
+	surface.Parent        = board
+
+	local title = MapParts.newTextLabel("Title", surface, UDim2.fromScale(1, 0.14), UDim2.fromScale(0, 0.01))
+	title.TextColor3 = cfg.textColor
+	title.Text = ""
+
+	local lineHeight = 0.84 / cfg.lines
+	for i = 1, cfg.lines do
+		local line = MapParts.newTextLabel("Line" .. i, surface,
+			UDim2.fromScale(0.94, lineHeight * 0.9), UDim2.fromScale(0.03, 0.15 + (i - 1) * lineHeight))
+		line.TextXAlignment = Enum.TextXAlignment.Left
+		line.TextColor3 = cfg.textColor
+		line.Text = ""
+	end
+
+	return board
+end
+
 function WorldBuilder.buildGlobalLighting()
 	if Lighting:FindFirstChild("BaerchiBloom") then
 		return   -- schon gesetzt
 	end
 
-	Lighting.ClockTime = MapConfig.LIGHTING_CLOCK_TIME
+	-- Himmel, Atmosphaere, Wolken, Tageszeit: siehe SkyBuilder / AmbienceConfig.
+	-- (MapConfig.LIGHTING_CLOCK_TIME ist damit abgeloest: die Tageszeit steht
+	-- jetzt in AmbienceConfig.CLOCK_TIME.)
+	SkyBuilder.build()
 
 	local bloom = Instance.new("BloomEffect")
 	bloom.Name      = "BaerchiBloom"
@@ -404,6 +461,9 @@ function WorldBuilder.buildPlatform()
 		spawnPad.BottomSurface = Enum.SurfaceType.Smooth
 		spawnPad.Parent        = model
 	end
+
+	-- Landschafts-Deko (Meeresboden, Schaum, Wege, Laternen, Baeume ...).
+	ScenicBuilder.build(model, WorldBuilder.isOnBridgeLane)
 
 	model.Parent = workspace
 	print(

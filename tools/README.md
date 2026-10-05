@@ -15,6 +15,9 @@ Aus dem Projektordner:
     node run.mjs client.test.lua             # Rauchtest der Client-UI
     node run.mjs migration.test.lua          # alte Spielstände → aktuelle Version
     node run.mjs session_lock.test.lua       # Sitzungs-Sperre beim Speichern
+    node run.mjs login_bonus.test.lua        # Login-Bonus (Tageswechsel, Gnadenfrist, Reset, UTC)
+    node run.mjs ../sim/progression_pacing.lua  # Pacing: Looks, Rebirths, Final-Tower (v15)
+    node run.mjs ../sim/tower_calibration.lua   # Tower-Kalibrierung je Rarity (v15)
     node run.mjs ../sim/egg_tree_check.lua   # Regeln des Ei-Baums
     node run.mjs ../sim/path_balance.lua     # Pfad-Profile (Gold/Kristall/Void)
     node run.mjs ../sim/fight_timeline.lua   # Zeitbudget der Kampf-Wiedergabe
@@ -37,12 +40,15 @@ selbst ist durch Attrappen ersetzt. Details: `luau-tests/README.md`.
 | `check_syntax.mjs` | jede `.luau`-Datei unter `src/` kompiliert |
 | `loc.test.lua` | `Loc`: Sprachwahl, Platzhalter, Plural, Fallbacks |
 | `client.test.lua` | Client-UI startet, Sprachwechsel, Toasts, HUD, Menü |
-| `migration.test.lua` | Spielstände im Format v6, v10 und v13 laufen durch `PlayerMigration.applyDefaults`, ergeben die Struktur von `Types.PlayerData` und ändern sich beim zweiten Durchlauf nicht mehr |
+| `migration.test.lua` | Spielstände im Format v6, v10, v13 und v14 laufen durch `PlayerMigration.applyDefaults`, ergeben die Struktur von `Types.PlayerData` und ändern sich beim zweiten Durchlauf nicht mehr |
+| `login_bonus.test.lua` | `LoginBonusCalc`: Tageswechsel, Gnadenfrist (1 Tag), Reset, Doppelklick, Wechsel genau 00:00 UTC, Zyklus 1..7 |
 | `session_lock.test.lua` | `SessionLock`: wann ein Spielstand als von einem anderen Server gehalten gilt |
 | `sim/egg_tree_check.lua` | Verteilungen = 100 %, Ø steigt entlang jeder Kante, jeder Bärchi fällt aus einem Ei, jede Fähigkeit hat eine Show, Lege-Fallback landet auf freiem Ei |
 | `sim/path_balance.lua` | kein Pfad gewinnt alle drei Ziele (Stärke, Tempo, Seltenheit) |
 | `sim/fight_timeline.lua` | ein PIT-Lauf bleibt im Zeitbudget |
-| `sim/pit_balance.lua` | Tabelle: erreichbare Stages je Rarity und PIT-Level (keine Prüfung) |
+| `sim/pit_balance.lua` | Tabelle: erreichbare Stages je Rarity und Tower (keine Prüfung) |
+| `sim/tower_calibration.lua` | Zielwerte der Tower (L1 Common ~3 Stages, Omega max Final 70–100, 100 Stages < 50 ms) |
+| `sim/progression_pacing.lua` | Pacing-Ziele (Look 2–6, Rebirth 1, Final 100 nicht vor Woche 8) für 30/90/240 min pro Tag |
 | `sim/egg_tree_sim.lua` | Tabelle: Spieltage bis zur Freischaltung je Knoten (keine Prüfung) |
 
 Die Typprüfung (`--!strict`) machen diese Tests nicht, das bleibt Studio.

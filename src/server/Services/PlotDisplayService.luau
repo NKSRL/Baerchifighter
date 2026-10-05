@@ -31,6 +31,21 @@
 --         Aendert sich, wenn der Baerchi eines legt oder der Spieler eines
 --         aufsammelt.
 --
+--   RECYCLER   (Level + Warteschlange des Waben-Recyclers)
+--       → MapService.updateRecycler: schreibt Schild und Lampe. Billig.
+--         Aendert sich jede Sekunde, solange der Recycler arbeitet.
+--
+--   LOOKS      (v15: Look-Stufe jedes Gebaeudes und des Recyclers)
+--       → MapService.updateBuildingLooks: baut genau das Gebaeude neu, dessen
+--         Look sich geaendert hat, mit kurzer Aufwertungs-Show. Haengt am
+--         LOOK, nicht am Level — ein Ausbau innerhalb eines Looks schreibt nur
+--         das Schild (GEBAEUDE oben).
+--
+--   TOWER      (v15: Look + Etagen + Schildtext des Tower-Turms)
+--       → MapService.updateTowerShowcase (Neuaufbau des Turms, Show nur beim
+--         Look-Wechsel) und MapService.setOwnerBadge (Symbol am Plot-Schild).
+--         Aendert sich nur bei einem neuen Rekord oder Tower.
+--
 -- Die Figuren und Schilder selbst baut MapService — dieser Service entscheidet
 -- nur WANN und WELCHE Tiefe.
 --
@@ -53,7 +68,9 @@ local Players             = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 
-local Types = require(ReplicatedStorage.Network.Types)
+local Types            = require(ReplicatedStorage.Network.Types)
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService    = require(ServerScriptService.Services.MapService)
@@ -65,6 +82,9 @@ type Signatures = {
 	state     : string,
 	buildings : string,
 	eggs      : string,
+	recycler  : string,
+	looks     : string,
+	tower     : string,
 }
 
 local _signatures: { [Player]: Signatures } = {}
@@ -129,13 +149,60 @@ local function eggSignature(data: Types.PlayerData): string
 	return table.concat(parts, "|")
 end
 
+-- Was sich aendern muss, damit Schild und Lampe des Waben-Recyclers neu
+-- geschrieben werden: Level und Warteschlange.
+local function recyclerSignature(data: Types.PlayerData): string
+	local recycler = data.island.recycler
+	return string.format("%d:%d", recycler.level, recycler.queued)
+end
+
+-- v15: Look-Stufen. Bewusst NICHT das Level: ein Gebaeude wird nur neu
+-- gebaut, wenn es einen neuen Look bekommt (README 4.2).
+local function lookSignature(data: Types.PlayerData): string
+	local parts: { string } = {}
+	for id, building in data.island.buildings do
+		table.insert(parts, string.format("%s:%d", id, BuildingBehavior.getLook(building.level)))
+	end
+	table.sort(parts)
+	table.insert(parts, "Recycler:" .. BuildingBehavior.getLook(data.island.recycler.level))
+	return table.concat(parts, "|")
+end
+
+-- v15: Tower-Turm: hoechster Tower (Look) und Rekord darin (Etagen + Schild).
+local function towerSignature(data: Types.PlayerData): string
+	local towerId, record = TowerConfig.bestRecord(data.towers)
+	local highest = data.towers.highestTower
+	if TowerConfig.getIndex(highest) > TowerConfig.getIndex(towerId) then
+		towerId, record = highest, data.towers.records[highest] or 0
+	end
+	return string.format("%s:%d", towerId, record)
+end
+
 local function allSignatures(data: Types.PlayerData): Signatures
 	return {
 		structure = structureSignature(data),
 		state     = stateSignature(data),
 		buildings = buildingSignature(data),
 		eggs      = eggSignature(data),
+		recycler  = recyclerSignature(data),
+		looks     = lookSignature(data),
+		tower     = towerSignature(data),
 	}
+end
+
+-- Turm und Plot-Symbol aus dem Tower-Stand (Signatur "Tower:Rekord").
+local function applyTower(player: Player, signature: string, show: boolean)
+	local towerId, recordText = string.match(signature, "^([^:]+):(%d+)$")
+	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
+	local record = tonumber(recordText) or 0
+
+	MapService.updateTowerShowcase(player, {
+		look   = def.look,
+		floors = TowerConfig.getShowcaseFloors(def.id, record),
+		title  = string.format("%s  ·  Tower %s  ·  %d", player.DisplayName, def.numeral, record),
+		color  = def.color,
+	}, show)
+	MapService.setOwnerBadge(player, string.format("◆ Tower %s · %d", def.numeral, record), def.color)
 end
 
 --------------------------------------------------------------------------------
@@ -153,6 +220,7 @@ local function refresh(player: Player, data: Types.PlayerData)
 		MapService.updateBaerchis(player, data.island)
 		MapService.updateBuildingSigns(player, data.island)
 		MapService.updateLaidEggs(player, data.island)
+		MapService.updateRecycler(player, data.island)
 		return
 	end
 
@@ -175,6 +243,23 @@ local function refresh(player: Player, data: Types.PlayerData)
 	-- gelegtes Ei soll nicht darauf warten, dass er ankommt.
 	if previous.eggs ~= current.eggs then
 		MapService.updateLaidEggs(player, data.island)
+	end
+
+	if previous.recycler ~= current.recycler then
+		MapService.updateRecycler(player, data.island)
+	end
+
+	-- v15: neuer Look -> genau dieses Gebaeude neu bauen (mit Show). Nach einem
+	-- Rebirth faellt der Look zurueck; rebuildIsland hat die Insel dann schon
+	-- komplett neu gebaut, updateBuildingLooks findet nichts mehr zu tun.
+	if previous.looks ~= current.looks then
+		MapService.updateBuildingLooks(player, data.island, true)
+	end
+
+	if previous.tower ~= current.tower then
+		local oldTower = string.match(previous.tower, "^([^:]+):")
+		local newTower = string.match(current.tower, "^([^:]+):")
+		applyTower(player, current.tower, oldTower ~= newTower)
 	end
 
 	_signatures[player] = current
@@ -203,8 +288,12 @@ function PlotDisplayService.init()
 		MapService.updateBuildingSigns(player, data.island)
 		MapService.updateBaerchiStates(player, data.island)
 		MapService.updateLaidEggs(player, data.island)
+		MapService.updateRecycler(player, data.island)
 
-		_signatures[player] = allSignatures(data)
+		local signatures = allSignatures(data)
+		applyTower(player, signatures.tower, false)
+
+		_signatures[player] = signatures
 	end)
 
 	PlayerService.onDataChanged(refresh)

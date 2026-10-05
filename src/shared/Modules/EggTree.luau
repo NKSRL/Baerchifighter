@@ -291,7 +291,7 @@ function EggTree.highestUnlocked(state: Types.EggTreeState?): Types.EggType
 	local best: Types.EggType = "SugarEgg"
 	local bestTier, bestOrder = 0, math.huge
 	for eggId, egg in EggConfig.data do
-		if egg.path ~= "Ascension" and EggTree.isUnlocked(state, eggId) then
+		if egg.path ~= "Ascension" and not egg.special and EggTree.isUnlocked(state, eggId) then
 			if egg.tier > bestTier or (egg.tier == bestTier and egg.sortOrder < bestOrder) then
 				best, bestTier, bestOrder = eggId, egg.tier, egg.sortOrder
 			end

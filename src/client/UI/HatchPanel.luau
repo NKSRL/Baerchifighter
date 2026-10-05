@@ -25,13 +25,14 @@ local EggTree   = require(ReplicatedStorage.Modules.EggTree)
 
 local Theme          = require(script.Parent.Theme)
 local PanelManager   = require(script.Parent.PanelManager)
+local EggIcon        = require(script.Parent.EggIcon)
 local HatchAnimation = require(script.Parent.HatchAnimation)
 local ClientState    = require(script.Parent.Parent.Controllers.ClientState)
 
 local HatchPanel = {}
 
 local PANEL_NAME = "Hatch"
-local EGG_HEIGHT = 80
+local EGG_HEIGHT = 84
 
 local _root: Frame?              = nil
 local _scroller: ScrollingFrame? = nil
@@ -73,28 +74,21 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	card.Size        = UDim2.new(1, -8, 0, EGG_HEIGHT)
 	card.LayoutOrder = order
 
-	-- Kleines Ei in der Ei-Farbe links, damit man die Sorte ohne Lesen erkennt
-	local swatch = Instance.new("Frame")
-	swatch.Name             = "Swatch"
-	swatch.Size             = UDim2.fromOffset(40, 52)
-	swatch.Position         = UDim2.new(0, 12, 0.5, -26)
-	swatch.BackgroundColor3 = def.color
-	swatch.BorderSizePixel  = 0
-	swatch.Parent           = card
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent = swatch
-	Theme.stroke(swatch, Theme.COLORS.outline, 2)
+	-- Das Ei links in Farbe und Muster seines Pfads (EggIcon), damit man die
+	-- Sorte ohne Lesen erkennt — genau so liegt es auch auf dem Plot.
+	local icon = EggIcon.make(card, eggType, 62, 3)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position    = UDim2.new(0, 10, 0.5, 0)
 
 	local name = Theme.label("Name", card, Loc.name("egg." .. eggType .. ".name", def.displayName))
-	name.Position = UDim2.new(0, 64, 0, 8)
+	name.Position = UDim2.new(0, 68, 0, 8)
 	name.Size     = UDim2.new(1, -200, 0, 22)
 
 	-- v14: ein noch gesperrtes Ei im Lager ist ein Sprung-Ei aus einem Event.
 	local data = ClientState.get()
 	local locked = data ~= nil and not EggTree.isUnlocked(data.eggTree, eggType)
 	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else def.description)
-	desc.Position = UDim2.new(0, 64, 0, 32)
+	desc.Position = UDim2.new(0, 68, 0, 32)
 	desc.Size     = UDim2.new(1, -200, 0, 40)
 
 	local count = Theme.label("Count", card, "x" .. stock)

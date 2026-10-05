@@ -20,10 +20,15 @@ local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 
 local Theme        = require(script.Parent.Theme)
 local Toast        = require(script.Parent.Toast)
+-- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
+local Notify       = require(script.Parent.Notify)
+local Moment       = require(script.Parent.Moment)
 local PanelManager = require(script.Parent.PanelManager)
+local Icons        = require(script.Parent.Icons)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
 local RebirthDialog = {}
@@ -36,6 +41,9 @@ local _costLabel: TextLabel?      = nil
 local _lossLabel: TextLabel?      = nil
 local _rewardLabel: TextLabel?    = nil
 local _confirmButton: TextButton? = nil
+-- HBB Paket 2: Icons vor den Zeilen (Vorher/Nachher ohne Saetze)
+local _rowIcons: { GuiObject } = {}
+local ICON_W = 28
 
 --------------------------------------------------------------------------------
 -- Inhalt
@@ -91,6 +99,44 @@ function RebirthDialog.refresh()
 
 	if _confirmButton then
 		Theme.setEnabled(_confirmButton, enough)
+	end
+
+	-- HBB Paket 2: dieselben Zeilen als Icon + Zahl. Die Warnung vor dem
+	-- Zuruecksetzen bleibt ein kurzer Satz: sie darf nicht in einem Icon
+	-- verschwinden.
+	local iconMode = FeatureFlags.isOn("UI_V2_GUIDE")
+	for _, icon in _rowIcons do
+		icon.Visible = iconMode
+	end
+	local labels = { _statusLabel, _costLabel, _lossLabel, _rewardLabel }
+	for index, label in labels do
+		if label then
+			-- Platz fuer das Icon links; die Warnung (Zeile 3) hat keins
+			local shift = if iconMode and index ~= 3 then ICON_W + 6 else 0
+			label.Position = UDim2.new(0, shift + (if index == 3 then 2 else 0), label.Position.Y.Scale, label.Position.Y.Offset)
+			label.Size = UDim2.new(1, -8 - shift, label.Size.Y.Scale, label.Size.Y.Offset)
+		end
+	end
+	if iconMode then
+		if _statusLabel then
+			_statusLabel.Text = string.format("x%s  ➜  x%s",
+				Loc.formatDecimal(data.rebirthMult, 2), Loc.formatDecimal(nextMult, 2))
+		end
+		if _costLabel then
+			_costLabel.Text = string.format("%s / %s", Loc.formatNumber(data.gummies), Loc.formatNumber(cost))
+		end
+		if _lossLabel then
+			_lossLabel.Text = "⚠ " .. Loc.t("ui.rebirth.warn_short")
+		end
+		if _rewardLabel then
+			local milestone = EconomyConfig.getRebirthMilestone(data.rebirthCount + 1)
+			local total = 0
+			if milestone then
+				for _, entry in milestone.eggs do total += entry.count end
+			end
+			total = math.max(total, eggs)
+			_rewardLabel.Text = if total > 0 then "+" .. Loc.formatNumber(total) else "—"
+		end
 	end
 end
 
@@ -151,6 +197,19 @@ function RebirthDialog.init(screenGui: ScreenGui)
 	reward.TextColor3 = Theme.COLORS.goldGummy
 	_rewardLabel = reward
 
+	-- HBB Paket 2: Icons fuer Multiplikator, Kosten, Belohnung (Zeile 3 =
+	-- Warnung bleibt ohne Icon)
+	local function rowIcon(y: number, name: string, fallback: string)
+		local icon = Icons.make(body, name, fallback)
+		icon.Position = UDim2.new(0, 0, 0, y)
+		icon.Size = UDim2.fromOffset(ICON_W, ICON_W)
+		icon.Visible = false
+		table.insert(_rowIcons, icon)
+	end
+	rowIcon(-2, "rebirth", "*")
+	rowIcon(25, "gummy", "G")
+	rowIcon(144, "egg", "EI")
+
 	local cancel = Theme.button("Cancel", body, "", Theme.COLORS.panelLight)
 	Loc.bind(cancel, "ui.rebirth.cancel")
 	cancel.AnchorPoint = Vector2.new(0, 1)
@@ -200,15 +259,20 @@ function RebirthDialog.init(screenGui: ScreenGui)
 			table.insert(parts, string.format("%d %s", entry.count,
 				Loc.name("egg." .. entry.eggType .. ".name", entry.eggType)))
 		end
-		if #parts > 0 and not onlyAscension then
-			Toast.success(Loc.t("msg.rebirth_done_list", {
-				count = typed.newRebirthCount, mult = typed.newMultiplier, eggs = table.concat(parts, ", "),
-			}))
-		else
-			Toast.success(if typed.ascensionEggs > 0
-				then Loc.tn("msg.rebirth_done_eggs", typed.ascensionEggs, args)
-				else Loc.t("msg.rebirth_done", args))
-		end
+		Notify.emit("rebirth_done", function()
+			if #parts > 0 and not onlyAscension then
+				Toast.success(Loc.t("msg.rebirth_done_list", {
+					count = typed.newRebirthCount, mult = typed.newMultiplier, eggs = table.concat(parts, ", "),
+				}))
+			else
+				Toast.success(if typed.ascensionEggs > 0
+					then Loc.tn("msg.rebirth_done_eggs", typed.ascensionEggs, args)
+					else Loc.t("msg.rebirth_done", args))
+			end
+		end, function()
+			-- Meilenstein-Eier fliegen ueber den Datenstand (UI/Feedback).
+			Moment.show("rebirth", Theme.COLORS.good, "ui.moment.rebirth")
+		end)
 
 		PanelManager.close(PANEL_NAME)
 	end)

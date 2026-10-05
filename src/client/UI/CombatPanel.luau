@@ -3,136 +3,178 @@
 -- StarterPlayerScripts/UI/CombatPanel.luau
 --
 -- Einzige Zustaendigkeit:
---   - Den ausgeruesteten Kaempfer und das PIT-Level anzeigen
---   - Nach einem Lauf eine kurze Ergebnis-Meldung zeigen (Toast)
+--   - Die Tower-Wahl zeigen (v15): eine Karte pro Tower mit Look-Farbe,
+--     Rekord, Deckel des aktuellen Rebirths und naechstem Meilenstein
+--   - Nach einem Lauf eine kurze Ergebnis-Meldung zeigen (Toast), am Deckel den
+--     Rebirth-Hinweis mit Knopf zum RebirthDialog, und Meilenstein-Toasts
 --
--- SEIT v12 startet dieses Panel keinen Lauf mehr: gestartet und
--- zurueckgeholt wird ueber den Fight-Knopf der unteren Pet-Leiste (PetBar).
--- Das Ergebnis kommt erst NACH der Abrechnung (am Ende der Wiedergabe in der
--- Arena, bzw. nach dem Zurueckholen nur mit den gespielten Stages).
+-- Gestartet und zurueckgeholt wird weiterhin ueber den Fight-Knopf der unteren
+-- Pet-Leiste (PetBar). Dieses Panel waehlt nur, WOHIN er schickt
+-- (RequestSelectTower). Ob ein Tower offen ist, prueft der Server; die Karten
+-- rechnen mit denselben Funktionen aus TowerConfig nur fuer die Anzeige.
 --
--- Seit dem Equip-System kann nur noch der AUSGERUESTETE Baerchi kaempfen: nur
--- er steht auf dem Plot und laeuft selbststaendig zur Arena (siehe
--- PitArenaService). Die frueher hier gezeigte Liste "welchen Baerchi
--- schicken" gibt es deshalb nicht mehr — wer einen anderen kaempfen lassen
--- will, ruestet ihn in der Baerchi-Karte oder im Inventar aus.
---
--- Ein PIT-Lauf ist kein einzelner Kampf: der Baerchi kaempft weiter solange
--- er gewinnt, seine HP werden zwischen den Stages nicht zurueckgesetzt.
--- Danach ist er erschoepft und muss auf dem Plot mit Honig hochgefuettert
--- werden — Kaempfe selbst geben keine XP mehr.
---
--- Der Ergebnis-Listener haengt am Modul, nicht am Panel: ein Lauf kann auch
--- aus der Baerchi-Detailkarte gestartet werden, die Wiedergabe soll trotzdem
--- laufen.
+-- Der Ergebnis-Listener haengt am Modul, nicht am Panel: ein Lauf soll seine
+-- Meldung auch bringen, wenn das Panel zu ist.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Types            = require(ReplicatedStorage.Network.Types)
-local Remotes          = require(ReplicatedStorage.Network.Remotes)
-local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
-local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
-local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local Types       = require(ReplicatedStorage.Network.Types)
+local Remotes     = require(ReplicatedStorage.Network.Remotes)
+local Loc         = require(ReplicatedStorage.Localization.Loc)
+local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local EggConfig   = require(ReplicatedStorage.Config.EggConfig)
 
 local Theme        = require(script.Parent.Theme)
 local Toast        = require(script.Parent.Toast)
+-- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
+local Notify       = require(script.Parent.Notify)
+local Moment       = require(script.Parent.Moment)
 local PanelManager = require(script.Parent.PanelManager)
+local PitResumeDialog = require(script.Parent.PitResumeDialog)
+local Icons        = require(script.Parent.Icons)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
 local CombatPanel = {}
 
-local PANEL_NAME = "Combat"
-local ROW_HEIGHT = 40
+local PANEL_NAME   = "Combat"
+local REBIRTH_PANEL = "Rebirth"
+local CARD_HEIGHT  = 78
 
-local _root: Frame?              = nil
-local _info: TextLabel?          = nil
-local _scroller: ScrollingFrame? = nil
-local _empty: TextLabel?         = nil
+type Card = {
+	frame  : Frame,
+	stroke : UIStroke?,
+	title  : TextLabel,
+	info   : TextLabel,
+	button : TextButton,
+}
 
---------------------------------------------------------------------------------
--- Auswahl
---------------------------------------------------------------------------------
+local _root: Frame?        = nil
+local _info: TextLabel?    = nil
+local _hint: Frame?        = nil
+local _cards: { [string]: Card } = {}
 
--- Kaempfen kann nur noch der ausgeruestete Baerchi — er ist der einzige, der
--- ueberhaupt auf dem Plot steht und zur Arena laufen kann.
-local function equippedUid(): string?
-	local data = ClientState.get()
-	if not data then return nil end
-	return data.island.equippedUid
+-- HBB Paket 2: bezahlter Wiedereinstieg ab der letzten Stage als kleiner
+-- Knopf (frueher eine Option im PitResumeDialog). Der kostenlose Einstieg
+-- ab 65 % laeuft jetzt ohne Frage ueber den Fight-Knopf.
+local _resume: TextButton? = nil
+local _resumeHint: TextLabel? = nil
+
+local function refreshResume(data: Types.PlayerDataUpdate)
+	local button, hintText = _resume, _resumeHint
+	if not button or not hintText then return end
+	local reached = PitResumeDialog.getProgress(data)
+	local towerId = if data.towers then data.towers.selected else TowerConfig.FIRST_TOWER
+	local cost = if reached then TowerConfig.getResumeCost(towerId, reached, data.rebirthMult) else 0
+	local show = FeatureFlags.isOn("UI_V2_GUIDE") and reached ~= nil and reached > 1 and cost > 0
+	button.Visible = show
+	hintText.Visible = not show
+	if show then
+		button.Text = string.format("⏩ %d   %s", reached :: number, Theme.formatNumber(cost))
+		Theme.setEnabled(button, cost <= data.gummies)
+	end
 end
 
 --------------------------------------------------------------------------------
--- Anzeige des ausgeruesteten Baerchis
+-- Karten
 --------------------------------------------------------------------------------
 
-local function buildRow(parent: Instance, baerchi: Types.Baerchi)
-	local def   = BaerchiConfig.getById(baerchi.configId)
-	local color = Theme.rarityColor(baerchi.rarity)
+local function towerName(def: TowerConfig.TowerDef): string
+	return Loc.t("tower." .. def.id .. ".name")
+end
 
-	local row = Theme.panel("Row_" .. baerchi.uid, parent, Theme.COLORS.panel)
-	row.Size = UDim2.new(1, -8, 0, ROW_HEIGHT)
+local function buildCard(parent: Instance, def: TowerConfig.TowerDef, order: number): Card
+	local frame = Theme.panel("Tower_" .. def.id, parent, Theme.COLORS.panel)
+	frame.Size        = UDim2.new(1, -8, 0, CARD_HEIGHT)
+	frame.LayoutOrder = order
 
-	local stroke = row:FindFirstChildOfClass("UIStroke")
-	if stroke then
-		stroke.Color     = Theme.COLORS.good
-		stroke.Thickness = Theme.OUTLINE_THICKNESS + 2
+	-- Farbstreifen links in der Look-Farbe des Towers
+	local stripe = Theme.panel("Stripe", frame, def.color)
+	stripe.Size     = UDim2.new(0, 14, 1, -12)
+	stripe.Position = UDim2.new(0, 6, 0, 6)
+
+	local title = Theme.label("Title", frame, "")
+	title.Position   = UDim2.new(0, 28, 0, 6)
+	title.Size       = UDim2.new(1, -150, 0, 26)
+	title.TextColor3 = Theme.shade(def.color, -0.1)
+	Theme.outlineText(title)
+
+	local info = Theme.bodyText("Info", frame, "")
+	info.Position = UDim2.new(0, 28, 0, 34)
+	info.Size     = UDim2.new(1, -150, 0, CARD_HEIGHT - 38)
+	info.TextSize = 13
+
+	local button = Theme.bigButton("Choose", frame, "", def.color)
+	button.AnchorPoint = Vector2.new(1, 0.5)
+	button.Position    = UDim2.new(1, -10, 0.5, 0)
+	button.Size        = UDim2.new(0, 110, 0, 40)
+	button.Activated:Connect(function()
+		if not button.Active then return end
+		Remotes.RequestSelectTower:FireServer(def.id)
+	end)
+
+	return {
+		frame  = frame,
+		stroke = frame:FindFirstChildOfClass("UIStroke"),
+		title  = title,
+		info   = info,
+		button = button,
+	}
+end
+
+local function refreshCard(card: Card, def: TowerConfig.TowerDef, data: Types.PlayerDataUpdate)
+	local towers = data.towers
+	local record = if towers then towers.records[def.id] or 0 else 0
+	local cap    = TowerConfig.getStageCap(data.rebirthCount, def.id)
+	local open   = cap > 0
+	local selected = towers ~= nil and towers.selected == def.id
+
+	card.title.Text = string.format("%s  (%d)", towerName(def), def.stages)
+
+	if open then
+		local claimed = if towers then towers.claimed[def.id] else nil
+		local nextStage = TowerConfig.nextMilestoneStage(def.id, claimed, record + 1)
+		local lines = {
+			Loc.t("ui.tower.record_cap", { record = record, cap = cap, stages = def.stages }),
+		}
+		if nextStage then
+			table.insert(lines, Loc.t("ui.tower.next_milestone", { stage = nextStage }))
+		end
+		card.info.Text = table.concat(lines, "\n")
+		card.button.Text = if selected then Loc.t("ui.tower.selected") else Loc.t("ui.tower.choose")
+		Theme.setEnabled(card.button, not selected)
+	else
+		card.info.Text = Loc.t("ui.tower.locked", { rebirths = TowerConfig.getOpeningRebirth(def.id) })
+		card.button.Text = Loc.t("ui.tower.locked_short")
+		Theme.setEnabled(card.button, false)
 	end
 
-	local name = Theme.label("Name", row, string.format(
-		"%s  Lv.%d",
-		def and def.displayName or baerchi.configId,
-		baerchi.level
-	))
-	name.Position   = UDim2.new(0, 12, 0.5, -10)
-	name.Size       = UDim2.new(1, -110, 0, 20)
-	name.TextColor3 = color
-
-	local stats = if def then CombatCalculator.getEffectiveStats(baerchi, def.baseStats) else nil
-	local statsLabel = Theme.label("Stats", row, if stats then string.format("HP %d  ATK %d", stats.maxHp, stats.atk) else "")
-	statsLabel.AnchorPoint    = Vector2.new(1, 0.5)
-	statsLabel.Position       = UDim2.new(1, -10, 0.5, 0)
-	statsLabel.Size           = UDim2.new(0, 92, 0, 16)
-	statsLabel.TextXAlignment = Enum.TextXAlignment.Right
-	statsLabel.TextScaled     = false
-	statsLabel.TextSize       = 13
-	statsLabel.Font           = Theme.FONT_BODY
-	statsLabel.TextColor3     = Theme.COLORS.textDim
+	local stroke = card.stroke
+	if stroke then
+		stroke.Color     = if selected then Theme.COLORS.good else Theme.COLORS.outline
+		stroke.Thickness = if selected then Theme.OUTLINE_THICKNESS + 2 else Theme.OUTLINE_THICKNESS
+	end
 end
 
 function CombatPanel.refresh()
-	local root     = _root
-	local scroller = _scroller
-	if not root or not scroller then return end
-	if not root.Visible then return end
+	local root = _root
+	if not root or not root.Visible then return end
 
 	local data = ClientState.get()
 	if not data then return end
 
-	local uid      = equippedUid()
-	local baerchi  = if uid then ClientState.getBaerchi(uid) else nil
-
+	local capTower, capStage = TowerConfig.getCap(data.rebirthCount)
+	local capDef = TowerConfig.get(capTower) or TowerConfig.TOWERS[1]
 	local info = _info
 	if info then
-		info.Text = string.format(
-			"PIT Level %d  —  Sieg bringt ca. %s Gummies",
-			data.island.pitLevel,
-			Theme.formatNumber(EconomyConfig.getPitReward(data.island.pitLevel, data.rebirthMult))
-		)
+		info.Text = Loc.t("ui.tower.cap_line", { rebirths = data.rebirthCount, tower = towerName(capDef), stage = capStage })
 	end
 
-	for _, child in scroller:GetChildren() do
-		if child:IsA("Frame") then
-			child:Destroy()
-		end
-	end
+	refreshResume(data)
 
-	local empty = _empty
-	if empty then
-		empty.Visible = baerchi == nil
-	end
-
-	if baerchi then
-		buildRow(scroller, baerchi)
+	for _, def in TowerConfig.TOWERS do
+		local card = _cards[def.id]
+		if card then refreshCard(card, def, data) end
 	end
 end
 
@@ -140,25 +182,70 @@ end
 -- Ergebnis des Laufs
 --------------------------------------------------------------------------------
 
--- Frueher lief hier ein Kampf-Fenster mitten im Bildschirm mit HP-Balken.
--- Auf Wunsch entfernt: es verdeckte genau den Kampf in der Arena, den man
--- beobachten will (die Arena zeigt Stages, HP-Balken und Tafel ohnehin
--- selbst). Uebrig bleibt nur eine kurze Meldung am unteren Rand.
+local function showCapHint(result: Types.PitRunResult)
+	local hint = _hint
+	if not hint then return end
+	local label = hint:FindFirstChild("Text")
+	if label and label:IsA("TextLabel") then
+		label.Text = Loc.t("ui.tower.cap_reached", { stage = result.capStage or 0 })
+	end
+	hint.Visible = true
+	task.delay(12, function()
+		hint.Visible = false
+	end)
+end
+
 local function showResult(result: Types.PitRunResult)
 	local cleared = result.stagesCleared or 0
+	local def = TowerConfig.get(result.towerId or "") or TowerConfig.TOWERS[1]
 	local parts = {
-		if cleared > 0 then string.format("%d Stages geschafft", cleared) else "Keine Stage geschafft",
+		"Tower " .. def.numeral,
+		Loc.tn("msg.tower_cleared", cleared),
 		"+" .. Theme.formatNumber(result.gummiesWon or 0) .. " Gummies",
 	}
 	if (result.goldGummiesWon or 0) > 0 then
 		table.insert(parts, "+" .. Theme.formatNumber(result.goldGummiesWon) .. " GoldGummies")
 	end
+	if result.newRecord then
+		table.insert(parts, Loc.t("msg.tower_new_record", { stage = result.newRecord }))
+	end
 	if result.recalled then
-		table.insert(parts, "zurueckgeholt")
+		table.insert(parts, Loc.t("msg.tower_recalled"))
 	end
 
-	local text = "PIT: " .. table.concat(parts, "  •  ")
-	if cleared > 0 then Toast.success(text) else Toast.info(text) end
+	local text = table.concat(parts, "  •  ")
+	-- Gummies/GoldGummies fliegen ueber den Datenstand (UI/Feedback); der
+	-- neue Rekord ist der Moment, den man sehen soll.
+	Notify.emit("tower_result", function()
+		if cleared > 0 then Toast.success(text) else Toast.info(text) end
+	end, function()
+		if result.newRecord then
+			Notify.emit("tower_record", function() end, function()
+				Moment.show("record", Theme.COLORS.goldGummy, "ui.moment.record")
+			end)
+		end
+	end)
+
+	if result.capReached then
+		showCapHint(result)
+	end
+end
+
+local function showMilestone(reward: Types.TowerMilestoneReward)
+	local def = TowerConfig.get(reward.towerId) or TowerConfig.TOWERS[1]
+	local parts: { string } = {}
+	if reward.gummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.gummies) .. " Gummies") end
+	if reward.goldGummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.goldGummies) .. " GoldGummies") end
+	if reward.eggType and reward.eggs > 0 then
+		local egg = EggConfig.data[reward.eggType]
+		table.insert(parts, string.format("+%d %s", reward.eggs, Loc.name("egg." .. reward.eggType .. ".name", if egg then egg.displayName else reward.eggType)))
+	end
+	if reward.blueprints > 0 then table.insert(parts, Loc.t("msg.tower_blueprint")) end
+	Notify.emit("tower_milestone", function()
+		Toast.success(Loc.t("msg.tower_milestone", { tower = def.numeral, stage = reward.stage, reward = table.concat(parts, ", ") }))
+	end, function()
+		Moment.show("milestone", Theme.COLORS.goldGummy, "ui.moment.milestone")
+	end)
 end
 
 --------------------------------------------------------------------------------
@@ -185,41 +272,81 @@ end
 function CombatPanel.init(screenGui: ScreenGui)
 	local root = Theme.dialog(
 		"CombatPanel", screenGui,
-		Vector2.new(0.46, 0.60),
-		Vector2.new(300, 290),
-		Vector2.new(520, 540)
+		Vector2.new(0.50, 0.70),
+		Vector2.new(320, 420),
+		Vector2.new(560, 600)
 	)
 	_root = root
 
-	Theme.dialogHeader(root, "Kampf", function()
+	Theme.dialogHeader(root, Loc.t("ui.tower.title"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 
 	local body = Theme.dialogBody(root)
 
-	local info = Theme.label("Info", body, "")
-	info.Size       = UDim2.new(1, -8, 0, 22)
-	info.TextColor3 = Theme.COLORS.textDim
+	local info = Theme.bodyText("Info", body, "")
+	info.Size = UDim2.new(1, -8, 0, 34)
 	_info = info
 
 	local scroller = Theme.scroller("List", body)
-	scroller.Position = UDim2.new(0, 0, 0, 28)
-	scroller.Size     = UDim2.new(1, 0, 1, -74)
-	_scroller = scroller
+	scroller.Position = UDim2.new(0, 0, 0, 38)
+	scroller.Size     = UDim2.new(1, 0, 1, -84)
 
 	local layout = Theme.listLayout(scroller, 6)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-	local empty = Theme.bodyText("Empty", body, "Noch kein Baerchi ausgeruestet. Ruest einen im Inventar aus.")
-	empty.Position = UDim2.new(0, 4, 0, 36)
-	empty.Size     = UDim2.new(1, -8, 0, 40)
-	empty.Visible  = false
-	_empty = empty
+	for order, def in TowerConfig.TOWERS do
+		_cards[def.id] = buildCard(scroller, def, order)
+	end
 
-	local hint = Theme.bodyText("Hint", body, "In den PIT schickst du deinen Baerchi mit dem Fight-Knopf unten am Bildschirm. Nochmal druecken holt ihn zurueck.")
+	local hintText = Theme.bodyText("Hint", body, Loc.t("ui.tower.hint"))
+	hintText.AnchorPoint = Vector2.new(0.5, 1)
+	hintText.Position    = UDim2.new(0.5, 0, 1, 0)
+	hintText.Size        = UDim2.new(1, -8, 0, 40)
+	_resumeHint = hintText
+
+	local resume = Theme.bigButton("ResumeLast", body, "", Theme.COLORS.goldGummy)
+	resume.AnchorPoint = Vector2.new(0.5, 1)
+	resume.Position    = UDim2.new(0.5, 0, 1, -2)
+	resume.Size        = UDim2.new(0, 200, 0, 40)
+	resume.Visible     = false
+	if Icons.has("gummy") then
+		local coin = Icons.make(resume, "gummy")
+		coin.AnchorPoint = Vector2.new(1, 0.5)
+		coin.Position    = UDim2.new(1, -6, 0.5, 0)
+		coin.Size        = UDim2.fromOffset(28, 28)
+		coin.ZIndex      = 4
+	end
+	resume.Activated:Connect(function()
+		if not resume.Active then return end
+		Remotes.RequestPetMode:FireServer("Fight", "Last")
+		PanelManager.close(PANEL_NAME)
+	end)
+	_resume = resume
+
+	-- Rebirth-Hinweis am Deckel: eigenes kleines Fenster unten in der Mitte,
+	-- unabhaengig davon, ob das Panel offen ist.
+	local hint = Theme.panel("CapHint", screenGui, Theme.COLORS.panel)
 	hint.AnchorPoint = Vector2.new(0.5, 1)
-	hint.Position    = UDim2.new(0.5, 0, 1, 0)
-	hint.Size        = UDim2.new(1, -8, 0, 40)
+	hint.Position    = UDim2.new(0.5, 0, 1, -110)
+	hint.Size        = UDim2.fromOffset(420, 70)
+	hint.Visible     = false
+	hint.ZIndex      = 15
+	_hint = hint
+
+	local hintLabel = Theme.bodyText("Text", hint, "")
+	hintLabel.Position = UDim2.new(0, 10, 0, 8)
+	hintLabel.Size     = UDim2.new(1, -140, 1, -16)
+	hintLabel.TextColor3 = Theme.COLORS.text
+
+	local rebirthButton = Theme.bigButton("Rebirth", hint, Loc.t("ui.tower.to_rebirth"), Theme.COLORS.goldGummy)
+	rebirthButton.AnchorPoint = Vector2.new(1, 0.5)
+	rebirthButton.Position    = UDim2.new(1, -10, 0.5, 0)
+	rebirthButton.Size        = UDim2.new(0, 116, 0, 44)
+	rebirthButton.Activated:Connect(function()
+		hint.Visible = false
+		PanelManager.open(REBIRTH_PANEL)
+	end)
 
 	PanelManager.register(PANEL_NAME, {
 		open  = openInternal,
@@ -230,12 +357,15 @@ function CombatPanel.init(screenGui: ScreenGui)
 		CombatPanel.refresh()
 	end)
 
+	Loc.onChanged(function()
+		CombatPanel.refresh()
+	end)
+
 	Remotes.CombatResultReceived.OnClientEvent:Connect(function(result: any)
 		if typeof(result) ~= "table" then return end
 		local typed = result :: Types.PitRunResult
 
-		-- Auf dem Hinweg zurueckgeholt: es gab keinen Kampf, also auch
-		-- nichts abzuspielen.
+		-- Auf dem Hinweg zurueckgeholt: es gab keinen Kampf.
 		if typed.recalled and (typeof(typed.stages) ~= "table" or #typed.stages == 0) then
 			return
 		end
@@ -243,7 +373,12 @@ function CombatPanel.init(screenGui: ScreenGui)
 		showResult(typed)
 	end)
 
-	print("[CombatPanel] Initialisiert")
+	Remotes.TowerMilestoneReceived.OnClientEvent:Connect(function(reward: any)
+		if typeof(reward) ~= "table" then return end
+		showMilestone(reward :: Types.TowerMilestoneReward)
+	end)
+
+	print("[CombatPanel] Initialisiert |", #TowerConfig.TOWERS, "Tower")
 end
 
 return CombatPanel

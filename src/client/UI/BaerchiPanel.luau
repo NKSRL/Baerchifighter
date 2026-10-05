@@ -53,8 +53,22 @@ local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 
 local Theme        = require(script.Parent.Theme)
 local Toast        = require(script.Parent.Toast)
+-- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
+local Notify        = require(script.Parent.Notify)
+local Feedback      = require(script.Parent.Feedback)
+local Moment        = require(script.Parent.Moment)
+local ReturnSummary = require(script.Parent.ReturnSummary)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
+local Unlock       = require(script.Parent.Unlock)   -- HBB Paket 3
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local CombatRating = require(ReplicatedStorage.Modules.CombatRating)
+local Loc          = require(ReplicatedStorage.Localization.Loc)
+
+-- HBB Paket 4: Kampfwert im Kopf, "Staerker machen" (Befoerdern + Fusion)
+local _ratingLabel: TextLabel? = nil
+local _ratingRow: Frame? = nil
+local _upgradeRow: Frame? = nil
 
 local BaerchiPanel = {}
 
@@ -302,6 +316,28 @@ end
 local function fill(baerchi: Types.Baerchi)
 	local def = BaerchiConfig.getById(baerchi.configId)
 	local color = Theme.rarityColor(baerchi.rarity)
+
+	-- HBB Paket 3: Charms und Verwerten erst, wenn sie gebraucht werden
+	if _charmButton then Unlock.apply("charms", _charmButton) end
+	if _recycleButton then Unlock.apply("recycling", _recycleButton) end
+
+	-- HBB Paket 4: Farbband statt zwoelf Einzelfarben, Kampfwert gross
+	local upgradeUi = FeatureFlags.isOn("UI_V2_UPGRADE_TAB")
+	if upgradeUi then
+		color = Theme.bandColor(baerchi.rarity)
+	end
+	local ratingLabel = _ratingLabel
+	if ratingLabel then
+		if _ratingRow then _ratingRow.Visible = upgradeUi end
+		local value, suffix = CombatRating.short(CombatRating.of(baerchi))
+		local digits = if suffix ~= "" and value < 100 then 1 else 0
+		ratingLabel.Text = "⚔ " .. (if digits > 0 then Loc.formatDecimal(value, digits) else Loc.formatNumber(math.floor(value))) .. suffix
+		ratingLabel.TextColor3 = color
+	end
+	local upgradeRow = _upgradeRow
+	if upgradeRow then
+		upgradeRow.Visible = upgradeUi and Unlock.isVisible("tab_upgrade")
+	end
 
 	if _accentBar   then _accentBar.BackgroundColor3 = color end
 	if _titleLabel  then _titleLabel.Text  = def and def.displayName or baerchi.configId end
@@ -556,6 +592,17 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	_titleLabel = Theme.label("Title", titleRow, "—")
 	_titleLabel.Size = UDim2.fromScale(1, 1)
 
+	-- HBB Paket 4: Kampfwert (eine Zahl statt fuenf Werte)
+	local ratingRow = row(40)
+	ratingRow.Visible = false
+	local ratingLabel = Theme.label("Rating", ratingRow, "")
+	ratingLabel.Size = UDim2.fromScale(1, 1)
+	Theme.outlineText(ratingLabel, 3)
+	local ratingLimit = ratingLabel:FindFirstChildOfClass("UITextSizeConstraint")
+	if ratingLimit then ratingLimit.MaxTextSize = 36 end
+	_ratingLabel = ratingLabel
+	_ratingRow = ratingRow
+
 	-- Rarity + Fusions-Badge nebeneinander
 	local rarityRow = row(22)
 	_rarityLabel = Theme.label("Rarity", rarityRow, "—")
@@ -609,6 +656,22 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		if not uid then return end
 		Remotes.RequestEquipBaerchi:FireServer(uid)
 	end)
+
+	-- HBB Paket 4: "Baerchi staerker machen" — Befoerdern (unten, wie bisher)
+	-- und Fusion an einer Stelle. Die Fusion oeffnet das bestehende
+	-- Fusions-Fenster mit diesem Baerchi vorgewaehlt; Services und Remotes
+	-- bleiben unveraendert.
+	local upgradeRow = row(34)
+	upgradeRow.Visible = false
+	local fuse = Theme.button("UpgradeFuse", upgradeRow, "⬆ + 🐻", Theme.COLORS.gummy)
+	fuse.Size = UDim2.new(1, 0, 1, 0)
+	fuse.Activated:Connect(function()
+		local uid = _openUid
+		if not uid then return end
+		Unlock.markSeen("tab_upgrade")
+		PanelManager.open("Fusion", uid)
+	end)
+	_upgradeRow = upgradeRow
 
 	-- ---------------------------------------------------------------- Promotion
 	section("Promotion")
@@ -669,6 +732,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	charms.Size = UDim2.new(1, 0, 1, 0)
 	_charmButton = charms
 	charms.Activated:Connect(function()
+		Unlock.markSeen("charms")
 		local uid = _openUid
 		if not uid then return end
 		PanelManager.open("Charms", uid)
@@ -794,6 +858,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	recycle.TextColor3 = Theme.COLORS.text
 	_recycleButton = recycle
 	recycle.Activated:Connect(function()
+		Unlock.markSeen("recycling")
 		local uid = _openUid
 		if not uid then return end
 
@@ -843,15 +908,23 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 				table.insert(numerals, CharmConfig.SLOT_NUMERALS[slot] or tostring(slot))
 			end
 
-			Toast.success(string.format(
-				"Promotion %d/%d  —  Charm-Slot %s frei",
-				typed.newPromotion, PromotionConfig.MAX_PROMOTION,
-				table.concat(numerals, ", ")
-			))
+			Notify.emit("promotion_slot", function()
+				Toast.success(string.format(
+					"Promotion %d/%d  —  Charm-Slot %s frei",
+					typed.newPromotion, PromotionConfig.MAX_PROMOTION,
+					table.concat(numerals, ", ")
+				))
+			end, function()
+				Moment.show("slot", Theme.COLORS.goldGummy, "ui.moment.new")
+			end)
 		else
-			Toast.success(string.format(
-				"Promotion %d/%d", typed.newPromotion, PromotionConfig.MAX_PROMOTION
-			))
+			Notify.emit("promotion", function()
+				Toast.success(string.format(
+					"Promotion %d/%d", typed.newPromotion, PromotionConfig.MAX_PROMOTION
+				))
+			end, function()
+				Feedback.gain("star", typed.newPromotion)
+			end)
 		end
 	end)
 
@@ -863,18 +936,26 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		-- Leere eggUid heisst "alles auf einmal" (siehe EggLayService.collectAll):
 		-- dann steht in inStock die ANZAHL der eingesammelten Eier, nicht der
 		-- Lagerbestand einer Sorte.
+		-- Neuer Weg: das Ei fliegt ueber den Datenstand zur Eier-Kachel
+		-- (UI/Feedback), deshalb hier nur der alte Text.
 		if typed.eggUid == "merchant" then
 			-- Kauf beim versteckten Haendler (EggMerchantService)
-			Toast.success(string.format("%s gekauft — liegt im Lager",
-				if def then def.displayName else typed.eggType))
+			Notify.emit("egg_bought", function()
+				Toast.success(string.format("%s gekauft — liegt im Lager",
+					if def then def.displayName else typed.eggType))
+			end)
 		elseif typed.eggUid == "" then
-			Toast.success(string.format("%d Eier eingesammelt", typed.inStock))
+			Notify.emit("egg_collected_all", function()
+				Toast.success(string.format("%d Eier eingesammelt", typed.inStock))
+			end)
 		else
-			Toast.success(string.format(
-				"%s eingesammelt  (%d im Lager)",
-				if def then def.displayName else typed.eggType,
-				typed.inStock
-			))
+			Notify.emit("egg_collected", function()
+				Toast.success(string.format(
+					"%s eingesammelt  (%d im Lager)",
+					if def then def.displayName else typed.eggType,
+					typed.inStock
+				))
+			end)
 		end
 	end)
 
@@ -882,11 +963,17 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		if typeof(report) ~= "table" then return end
 		local typed = report :: Types.OfflineEggReport
 
-		Toast.success(string.format(
-			"%d Eier waehrend deiner Abwesenheit gelegt%s",
-			typed.laid,
-			if typed.skipped then " (Platz war voll)" else ""
-		))
+		Notify.emit("offline_eggs", function()
+			Toast.success(string.format(
+				"%d Eier waehrend deiner Abwesenheit gelegt%s",
+				typed.laid,
+				if typed.skipped then " (Platz war voll)" else ""
+			))
+		end, function()
+			if typed.laid > 0 then
+				ReturnSummary.addEggs(typed.secondsAway, typed.laid)
+			end
+		end)
 	end)
 
 	Remotes.EventStatGained.OnClientEvent:Connect(function(gain: any)
@@ -896,9 +983,17 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		-- Zwischenmeldung waehrend eines Events: nur der Text, kein "vorbei".
 		if typed.midEvent then
 			if typed.rarityUp then
-				Toast.success(typed.bonusText or "")
+				local rarity = typed.rarityUp :: string
+				Notify.emit("event_mid_rarity", function()
+					Toast.success(typed.bonusText or "")
+				end, function()
+					Moment.show("rarity", Theme.rarityColor(rarity :: any), "ui.moment.rarity")
+				end)
 			elseif typed.bonusText then
-				Toast.info(typed.bonusText)
+				local text = typed.bonusText :: string
+				Notify.emit("event_mid", function()
+					Toast.info(text)
+				end)
 			end
 			return
 		end
@@ -930,11 +1025,26 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 			table.insert(parts, "alle Stats stehen schon am Maximum")
 		end
 
-		Toast.success(string.format(
-			"%s vorbei: %s",
-			eventName,
-			table.concat(parts, "  •  ")
-		))
+		-- HBB Paket 1: neuer Weg = Mutation als grosser Moment, Stat-Stufe
+		-- als Zahl ueber dem Baerchi. Eier/Gummies des Bonus fliegen ueber
+		-- den Datenstand (UI/Feedback).
+		Notify.emit("event_end", function()
+			Toast.success(string.format(
+				"%s vorbei: %s",
+				eventName,
+				table.concat(parts, "  •  ")
+			))
+		end, function()
+			local mutation = typed.mutation
+			if mutation then
+				Notify.emit("event_end_mutation", function() end, function()
+					Moment.show("mutation", BaerchiConfig.getMutationColor(mutation), "ui.moment.mutation")
+				end)
+			end
+			if statKey then
+				Feedback.gain("stat", 1, nil, PromotionConfig.STAT_LABELS[statKey] or statKey)
+			end
+		end)
 	end)
 
 	print("[BaerchiPanel] Initialisiert")

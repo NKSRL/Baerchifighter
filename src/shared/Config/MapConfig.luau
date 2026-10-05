@@ -271,8 +271,9 @@ local FLOWER_COLORS: { Color3 } = {
 -- Gebaeude auf dem Plot (Offsets im PLOT-LOKALEN Raum, siehe Kopf)
 --------------------------------------------------------------------------------
 
--- Die drei Honig-Gebaeude stehen ab dem ersten Join auf dem Plot (siehe
--- Types.createDefaultPlayerData). Sie stehen in einer Reihe an der zur Mitte
+-- Die zwei Honig-Gebaeude (v15: Bienenstock und Honig-Veredler) stehen ab dem
+-- ersten Join auf dem Plot (siehe Types.createDefaultPlayerData). Der dritte
+-- Ausbau, der Waben-Recycler, steht vorne am Steg (CombConfig.RECYCLER_OFFSET). Sie stehen in einer Reihe an der zur Mitte
 -- zeigenden Seite (-Z), damit die vordere Haelfte des Plots (+Z) frei bleibt
 -- fuer die Baerchis und den Weg zur Bruecke.
 --
@@ -297,26 +298,22 @@ local BUILDING_OFFSETS: { [string]: { offset: Vector3, size: Vector3, color: Col
 		displayName = "Bienenstock",
 		shortName   = "Stock",
 	},
-	HoneyPot = {
-		offset      = Vector3.new(0, 0, -26),
-		size        = Vector3.new(12, 9, 12),
-		color       = Color3.fromRGB(205, 135, 45),    -- Honig-Orange
-		displayName = "Honigtopf",
-		shortName   = "Topf",
-	},
-	HoneyPress = {
+	-- v15: Honigtopf + Honig-Presse -> Honig-Veredler ("Honig-Veredler" ist ein
+	-- Platzhalter-Name). Steht dort, wo die Presse stand; die Mitte (frueher
+	-- der Topf) bleibt frei.
+	HoneyRefiner = {
 		offset      = Vector3.new(22, 0, -22),
-		size        = Vector3.new(11, 10, 11),
-		color       = Color3.fromRGB(160, 110, 65),    -- Holz
-		displayName = "Honig-Presse",
-		shortName   = "Presse",
+		size        = Vector3.new(12, 11, 12),
+		color       = Color3.fromRGB(205, 135, 45),    -- Honig-Orange
+		displayName = "Honig-Veredler",
+		shortName   = "Veredler",
 	},
 }
 
 -- Feste Reihenfolge fuer alles was die Gebaeude AUFLISTET (Panel, Schilder).
 -- Die Gebaeude-Tabelle in IslandData ist eine Hash-Tabelle und damit nicht
 -- stabil sortiert.
-local BUILDING_ORDER: { string } = { "Beehive", "HoneyPot", "HoneyPress" }
+local BUILDING_ORDER: { string } = { "Beehive", "HoneyRefiner" }
 
 --------------------------------------------------------------------------------
 -- Aussehen der Gebaeude
@@ -378,24 +375,11 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 		{ name = "Brett",    shape = Enum.PartType.Block,    size = Vector3.new(3.6,  0.4,  1.6), offset = Vector3.new(0, 0.20, -5.6), color = WOOD_DARK, material = Enum.Material.Wood },
 	},
 
-	-- Bauchiger Topf mit Deckel. Der goldene Ring auf Bauchhoehe ist der
-	-- Fuellstand — rein dekorativ, aber er macht sofort klar was drin ist.
-	-- Der Bauch ist bewusst eine gestauchte Kugel und kein Zylinder: mit einem
-	-- Zylinder sah der Topf aus wie ein Fass. Roblox skaliert eine Ball-Part
-	-- mit ungleichen Seiten zu einem Ellipsoid — die Kollision waere dann zwar
-	-- nur eine Kugel, aber Deko kollidiert ohnehin nicht.
-	HoneyPot = {
-		{ name = "Fuss",     shape = Enum.PartType.Cylinder, size = Vector3.new(1.0,  7.0,  7.0), offset = Vector3.new(0, 0.50, 0), color = HONEY_DEEP, rotation = UPRIGHT, solid = true },
-		{ name = "Bauch",    shape = Enum.PartType.Ball,     size = Vector3.new(11.0, 6.4, 11.0), offset = Vector3.new(0, 3.60, 0), color = HONEY_DEEP, solid = true },
-		{ name = "Fuellung", shape = Enum.PartType.Cylinder, size = Vector3.new(0.6, 11.2, 11.2), offset = Vector3.new(0, 4.20, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
-		{ name = "Hals",     shape = Enum.PartType.Cylinder, size = Vector3.new(1.3,  7.0,  7.0), offset = Vector3.new(0, 6.60, 0), color = HONEY_DEEP, rotation = UPRIGHT, solid = true },
-		{ name = "Deckel",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.9,  8.6,  8.6), offset = Vector3.new(0, 7.70, 0), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT, solid = true },
-		{ name = "Knauf",    shape = Enum.PartType.Ball,     size = Vector3.new(1.8,  1.8,  1.8), offset = Vector3.new(0, 8.70, 0), color = WOOD_DARK, material = Enum.Material.Wood },
-	},
-
-	-- Spindelpresse: Grundplatte, vier Pfosten, Deckplatte, dazwischen die
-	-- Spindel mit Querholz. Unten steht schon ausgepresster Honig.
-	HoneyPress = {
+	-- v15: Honig-Veredler. Die Spindelpresse von frueher (Grundplatte, vier
+	-- Pfosten, Deckplatte, Spindel mit Querholz, unten ausgepresster Honig) mit
+	-- dem kleinen Honigtopf obendrauf — beides steckt jetzt in einem Gebaeude.
+	-- Platzhalter bis zu den Looks in Prompt 4.
+	HoneyRefiner = {
 		{ name = "Grundplatte", shape = Enum.PartType.Block,    size = Vector3.new(10.0, 1.4, 10.0), offset = Vector3.new(   0, 0.70,    0), color = WOOD,      material = Enum.Material.Wood, solid = true },
 		{ name = "Sud",         shape = Enum.PartType.Block,    size = Vector3.new( 6.0, 0.4,  6.0), offset = Vector3.new(   0, 1.60,    0), color = HONEY,     material = Enum.Material.Neon },
 		{ name = "Pfosten1",    shape = Enum.PartType.Block,    size = Vector3.new( 1.2, 7.0,  1.2), offset = Vector3.new(-3.9, 4.10, -3.9), color = WOOD_DARK, material = Enum.Material.Wood, solid = true },
@@ -406,8 +390,93 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 		{ name = "Spindel",     shape = Enum.PartType.Cylinder, size = Vector3.new( 6.2, 1.4,  1.4), offset = Vector3.new(   0, 5.30,    0), color = METAL,     material = Enum.Material.Metal, rotation = UPRIGHT },
 		{ name = "Deckplatte",  shape = Enum.PartType.Block,    size = Vector3.new(10.0, 1.2, 10.0), offset = Vector3.new(   0, 8.20,    0), color = WOOD,      material = Enum.Material.Wood, solid = true },
 		{ name = "Querholz",    shape = Enum.PartType.Cylinder, size = Vector3.new( 9.0, 0.9,  0.9), offset = Vector3.new(   0, 9.20,    0), color = WOOD_DARK, material = Enum.Material.Wood },
+		{ name = "Topf",        shape = Enum.PartType.Ball,     size = Vector3.new( 2.6, 2.0,  2.6), offset = Vector3.new( 2.8, 9.60,  2.8), color = HONEY_DEEP },
+		{ name = "Topfdeckel",  shape = Enum.PartType.Cylinder, size = Vector3.new( 0.4, 1.8,  1.8), offset = Vector3.new( 2.8, 10.70, 2.8), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT },
 	},
 }
+
+-- ============================================================
+-- v15: LOOK-STUFEN DER GEBAEUDE (Platzhalter bis Prompt 4)
+-- ============================================================
+-- Ein Gebaeude hat sechs Looks (Level 1-9 / 10-19 / 20-29 / 30-44 / 45-59 /
+-- 60, siehe EconomyConfig.LOOK_THRESHOLDS). Bis die echten Modelle kommen,
+-- bekommt jeder Look ein paar Zierteile DAZU: gebaut wird die Grund-Deko plus
+-- alle Zusaetze bis zum aktuellen Look (getBuildingDecor). Die Regeln sind
+-- dieselben wie oben (gebaeude-lokal, solid nur fuer den Umriss);
+-- tools/check_decor.py prueft jeden Look einzeln und das Teile-Budget
+-- (LOOK_PART_BUDGET). PlotDisplayService baut ein Gebaeude nur neu, wenn sich
+-- der Look aendert — nicht bei jedem Level.
+local GOLD_TRIM   = Color3.fromRGB(255, 205, 70)
+local GLOW_AMBER  = Color3.fromRGB(255, 170, 40)
+local CRYSTAL     = Color3.fromRGB(150, 225, 255)
+local PENNANT_RED = Color3.fromRGB(220, 70, 60)
+
+-- Hoechstens so viele Teile pro Look (Grund-Deko + Zusaetze), README 4.2.
+local LOOK_PART_BUDGET: { number } = { 40, 40, 70, 70, 110, 110 }
+
+local BUILDING_LOOK_DECOR: { [string]: { [number]: { DecorPiece } } } = {
+	Beehive = {
+		[2] = {
+			{ name = "L2Stab",     shape = Enum.PartType.Block,    size = Vector3.new(0.3, 3.0, 0.3),   offset = Vector3.new( 4.4, 1.50,  4.4), color = WOOD_DARK, material = Enum.Material.Wood },
+			{ name = "L2Wimpel",   shape = Enum.PartType.Block,    size = Vector3.new(0.1, 1.0, 1.6),   offset = Vector3.new( 4.4, 2.50,  5.2), color = PENNANT_RED },
+		},
+		[3] = {
+			{ name = "L3Goldring", shape = Enum.PartType.Cylinder, size = Vector3.new(0.5, 12.0, 12.0), offset = Vector3.new(0, 0.25, 0), color = GOLD_TRIM, material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+		[4] = {
+			{ name = "L4Krone",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.6, 3.0, 3.0),   offset = Vector3.new(0, 11.20, 0), color = GOLD_TRIM, material = Enum.Material.Metal, rotation = UPRIGHT },
+			{ name = "L4Zacke",    shape = Enum.PartType.Ball,     size = Vector3.new(1.0, 1.0, 1.0),   offset = Vector3.new(0, 11.90, 0), color = GOLD_TRIM, material = Enum.Material.Metal },
+		},
+		[5] = {
+			{ name = "L5Band1",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 10.2, 10.2), offset = Vector3.new(0, 4.05, 0), color = GLOW_AMBER, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L5Band2",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 8.2, 8.2),   offset = Vector3.new(0, 6.35, 0), color = GLOW_AMBER, material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+		[6] = {
+			{ name = "L6Kristall1", shape = Enum.PartType.Block,   size = Vector3.new(1.2, 2.4, 1.2),   offset = Vector3.new(-4.4, 1.20,  4.4), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+			{ name = "L6Kristall2", shape = Enum.PartType.Block,   size = Vector3.new(1.2, 2.4, 1.2),   offset = Vector3.new( 4.4, 1.20, -4.4), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+		},
+	},
+	HoneyRefiner = {
+		[2] = {
+			{ name = "L2Stab",     shape = Enum.PartType.Block,    size = Vector3.new(0.3, 3.0, 0.3),   offset = Vector3.new(-5.4, 1.50,  5.4), color = WOOD_DARK, material = Enum.Material.Wood },
+			{ name = "L2Wimpel",   shape = Enum.PartType.Block,    size = Vector3.new(0.1, 1.0, 1.6),   offset = Vector3.new(-5.4, 2.50,  4.6), color = PENNANT_RED },
+		},
+		[3] = {
+			{ name = "L3Goldkante", shape = Enum.PartType.Block,   size = Vector3.new(10.4, 0.3, 10.4), offset = Vector3.new(0, 1.55, 0), color = GOLD_TRIM, material = Enum.Material.Neon },
+		},
+		[4] = {
+			{ name = "L4Krone",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.6, 2.4, 2.4),   offset = Vector3.new(0, 9.95, 0), color = GOLD_TRIM, material = Enum.Material.Metal, rotation = UPRIGHT },
+			{ name = "L4Zacke",    shape = Enum.PartType.Ball,     size = Vector3.new(1.0, 1.0, 1.0),   offset = Vector3.new(0, 10.65, 0), color = GOLD_TRIM, material = Enum.Material.Metal },
+		},
+		[5] = {
+			{ name = "L5Glut1",    shape = Enum.PartType.Block,    size = Vector3.new(1.4, 6.0, 0.2),   offset = Vector3.new(-3.9, 4.10, -4.6), color = GLOW_AMBER, material = Enum.Material.Neon },
+			{ name = "L5Glut2",    shape = Enum.PartType.Block,    size = Vector3.new(1.4, 6.0, 0.2),   offset = Vector3.new( 3.9, 4.10, -4.6), color = GLOW_AMBER, material = Enum.Material.Neon },
+		},
+		[6] = {
+			{ name = "L6Kristall1", shape = Enum.PartType.Block,   size = Vector3.new(1.2, 2.4, 1.2),   offset = Vector3.new(-5.0, 1.20, -5.0), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+			{ name = "L6Kristall2", shape = Enum.PartType.Block,   size = Vector3.new(1.2, 2.4, 1.2),   offset = Vector3.new( 5.0, 1.20,  5.0), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+		},
+	},
+}
+
+-- Grund-Deko plus alle Look-Zusaetze bis `look` (fuer PlotBuilder und
+-- RecyclerBuilder; der Recycler gibt seine eigenen Tabellen mit).
+local function combineLookDecor(base: { DecorPiece }?, extras: { [number]: { DecorPiece } }?, look: number): { DecorPiece }
+	local result: { DecorPiece } = {}
+	for _, piece in base or {} do
+		table.insert(result, piece)
+	end
+	for step = 2, math.max(1, math.floor(look)) do
+		for _, piece in (extras and extras[step]) or {} do
+			table.insert(result, piece)
+		end
+	end
+	return result
+end
+
+local function getBuildingDecor(buildingId: string, look: number): { DecorPiece }
+	return combineLookDecor(BUILDING_DECOR[buildingId], BUILDING_LOOK_DECOR[buildingId], look)
+end
 
 -- Honig-Tropfen am Fuss jedes Gebaeudes: einer pro eingelagertem Honig.
 --
@@ -434,6 +503,10 @@ local HONEY_DOT_HEIGHT = 1.5      -- ueber dem Plot-Boden
 local HONEY_DOT_SPACING = 37.5    -- Grad zwischen zwei Tropfen
 local HONEY_DOT_ARC     = 200     -- Grad, mehr als so breit wird es nie
 local HONEY_DOT_COLOR  = Color3.fromRGB(255, 198, 62)
+-- v15: hoechstens so viele Tropfen pro Gebaeude. Das Lager des Bienenstocks
+-- waechst bis Level 60 auf 39 — ab hier steht ein Tropfen fuer einen ANTEIL
+-- des Lagers (PlotBuilder.writeBuildingState), damit es keine 39 Kugeln werden.
+local HONEY_DOT_MAX    = 14
 
 --------------------------------------------------------------------------------
 -- Honig-Teich
@@ -771,19 +844,9 @@ local PIT_FENCE_GAP_DEGREES  = 34    -- Oeffnung zum Steg, halber Winkel je Seit
 local PIT_FENCE_INSET        = 1.4   -- wie weit innerhalb des Sockelrandes
 local PIT_FENCE_COLOR        = Color3.fromRGB(255, 232, 150)
 
--- Saeulen am Arena-Rand: Anzahl = pitLevel
-local PIT_PILLAR_SIZE   = Vector3.new(3, 8, 3)
-local PIT_PILLAR_INSET  = 2      -- wie weit innerhalb des Arena-Randes
-local PIT_PILLAR_COLORS: { Color3 } = {
-	Color3.fromRGB(255, 170,  60),
-	Color3.fromRGB(255, 120,  60),
-	Color3.fromRGB(255,  90,  90),
-	Color3.fromRGB(230,  70, 140),
-	Color3.fromRGB(180,  80, 220),
-	Color3.fromRGB(110, 110, 240),
-	Color3.fromRGB( 70, 180, 240),
-	Color3.fromRGB( 90, 230, 180),
-}
+-- (v15: die Saeulen am Arena-Rand — eine pro PIT-Level — sind mit dem
+-- PIT-Level entfallen. Den Fortschritt zeigt jetzt der Tower-Turm, siehe
+-- TOWER_SHOWCASE weiter unten.)
 
 -- ============================================================
 -- PIT-TURM: EINE ETAGE PRO GESCHAFFTER STAGE
@@ -804,6 +867,10 @@ local PIT_PILLAR_COLORS: { Color3 } = {
 -- ihn Stufe fuer Stufe waehrend der Stages und raeumt ihn wieder ab, sobald
 -- der naechste Lauf beginnt (siehe MapService.setPitTowerLevel) — er bleibt
 -- also NICHT zwischen zwei Laeufen stehen.
+--
+-- v15: bei bis zu 100 Stages wird er gestaucht (TowerConfig.getRunFloor,
+-- hoechstens TowerConfig.RUN_MAX_FLOORS Etagen). Den STAENDIGEN Turm mit dem
+-- Rekord zeigt TOWER_SHOWCASE.
 local PIT_TOWER_STEP_HEIGHT = 2.4     -- Studs Anstieg pro Etage
 -- Gleicher Radius wie die Kampfflaeche selbst, damit jede neue Etage nahtlos
 -- unter der vorherigen sitzt statt als abgesetzter Absatz zu wirken.
@@ -834,6 +901,110 @@ local PIT_TOWER_COLORS: { Color3 } = {
 	Color3.fromRGB(196, 110,  60),   -- Terrakotta
 	Color3.fromRGB(120,  96,  60),   -- Dunkelbraun
 	Color3.fromRGB(210, 196, 160),   -- Creme
+}
+
+-- ============================================================
+-- v15: DER TOWER-TURM (Angeberflaeche) auf der Arena-Insel
+-- ============================================================
+-- EIN Turm pro Spieler am aeusseren Rand seiner Arena-Insel (auf der Seite weg
+-- vom Steg, auf einem eigenen Sockel, halb ueber dem Wasser). Sein LOOK zeigt
+-- den hoechsten je erreichten Tower (Holz -> Stein -> Gold -> Kristall), seine
+-- HOEHE den Rekord in diesem Tower (gestaucht auf hoechstens
+-- TowerConfig.SHOWCASE_MAX_FLOORS Etagen). Darueber ein Schild "Name · Tower ·
+-- Rekord". Die feinen Modelle kommen in Prompt 4 — hier stehen deklarative
+-- Platzhalter: eine Etage aus wenigen Teilen, wiederholt, plus Spitze.
+--
+-- Gebaut wird nur, wenn sich Look oder Rekord aendern (PlotDisplayService,
+-- Signatur). Teile-Budget: Sockel + 12 Etagen x Etagen-Teile + Spitze bleibt
+-- unter 60 — die ganze Insel unter 250 (gezaehlt mit dem Debug-Befehl
+-- "parts").
+--
+-- Koordinaten: Ursprung = Mitte des Turm-Fusses auf Arena-Hoehe
+-- (PLATFORM_TOP_Y), +Y nach oben. Etagen-Teile sind relativ zur UNTERKANTE
+-- ihrer Etage.
+-- v15: Bestenlisten-Tafel auf der Hauptinsel (LeaderboardService schreibt,
+-- MapService baut). Steht zwischen zwei Stegen auf dem Ring um das Event-Pit,
+-- die Schrift zeigt nach aussen (zu den Plots, von wo man kommt).
+local LEADERBOARD_BOARD = {
+	angleDegrees = 22.5,                    -- zwischen zwei Stegen (alle 45 Grad)
+	radius       = 80,                      -- Abstand zur Weltmitte
+	size         = Vector3.new(20, 13, 0.8),
+	postHeight   = 3,
+	color        = Color3.fromRGB(92, 64, 40),
+	textColor    = Color3.fromRGB(255, 236, 190),
+	lines        = 10,
+}
+
+local TOWER_SHOWCASE = {
+	distance     = 35,      -- Abstand der Turm-Mitte von der Arena-Mitte (nach aussen)
+	radius       = 4.5,
+	floorHeight  = 3.0,
+	plinthHeight = 1.2,
+	signGap      = 2.5,     -- Schild ueber der Spitze
+	signDistance = 260,
+}
+
+export type TowerLook = {
+	floor : { DecorPiece },   -- Teile EINER Etage (relativ zur Etagen-Unterkante)
+	top   : { DecorPiece },   -- Spitze (relativ zur Oberkante der letzten Etage)
+	plinth: Color3,
+	accent: Color3,
+}
+
+local TOWER_LOOKS: { [string]: TowerLook } = {
+	Wood = {
+		plinth = Color3.fromRGB(120, 92, 62),
+		accent = Color3.fromRGB(245, 175, 45),
+		floor = {
+			{ name = "Wand",  shape = Enum.PartType.Cylinder, size = Vector3.new(2.6, 8.4, 8.4), offset = Vector3.new(0, 1.3, 0), color = Color3.fromRGB(160, 110, 65), material = Enum.Material.Wood, rotation = UPRIGHT, solid = true },
+			{ name = "Band",  shape = Enum.PartType.Cylinder, size = Vector3.new(0.4, 9.0, 9.0), offset = Vector3.new(0, 2.8, 0), color = Color3.fromRGB(118, 80, 46), material = Enum.Material.Wood, rotation = UPRIGHT },
+		},
+		top = {
+			{ name = "Dach",  shape = Enum.PartType.Cylinder, size = Vector3.new(1.0, 10.0, 10.0), offset = Vector3.new(0, 0.5, 0), color = Color3.fromRGB(118, 80, 46), material = Enum.Material.Wood, rotation = UPRIGHT },
+			{ name = "Honig", shape = Enum.PartType.Ball,     size = Vector3.new(3.0, 3.0, 3.0),   offset = Vector3.new(0, 2.2, 0), color = Color3.fromRGB(245, 175, 45), material = Enum.Material.Neon },
+		},
+	},
+	Stone = {
+		plinth = Color3.fromRGB(110, 112, 120),
+		accent = Color3.fromRGB(200, 60, 60),
+		floor = {
+			{ name = "Wand",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.6, 8.6, 8.6), offset = Vector3.new(0, 1.3, 0), color = Color3.fromRGB(150, 155, 165), material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+			{ name = "Sims",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.4, 9.4, 9.4), offset = Vector3.new(0, 2.8, 0), color = Color3.fromRGB(120, 124, 132), material = Enum.Material.Slate, rotation = UPRIGHT },
+			{ name = "Banner", shape = Enum.PartType.Block,    size = Vector3.new(0.2, 1.8, 1.4), offset = Vector3.new(0, 1.4, -4.4), color = Color3.fromRGB(200, 60, 60) },
+		},
+		top = {
+			{ name = "Zinne",  shape = Enum.PartType.Cylinder, size = Vector3.new(1.2, 10.0, 10.0), offset = Vector3.new(0, 0.6, 0), color = Color3.fromRGB(120, 124, 132), material = Enum.Material.Slate, rotation = UPRIGHT },
+			{ name = "Fahne",  shape = Enum.PartType.Block,    size = Vector3.new(0.3, 4.0, 0.3),   offset = Vector3.new(0, 3.2, 0), color = Color3.fromRGB(90, 70, 50), material = Enum.Material.Wood },
+			{ name = "Tuch",   shape = Enum.PartType.Block,    size = Vector3.new(0.1, 1.2, 2.0),   offset = Vector3.new(0, 4.6, 1.0), color = Color3.fromRGB(200, 60, 60) },
+		},
+	},
+	Gold = {
+		plinth = Color3.fromRGB(150, 120, 60),
+		accent = Color3.fromRGB(255, 205, 70),
+		floor = {
+			{ name = "Wand",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.6, 8.6, 8.6), offset = Vector3.new(0, 1.3, 0), color = Color3.fromRGB(240, 200, 90), material = Enum.Material.Metal, rotation = UPRIGHT, solid = true },
+			{ name = "Saeule1", shape = Enum.PartType.Block,   size = Vector3.new(0.8, 2.6, 0.8), offset = Vector3.new( 4.3, 1.3, 0), color = Color3.fromRGB(255, 235, 150), material = Enum.Material.Marble },
+			{ name = "Saeule2", shape = Enum.PartType.Block,   size = Vector3.new(0.8, 2.6, 0.8), offset = Vector3.new(-4.3, 1.3, 0), color = Color3.fromRGB(255, 235, 150), material = Enum.Material.Marble },
+			{ name = "Band",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.4, 9.4, 9.4), offset = Vector3.new(0, 2.8, 0), color = Color3.fromRGB(255, 205, 70), material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+		top = {
+			{ name = "Kuppel", shape = Enum.PartType.Ball,     size = Vector3.new(8.0, 5.0, 8.0),   offset = Vector3.new(0, 1.2, 0), color = Color3.fromRGB(255, 205, 70), material = Enum.Material.Metal },
+			{ name = "Spitze", shape = Enum.PartType.Ball,     size = Vector3.new(1.6, 1.6, 1.6),   offset = Vector3.new(0, 4.2, 0), color = Color3.fromRGB(255, 245, 190), material = Enum.Material.Neon },
+		},
+	},
+	Crystal = {
+		plinth = Color3.fromRGB(70, 80, 120),
+		accent = Color3.fromRGB(150, 225, 255),
+		floor = {
+			{ name = "Kern",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.6, 7.4, 7.4), offset = Vector3.new(0, 1.3, 0), color = Color3.fromRGB(120, 140, 220), material = Enum.Material.Glass, rotation = UPRIGHT, solid = true },
+			{ name = "Ring",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 9.6, 9.6), offset = Vector3.new(0, 2.6, 0), color = Color3.fromRGB(150, 225, 255), material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "Splitter", shape = Enum.PartType.Block,  size = Vector3.new(0.8, 2.2, 0.8), offset = Vector3.new(3.8, 1.2, 0), color = Color3.fromRGB(190, 240, 255), material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 20) },
+		},
+		top = {
+			{ name = "Spitze", shape = Enum.PartType.Block,    size = Vector3.new(2.6, 6.0, 2.6),   offset = Vector3.new(0, 3.0, 0), color = Color3.fromRGB(190, 240, 255), material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+			{ name = "Schweberring", shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 7.0, 7.0), offset = Vector3.new(0, 4.4, 0), color = Color3.fromRGB(150, 225, 255), material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+	},
 }
 
 -- Anzeigetafel ueber der Arena.
@@ -998,9 +1169,6 @@ local RARITY_AURA_MIN_LIGHT: { [string]: boolean } = {
 	Eternal   = true,
 	Omega     = true,
 }
-local RARITY_AURA_PARTICLE_RATE   = 6    -- Partikel/Sekunde, dezenter Dauer-Effekt
-local RARITY_AURA_LIGHT_RANGE     = 10
-local RARITY_AURA_LIGHT_BRIGHTNESS = 2
 
 return {
 	CENTER          = CENTER,
@@ -1075,6 +1243,10 @@ return {
 	BUILDING_OFFSETS = BUILDING_OFFSETS,
 	BUILDING_ORDER   = BUILDING_ORDER,
 	BUILDING_DECOR   = BUILDING_DECOR,
+	BUILDING_LOOK_DECOR = BUILDING_LOOK_DECOR,
+	LOOK_PART_BUDGET    = LOOK_PART_BUDGET,
+	combineLookDecor    = combineLookDecor,
+	getBuildingDecor    = getBuildingDecor,
 	CENTER_DECOR     = CENTER_DECOR,
 
 	HONEY_DOT_SIZE   = HONEY_DOT_SIZE,
@@ -1083,6 +1255,7 @@ return {
 	HONEY_DOT_SPACING = HONEY_DOT_SPACING,
 	HONEY_DOT_ARC    = HONEY_DOT_ARC,
 	HONEY_DOT_COLOR  = HONEY_DOT_COLOR,
+	HONEY_DOT_MAX    = HONEY_DOT_MAX,
 
 	POND_OFFSET      = POND_OFFSET,
 	POND_RADIUS      = POND_RADIUS,
@@ -1146,13 +1319,14 @@ return {
 	PIT_BASE_RADIUS   = PIT_BASE_RADIUS,
 	PIT_RIM_DROP      = PIT_RIM_DROP,
 	PIT_BASE_COLOR    = PIT_BASE_COLOR,
-	PIT_PILLAR_SIZE   = PIT_PILLAR_SIZE,
-	PIT_PILLAR_INSET  = PIT_PILLAR_INSET,
-	PIT_PILLAR_COLORS = PIT_PILLAR_COLORS,
 
 	PIT_RING_OVERHANG = PIT_RING_OVERHANG,
 	PIT_RING_HEIGHT   = PIT_RING_HEIGHT,
 	PIT_RING_COLOR    = PIT_RING_COLOR,
+
+	TOWER_SHOWCASE = TOWER_SHOWCASE,
+	LEADERBOARD_BOARD = LEADERBOARD_BOARD,
+	TOWER_LOOKS    = TOWER_LOOKS,
 
 	PIT_TOWER_STEP_HEIGHT = PIT_TOWER_STEP_HEIGHT,
 	PIT_TOWER_RADIUS      = PIT_TOWER_RADIUS,
@@ -1219,7 +1393,7 @@ return {
 
 	RARITY_AURA_MIN_SPARKLE     = RARITY_AURA_MIN_SPARKLE,
 	RARITY_AURA_MIN_LIGHT       = RARITY_AURA_MIN_LIGHT,
-	RARITY_AURA_PARTICLE_RATE   = RARITY_AURA_PARTICLE_RATE,
-	RARITY_AURA_LIGHT_RANGE     = RARITY_AURA_LIGHT_RANGE,
-	RARITY_AURA_LIGHT_BRIGHTNESS = RARITY_AURA_LIGHT_BRIGHTNESS,
+	RARITY_AURA_PARTICLE_RATE   = 6,    -- Partikel/Sekunde, dezenter Dauer-Effekt (direkt hier: 200-Locals-Limit)
+	RARITY_AURA_LIGHT_RANGE     = 10,
+	RARITY_AURA_LIGHT_BRIGHTNESS = 2,
 }

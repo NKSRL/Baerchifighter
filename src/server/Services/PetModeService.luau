@@ -45,6 +45,7 @@ local CombatService             = require(ServerScriptService.Services.CombatSer
 local PitArenaService           = require(ServerScriptService.Services.PitArenaService)
 local EventParticipationService = require(ServerScriptService.Services.EventParticipationService)
 local RateLimiter               = require(ServerScriptService.Util.RateLimiter)
+local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 
 local PetModeService = {}
 
@@ -125,9 +126,14 @@ local function broadcast(player: Player, force: boolean?)
 	local pending = _pending[player]
 	local abducting = EventParticipationService.isAbducting(player)
 
+	-- v15: in welchem Tower gekaempft wird (Pet-Leiste "Tower II · Stage 23").
+	local data = PlayerService.getData(player)
+	local tower = if data then data.towers.selected else nil
+
 	local signature = table.concat({
 		state,
 		tostring(stage),
+		tostring(tower),
 		tostring(from),
 		if pending then pending.mode else "-",
 		tostring(abducting),
@@ -140,6 +146,7 @@ local function broadcast(player: Player, force: boolean?)
 
 	Remotes.PetModeChanged:FireClient(player, state, if pending then pending.mode else nil, {
 		stage     = stage,
+		tower     = tower,
 		from      = from,
 		abducting = abducting,
 	})
@@ -161,6 +168,7 @@ function PetModeService.request(player: Player, mode: string, resume: CombatServ
 		return
 	end
 	local wanted: Mode = mode :: Mode
+	if wanted == "Event" then FunnelService.step(player, "F08_EventButtonPressed") end
 
 	if active == wanted then
 		-- Gleicher Knopf nochmal: zurueckholen.
@@ -193,7 +201,9 @@ local function tick()
 		local pending = _pending[player]
 		if pending and readState(player) == "Home" then
 			_pending[player] = nil
-			start(player, pending.mode, pending.resume)
+			-- v15: der Start simuliert in Portionen (yieldet) — nicht den Takt
+			-- fuer alle anderen Spieler aufhalten.
+			task.spawn(start, player, pending.mode, pending.resume)
 		end
 
 		broadcast(player)

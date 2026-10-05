@@ -26,6 +26,9 @@ local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local EggTree          = require(ReplicatedStorage.Modules.EggTree)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 
 local PlayerMigration = {}
 
@@ -63,7 +66,6 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 
 	-- Neue Island-Felder
 	local island = data.island
-	if island.pitLevel  == nil then island.pitLevel  = 1  end
 	if island.baerchis  == nil then island.baerchis  = {} end
 	if island.eggStock  == nil then island.eggStock  = { BasicEgg = 3 } end
 
@@ -95,6 +97,13 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		local owned = 0
 		for _ in data.island.baerchis do owned += 1 end
 		data.stats.totalHatched = math.max(data.stats.totalHatched or 0, owned)
+	end
+
+	-- HBB Paket 3: uiSeen. Leer nachruesten; UiStateService markiert beim
+	-- ersten Laden eines Stands mit Fortschritt alles Sichtbare als gesehen
+	-- (keine Badge-Flut fuer Veteranen). Kein Versions-Sprung.
+	if data.uiSeen == nil then
+		data.uiSeen = {}
 	end
 
 	if data.quests == nil then
@@ -201,14 +210,30 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		island.lastEggAt = os.time()
 	end
 
+	-- v15: Waben-Recycler. Feldweise nachgeruestet (wie lastEggAt), deshalb
+	-- gefahrlos wiederholbar und ohne Versionssprung.
+	local recycler = (island :: any).recycler
+	if typeof(recycler) ~= "table" then
+		(island :: any).recycler = { level = 1, queued = 0, progress = 0, lastProcessedAt = os.time() }
+	else
+		if typeof(recycler.level) ~= "number" then recycler.level = 1 end
+		if typeof(recycler.queued) ~= "number" then recycler.queued = 0 end
+		if typeof(recycler.progress) ~= "number" then recycler.progress = 0 end
+		if typeof(recycler.lastProcessedAt) ~= "number" then recycler.lastProcessedAt = os.time() end
+	end
+
 	-- (v5 hatte hier die uid-Nachruestung der Brut-Eier — seit v12 gibt es
 	-- keine Brut-Eier mehr, siehe oben.)
 
 	-- v4: die Gebaeude sind komplett ausgetauscht. Frueher gab es Hatchery,
 	-- GummyFarm, Recycler (und davor FusionLab) mit je eigener Funktion —
-	-- jetzt drei reine Honig-Produzenten. Alte Eintraege werden entfernt und
+	-- jetzt reine Honig-Produzenten. Alte Eintraege werden entfernt und
 	-- die neuen angelegt; das Level laesst sich nicht sinnvoll uebertragen,
 	-- weil die Gebaeude etwas voellig anderes tun.
+	--
+	-- (Honigtopf und Honig-Presse bleiben hier noch stehen: die v7- und die
+	-- v15-Migration weiter unten brauchen ihre Level. Entfernt werden sie erst
+	-- in der v15-Zusammenlegung.)
 	local OBSOLETE_BUILDINGS = { "Hatchery", "GummyFarm", "Recycler", "FusionLab" }
 
 	if island.buildings == nil then
@@ -259,7 +284,7 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	-- jedem Join erneut, wuerde die Presse jedes Mal wieder auf das Maximum
 	-- hochgezogen — der Spieler koennte die anderen beiden nie ueberholen.
 	if (data.version or 0) < 7 then
-		local press = island.buildings.HoneyPress
+		local press = (island.buildings :: any).HoneyPress
 
 		if press then
 			local highest = press.level or 1
@@ -270,6 +295,153 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 
 			press.level = highest
 		end
+	end
+
+	-- ============================================================
+	-- v15: GEBAEUDE OPTION B — Honigtopf + Honig-Presse -> Honig-Veredler
+	-- ============================================================
+	-- Niemand verliert etwas: der Veredler bekommt das HOEHERE der beiden alten
+	-- Level (er kann beides: XP wie die Presse, Heilung wie der Topf), und der
+	-- eingelagerte Honig beider wird zusammengelegt (gedeckelt auf sein Lager).
+	-- Haengt an der Version, weil es UMRECHNET; danach sind Topf und Presse weg.
+	-- Ueber `any`, weil Types.BuildingId die alten Ids nicht mehr kennt.
+	do
+		local buildings = island.buildings :: any
+		if (data.version or 0) < 15 then
+			local pot     = buildings.HoneyPot
+			local press   = buildings.HoneyPress
+			local refiner = buildings.HoneyRefiner
+			if refiner and (pot or press) then
+				local level = math.max(refiner.level or 1,
+					if pot then pot.level or 1 else 1,
+					if press then press.level or 1 else 1)
+				refiner.level = math.clamp(level, 1, EconomyConfig.MAX_BUILDING_LEVEL)
+
+				local honey = (if pot then pot.honey or 0 else 0) + (if press then press.honey or 0 else 0)
+				refiner.honey = math.clamp(honey, 0, BuildingBehavior.getCapacity("HoneyRefiner", refiner.level))
+			end
+		end
+
+		-- Alles, was es nicht (mehr) gibt, verschwindet — auch Topf und Presse
+		-- nach der Zusammenlegung. Am Feld erkennbar, deshalb wiederholbar.
+		for buildingId in buildings do
+			if default.island.buildings[buildingId] == nil then
+				buildings[buildingId] = nil
+			end
+		end
+
+		-- Level auf den gueltigen Bereich (1-60) klemmen.
+		for _, building in buildings do
+			building.level = EconomyConfig.clampBuildingLevel(building.level or 1)
+		end
+	end
+
+	-- ============================================================
+	-- v15: TOWER STATT PIT-LEVEL
+	-- ============================================================
+	-- 1. Erstattung: die Summe der bezahlten PIT-Ausbaukosten landet in
+	--    island.pitRefund. Die Migration fasst KEINE Waehrung an —
+	--    TowerService zahlt den Betrag beim Join ueber EconomyService aus.
+	-- 2. Rekord: der alte letzte Lauf (pitProgress) wird in die gleich starke
+	--    Tower-Stage umgerechnet (TowerConfig.legacyPitToTower) und als
+	--    permanenter Rekord eingetragen. Die zugehoerigen Meilensteine vergibt
+	--    TowerService beim Join rueckwirkend.
+	-- 3. pitLevel, pitProgress und stats.highestPitLevel werden entfernt.
+	--
+	-- Gilt reachedStage als "geschafft"? reachedStage ist die letzte Stage, in
+	-- die der Baerchi eingetreten ist — gewonnen oder verloren. Bewusst
+	-- grosszuegig als Rekord gezaehlt: niemand soll durch die Umstellung weniger
+	-- haben (ANNAHME, im Bericht).
+	data.towers = (data :: any).towers
+	if typeof(data.towers) ~= "table" then
+		data.towers = {
+			records      = {},
+			claimed      = {},
+			highestTower = TowerConfig.FIRST_TOWER,
+			selected     = TowerConfig.FIRST_TOWER,
+		}
+	end
+	local towers = data.towers :: any
+	if typeof(towers.records) ~= "table" then towers.records = {} end
+	if typeof(towers.claimed) ~= "table" then towers.claimed = {} end
+
+	if (data.version or 0) < 15 then
+		local legacyLevel = tonumber(legacyIsland.pitLevel) or 1
+		local refund = TowerConfig.legacyPitRefund(legacyLevel)
+		legacyIsland.pitRefund = (tonumber(legacyIsland.pitRefund) or 0) + refund
+
+		local legacyProgress = legacyIsland.pitProgress
+		if typeof(legacyProgress) == "table" then
+			local towerId, stage = TowerConfig.legacyPitToTower(
+				tonumber(legacyProgress.pitLevel) or legacyLevel,
+				tonumber(legacyProgress.reachedStage) or 0
+			)
+			if towerId and stage > 0 then
+				towers.records[towerId] = math.max(tonumber(towers.records[towerId]) or 0, stage)
+			end
+		end
+	end
+	legacyIsland.pitLevel    = nil
+	legacyIsland.pitProgress = nil
+	stats.highestPitLevel    = nil
+
+	-- Rekorde: nur gueltige Tower, nur Zahlen, nur bis zur Stage-Zahl.
+	for towerId, record in towers.records do
+		local def = TowerConfig.get(towerId)
+		local value = tonumber(record)
+		if not def or not value or value <= 0 then
+			towers.records[towerId] = nil
+		else
+			towers.records[towerId] = math.clamp(math.floor(value), 0, def.stages)
+		end
+	end
+	-- Meilensteine: Tabelle je Tower mit TEXT-Schluesseln (siehe Types).
+	for towerId, claimed in towers.claimed do
+		if not TowerConfig.get(towerId) or typeof(claimed) ~= "table" then
+			towers.claimed[towerId] = nil
+		else
+			local cleaned: { [string]: boolean } = {}
+			for stage, flag in claimed do
+				if flag == true and tonumber(stage) then
+					cleaned[tostring(math.floor(tonumber(stage) :: number))] = true
+				end
+			end
+			towers.claimed[towerId] = cleaned
+		end
+	end
+	-- Hoechster Tower = der hoechste mit Rekord (nie niedriger als gespeichert).
+	local highest = if TowerConfig.isValidId(towers.highestTower) then towers.highestTower else TowerConfig.FIRST_TOWER
+	for towerId in towers.records do
+		if TowerConfig.getIndex(towerId) > TowerConfig.getIndex(highest) then
+			highest = towerId
+		end
+	end
+	towers.highestTower = highest
+	if not TowerConfig.isValidId(towers.selected) then
+		towers.selected = TowerConfig.FIRST_TOWER
+	end
+
+	-- Fortsetzen pro Tower (ersetzt pitProgress) und Erstattungs-Feld.
+	if typeof(legacyIsland.towerProgress) ~= "table" then
+		legacyIsland.towerProgress = {}
+	else
+		for towerId, stage in legacyIsland.towerProgress do
+			if not TowerConfig.get(towerId) or typeof(stage) ~= "number" or stage < 1 then
+				legacyIsland.towerProgress[towerId] = nil
+			end
+		end
+	end
+	if typeof(legacyIsland.pitRefund) ~= "number" or legacyIsland.pitRefund < 0 then
+		legacyIsland.pitRefund = 0
+	end
+
+	-- v15: Login-Bonus. Feldweise, wiederholbar.
+	local daily = (data :: any).daily
+	if typeof(daily) ~= "table" then
+		(data :: any).daily = { lastClaimDay = 0, streak = 0 }
+	else
+		if typeof(daily.lastClaimDay) ~= "number" then daily.lastClaimDay = 0 end
+		if typeof(daily.streak) ~= "number" then daily.streak = 0 end
 	end
 
 	-- v8: die zweite Fortschrittsachse (Promotion, Stat-Level, Charms).

@@ -23,7 +23,10 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- v13: Quest-Belohnung abholen. Zahlt aus, deshalb nicht im Sekundentakt.
 	RequestClaimQuest      = 0.50,
 	RequestUpgradeBuilding = 0.50,
-	RequestUpgradePit      = 0.50,
+	-- v15: Tower waehlen (reines Umschalten) und Login-Bonus (zahlt aus).
+	RequestSelectTower     = 0.30,
+	RequestClaimDailyBonus = 1.00,
+	RequestUpgradeRecycler = 0.50,   -- v15: Waben-Recycler
 	RequestFuseBaerchis    = 1.00,
 	RequestRecycleBaerchi  = 0.25,
 	-- Fuettern ist die haeufigste Aktion im Spiel (ein Klick pro Honig) —
@@ -60,6 +63,21 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestSetLanguage     = 1.00,
 
 	GetPlayerData          = 1.00,
+
+	-- HBB Paket 0: Statistik-Ereignisse. Kurz, weil "Panel auf" und "Panel
+	-- schnell zu" direkt nacheinander kommen koennen; die Menge deckelt
+	-- FunnelConfig.MAX_UI_EVENTS_PER_SESSION.
+	RequestLogUiEvent      = 0.20,
+	-- HBB Paket 3: "gesehen"-Markierung. Nimmt mehrere Ids pro Aufruf an,
+	-- deshalb reicht ein ruhiger Abstand.
+	RequestMarkUiSeen      = 0.30,
+	-- HBB Paket 5: Heim-Knopf. Teleport — nicht im Sekundentakt.
+	RequestGoHome          = 3.00,
+
+	-- v15: Bestenliste und Inspektor. Der Server antwortet aus dem Cache bzw.
+	-- aus dem Speicher; die Bremse schuetzt nur vor Spam.
+	GetLeaderboard         = 1.00,
+	GetPlayerProfile       = 1.00,
 }
 
 -- Fuer Remotes die (noch) keinen eigenen Eintrag haben

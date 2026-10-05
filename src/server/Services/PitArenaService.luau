@@ -64,6 +64,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig   = require(ReplicatedStorage.Config.MapConfig)
+local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 local SkillConfig = require(ReplicatedStorage.Config.SkillConfig)
 local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
 local BaerchiMesh = require(ReplicatedStorage.Modules.BaerchiMesh)
@@ -176,10 +177,16 @@ end
 -- Text auf der Anzeigetafel ueber der Arena. Die Tafel selbst gehoert
 -- MapService; hier wird nur entschieden WAS draufsteht, weil nur dieser
 -- Service den Verlauf des Laufs kennt.
-local function showStage(player: Player, stage: Types.PitStageResult, cleared: number)
+-- v15: "Tower II · Stage 23"
+local function stageTitle(towerId: string?, stage: number): string
+	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
+	return string.format("Tower %s  ·  Stage %d", def.numeral, stage)
+end
+
+local function showStage(player: Player, towerId: string?, stage: Types.PitStageResult, cleared: number)
 	MapService.setPitBanner(
 		player,
-		string.format("Stage %d", stage.stage),
+		stageTitle(towerId, stage.stage),
 		if cleared > 0
 			then string.format("%d geschafft", cleared)
 			else "erster Gegner",
@@ -543,11 +550,13 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			-- Etagen darunter sichtbar hoch und er faehrt oben mit. Danach
 			-- kaempft er auf genau der Hoehe, auf der Stage 30 bei einem Lauf
 			-- von vorn stattfinden wuerde — man sieht, wie weit oben man ist.
-			local baseLevel = math.max(0, (run.startStage or 1) - 1)
+			-- v15: gestaucht (TowerConfig.getRunFloor), bei 100 Stages hoechstens
+			-- RUN_MAX_FLOORS Etagen.
+			local baseLevel = TowerConfig.getRunFloor(run.towerId or "I", run.startStage or 1)
 			if baseLevel > 0 and not recallWanted(player, token) then
 				MapService.setPitBanner(
 					player,
-					string.format("Stage %d", run.startStage or 1),
+					stageTitle(run.towerId, run.startStage or 1),
 					"Der Turm waechst …",
 					MapConfig.PIT_BANNER_RUNNING
 				)
@@ -590,7 +599,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				-- Abschnitt "PIT-TURM").
 				-- v12: absolute Etage — bei einer Fortsetzung steht der Turm
 				-- schon (siehe oben), Stage 30 kaempft auf Etage 29.
-				local towerLevel = math.max(0, stage.stage - 1)
+				local towerLevel = TowerConfig.getRunFloor(run.towerId or "I", stage.stage)
 				MapService.setPitTowerLevel(player, towerLevel)
 				towerNow = towerLevel
 
@@ -614,7 +623,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 					})
 				end
 
-				showStage(player, stage, cleared)
+				showStage(player, run.towerId, stage, cleared)
 
 				if previousEnemy and previousEnemy.Parent then
 					previousEnemy:Destroy()

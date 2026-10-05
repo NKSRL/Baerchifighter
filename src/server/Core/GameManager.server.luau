@@ -55,10 +55,16 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "PitArenaService", module = ServerScriptService.Services.PitArenaService },
 	{ name = "CombatService",   module = ServerScriptService.Services.CombatService },
 	{ name = "PetModeService",  module = ServerScriptService.Services.PetModeService },
+	-- v15: Tower-Fortschritt (ersetzt das PIT-Level)
+	{ name = "TowerService",    module = ServerScriptService.Services.TowerService },
 
 	-- Events
 	{ name = "EventService",              module = ServerScriptService.Services.EventService },
 	{ name = "EventParticipationService", module = ServerScriptService.Services.EventParticipationService },
+
+	-- Waben: Sammeln im Event-Pit und der Recycler auf dem Plot
+	{ name = "CombRecyclerService", module = ServerScriptService.Services.CombRecyclerService },
+	{ name = "CombService",         module = ServerScriptService.Services.CombService },
 
 	-- Baerchis veraendern
 	{ name = "FusionService",    module = ServerScriptService.Services.FusionService },
@@ -70,6 +76,19 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Meta
 	{ name = "QuestService",    module = ServerScriptService.Services.QuestService },
 	{ name = "SettingsService", module = ServerScriptService.Services.SettingsService },
+
+	-- v15: Angeben (Bestenlisten, Inspektor, Abzeichen) und Login-Bonus
+	{ name = "LeaderboardService", module = ServerScriptService.Services.LeaderboardService },
+	{ name = "ProfileService",     module = ServerScriptService.Services.ProfileService },
+	{ name = "PlayerBadgeService", module = ServerScriptService.Services.PlayerBadgeService },
+	{ name = "LoginBonusService",  module = ServerScriptService.Services.LoginBonusService },
+
+	-- HBB Paket 0: Messpunkte (Onboarding-Trichter, UI-Ereignisse)
+	{ name = "FunnelService",      module = ServerScriptService.Services.FunnelService },
+	-- HBB Paket 3: Anzeigestand (welche Bedienelemente schon gesehen sind)
+	{ name = "UiStateService",     module = ServerScriptService.Services.UiStateService },
+	-- HBB Paket 5: Heim-Knopf (zurueck auf den eigenen Plot)
+	{ name = "HomeService",        module = ServerScriptService.Services.HomeService },
 
 	-- Kein Spiel-Service: die Studio-Test-Schnittstelle
 	{ name = "DebugService", module = ServerScriptService.Services.DebugService },

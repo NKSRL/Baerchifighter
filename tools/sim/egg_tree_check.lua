@@ -19,7 +19,12 @@ for eggId, egg in EggConfig.data do
 	local hs = 0
 	for _, w in egg.hatchTable do hs += w end
 	check(math.abs(hs - 100) < 1e-6, eggId .. ": hatchTable-Summe " .. hs)
-	check(EggConfig.TREE[eggId] ~= nil, eggId .. ": kein TREE-Eintrag")
+	if egg.special then
+		check(EggConfig.TREE[eggId] == nil, eggId .. ": Sonder-Ei darf keinen TREE-Eintrag haben")
+		check(egg.parent == nil, eggId .. ": Sonder-Ei darf keinen Vorgaenger haben")
+	else
+		check(EggConfig.TREE[eggId] ~= nil, eggId .. ": kein TREE-Eintrag")
+	end
 end
 
 -- 2. Ø steigt entlang jeder Kante

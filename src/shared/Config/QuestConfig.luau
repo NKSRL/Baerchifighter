@@ -34,7 +34,7 @@ export type Metric =
 	| "baerchiCount" -- Baerchis im Besitz (Zustand, kein Zaehler)
 	| "discovered"   -- Index-Eintraege
 	| "buildingLevel"-- hoechstes Gebaeude-Level
-	| "pitLevel"     -- Arena-Stufe
+	| "towerStage"   -- v15: beste geschaffte Stage in irgendeinem Tower (ersetzt "pitLevel")
 
 export type Reward = {
 	gummies : number,
@@ -58,7 +58,9 @@ local CHAIN: { QuestDef } = {
 	{ id = "c_hatch5",    metric = "hatched",       target = 5,  reward = { gummies = 300, eggType = "SugarEgg" } },
 	{ id = "c_discover5", metric = "discovered",    target = 5,  reward = { gummies = 400 } },
 	{ id = "c_fuse1",     metric = "fusions",       target = 1,  reward = { gummies = 500, eggType = "SugarEgg" } },
-	{ id = "c_pit2",      metric = "pitLevel",      target = 2,  reward = { gummies = 600 } },
+	-- v15: ersetzt "c_pit2" (PIT-Level 2) an derselben Stelle der Kette — der
+	-- Kettenstand zaehlt Positionen, abgeholte Quests bleiben also abgeholt.
+	{ id = "c_tower10",   metric = "towerStage",    target = 10, reward = { gummies = 600 } },
 	{ id = "c_discover8", metric = "discovered",    target = 8,  reward = { gummies = 800, eggType = "GoldenEgg" } },
 	{ id = "c_fight25",   metric = "fightsWon",     target = 25, reward = { gummies = 1000 } },
 	{ id = "c_discover10",metric = "discovered",    target = 10, reward = { gummies = 1500, eggType = "CrystalEgg" } },
@@ -73,6 +75,20 @@ local DAILY: { QuestDef } = {
 
 local SECONDS_PER_DAY = 86400
 
+-- HBB Paket 2: Icon je Messgroesse (Namen aus UI/Icons). Der Quest-Tracker
+-- zeigt Icon + Zaehler statt Text; der Volltext kommt erst beim Antippen.
+-- Pro Messgroesse statt pro Quest: so braucht eine neue Quest kein Icon.
+local METRIC_ICON: { [string]: string } = {
+	hatched       = "egg",
+	fightsWon     = "swords",
+	gummiesEarned = "gummy",
+	fusions       = "bear",
+	baerchiCount  = "bear",
+	discovered    = "scroll",
+	buildingLevel = "honey",
+	towerStage    = "trophy",
+}
+
 local byId: { [string]: QuestDef } = {}
 for _, def in CHAIN do byId[def.id] = def end
 for _, def in DAILY do byId[def.id] = def end
@@ -85,6 +101,7 @@ end
 return {
 	CHAIN = CHAIN,
 	DAILY = DAILY,
+	METRIC_ICON = METRIC_ICON,
 	SECONDS_PER_DAY = SECONDS_PER_DAY,
 
 	getById = function(id: string): QuestDef?

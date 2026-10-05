@@ -14,6 +14,9 @@ Geprueft wird pro Deko-Liste:
     3. Gebaeude-Deko bleibt im Grundriss der Koerper-Part (BUILDING_OFFSETS.size),
        damit zwei Gebaeude nicht ineinander wachsen.
     4. Gebaeude-Deko bleibt unter dem Schild (Koerperhoehe + 2).
+    5. v15: jeder LOOK (Grund-Deko + Zusaetze aus BUILDING_LOOK_DECOR bzw.
+       CombConfig.RECYCLER_LOOK_DECOR) besteht 1.-4. und bleibt im Teile-Budget
+       (MapConfig.LOOK_PART_BUDGET).
 
 Aufruf:  python3 tools/check_decor.py      (Exit-Code 1 wenn etwas nicht stimmt)
 """
@@ -24,6 +27,7 @@ import sys
 from pathlib import Path
 
 MAP_CONFIG = Path(__file__).resolve().parent.parent / "src" / "shared" / "Config" / "MapConfig.luau"
+COMB_CONFIG = Path(__file__).resolve().parent.parent / "src" / "shared" / "Config" / "CombConfig.luau"
 
 # Toleranz in Studs. Rundungsfehler in handgeschriebenen Zahlen sollen nicht
 # als Fehler durchgehen, ein sichtbarer Spalt aber schon.
@@ -95,6 +99,33 @@ def split_named_lists(block):
         end = block.find("\n\t},", m.end())
         result[key] = block[m.end():end]
     return result
+
+
+def split_look_lists(block, indent):
+    """Teilt `[2] = { ... },  [3] = { ... },` (mit `indent` Tabs) in {look: Text}."""
+    result = {}
+    tabs = "\t" * indent
+    for m in re.finditer(r"^" + tabs + r"\[(\d+)\] = \{$", block, re.MULTILINE):
+        end = block.find("\n" + tabs + "},", m.end())
+        result[int(m.group(1))] = block[m.end():end]
+    return result
+
+
+def extract_assigned(source, name):
+    """Der Text zwischen `<name> = {` und der Zeile `}` auf Spalte 0."""
+    start = source.find(name + " = {")
+    if start < 0:
+        return None
+    brace = source.find("{", start)
+    end = source.find("\n}", brace)
+    return source[brace:end]
+
+
+def parse_budget(source):
+    m = re.search(r"local LOOK_PART_BUDGET[^=]*=\s*\{([^}]*)\}", source)
+    if not m:
+        return None
+    return [int(x) for x in re.findall(r"\d+", m.group(1))]
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +233,41 @@ def main():
     failures = []
     for key, block in split_named_lists(decor_block).items():
         failures += check_list(key, parse_pieces(block), body_sizes.get(key))
+
+    # v15: Looks der Gebaeude (Grund-Deko + alle Zusaetze bis zum Look)
+    budget = parse_budget(source) or [999] * 6
+    look_block = extract_table(source, "BUILDING_LOOK_DECOR")
+    base_lists = split_named_lists(decor_block)
+    if look_block is None:
+        print("!! BUILDING_LOOK_DECOR nicht gefunden")
+        failures.append("BUILDING_LOOK_DECOR fehlt")
+    else:
+        for key, block in split_named_lists(look_block).items():
+            extras = split_look_lists(block, 2)
+            pieces = parse_pieces(base_lists.get(key, ""))
+            for look in range(2, 7):
+                pieces = pieces + parse_pieces(extras.get(look, ""))
+                failures += check_list(f"{key} Look {look}", pieces, body_sizes.get(key))
+                if len(pieces) > budget[look - 1]:
+                    failures.append(f"{key} Look {look}: {len(pieces)} Teile > Budget {budget[look - 1]}")
+                    print(f"     - {len(pieces)} Teile > Budget {budget[look - 1]}")
+
+    # v15: Recycler (CombConfig) — Boden/Schweben und Budget, kein Grundriss
+    comb = COMB_CONFIG.read_text(encoding="utf-8")
+    rec_base = extract_assigned(comb, "CombConfig.RECYCLER_DECOR")
+    rec_looks = extract_assigned(comb, "CombConfig.RECYCLER_LOOK_DECOR")
+    if rec_base is None or rec_looks is None:
+        print("!! Recycler-Deko nicht gefunden")
+        failures.append("Recycler-Deko fehlt")
+    else:
+        pieces = parse_pieces(rec_base)
+        failures += check_list("Recycler", pieces)
+        extras = split_look_lists(rec_looks, 1)
+        for look in range(2, 7):
+            pieces = pieces + parse_pieces(extras.get(look, ""))
+            failures += check_list(f"Recycler L{look}", pieces)
+            if len(pieces) > budget[look - 1]:
+                failures.append(f"Recycler Look {look}: zu viele Teile")
 
     failures += check_list("Honigmast", parse_pieces(center_block))
     failures += check_list("Honig-Teich", parse_pieces(pond_block), floating_ok=True)

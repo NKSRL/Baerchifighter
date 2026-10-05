@@ -15,4 +15,10 @@ return {
 	-- true = eine Zeile pro Fuetterung (HoneyService). Zum Nachrechnen von
 	-- XP/HP beim Balancing.
 	VERBOSE_LOG = false,
+
+	-- true = FunnelService schreibt jeden Trichter-Schritt und jedes
+	-- UI-Ereignis ins Output. In Studio gehen keine echten Analytics-Events
+	-- raus (Roblox nimmt sie nur im veroeffentlichten Spiel an) — das Log ist
+	-- dort der einzige Nachweis, dass ein Schritt ausgeloest wurde.
+	FUNNEL_LOG = true,
 }

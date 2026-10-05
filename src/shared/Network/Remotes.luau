@@ -151,6 +151,16 @@ local EggCollectedReceived = getOrCreateEvent("EggCollectedReceived")
 -- Args: OfflineEggReport
 local OfflineEggReportReceived = getOrCreateEvent("OfflineEggReportReceived")
 
+-- v15: Der Spieler hat seinen Waben-Stapel auf der eigenen Insel abgegeben.
+-- Reiner Anzeige-Anlass (Meldung); die Waben gehen serverseitig direkt in die
+-- Warteschlange des Recyclers (CombRecyclerService).
+-- Args: count: number (Waben), units: number (Wabeneinheiten, goldene zaehlen mehr)
+local CombDelivered = getOrCreateEvent("CombDelivered")
+
+-- v15: Der Waben-Recycler wurde ausgebaut.
+-- Args: newLevel: number
+local RecyclerUpgraded = getOrCreateEvent("RecyclerUpgraded")
+
 -- v12: Zustand des ausgeruesteten Baerchis fuer die untere Pet-Leiste
 -- (PetBar). Die Wahrheit liegt ausschliesslich in PetModeService, dieser
 -- Event teilt sie nur mit.
@@ -168,6 +178,25 @@ local PetModeChanged = getOrCreateEvent("PetModeChanged")
 local QuestRewardReceived = getOrCreateEvent("QuestRewardReceived")
 
 local ActionFailed = getOrCreateEvent("ActionFailed")
+
+-- v17 (lebendige Events): Meldung waehrend eines Events, als LocMsg (der
+-- Client uebersetzt). Geht an einen Spieler oder an alle (Jackpot, Boss).
+-- Args: msg: Types.LocMsg, style: ("info" | "good" | "big")?
+local EventNotice = getOrCreateEvent("EventNotice")
+
+-- v17: Telegraph einer Boss-Attacke (an alle). Args: Types.HazardTelegraph
+local EventTelegraph = getOrCreateEvent("EventTelegraph")
+
+-- v17: Der eigene Charakter wurde von einer Boss-Attacke getroffen.
+-- Args: Types.HazardHit
+local EventHazardHit = getOrCreateEvent("EventHazardHit")
+
+-- v15 (Tower): ein Tower-Meilenstein wurde ausgezahlt (Toast).
+-- Args: Types.TowerMilestoneReward
+local TowerMilestoneReceived = getOrCreateEvent("TowerMilestoneReceived")
+
+-- v15: Login-Bonus ausgezahlt (Toast). Args: Types.DailyBonusResult
+local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
 
 -- v14 (Mega Egg Tree): Ei-Baum, Ei-Presse, Blaupausen, Faehigkeiten-Show
 local EggTreeUnlocked        = getOrCreateEvent("EggTreeUnlocked")        -- S->C (Types.EggUnlockResult)
@@ -201,9 +230,20 @@ local RequestPetMode = getOrCreateEvent("RequestPetMode")
 -- Args: buildingId: string
 local RequestUpgradeBuilding = getOrCreateEvent("RequestUpgradeBuilding")
 
--- Spieler will die Kampfplattform um eine Schicht erhoehen
+-- (v15: RequestUpgradePit ist entfallen — es gibt kein PIT-Level mehr.)
+
+-- v15: Tower waehlen, in den der Fight-Knopf schickt. Der Server prueft, ob
+-- der Tower beim aktuellen Rebirth offen ist (TowerConfig.isOpen).
+-- Args: towerId: string
+local RequestSelectTower = getOrCreateEvent("RequestSelectTower")
+
+-- v15: taeglichen Login-Bonus abholen. Der Server prueft UTC-Tag,
+-- Gnadenfrist und doppelte Abholung (Modules/LoginBonusCalc).
 -- Args: (keine)
-local RequestUpgradePit = getOrCreateEvent("RequestUpgradePit")
+local RequestClaimDailyBonus = getOrCreateEvent("RequestClaimDailyBonus")
+
+-- v15: Waben-Recycler ausbauen (kein Argument: es gibt nur einen pro Insel)
+local RequestUpgradeRecycler = getOrCreateEvent("RequestUpgradeRecycler")
 
 -- Spieler will zwei Baerchis fusionieren
 --
@@ -263,6 +303,24 @@ local RequestRebirth = getOrCreateEvent("RequestRebirth")
 -- Args: language: string?   ("de" | "en" | "fr" | "es")
 local RequestSetLanguage = getOrCreateEvent("RequestSetLanguage")
 
+-- HBB Paket 0: Messpunkte der Oberflaeche (Panel geoeffnet, Panel schnell
+-- wieder geschlossen, Spieler steht still). Reine Statistik, aendert nichts
+-- am Spielstand. Der Server prueft Art und Panel-Namen gegen
+-- FunnelConfig und deckelt die Anzahl pro Sitzung.
+-- Args: kind: "PanelOpened" | "PanelQuickClose" | "IdleStanding",
+--       panelName: string?
+local RequestLogUiEvent = getOrCreateEvent("RequestLogUiEvent")
+
+-- HBB Paket 3: Bedienelemente als "gesehen" markieren (Badge verschwindet).
+-- Rein kosmetisch; der Server prueft nur die Ids gegen UnlockRules.ELEMENTS.
+-- Args: ids: string | { string }
+local RequestMarkUiSeen = getOrCreateEvent("RequestMarkUiSeen")
+
+-- HBB Paket 5: Heim-Knopf. Der Server teleportiert auf den eigenen Plot,
+-- ausser der Spieler traegt Waben (dann ActionFailed).
+-- Args: (keine)
+local RequestGoHome = getOrCreateEvent("RequestGoHome")
+
 -- ============================================================
 -- Client → Server Functions (brauchen eine Antwort)
 -- ============================================================
@@ -270,6 +328,16 @@ local RequestSetLanguage = getOrCreateEvent("RequestSetLanguage")
 -- Spieler fragt seine aktuellen Daten an (z.B. nach Reconnect)
 -- Returns: PlayerDataUpdate?
 local GetPlayerData = getOrCreateFunction("GetPlayerData")
+
+-- v15: eine Bestenliste (LeaderboardService, gecacht).
+-- Args: listId: "Tower" | "Rebirths" | "Collection"
+-- Returns: Types.LeaderboardView?
+local GetLeaderboard = getOrCreateFunction("GetLeaderboard")
+
+-- v15: Profilkarte eines anderen Spielers auf DIESEM Server (Inspektor).
+-- Args: userId: number
+-- Returns: Types.PlayerProfileCard?
+local GetPlayerProfile = getOrCreateFunction("GetPlayerProfile")
 
 return {
 	-- Server → Client
@@ -289,8 +357,16 @@ return {
 	EggCollectedReceived    = EggCollectedReceived,
 	OfflineEggReportReceived = OfflineEggReportReceived,
 	PetModeChanged          = PetModeChanged,
+	CombDelivered           = CombDelivered,
+	RecyclerUpgraded        = RecyclerUpgraded,
 	QuestRewardReceived     = QuestRewardReceived,
 	ActionFailed          = ActionFailed,
+	EventNotice           = EventNotice,
+	EventTelegraph        = EventTelegraph,
+	EventHazardHit        = EventHazardHit,
+
+	TowerMilestoneReceived = TowerMilestoneReceived,
+	DailyBonusReceived     = DailyBonusReceived,
 
 	EggTreeUnlocked        = EggTreeUnlocked,
 	EggPressResultReceived = EggPressResultReceived,
@@ -303,7 +379,9 @@ return {
 	RequestClaimQuest      = RequestClaimQuest,
 	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,
-	RequestUpgradePit      = RequestUpgradePit,
+	RequestSelectTower     = RequestSelectTower,
+	RequestClaimDailyBonus = RequestClaimDailyBonus,
+	RequestUpgradeRecycler = RequestUpgradeRecycler,
 	RequestFuseBaerchis    = RequestFuseBaerchis,
 	RequestRecycleBaerchi  = RequestRecycleBaerchi,
 	RequestFeedHoney       = RequestFeedHoney,
@@ -315,7 +393,12 @@ return {
 	RequestToggleCharmLock = RequestToggleCharmLock,
 	RequestCollectEgg      = RequestCollectEgg,
 	RequestCollectAllEggs  = RequestCollectAllEggs,
+	RequestLogUiEvent      = RequestLogUiEvent,
+	RequestMarkUiSeen      = RequestMarkUiSeen,
+	RequestGoHome          = RequestGoHome,
 
 	-- Functions
 	GetPlayerData          = GetPlayerData,
+	GetLeaderboard         = GetLeaderboard,
+	GetPlayerProfile       = GetPlayerProfile,
 }

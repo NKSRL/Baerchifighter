@@ -61,6 +61,10 @@ local Types      = require(ReplicatedStorage.Network.Types)
 
 local BaerchiMesh = {}
 
+-- Eigene Baerchis sind etwas groesser als das Template, damit sie neben den
+-- gelegten Eiern (EGG_SCALE im LaidEggBuilder) klar die Hauptfigur bleiben.
+local BAERCHI_SCALE = 1.15
+
 -- Namen der Parts/MeshParts die die Fellfarbe bekommen (nur bei Platzhalter-
 -- Rarities relevant, siehe Kommentar-Kopf). Muss mit den Node-Namen in
 -- JEDEM importierten GLB uebereinstimmen (siehe Setup-Schritt oben) —
@@ -211,6 +215,7 @@ function BaerchiMesh.build(
 	end
 
 	local model = cloneAndPrepare(template, if isDedicated then nil else rarityColor)
+	model:ScaleTo(model:GetScale() * BAERCHI_SCALE)   -- relativ: das Template traegt schon einen eigenen Massstab
 
 	if mutationColor then
 		markMutation(model, mutationColor)

@@ -3,11 +3,12 @@
 -- ServerScriptService/Util/MapBuild/ArenaBuilder.luau
 --
 -- Einzige Zustaendigkeit:
---   - Den Steg zur Arena-Insel, die PIT-Arena und die Ringe des PIT-Turms
---     bauen
+--   - Den Steg zur Arena-Insel, die PIT-Arena, die Ringe des Lauf-Turms und
+--     (v15) den staendigen Tower-Turm (Angeberflaeche) bauen
 --
--- Die Arena ist eine flache Kampfflaeche; das PIT-Level zeigt sich an den
--- Saeulen am Rand.
+-- Die Arena ist eine flache Kampfflaeche. Seit v15 gibt es kein PIT-Level und
+-- damit keine Saeulen mehr; den Fortschritt zeigt der Tower-Turm am aeusseren
+-- Rand der Insel (Look = hoechster Tower, Hoehe = Rekord, MapConfig.TOWER_LOOKS).
 --
 -- Teil von MapService: nur MapService (und die Builder untereinander)
 -- benutzen dieses Modul. Es aendert keine Spielerdaten.
@@ -16,6 +17,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 
@@ -37,12 +39,11 @@ function ArenaBuilder.buildBridge(plotModel: Model, slot: number)
 	)
 end
 
--- Die PIT-Arena am Ende der Bruecke. Flache runde Kampfflaeche; das PIT-Level
--- zeigt sich an der Anzahl der Saeulen am Rand.
+-- Die PIT-Arena am Ende der Bruecke. Flache runde Kampfflaeche.
 --
 -- Die Kampfflaeche heisst bewusst weiterhin "FightFloor": WorldController
 -- haengt genau an diesem Namen seinen Kampf-Prompt auf.
-function ArenaBuilder.buildPit(plotModel: Model, slot: number, pitLevel: number)
+function ArenaBuilder.buildPit(plotModel: Model, slot: number)
 	local old = plotModel:FindFirstChild("PitPlatform")
 	if old then old:Destroy() end
 
@@ -183,33 +184,6 @@ function ArenaBuilder.buildPit(plotModel: Model, slot: number, pitLevel: number)
 	local bannerTitle = MapParts.newTextLabel("Title", banner, UDim2.fromScale(1, 0.6), UDim2.fromScale(0, 0))
 	bannerTitle.Text  = ""
 	MapParts.newTextLabel("Sub", banner, UDim2.fromScale(1, 0.4), UDim2.fromScale(0, 0.6))
-
-	-- Eine Saeule pro PIT-Level, gleichmaessig am Rand verteilt
-	local pillarCount = math.max(0, math.floor(pitLevel))
-	if pillarCount <= 0 then
-		return
-	end
-
-	local pillarRadius = MapConfig.PIT_RADIUS - MapConfig.PIT_PILLAR_INSET
-	local pillarY      = MapConfig.PLATFORM_TOP_Y + MapConfig.PIT_PILLAR_SIZE.Y * 0.5
-
-	for i = 1, pillarCount do
-		local angle = math.rad((i - 1) * (360 / pillarCount))
-		local color = MapConfig.PIT_PILLAR_COLORS[((i - 1) % #MapConfig.PIT_PILLAR_COLORS) + 1]
-
-		local pillar = MapParts.newPart(
-			"PitPillar_" .. i,
-			MapConfig.PIT_PILLAR_SIZE,
-			CFrame.new(
-				center.X + pillarRadius * math.cos(angle),
-				pillarY,
-				center.Z + pillarRadius * math.sin(angle)
-			),
-			color,
-			Enum.Material.Neon
-		)
-		pillar.Parent = container
-	end
 end
 
 -- Eine einzelne Turm-Etage: eine Scheibe im selben Radius wie die
@@ -229,6 +203,95 @@ function ArenaBuilder.buildTowerRing(tower: Folder, center: Vector3, level: numb
 	)
 	ring.Shape  = Enum.PartType.Cylinder
 	ring.Parent = tower
+end
+
+--------------------------------------------------------------------------------
+-- v15: der Tower-Turm (Angeberflaeche)
+--------------------------------------------------------------------------------
+
+export type ShowcaseView = {
+	look   : string,   -- Schluessel in MapConfig.TOWER_LOOKS
+	floors : number,   -- 1 .. TowerConfig.SHOWCASE_MAX_FLOORS
+	title  : string,   -- Schild: "Name · Tower III · 42"
+	color  : Color3,
+}
+
+-- Mitte des Turm-Fusses (Arena-Hoehe), aussen an der Arena-Insel.
+function ArenaBuilder.showcaseFoot(slot: number): Vector3
+	local center  = MapParts.pitCenter(slot)
+	local outward = MapParts.outwardDirection(slot)
+	local pos = center + outward * MapConfig.TOWER_SHOWCASE.distance
+	return Vector3.new(pos.X, MapConfig.PLATFORM_TOP_Y, pos.Z)
+end
+
+-- Baut den Turm neu (der alte wird ersetzt). Teile: Sockel (bis ins Wasser),
+-- `floors` Etagen aus dem Look, Spitze, Schild. Rein deklarativ aus
+-- MapConfig.TOWER_LOOKS — Formaenderungen nur dort.
+function ArenaBuilder.buildShowcase(plotModel: Model, slot: number, view: ShowcaseView): Model
+	local old = plotModel:FindFirstChild("TowerShowcase")
+	if old then old:Destroy() end
+
+	local cfg  = MapConfig.TOWER_SHOWCASE
+	local look = MapConfig.TOWER_LOOKS[view.look] or MapConfig.TOWER_LOOKS.Wood
+	local foot = ArenaBuilder.showcaseFoot(slot)
+
+	local container = Instance.new("Model")
+	container.Name = "TowerShowcase"
+	container:SetAttribute("Look", view.look)
+	container:SetAttribute("Floors", view.floors)
+
+	-- Sockel: vom Grund der Insel bis knapp ueber die Arena, damit der Turm
+	-- nicht auf dem Wasser schwebt.
+	local plinthHeight = MapConfig.ISLAND_HEIGHT + cfg.plinthHeight
+	local plinth = MapParts.newPart(
+		"Sockel",
+		Vector3.new(plinthHeight, (cfg.radius + 1.2) * 2, (cfg.radius + 1.2) * 2),
+		CFrame.new(foot.X, foot.Y + cfg.plinthHeight - plinthHeight * 0.5, foot.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		look.plinth,
+		Enum.Material.Slate
+	)
+	plinth.Shape    = Enum.PartType.Cylinder
+	plinth.CanQuery = false
+	plinth.Parent   = container
+
+	local floors = math.clamp(math.floor(view.floors), 1, TowerConfig.SHOWCASE_MAX_FLOORS)
+	local baseY  = cfg.plinthHeight
+	for i = 1, floors do
+		local origin = CFrame.new(foot.X, foot.Y + baseY + (i - 1) * cfg.floorHeight, foot.Z)
+		MapParts.buildDecor(container, origin, look.floor)
+	end
+
+	local topY = baseY + floors * cfg.floorHeight
+	MapParts.buildDecor(container, CFrame.new(foot.X, foot.Y + topY, foot.Z), look.top)
+
+	-- Schild ueber der Spitze (Name · Tower · Rekord).
+	local anchor = MapParts.newPart(
+		"SignAnchor",
+		Vector3.new(1, 1, 1),
+		CFrame.new(foot.X, foot.Y + topY + MapParts.decorHeight(look.top) + cfg.signGap, foot.Z),
+		look.accent,
+		Enum.Material.SmoothPlastic
+	)
+	anchor.Transparency = 1
+	anchor.CanCollide   = false
+	anchor.CanQuery     = false
+	anchor.CanTouch     = false
+	anchor.Parent       = container
+
+	local sign = Instance.new("BillboardGui")
+	sign.Name        = "Sign"
+	sign.Size        = UDim2.fromScale(16, 2.4)
+	sign.AlwaysOnTop = false
+	sign.MaxDistance = cfg.signDistance
+	sign.Adornee     = anchor
+	sign.Parent      = anchor
+
+	local title = MapParts.newTextLabel("Title", sign, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0))
+	title.Text       = view.title
+	title.TextColor3 = view.color
+
+	container.Parent = plotModel
+	return container
 end
 
 return ArenaBuilder

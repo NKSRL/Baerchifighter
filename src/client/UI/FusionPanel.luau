@@ -44,6 +44,8 @@ local SkillConfig     = require(ReplicatedStorage.Config.SkillConfig)
 
 local Theme        = require(script.Parent.Theme)
 local Toast        = require(script.Parent.Toast)
+-- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
+local Notify       = require(script.Parent.Notify)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
@@ -288,7 +290,9 @@ local function showResult(result: Types.FusionResult)
 	local def     = BaerchiConfig.getById(baerchi.configId)
 	local name    = def and def.displayName or baerchi.configId
 
-	Toast.success(string.format("Fusion: %s (%s) Lv. %d", name, baerchi.rarity, baerchi.level))
+	Notify.emit("fusion_result", function()
+		Toast.success(string.format("Fusion: %s (%s) Lv. %d", name, baerchi.rarity, baerchi.level))
+	end)
 
 	local root = _root
 	if not root or not root.Visible then return end

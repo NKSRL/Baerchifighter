@@ -33,6 +33,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 
 local EventConfig = require(ReplicatedStorage.Config.EventConfig)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)  -- HBB Paket 6
 local MapConfig    = require(ReplicatedStorage.Config.MapConfig)
 local Remotes      = require(ReplicatedStorage.Network.Remotes)
 local MapService   = require(ServerScriptService.Services.MapService)
@@ -52,6 +53,11 @@ local _phaseEndsAt = 0
 -- Index in EventConfig.EVENTS, der als naechstes drankommt. Der Reihe nach,
 -- kein Zufall — siehe EventConfig, Kommentar bei EVENTS.
 local _nextIndex = 1
+
+-- In welchem Durchlauf des Zyklus das naechste Event liegt (ab 1). Events mit
+-- everyNthCycle (Boss) laufen nur in passenden Durchlaeufen; die Regel steht
+-- in EventConfig.isScheduledInCycle, hier wird nur weitergezaehlt.
+local _nextCycle = 1
 
 -- Beobachter, die beim START eines Events benachrichtigt werden wollen
 -- (EventParticipationService startet damit den Event-Handler).
@@ -98,9 +104,25 @@ local function broadcastPhase()
 	Remotes.EventPhaseChanged:FireAllClients(phasePayload())
 end
 
+-- Stellt _nextIndex auf das naechste Event, das im jeweiligen Durchlauf
+-- laeuft. Beim Umlauf (letztes → erstes Event) beginnt ein neuer Durchlauf.
+local function advance()
+	local count = #EventConfig.EVENTS
+	for _ = 1, count * 2 do
+		_nextIndex += 1
+		if _nextIndex > count then
+			_nextIndex = 1
+			_nextCycle += 1
+		end
+		if EventConfig.isScheduledInCycle(EventConfig.EVENTS[_nextIndex], _nextCycle) then
+			return
+		end
+	end
+end
+
 local function startEvent()
 	local def = EventConfig.EVENTS[_nextIndex]
-	_nextIndex = (_nextIndex % #EventConfig.EVENTS) + 1
+	advance()
 
 	_active      = def
 	_phaseEndsAt = os.time() + EventConfig.getDuration(def)
@@ -282,8 +304,8 @@ function EventService.init()
 	end)
 
 	print(
-		"[EventService] Initialisiert |", #EventConfig.EVENTS, "Events im Wechsel |",
-		"individuelle Dauer,", EventConfig.EVENT_GAP_SECONDS, "s Pause"
+		"[EventService] Initialisiert |", #EventConfig.EVENTS, "Events im Wechsel",
+		"(manche nur jeden n-ten Durchlauf) | individuelle Dauer,", EventConfig.EVENT_GAP_SECONDS, "s Pause"
 	)
 end
 
@@ -294,7 +316,11 @@ function EventService.start()
 	-- Server startet in der Pause, nicht mitten in einem Event — sonst wuerde
 	-- jeder frisch gestartete Server sofort mit einem laufenden Event
 	-- begruesst, was sich nach einem Fehler anfuehlt statt nach Absicht.
-	_phaseEndsAt = os.time() + EventConfig.EVENT_GAP_SECONDS
+	-- HBB Paket 6: die erste Pause eines neuen Servers ist kuerzer.
+	local firstGap = if FeatureFlags.isOn("EVENT_V2_TIMER")
+		then EventConfig.FIRST_GAP_SECONDS
+		else EventConfig.EVENT_GAP_SECONDS
+	_phaseEndsAt = os.time() + firstGap
 	MapService.setEventPitTheme(nil)
 
 	task.spawn(function()

@@ -19,20 +19,24 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
+local FeatureFlags      = require(ReplicatedStorage.Config.FeatureFlags)
 
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local Theme           = require(script.Parent.Theme)
+local Icons           = require(script.Parent.Icons)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
 local ClientState     = require(script.Parent.Parent.Controllers.ClientState)
+local Unlock          = require(script.Parent.Unlock)
 
 local PetBar = {}
 
-local BUTTON_WIDTH  = 190
-local BUTTON_HEIGHT = 62    -- Mindesthoehe 56 px fuer Touch
+local BUTTON_WIDTH  = 210
+local BUTTON_HEIGHT = 68    -- Mindesthoehe 56 px fuer Touch
 local GAP           = 14
 
 local EVENT_COLOR = Color3.fromRGB(120, 190, 255)
@@ -45,6 +49,7 @@ type ButtonView = {
 	sub    : TextLabel,
 	stroke : UIStroke,
 	color  : Color3,
+	icon   : GuiObject,
 }
 
 local _event: ButtonView? = nil
@@ -54,6 +59,7 @@ local _fight: ButtonView? = nil
 local _state   = "Home"
 local _pending: string? = nil
 local _stage: number? = nil
+local _tower: string? = nil   -- v15: Tower des laufenden Kampfs (vom Server)
 local _from: string? = nil
 local _abducting = false
 
@@ -65,6 +71,17 @@ local _phaseEndsAt = 0
 --------------------------------------------------------------------------------
 -- Hilfen
 --------------------------------------------------------------------------------
+
+-- HBB Paket 6: Icon je Event fuer den Timer am Knopf (Name aus UI/Icons,
+-- sonst das Zeichen als Rueckfall). Die Wespenkoenigin bekommt ein eigenes.
+local EVENT_ICON: { [string]: { name: string, fallback: string } } = {
+	Ufo            = { name = "ufo",   fallback = "UFO" },
+	HotEgg         = { name = "egg",   fallback = "🥚" },
+	MutationsSturm = { name = "",      fallback = "🌪" },
+	Koenigshuegel  = { name = "crown", fallback = "♛" },
+	Schatzgraeber  = { name = "gift",  fallback = "💎" },
+	WaspQueen      = { name = "",      fallback = "🐝" },
+}
 
 local function clock(seconds: number): string
 	local s = math.max(0, math.floor(seconds))
@@ -83,21 +100,29 @@ local function eventLine(): string
 	return ""
 end
 
--- HP-Anteil und PIT-Level des ausgeruesteten Baerchis (nil = keiner da)
-local function fighterInfo(): (number?, number)
-	local data = ClientState.get()
-	if not data then return nil, 1 end
+-- "Tower II" fuer eine Tower-Id.
+local function towerLabel(towerId: string?): string
+	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
+	return "Tower " .. def.numeral
+end
 
+-- HP-Anteil des ausgeruesteten Baerchis (nil = keiner da) und der gewaehlte
+-- Tower (v15, ersetzt das PIT-Level).
+local function fighterInfo(): (number?, string)
+	local data = ClientState.get()
+	if not data then return nil, "I" end
+
+	local tower = if data.towers then data.towers.selected else "I"
 	local uid = data.island.equippedUid
 	local baerchi = if uid then data.island.baerchis[uid] else nil
 	local def = if baerchi then BaerchiConfig.getById(baerchi.configId) else nil
 	if not baerchi or not def then
-		return nil, data.island.pitLevel
+		return nil, tower
 	end
 
 	local maxHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
 	local hp = math.clamp(baerchi.currentHp or maxHp, 0, maxHp)
-	return hp / math.max(1, maxHp), data.island.pitLevel
+	return hp / math.max(1, maxHp), tower
 end
 
 local function paint(view: ButtonView, title: string, sub: string, mode: "normal" | "active" | "waiting" | "disabled")
@@ -111,11 +136,14 @@ local function paint(view: ButtonView, title: string, sub: string, mode: "normal
 		view.stroke.Color            = Theme.COLORS.outline
 		view.stroke.Thickness        = Theme.OUTLINE_THICKNESS
 		view.title.TextTransparency  = 0.35
+		Icons.tint(view.icon, Color3.fromRGB(140, 140, 150))
 		return
 	end
 
+	Icons.tint(view.icon, Color3.new(1, 1, 1))
+
 	view.button.Active          = true
-	view.button.AutoButtonColor = true
+	view.button.AutoButtonColor = false
 	view.title.TextTransparency = 0
 
 	if mode == "active" then
@@ -137,11 +165,32 @@ end
 -- Anzeige
 --------------------------------------------------------------------------------
 
+local _eventIconKey: string? = nil
+
+-- Tauscht das Icon des Event-Knopfs gegen das des kommenden/laufenden Events.
+local function setEventIcon(view: ButtonView, eventId: string?)
+	local key = eventId or "Ufo"
+	if _eventIconKey == key then return end
+	_eventIconKey = key
+	local look = EVENT_ICON[key] or EVENT_ICON.Ufo
+	local old = view.icon
+	local icon = Icons.make(view.button, look.name, look.fallback)
+	icon.AnchorPoint = old.AnchorPoint
+	icon.Position    = old.Position
+	icon.Size        = old.Size
+	icon.ZIndex      = old.ZIndex
+	old:Destroy()
+	view.icon = icon
+end
+
 local function refresh()
 	local event, fight = _event, _fight
 	if not event or not fight then return end
 
-	local hpRatio, pitLevel = fighterInfo()
+	-- HBB Paket 3: der Event-Knopf erscheint erst nach dem ersten Kampf
+	Unlock.apply("button_event", event.button)
+
+	local hpRatio, selectedTower = fighterInfo()
 	local hasPet = hpRatio ~= nil
 
 	-- --------------------------------------------------------------- Event
@@ -157,19 +206,24 @@ local function refresh()
 		paint(event, "wartet …", "erst heim, dann hin • Klick bricht ab", "waiting")
 	elseif _state == "Returning" and _from == "Event" then
 		paint(event, "Event", "kommt heim …", "normal")
+	elseif FeatureFlags.isOn("EVENT_V2_TIMER") then
+		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
+		-- keine Woerter.
+		setEventIcon(event, _eventId or _nextEventId)
+		paint(event, clock(_phaseEndsAt - os.clock()), "", "normal")
 	else
 		paint(event, "Event", eventLine(), "normal")
 	end
 
 	-- --------------------------------------------------------------- Fight
-	local hpText = if hpRatio then string.format("HP %d%%  •  PIT %d", math.floor(hpRatio * 100 + 0.5), pitLevel) else ""
+	local hpText = if hpRatio then string.format("HP %d%%  •  %s", math.floor(hpRatio * 100 + 0.5), towerLabel(selectedTower)) else ""
 
 	if not hasPet then
 		paint(fight, "Fight", "Kein Baerchi ausgeruestet", "disabled")
 	elseif _state == "ToPit" then
 		paint(fight, "Zurueckholen", "laeuft in den PIT …", "active")
 	elseif _state == "InPit" then
-		paint(fight, "Zurueckholen", if _stage then "Stage " .. _stage else "im PIT", "active")
+		paint(fight, "Zurueckholen", if _stage then towerLabel(_tower or selectedTower) .. " · Stage " .. _stage else towerLabel(_tower or selectedTower), "active")
 	elseif _pending == "Fight" then
 		paint(fight, "wartet …", "erst heim, dann PIT • Klick bricht ab", "waiting")
 	elseif _state == "Returning" and _from == "Fight" then
@@ -186,6 +240,7 @@ end
 --------------------------------------------------------------------------------
 
 local function onEventClicked()
+	Unlock.markSeen("button_event")
 	Remotes.RequestPetMode:FireServer("Event")
 end
 
@@ -196,9 +251,20 @@ local function onFightClicked()
 		return
 	end
 
-	-- Neuer Lauf: gibt es einen letzten Lauf auf diesem PIT-Level, zuerst die
+	-- Neuer Lauf: gibt es einen letzten Lauf in diesem Tower, zuerst die
 	-- Fortsetzungs-Frage.
 	local data = ClientState.get()
+
+	-- HBB Paket 2: keine Frage mehr. Mit gespeichertem Lauf geht es
+	-- kostenlos ab 65 % weiter; der bezahlte Einstieg ab der letzten Stage
+	-- ist ein eigener kleiner Knopf im Tower-Fenster (CombatPanel). Der
+	-- Server rechnet beide Wege unveraendert.
+	if FeatureFlags.isOn("UI_V2_GUIDE") then
+		local choice = if data and PitResumeDialog.getProgress(data) then "Percent" else "Fresh"
+		Remotes.RequestPetMode:FireServer("Fight", choice)
+		return
+	end
+
 	if data and PitResumeDialog.getProgress(data) then
 		PitResumeDialog.open(function(choice)
 			Remotes.RequestPetMode:FireServer("Fight", choice)
@@ -210,26 +276,42 @@ local function onFightClicked()
 end
 
 --------------------------------------------------------------------------------
+-- HBB Paket 2: Anker fuer die Fuehrung (GuideController)
+--------------------------------------------------------------------------------
+
+function PetBar.getButton(mode: string): GuiObject?
+	local view = if mode == "Fight" then _fight elseif mode == "Event" then _event else nil
+	return if view then view.button else nil
+end
+
+--------------------------------------------------------------------------------
 -- Aufbau
 --------------------------------------------------------------------------------
 
-local function buildButton(parent: Instance, name: string, color: Color3, order: number, onClick: () -> ()): ButtonView
+local function buildButton(parent: Instance, name: string, color: Color3, order: number, onClick: () -> (), iconName: string, fallback: string): ButtonView
 	local button = Theme.bigButton(name, parent, "", color)
 	button.Size        = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT)
 	button.LayoutOrder = order
 
 	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
 
+	-- Icon links, ragt oben ueber den Knopf hinaus
+	local icon = Icons.make(button, iconName, fallback)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position    = UDim2.new(0, 6, 0.5, -6)
+	icon.Size        = UDim2.fromOffset(60, 60)
+	icon.ZIndex      = 4
+
 	local title = Theme.label("Title", button, name)
-	title.Position       = UDim2.new(0, 8, 0, 5)
-	title.Size           = UDim2.new(1, -16, 0, 30)
+	title.Position       = UDim2.new(0, 64, 0, 6)
+	title.Size           = UDim2.new(1, -72, 0, 30)
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.TextColor3     = Theme.COLORS.text
 	Theme.outlineText(title)
 
 	local sub = Theme.label("Sub", button, "")
-	sub.Position       = UDim2.new(0, 6, 1, -24)
-	sub.Size           = UDim2.new(1, -12, 0, 18)
+	sub.Position       = UDim2.new(0, 64, 1, -26)
+	sub.Size           = UDim2.new(1, -70, 0, 18)
 	sub.TextXAlignment = Enum.TextXAlignment.Center
 	sub.TextScaled     = false
 	sub.TextSize       = 12
@@ -242,7 +324,7 @@ local function buildButton(parent: Instance, name: string, color: Color3, order:
 		onClick()
 	end)
 
-	return { button = button, title = title, sub = sub, stroke = stroke, color = color }
+	return { button = button, title = title, sub = sub, stroke = stroke, color = color, icon = icon }
 end
 
 function PetBar.init(screenGui: ScreenGui)
@@ -265,8 +347,8 @@ function PetBar.init(screenGui: ScreenGui)
 	local layout = Theme.listLayout(bar, GAP, true)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked)
-	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked)
+	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO")
+	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X")
 
 	PitResumeDialog.init(screenGui)
 
@@ -275,6 +357,7 @@ function PetBar.init(screenGui: ScreenGui)
 		_pending = if typeof(pending) == "string" then pending else nil
 		local typedInfo = if typeof(info) == "table" then info else {}
 		_stage     = if typeof(typedInfo.stage) == "number" then typedInfo.stage else nil
+		_tower     = if typeof(typedInfo.tower) == "string" then typedInfo.tower else nil
 		_from      = if typeof(typedInfo.from) == "string" then typedInfo.from else nil
 		_abducting = typedInfo.abducting == true
 

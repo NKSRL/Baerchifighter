@@ -41,6 +41,7 @@ local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 
 local Theme = require(script.Parent.Theme)
+local EggIcon = require(script.Parent.EggIcon)
 local Toast = require(script.Parent.Toast)
 
 local HatchAnimation = {}
@@ -195,12 +196,8 @@ local function buildScene(screenGui: ScreenGui, eggType: Types.EggType): Scene
 	local stroke = Theme.stroke(egg, Theme.COLORS.outline, 4)
 	Theme.gradient(egg, Theme.shade(eggColor, 0.25), Theme.shade(eggColor, -0.15))
 
-	-- Ein paar Tupfen machen aus der Ellipse ein Ei
-	for index, spot in { Vector2.new(0.32, 0.30), Vector2.new(0.66, 0.46), Vector2.new(0.40, 0.68) } do
-		local dot = newFrame("Spot" .. index, egg, UDim2.fromScale(0.16, 0.12), UDim2.fromScale(spot.X, spot.Y), Theme.shade(eggColor, -0.18))
-		dot.ZIndex = 53
-		round(dot)
-	end
+	-- Muster und Glanzpunkt wie auf dem Ei in der Welt (EggIcon/EggLook)
+	EggIcon.decorate(egg, eggType, EGG_SIZE.X / EGG_SIZE.Y, 53)
 
 	local cracks = Instance.new("Frame")
 	cracks.Name                   = "Cracks"
@@ -435,7 +432,9 @@ local function play(job: Job)
 	if not result then
 		connection:Disconnect()
 		if not job.silent then
-			Toast.show(job.failed or "Oeffnen fehlgeschlagen", Theme.COLORS.bad)
+			Notify.emit("hatch_failed", function()
+				Toast.show(job.failed or "Oeffnen fehlgeschlagen", Theme.COLORS.bad)
+			end)
 		end
 		tween(scene.backdrop, FADE_SECONDS, { BackgroundTransparency = 1 })
 		tween(scene.egg, FADE_SECONDS, { BackgroundTransparency = 1, Position = UDim2.fromScale(0.5, 1.3) })

@@ -8,12 +8,13 @@
 --
 -- Was ein Rebirth kostet und was er einbringt:
 --   Kosten     : EconomyConfig.getRebirthCost(rebirthCount)  (Gummies)
---   Verloren   : alle Gebaeude-Level, PIT-Turm-Fortschritt, laufende Bruten,
+--   Verloren   : alle Gebaeude-Level, der Fortsetzen-Stand der Tower,
 --                Gummies (zurueck auf REBIRTH_START_GUMMIES),
 --                Baerchi-LEVEL und -XP (siehe unten)
 --   Behalten   : alle Baerchis SELBST (inkl. wer gerade ausgeruestet ist,
 --                Rarity, Skill, Fusion-Bonus), GoldGummies, Rang,
---                Statistiken, der Ei-Baum (v14) und ALLE Eier im Lager
+--                Statistiken, der Ei-Baum (v14), Tower-Rekorde und
+--                Meilensteine (v15) und ALLE Eier im Lager
 --                (v14 — vorher nur die Ascensions-Eier; seit kein Ei mehr
 --                kaufbar ist, waere jedes andere Ei ein echter Verlust).
 --                Herumliegende Eier wandern beim Rebirth ins Lager.

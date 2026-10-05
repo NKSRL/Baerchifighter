@@ -2,15 +2,22 @@
 -- EventConfig.luau
 -- ReplicatedStorage/Config/EventConfig.luau
 --
--- Der Event-Zyklus (Stand 2026-10-02, siehe Projekt-Doc
--- EVENT_UND_RARITY_IDEEN_2026-10-02): FUENF Events im festen Wechsel.
+-- Der Event-Zyklus (Stand 2026-10-04, siehe Projekt-Docs
+-- EVENT_UND_RARITY_IDEEN_2026-10-02 und README_EVENTS_GEBAEUDE_TOWER_PLAN):
+-- SECHS Events im festen Wechsel, das Boss-Event nur in jedem zweiten
+-- Durchlauf (everyNthCycle). Ein Durchlauf ohne Boss dauert ~41 min, mit ~46.
 --
---   UFO             Flaggschiff, 4 Min. Als EINZIGES Event gibt es Stat-Stufen
---                   (+1 auf ALLE fuenf Stats) und eine Rarity-Up-Chance.
---   Hot Egg         Heisses Ei wird per Beruehrung weitergegeben -> Gutes Ei
+--   UFO             Flaggschiff, 4 Min. Patrouilliert ueber dem Pit, der Beam
+--                   wandert mit; Entfuehrung = +1 auf ALLE Stats und
+--                   Rarity-Up-Chance. Alle 30 s ein Ei-Abwurf (1 % Jackpot).
+--   Hot Egg         Heisses Ei wird weitergegeben -> Gutes Ei. Waben werden
+--                   zu Lava (x3), alle ~30 s ein Vulkan-Ausbruch.
 --   Mutations-Sturm Blitze mutieren Baerchis, Chance sinkt mit Rarity -> Mutation
 --   Koenigshuegel   Wer am laengsten oben steht -> Gutes Ei
 --   Schatzgraeber   Baerchis graben, Bomben schicken sie heim -> Gutes Ei
+--   Wespenkoenigin  Boss-Kampf fuer alle (jeder zweite Durchlauf): Baerchis
+--                   kaempfen, Spieler weichen Telegraphen aus. Belohnung nach
+--                   Schadensanteil.
 --
 -- EventService faehrt nur die Uhr, EventParticipationService teilt aus und
 -- startet die Event-Handler (Services/EventHandlers/*). WAS es gibt und alle
@@ -86,6 +93,10 @@ export type EventDef = {
 
 	-- Ein Satz fuer Tafel/UI. Hat Vorrang vor der automatisch gebauten Zeile.
 	rewardText  : string?,
+
+	-- Laeuft nur in jedem n-ten Durchlauf des Zyklus (nil = jeder). Der Zyklus
+	-- zaehlt ab 1; mit 2 kommt das Event im 2., 4., 6. ... Durchlauf.
+	everyNthCycle : number?,
 }
 
 --------------------------------------------------------------------------------
@@ -95,6 +106,11 @@ export type EventDef = {
 -- Standard-Dauer, falls ein Event keine eigene hat (und fuer Debug-Ausgaben).
 local EVENT_DURATION_SECONDS = 180
 local EVENT_GAP_SECONDS      = 300
+-- HBB Paket 6: Pause vor dem ERSTEN Event eines frisch gestarteten Servers.
+-- Kuerzer, damit die ersten Spieler eines neuen Servers nicht fuenf Minuten
+-- auf das erste Event warten. Alle spaeteren Pausen und die Boss-Haeufigkeit
+-- (everyNthCycle) bleiben unveraendert. Gilt nur mit FeatureFlags.EVENT_V2_TIMER.
+local FIRST_GAP_SECONDS      = 75
 
 --------------------------------------------------------------------------------
 -- UFO-Event
@@ -103,7 +119,41 @@ local EVENT_GAP_SECONDS      = 300
 local UFO = {
 	-- So viele Sekunden Beam-Fortschritt braucht ein Baerchi zur Entfuehrung.
 	-- Der Fortschritt muss nicht am Stueck laufen (Kaempfe pausieren ihn nur).
-	BEAM_REQUIRED_SECONDS = 30,
+	-- 20 statt 30: der Ring wandert, der Baerchi verliert beim Nachlaufen Zeit.
+	BEAM_REQUIRED_SECONDS = 20,
+
+	-- PATROUILLE: Lissajous-Bahn ueber dem Pit (Studs, Sekunden), reine
+	-- Funktion der Serverzeit (Modules/EventMotion). Halbachsen so, dass der
+	-- Beam-Ring immer im Pit bleibt (Pit-Radius 50, Ring 11); schnellster
+	-- Punkt ~2,5 Studs/s, ein Baerchi laeuft am Event 26.
+	PATROL_RADIUS_X = 24,
+	PATROL_RADIUS_Z = 18,
+	PATROL_PERIOD_X = 90,
+	PATROL_PERIOD_Z = 60,
+	-- Ein Baerchi im Beam laeuft nach, sobald er weiter als dieser Anteil des
+	-- Ring-Radius von der Ring-Mitte steht; Ziel ist die Ring-Mitte so viele
+	-- Sekunden voraus.
+	FOLLOW_SHARE      = 0.55,
+	FOLLOW_LEAD_SECONDS = 1.5,
+
+	-- EI-ABWURF: alle DROP_INTERVAL_SECONDS (erster nach DROP_FIRST_SECONDS,
+	-- 8 pro Event). DROP_TELEGRAPH_SECONDS vorher erscheint der Landekreis an
+	-- der vorhergesagten UFO-Position. Aufheben: Spieler-CHARAKTER innerhalb
+	-- DROP_PICKUP_RADIUS, erster gewinnt (Server prueft im Takt).
+	DROP_FIRST_SECONDS      = 15,
+	DROP_INTERVAL_SECONDS   = 30,
+	DROP_TELEGRAPH_SECONDS  = 3,
+	DROP_PICKUP_RADIUS      = 5,
+	DROP_PICKUP_MAX_HEIGHT  = 8,
+	DROP_CHECK_SECONDS      = 0.1,
+	DROP_EGG                = "BasicEgg" :: Types.EggType,
+
+	-- JACKPOT: goldene Kiste mit dem UFO-Jackpot-Ei. Pity: spaetestens der
+	-- JACKPOT_PITY_DROPS-te Abwurf (serverweit, Laufzeit-Zaehler, wird nach
+	-- jedem Jackpot zurueckgesetzt).
+	JACKPOT_CHANCE     = 0.01,
+	JACKPOT_PITY_DROPS = 100,
+	JACKPOT_EGG        = "UfoJackpotEgg" :: Types.EggType,
 
 	-- War so lange KEIN Baerchi im Beam (oder kommt einer zu spaet), schliesst
 	-- das UFO den Beam und setzt ihn zurueck: alle Countdowns beginnen neu.
@@ -200,6 +250,17 @@ local HOT_EGG = {
 	-- Nach einer Weitergabe darf das Ei kurz nicht zurueck.
 	PASS_COOLDOWN_SECONDS  = 2.0,
 	TOUCH_DISTANCE         = 5,
+
+	-- Wabenthema waehrend des Events (CombConfig.THEMES).
+	COMB_THEME = "HotEgg",
+
+	-- VULKAN-AUSBRUCH: alle ERUPTION_INTERVAL_SECONDS ein Warnring in der
+	-- Mitte, ERUPTION_WARN_SECONDS spaeter fliegen ERUPTION_MIN..MAX
+	-- Lava-Waben in alle Richtungen (landen als normale Waben im Slot-Modell).
+	ERUPTION_INTERVAL_SECONDS = 30,
+	ERUPTION_WARN_SECONDS     = 2,
+	ERUPTION_MIN              = 8,
+	ERUPTION_MAX              = 10,
 }
 
 --------------------------------------------------------------------------------
@@ -250,6 +311,110 @@ local TREASURE = {
 		{ minFinds = 3, eggPick = "highest", amount = 2 },
 		{ minFinds = 5, eggPick = "jump",    amount = 1, blueprintChance = 0.10 },
 	},
+}
+
+--------------------------------------------------------------------------------
+-- Wespenkoenigin (Boss-Event)
+--------------------------------------------------------------------------------
+-- Ablauf: ANNOUNCE_SECONDS Ankuendigung (Himmel dunkelt), dann Kampf bis zum
+-- Sieg oder Event-Ende. Die Baerchis am Event kaempfen automatisch, ihr
+-- Schaden kommt aus dem echten Kampfmodell (Modules/BossBalance ueber
+-- CombatCalculator). Die Spieler weichen Telegraphen aus: ein Treffer stoesst
+-- zurueck, bremst und setzt den Schaden des eigenen Baerchis kurz aus. Wer
+-- mit seinem Charakter im Pit steht, feuert an (CHEER_FACTOR).
+
+local WASP_QUEEN = {
+	ANNOUNCE_SECONDS = 20,
+	TICK_SECONDS     = 0.5,
+
+	-- Ziel-Kampfdauer, aus der die HP berechnet werden:
+	--   HP = Spieler x mittlere DPS x TARGET_FIGHT_SECONDS x HP_FACTOR
+	-- (Spieler = Baerchis am Event beim Kampfbeginn). Wer spaeter dazukommt,
+	-- erhoeht die HP um seine DPS x Restzeit bis zum Ziel (mind. LATE_JOIN_MIN_SECONDS).
+	-- 135 statt 150: Treffer setzen Schaden aus, und Anfaenger weichen
+	-- schlechter aus; mit 135 liegt der Kampf ueber alle Staerken bei
+	-- ~125-170 s (tools/sim/boss_balance.lua).
+	TARGET_FIGHT_SECONDS  = 135,
+	HP_FACTOR             = 1.0,
+	-- v15 (vorbereitet, AUS): Boss-HP-Faktor nach dem hoechsten Tower der
+	-- Teilnehmer (Index 1-4 = I, II, III, Final). Standard ueberall 1 — erst
+	-- nach dem Playtest einschalten (BossBalance.towerHpFactor).
+	TOWER_HP_FACTOR       = { 1.0, 1.0, 1.0, 1.0 },
+	MIN_HP                = 400,
+	LATE_JOIN_MIN_SECONDS = 30,
+
+	CHEER_FACTOR     = 1.25,
+	HIT_STUN_SECONDS = 3,
+	-- Treffer am Spieler: Rueckstoss (Studs/s) und Bremse (Anteil, Sekunden).
+	KNOCKBACK_SPEED  = 70,
+	SLOW_FACTOR      = 0.5,
+	SLOW_SECONDS     = 2,
+
+	-- Phase 2 ab diesem HP-Anteil: schnellere Attacken, Waben-Regen (Koenigsgelee).
+	PHASE2_AT              = 0.5,
+	PHASE1_ATTACK_INTERVAL = 6,
+	PHASE2_ATTACK_INTERVAL = 4,
+	TELEGRAPH_SECONDS      = 2,
+	RAIN_THEME             = "WaspQueen",
+	RAIN_INTERVAL_SECONDS  = 8,
+	RAIN_COUNT             = 6,
+
+	-- Attacken (Studs). Schockwelle: Ring um den Boden unter der Koenigin.
+	-- Stachel-Salve: Kreise auf Spielerpositionen. Schwarm: Bahn quer durchs Pit.
+	SHOCK_INNER        = 7,
+	SHOCK_OUTER        = 17,
+	STING_RADIUS       = 6,
+	STING_COUNT        = 3,
+	STING_COUNT_PHASE2 = 5,
+	SWARM_WIDTH        = 9,
+
+	-- Bewegung (Modules/EventMotion): Kreis ueber dem Pit.
+	ORBIT_RADIUS        = 14,
+	ORBIT_PERIOD        = 32,
+	ORBIT_PERIOD_PHASE2 = 20,
+
+	-- Belohnung nach Schadensanteil. Unter MIN_DAMAGE_SHARE gibt es nichts.
+	-- Teilnahme: Gummies (mit Rebirth-Multiplikator) und Wabeneinheiten in den
+	-- Recycler, je GUMMIES_BASE/COMB_UNITS_BASE mal Anteil x Teilnehmerzahl
+	-- (ein Durchschnitts-Teilnehmer bekommt genau die Basis), begrenzt auf
+	-- SHARE_FACTOR_MIN..MAX. Die besten TOP_RANKS bekommen ein Sprung-Ei und
+	-- einen Rarity-Up-Wurf (RARITY_UP_FACTOR x EventConfig.RARITY_UP_CHANCE).
+	-- Sieg: jeder bekommt sein hoechstes Ei, mit JACKPOT_CHANCE stattdessen das
+	-- Jackpot-Ei. Niederlage: nur Teilnahme x DEFEAT_FACTOR.
+	MIN_DAMAGE_SHARE  = 0.02,
+	GUMMIES_BASE      = 300,
+	COMB_UNITS_BASE   = 15,
+	SHARE_FACTOR_MIN  = 0.5,
+	SHARE_FACTOR_MAX  = 2.0,
+	TOP_RANKS         = 3,
+	RARITY_UP_FACTOR  = 0.5,
+	JACKPOT_CHANCE    = 0.01,
+	DEFEAT_FACTOR     = 0.5,
+}
+
+-- HBB Paket 7: Belohnungsstufen am Boss (Modules/BossTiers), ZUSAETZLICH zur
+-- Belohnung nach Schadensanteil oben. Gilt nur mit FeatureFlags.BOSS_TIERS.
+-- Schwellen relativ zum eigenen Potenzial (DPS x Zeit am Boss).
+-- Belohnungen nur aus vorhandenen Bausteinen; Gummies sind Basisbetraege
+-- (EconomyService wendet den Rebirth-Multiplikator an). Kumuliert: Stufe 3
+-- hat zusammen zwei Basis-Eier, Stufe 4 dazu einen Mutations-Wurf.
+local BOSS_TIERS = {
+	T2 = 0.05,
+	T3 = 0.25,
+	T4 = 0.60,
+	-- Aktivitaet: Charakter alle CHECK_SECONDS mehr als MOVE_STUDS bewegt
+	-- (Player.Idled gibt es nur auf dem Client)
+	ACTIVE_WINDOW_SECONDS = 60,
+	ACTIVE_CHECK_SECONDS  = 2,
+	ACTIVE_MOVE_STUDS     = 4,
+	REWARDS = {
+		[1] = { gummies = 40,  combUnits = 3, basicEggs = 0, mutationRoll = false },
+		[2] = { gummies = 60,  combUnits = 4, basicEggs = 1, mutationRoll = false },
+		[3] = { gummies = 80,  combUnits = 5, basicEggs = 2, mutationRoll = false },
+		[4] = { gummies = 100, combUnits = 6, basicEggs = 2, mutationRoll = true },
+	} :: { [number]: { gummies: number, combUnits: number, basicEggs: number, mutationRoll: boolean } },
+	-- Wurf wie beim Mutations-Sturm (gleiche Chance, gleiche Rarity-Daempfung)
+	MUTATION_CHANCE = 0.20,
 }
 
 --------------------------------------------------------------------------------
@@ -347,6 +512,25 @@ local EVENTS: { EventDef } = {
 		bonus           = nil,
 		rewardText      = "Eier je nach Funden  •  Vorsicht, Bomben!",
 	},
+
+	-- ---------------------------------------------------------------- 6
+	{
+		id              = "WaspQueen",
+		displayName     = "Wespenkoenigin",
+		floorColor      = Color3.fromRGB( 60,  44,  20),
+		fenceColor      = Color3.fromRGB(255, 200,  40),
+		ringColor       = Color3.fromRGB(255, 170,  30),
+		bannerColor     = Color3.fromRGB(255, 210,  90),
+		action          = "bounce",
+		actionText      = "kaempft gegen die Wespenkoenigin",
+		durationSeconds = 240,
+		handler         = "WaspQueen",
+		statGain        = false,
+		statFocus       = nil,
+		bonus           = { kind = "eggs", eggPick = "highest", amount = 1 },
+		rewardText      = "Boss! Belohnung nach Schaden  •  Sieg: dein hoechstes Ei (1 % Jackpot)",
+		everyNthCycle   = 2,
+	},
 }
 
 --------------------------------------------------------------------------------
@@ -360,6 +544,13 @@ local function getById(id: string): EventDef?
 		end
 	end
 	return nil
+end
+
+-- Laeuft dieses Event im Durchlauf `cycle` (ab 1 gezaehlt)?
+local function isScheduledInCycle(def: EventDef, cycle: number): boolean
+	local n = def.everyNthCycle
+	if not n or n <= 1 then return true end
+	return cycle % n == 0
 end
 
 local function getDuration(def: EventDef): number
@@ -428,6 +619,8 @@ return {
 	EMERGENCY_BASIC_EGG_CHANCE = EMERGENCY_BASIC_EGG_CHANCE,
 	EVENT_DURATION_SECONDS = EVENT_DURATION_SECONDS,
 	EVENT_GAP_SECONDS      = EVENT_GAP_SECONDS,
+	FIRST_GAP_SECONDS      = FIRST_GAP_SECONDS,
+	BOSS_TIERS             = BOSS_TIERS,
 	EVENTS                 = EVENTS,
 
 	UFO                    = UFO,
@@ -438,9 +631,11 @@ return {
 	HOT_EGG                = HOT_EGG,
 	KING                   = KING,
 	TREASURE               = TREASURE,
+	WASP_QUEEN             = WASP_QUEEN,
 
 	getById           = getById,
 	getDuration       = getDuration,
+	isScheduledInCycle = isScheduledInCycle,
 	getRarityUpChance = getRarityUpChance,
 	getMutationFactor = getMutationFactor,
 	describeBonus     = describeBonus,

@@ -3,8 +3,14 @@
 -- ServerScriptService/Services/CombatService.luau
 --
 -- Einzige Zustaendigkeit:
---   - Einen PIT-LAUF validieren, durchsimulieren und (am Ende der Wiedergabe)
---     abrechnen
+--   - Einen TOWER-LAUF validieren, durchsimulieren und (am Ende der
+--     Wiedergabe) abrechnen
+--
+-- v15: Es gibt kein PIT-Level mehr. Gekaempft wird im gewaehlten Tower
+-- (TowerService.getSelected); Gegner und Stage-Gummies kommen aus TowerConfig,
+-- Rekord, Meilensteine und Deckel fuehrt TowerService (recordRun). Bis zu 100
+-- Stages werden IN PORTIONEN simuliert (SIM_STAGES_PER_STEP pro task.wait),
+-- damit ein langer Lauf keinen Frame-Spike auf dem Server macht.
 --
 -- Ein Lauf ist kein einzelner Kampf: der Baerchi kaempft Stage fuer Stage
 -- weiter, solange er gewinnt, und seine HP werden zwischen den Stages NICHT
@@ -34,13 +40,14 @@
 --   "Fresh"   Stage 1, kostenlos
 --   "Percent" bei 65 % der Stage-Tiefe seines letzten Laufs
 --   "Last"    bei der letzten erreichten Stage
--- Kosten und Startstage rechnet EconomyConfig (dieselben Funktionen nutzt der
--- Client fuer die Anzeige). Der letzte Lauf steht in island.pitProgress und
--- gilt nur auf demselben PIT-Level.
+-- Kosten und Startstage rechnet TowerConfig (dieselben Funktionen nutzt der
+-- Client fuer die Anzeige). Der letzte Lauf steht pro Tower in
+-- island.towerProgress (v15).
 --
--- Gegner-Werte kommen aus CombatConfig, Belohnungen aus EconomyConfig, die
--- Simulation aus CombatCalculator. rebirthMult wendet ausschliesslich
--- EconomyService.awardGummies an.
+-- Gegner-Werte und Belohnungen kommen aus TowerConfig, die Simulation aus
+-- CombatCalculator. rebirthMult wendet ausschliesslich
+-- EconomyService.awardGummies an. Der weiche Deckel: ueber den Deckel hinaus
+-- wird gekaempft, Stage-Gummies und GoldGummies gibt es aber nur bis dorthin.
 
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -48,16 +55,25 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
-local CombatConfig     = require(ReplicatedStorage.Config.CombatConfig)
-local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
 local PlayerService   = require(ServerScriptService.Services.PlayerService)
 local EconomyService  = require(ServerScriptService.Services.EconomyService)
 local PitArenaService = require(ServerScriptService.Services.PitArenaService)
+local TowerService    = require(ServerScriptService.Services.TowerService)
+local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local CombatService = {}
+
+-- So viele Stages werden am Stueck simuliert, dann gibt der Server einen
+-- Frame frei (task.wait). Rein technisch, kein Balancing-Wert.
+local SIM_STAGES_PER_STEP = 10
+
+-- Spieler, deren Lauf gerade simuliert wird (die Simulation yieldet jetzt —
+-- ein zweiter Knopfdruck darf nicht dazwischen einen zweiten Lauf starten).
+local _simulating: { [Player]: boolean } = {}
 
 export type ResumeChoice = "Fresh" | "Percent" | "Last"
 
@@ -66,56 +82,65 @@ local function fail(player: Player, reason: Types.LocMsg | string)
 end
 
 -- Gegner-Snapshot fuer eine Stage. Die Werte selbst kommen komplett aus
--- CombatConfig — hier wird nur umgepackt.
-local function buildEnemySnapshot(pitLevel: number, stage: number): CombatCalculator.CombatSnapshot
-	local stats = CombatConfig.getEnemyStats(pitLevel, stage)
+-- TowerConfig — hier wird nur umgepackt.
+local function buildEnemySnapshot(towerId: string, stage: number): CombatCalculator.CombatSnapshot
+	local stats = TowerConfig.getEnemyStats(towerId, stage)
 
 	return {
-		uid    = string.format("enemy_p%d_s%d", pitLevel, stage),
+		uid    = string.format("enemy_%s_s%d", towerId, stage),
 		stats  = stats,
 		hp     = stats.maxHp,
 		charge = 0,
 	}
 end
 
--- Der gespeicherte letzte Lauf, sofern er fuer das AKTUELLE PIT-Level gilt.
-function CombatService.getProgress(data: Types.PlayerData): Types.PitProgress?
-	local progress = data.island.pitProgress
-	if progress and progress.pitLevel == data.island.pitLevel and progress.reachedStage >= 1 then
-		return progress
-	end
-	return nil
+-- Letzte erreichte Stage in diesem Tower (0 = kein Lauf gespeichert).
+function CombatService.getProgress(data: Types.PlayerData, towerId: string): number
+	local reached = data.island.towerProgress[towerId]
+	return if typeof(reached) == "number" and reached >= 1 then reached else 0
 end
 
 -- Startstage und Kosten fuer eine Fortsetzungs-Wahl. nil = Wahl ungueltig
--- (kein letzter Lauf auf diesem Level).
-function CombatService.getResumeOffer(data: Types.PlayerData, choice: ResumeChoice): (number?, number)
+-- (kein letzter Lauf in diesem Tower).
+function CombatService.getResumeOffer(data: Types.PlayerData, towerId: string, choice: ResumeChoice): (number?, number)
 	if choice == "Fresh" then
 		return 1, 0
 	end
 
-	local progress = CombatService.getProgress(data)
-	if not progress then
+	local reached = CombatService.getProgress(data, towerId)
+	if reached <= 0 then
 		return nil, 0
 	end
 
 	local startStage = if choice == "Last"
-		then progress.reachedStage
-		else EconomyConfig.getPitResumePercentStage(progress.reachedStage)
+		then reached
+		else TowerConfig.getResumePercentStage(reached)
 
-	startStage = math.clamp(startStage, 1, CombatConfig.MAX_STAGES_PER_RUN)
-	return startStage, EconomyConfig.getPitResumeCost(data.island.pitLevel, startStage, data.rebirthMult)
+	local def = TowerConfig.get(towerId)
+	startStage = math.clamp(startStage, 1, if def then def.stages else 1)
+	return startStage, TowerConfig.getResumeCost(towerId, startStage, data.rebirthMult)
 end
 
--- Startet einen PIT-Lauf. Gibt true zurueck, wenn er losgeht — sonst hat der
--- Spieler bereits ein ActionFailed mit dem Grund bekommen.
+-- Startet einen Tower-Lauf. Gibt true zurueck, wenn er losgeht — sonst hat
+-- der Spieler bereits ein ActionFailed mit dem Grund bekommen.
 function CombatService.startPitRun(player: Player, baerchiUid: string, choice: ResumeChoice?): boolean
 	-- Ein zweiter Lauf darf nie in einen laufenden hineinstarten (die Figur
 	-- wuerde sonst mitten in der Wiedergabe weggezogen).
-	if PitArenaService.isRunning(player) then
+	if PitArenaService.isRunning(player) or _simulating[player] then
 		fail(player, Loc.msg("err.combat_busy"))
 		return false
 	end
+	_simulating[player] = true
+	local ok, started = pcall(CombatService._startRun, player, baerchiUid, choice)
+	_simulating[player] = nil
+	if not ok then
+		warn("[CombatService] Lauf konnte nicht starten:", started)
+		return false
+	end
+	return started
+end
+
+function CombatService._startRun(player: Player, baerchiUid: string, choice: ResumeChoice?): boolean
 
 	local data = PlayerService.getData(player)
 	if not data then return false end
@@ -143,8 +168,17 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 		return false
 	end
 
-	local pitLevel = data.island.pitLevel
-	local startStage, cost = CombatService.getResumeOffer(data, choice or "Fresh")
+	local towerId = TowerService.getSelected(data)
+	local tower = TowerConfig.get(towerId)
+	if not tower then
+		fail(player, Loc.msg("err.tower_unknown"))
+		return false
+	end
+	-- Deckel beim START festhalten: ein Rebirth waehrend des Laufs ist
+	-- unmoeglich (der Lauf gehoert zur Insel), sicher ist sicher.
+	local capStage = TowerService.getStageCap(data, towerId)
+
+	local startStage, cost = CombatService.getResumeOffer(data, towerId, choice or "Fresh")
 	if not startStage then
 		fail(player, Loc.msg("err.combat_no_last_run"))
 		return false
@@ -168,19 +202,32 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 	-- Faehigkeiten). Bleibt auf dem Server — PitArenaService spielt sie ab,
 	-- der Client sieht nur das Ergebnis in der Welt.
 	local beats: { { Types.FightBeat } } = {}
-	local lastStage = startStage + CombatConfig.MAX_STAGES_PER_RUN - 1
+	local lastStage = tower.stages
 
 	-- v15: die Aufladung der Faehigkeit bleibt ueber die Stages erhalten.
 	local charge = 0
+	local simulatedInStep = 0
 
 	for stage = startStage, lastStage do
+		-- In Portionen: nach SIM_STAGES_PER_STEP Stages einen Frame freigeben.
+		simulatedInStep += 1
+		if simulatedInStep > SIM_STAGES_PER_STEP then
+			simulatedInStep = 1
+			task.wait()
+			if player.Parent == nil then
+				-- Gegangen, waehrend simuliert wurde: bezahlte Fortsetzung zurueck.
+				if cost > 0 then EconomyService.awardGummiesFlat(player, cost) end
+				return false
+			end
+		end
+
 		local playerSnapshot: CombatCalculator.CombatSnapshot = {
 			uid    = baerchi.uid,
 			stats  = stats,
 			hp     = hp,
 			charge = charge,
 		}
-		local enemySnapshot = buildEnemySnapshot(pitLevel, stage)
+		local enemySnapshot = buildEnemySnapshot(towerId, stage)
 		local enemyMax = math.max(1, enemySnapshot.stats.maxHp)
 
 		local result = CombatCalculator.simulate(playerSnapshot, enemySnapshot, true)
@@ -208,7 +255,8 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 			rounds     = result.rounds,
 			hpAfter    = hp,
 			-- Basiswert ohne rebirthMult; ausgezahlt wird erst in settle.
-			gummiesWon = if won then EconomyConfig.getPitStageReward(pitLevel, stage) else 0,
+			-- Weicher Deckel: ueber dem Deckel gibt es nichts.
+			gummiesWon = if won and stage <= capStage then TowerConfig.getStageReward(towerId, stage) else 0,
 			-- v14: fuer die Faehigkeiten-Show (PitArenaService -> SkillFX)
 			skillUses       = result.skillUses,
 			firstSkillRound = result.firstSkillRound,
@@ -223,6 +271,8 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 
 	local fullRun: Types.PitRunResult = {
 		baerchiUid     = baerchiUid,
+		towerId        = towerId,
+		capStage       = capStage,
 		startStage     = startStage,
 		recalled       = false,
 		stagesCleared  = 0,
@@ -250,6 +300,8 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 
 		local playedStages: { Types.PitStageResult } = {}
 		local cleared     = 0
+		local paidCleared = 0   -- geschaffte Stages bis zum Deckel (GoldGummies)
+		local highestWon  = 0
 		local baseGummies = 0
 		for index = 1, played do
 			local stage = stages[index]
@@ -257,6 +309,10 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 			if stage.won then
 				cleared += 1
 				baseGummies += stage.gummiesWon
+				highestWon = math.max(highestWon, stage.stage)
+				if stage.stage <= capStage then
+					paidCleared += 1
+				end
 			end
 		end
 
@@ -268,6 +324,8 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 		local current = PlayerService.getData(player)
 		local result: Types.PitRunResult = {
 			baerchiUid     = baerchiUid,
+			towerId        = towerId,
+			capStage       = capStage,
 			startStage     = startStage,
 			recalled       = recalled,
 			corrected      = played < #stages,
@@ -304,38 +362,35 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 				result.gummiesWon = EconomyService.awardGummies(player, baseGummies)
 			end
 
-			local goldReward = EconomyConfig.getPitGoldReward(cleared, pitLevel)
+			local goldReward = TowerConfig.getRunGold(towerId, paidCleared)
 			if goldReward > 0 then
 				result.goldGummiesWon = EconomyService.awardGoldGummies(player, goldReward)
 			end
 
 			if cleared > 0 then
 				current.stats.totalFightsWon += cleared
-				if pitLevel > current.stats.highestPitLevel then
-					current.stats.highestPitLevel = pitLevel
-				end
 			end
 			if not playedStages[played].won then
 				current.stats.totalFightsLost += 1
 			end
 
+			-- v15: Rekord, Meilensteine, Deckel-Hinweis (TowerService).
+			local newRecord, capReached = TowerService.recordRun(player, current, towerId, highestWon)
+			result.newRecord  = newRecord
+			result.capReached = capReached
+
 			-- Fuer die Fortsetzungs-Frage: die letzte Stage, in die er
-			-- eingetreten ist. Nur wenn das PIT-Level noch dasselbe ist — ein
-			-- Ausbau mitten im Lauf macht den Eintrag sinnlos.
-			if current.island.pitLevel == pitLevel then
-				current.island.pitProgress = {
-					pitLevel     = pitLevel,
-					reachedStage = playedStages[played].stage,
-				}
-			end
+			-- eingetreten ist — pro Tower.
+			current.island.towerProgress[towerId] = playedStages[played].stage
 		end
 
+		FunnelService.step(player, "F06_FirstFightEnded")
 		PlayerService.markDirty(player)
 		PlayerService.saveNow(player)
 
 		print(
 			"[CombatService]", player.Name,
-			"| PIT", pitLevel, "ab Stage", startStage,
+			"| Tower", towerId, "ab Stage", startStage,
 			"| gespielt:", played, "/", #stages,
 			if recalled then "(zurueckgeholt)" else "",
 			"| geschafft:", cleared,
@@ -351,19 +406,24 @@ function CombatService.startPitRun(player: Player, baerchiUid: string, choice: R
 	-- Den Client informiert NICHT dieser Service, sondern PitArenaService — am
 	-- Ende der Wiedergabe mit dem abgerechneten Ergebnis.
 	PitArenaService.play(player, fullRun, settle, beats)
+	FunnelService.step(player, "F05_FirstFightStarted")
 
 	-- Kosten sind schon abgezogen: syncen, damit die Anzeige stimmt.
 	if cost > 0 then
 		PlayerService.markDirty(player)
 	end
 
-	print("[CombatService]", player.Name, "| PIT-Lauf startet: PIT", pitLevel,
+	print("[CombatService]", player.Name, "| Tower-Lauf startet: Tower", towerId,
 		"| ab Stage", startStage, "| Kosten:", cost, "| simuliert:", #stages, "Stages")
 
 	return true
 end
 
 function CombatService.init()
+	game:GetService("Players").PlayerRemoving:Connect(function(player)
+		_simulating[player] = nil
+	end)
+
 	-- Seit v12 kein eigener Remote mehr: gestartet wird ueber die Pet-Leiste
 	-- (PetModeService.RequestPetMode).
 	print("[CombatService] Initialisiert")

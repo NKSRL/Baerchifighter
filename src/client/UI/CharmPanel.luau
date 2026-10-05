@@ -32,6 +32,8 @@ local PromotionConfig = require(ReplicatedStorage.Config.PromotionConfig)
 
 local Theme        = require(script.Parent.Theme)
 local Toast        = require(script.Parent.Toast)
+-- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
+local Notify       = require(script.Parent.Notify)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
@@ -376,10 +378,12 @@ function CharmPanel.init(screenGui: ScreenGui)
 		if typeof(result) ~= "table" then return end
 		local typed = result :: Types.CharmRollResult
 
-		Toast.success(string.format(
-			"%d Wurf/Wuerfe  —  %s GoldGummies",
-			typed.rolls, Theme.formatNumber(typed.goldGummiesSpent)
-		))
+		Notify.emit("charm_roll", function()
+			Toast.success(string.format(
+				"%d Wurf/Wuerfe  —  %s GoldGummies",
+				typed.rolls, Theme.formatNumber(typed.goldGummiesSpent)
+			))
+		end)
 
 		CharmPanel.refresh()
 	end)

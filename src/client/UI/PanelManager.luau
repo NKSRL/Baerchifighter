@@ -31,6 +31,27 @@ export type Panel = {
 local _panels: { [string]: Panel } = {}
 local _openName: string? = nil
 
+-- HBB Paket 0: Beobachter fuer Messpunkte (UiEventLogger). Bekommen nur den
+-- Namen bzw. Namen + offene Dauer; sie duerfen kein Panel steuern.
+local _openedAt: number = 0
+local _onOpened: { (string) -> () } = {}
+local _onClosed: { (string, number) -> () } = {}
+
+local function notifyClosed(name: string)
+	local seconds = os.clock() - _openedAt
+	for _, callback in _onClosed do
+		task.spawn(callback, name, seconds)
+	end
+end
+
+function PanelManager.onOpened(callback: (string) -> ())
+	table.insert(_onOpened, callback)
+end
+
+function PanelManager.onClosed(callback: (string, number) -> ())
+	table.insert(_onClosed, callback)
+end
+
 -- Seit jedes Gebaeude sein EIGENES Menue hat, brauchen drei Stellen denselben
 -- Panel-Namen: BuildingPanel meldet ihn an, die Menueleiste oeffnet ihn, und
 -- der Welt-Prompt am Gebaeude auch. Die Konvention steht deshalb hier — das
@@ -40,9 +61,9 @@ function PanelManager.buildingPanelName(buildingId: string): string
 	return "Building_" .. buildingId
 end
 
--- Das Menue der Kampfplattform (Ausbauen). Der Kampf selbst hat ein eigenes
--- Panel ("Combat") — hier geht es nur um die Stufe der Arena.
-PanelManager.ARENA_PANEL = "Arena"
+-- v15: der Prompt an der Kampfplattform oeffnet die Tower-Wahl im Kampf-Panel
+-- ("Combat"). Das fruehere Ausbau-Menue der Arena (PIT-Level) gibt es nicht mehr.
+PanelManager.ARENA_PANEL = "Combat"
 
 --------------------------------------------------------------------------------
 -- Anmeldung
@@ -77,8 +98,21 @@ function PanelManager.open(name: string, ...: any)
 		end
 	end
 
+	-- Ein Wechsel schliesst das bisherige Panel implizit.
+	local previous = _openName
+	if previous and previous ~= name then
+		notifyClosed(previous)
+	end
+
 	_openName = name
 	panel.open(...)
+
+	if previous ~= name then
+		_openedAt = os.clock()
+		for _, callback in _onOpened do
+			task.spawn(callback, name)
+		end
+	end
 end
 
 function PanelManager.close(name: string)
@@ -88,6 +122,7 @@ function PanelManager.close(name: string)
 	panel.close()
 	if _openName == name then
 		_openName = nil
+		notifyClosed(name)
 	end
 end
 

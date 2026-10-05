@@ -18,10 +18,15 @@ local TweenService      = game:GetService("TweenService")
 local Types   = require(ReplicatedStorage.Network.Types)
 local Remotes = require(ReplicatedStorage.Network.Remotes)
 local Loc     = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local QuestConfig  = require(ReplicatedStorage.Config.QuestConfig)
 
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
 local Toast        = require(script.Parent.Toast)
+-- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
+local Notify       = require(script.Parent.Notify)
+local Icons        = require(script.Parent.Icons)
 local QuestPanel   = require(script.Parent.QuestPanel)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
@@ -50,6 +55,36 @@ local function dailyReady(quests: Types.QuestView): (number, number)
 		end
 	end
 	return done, claimable
+end
+
+local _bonusOpen = false
+
+-- HBB Paket 2: kompakte Karte (Icon + Zaehler + Belohnungs-Icon). Antippen
+-- klappt den Volltext fuer EXPAND_SECONDS auf; ein zweites Antippen oeffnet
+-- wie bisher das Quest-Fenster.
+local EXPAND_SECONDS = 6
+local _expanded = false
+local _expandToken = 0
+local _questIcon: Frame? = nil
+local _reward: Frame? = nil
+local _rewardIcon: Frame? = nil
+local _rewardLabel: TextLabel? = nil
+local _claimCheck: GuiObject? = nil
+
+local function compact(): boolean
+	return FeatureFlags.isOn("UI_V2_GUIDE") and not _expanded
+end
+
+local function setIcon(holder: Frame?, name: string, fallback: string)
+	if not holder then return end
+	if holder:GetAttribute("IconName") == name then return end
+	holder:SetAttribute("IconName", name)
+	for _, child in holder:GetChildren() do
+		if child:IsA("GuiObject") then child:Destroy() end
+	end
+	local icon = Icons.make(holder, name, fallback)
+	icon.Size = UDim2.fromScale(1, 1)
+	icon.ZIndex = 4
 end
 
 local function refresh(data: Types.PlayerDataUpdate)
@@ -82,17 +117,60 @@ local function refresh(data: Types.PlayerDataUpdate)
 		claim.Visible     = false
 	end
 
+	-- HBB Paket 2: kompakte Darstellung
+	local isCompact = compact()
+	header.Visible = not isCompact
+	title.Visible  = not isCompact
+	hint.Visible   = not isCompact
+	local questIcon, reward, rewardIcon, rewardLabel, check = _questIcon, _reward, _rewardIcon, _rewardLabel, _claimCheck
+	if questIcon and reward and rewardLabel and check then
+		local def = if chain then QuestConfig.getById(chain.id) else nil
+		questIcon.Visible = isCompact and def ~= nil
+		reward.Visible    = isCompact and def ~= nil
+		check.Visible     = isCompact and claim.Visible
+		claim.TextTransparency = if isCompact then 1 else 0
+		if def then
+			setIcon(questIcon, QuestConfig.METRIC_ICON[def.metric] or "scroll", "?")
+			if def.reward.eggType then
+				setIcon(rewardIcon, "egg", "EI")
+				rewardLabel.Text = "+" .. Loc.formatNumber(def.reward.gummies)
+			else
+				setIcon(rewardIcon, "gummy", "G")
+				rewardLabel.Text = "+" .. Loc.formatNumber(def.reward.gummies)
+			end
+		end
+		-- Der Abholen-Knopf bleibt, wo er ist (sein Puls-Tween setzt die Groesse).
+		if isCompact then
+			bar.track.Position = UDim2.new(0, 64, 0, 18)
+			bar.track.Size     = UDim2.new(1, -74, 0, 22)
+		else
+			bar.track.Position = UDim2.new(0, 10, 0, 80)
+			bar.track.Size     = UDim2.new(1, -20, 0, 18)
+		end
+	end
+
 	local doneCount, claimable = dailyReady(quests)
-	daily.Text = Loc.t("ui.quest.daily_link", { done = doneCount, total = #quests.daily })
+	-- v15: ist der Login-Bonus noch nicht abgeholt, zeigt der untere Knopf
+	-- darauf (und oeffnet das Bonus-Fenster statt der Quests).
+	local bonusOpen = data.daily ~= nil and data.daily.claimable
+	_bonusOpen = bonusOpen
+	if isCompact then
+		-- Nur Zeichen und Zahlen: Geschenk = Login-Bonus, Rolle = Tagesquests
+		daily.Text = if bonusOpen then "🎁" else string.format("📜 %d/%d", doneCount, #quests.daily)
+	else
+		daily.Text = if bonusOpen
+			then Loc.t("ui.daily.tracker_hint")
+			else Loc.t("ui.quest.daily_link", { done = doneCount, total = #quests.daily })
+	end
 
 	-- Rotes "!" am Karten-Rand: irgendetwas ist abholbereit.
 	local chainReady = chain ~= nil and chain.progress >= chain.target
-	alert.Visible = chainReady or claimable > 0
+	alert.Visible = chainReady or claimable > 0 or bonusOpen
 end
 
 function QuestTracker.init(screenGui: ScreenGui)
 	local card = Theme.panel("QuestTracker", screenGui, Theme.COLORS.panelDeep)
-	card.Position = UDim2.new(0.012, 0, 0, 136)
+	card.Position = UDim2.new(0.012, 12, 0, 148)
 	card.Size     = UDim2.new(0, CARD_W, 0, CARD_H)
 	card.ZIndex   = 2
 	_card = card
@@ -107,18 +185,40 @@ function QuestTracker.init(screenGui: ScreenGui)
 	hit.ZIndex                 = 2
 	hit.Parent                 = card
 	hit.Activated:Connect(function()
+		-- HBB Paket 2: erst aufklappen (Volltext), dann erst das Fenster
+		if compact() then
+			_expanded = true
+			_expandToken += 1
+			local token = _expandToken
+			local data = ClientState.get()
+			if data then refresh(data) end
+			task.delay(EXPAND_SECONDS, function()
+				if token ~= _expandToken then return end
+				_expanded = false
+				local current = ClientState.get()
+				if current then refresh(current) end
+			end)
+			return
+		end
 		PanelManager.toggle("Quests")
 	end)
 
+	-- Schriftrolle links oben, ragt ueber die Ecke der Karte hinaus
+	local icon = Icons.make(card, "scroll", "?")
+	icon.Position = UDim2.new(0, -10, 0, -12)
+	icon.Size     = UDim2.fromOffset(40, 40)
+	icon.ZIndex   = 4
+
 	local header = Theme.label("Header", card, "")
-	header.Position   = UDim2.new(0, 10, 0, 5)
-	header.Size       = UDim2.new(1, -20, 0, 14)
+	header.Position   = UDim2.new(0, 36, 0, 5)
+	header.Size       = UDim2.new(1, -46, 0, 14)
 	header.TextColor3 = Theme.COLORS.accent
 	_header = header
 
 	local title = Theme.label("Title", card, "")
-	title.Position = UDim2.new(0, 10, 0, 20)
-	title.Size     = UDim2.new(1, -20, 0, 22)
+	title.Position = UDim2.new(0, 36, 0, 20)
+	title.Size     = UDim2.new(1, -46, 0, 22)
+	Theme.outlineText(title, 2)
 	_title = title
 
 	local hint = Theme.bodyText("Hint", card, "")
@@ -161,7 +261,7 @@ function QuestTracker.init(screenGui: ScreenGui)
 	daily.ZIndex     = 3
 	_daily = daily
 	daily.Activated:Connect(function()
-		PanelManager.toggle("Quests")
+		PanelManager.toggle(if _bonusOpen then "DailyBonus" else "Quests")
 	end)
 
 	local alert = Theme.panel("Alert", card, Theme.COLORS.bad)
@@ -177,6 +277,38 @@ function QuestTracker.init(screenGui: ScreenGui)
 	bang.ZIndex         = 5
 	_alert = alert
 
+	-- HBB Paket 2: Elemente der kompakten Karte
+	local questIcon = Theme.container("QuestIcon", card)
+	questIcon.Position = UDim2.new(0, 8, 0, 8)
+	questIcon.Size     = UDim2.fromOffset(50, 50)
+	questIcon.ZIndex   = 3
+	questIcon.Visible  = false
+	_questIcon = questIcon
+
+	local reward = Theme.container("Reward", card)
+	reward.Position = UDim2.new(0, 64, 0, 46)
+	reward.Size     = UDim2.new(1, -74, 0, 28)
+	reward.ZIndex   = 3
+	reward.Visible  = false
+	_reward = reward
+	local rewardIcon = Theme.container("Icon", reward)
+	rewardIcon.Size = UDim2.fromOffset(28, 28)
+	_rewardIcon = rewardIcon
+	local rewardLabel = Theme.label("Amount", reward, "")
+	rewardLabel.Position = UDim2.new(0, 34, 0, 2)
+	rewardLabel.Size     = UDim2.new(1, -34, 1, -4)
+	rewardLabel.TextColor3 = Theme.COLORS.goldGummy
+	Theme.outlineText(rewardLabel, 2)
+	_rewardLabel = rewardLabel
+
+	local check = Icons.make(claim, "check", "✓")
+	check.AnchorPoint = Vector2.new(0.5, 0.5)
+	check.Position    = UDim2.fromScale(0.5, 0.5)
+	check.Size        = UDim2.fromOffset(24, 24)
+	check.ZIndex      = 4
+	check.Visible     = false
+	_claimCheck = check
+
 	ClientState.onChanged(refresh)
 	Loc.onChanged(function()
 		local data = ClientState.get()
@@ -184,7 +316,10 @@ function QuestTracker.init(screenGui: ScreenGui)
 	end)
 
 	Remotes.QuestRewardReceived.OnClientEvent:Connect(function(reward: Types.QuestReward)
-		Toast.success(Loc.t("ui.quest.toast", { text = QuestPanel.rewardText(reward.questId) }))
+		-- Gummies und Eier der Quest fliegen ueber den Datenstand.
+		Notify.emit("quest_reward", function()
+			Toast.success(Loc.t("ui.quest.toast", { text = QuestPanel.rewardText(reward.questId) }))
+		end)
 	end)
 
 	print("[QuestTracker] Initialisiert")

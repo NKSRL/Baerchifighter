@@ -5,7 +5,7 @@
 -- Einzige Zustaendigkeit:
 --   - Gummies und GoldGummies aendern
 --   - Alle Transaktionen validieren (nie ins Minus gehen)
---   - Kosten-Transaktionen fuer Gebaeude- und PIT-Upgrades
+--   - Kosten-Transaktionen fuer Gebaeude-Upgrades (v15: PIT-Level entfallen)
 --   - Kein anderer Service aendert Waehrungen direkt
 --
 -- rebirthMult wird GENAU HIER angewendet (awardGummies) und nirgendwo sonst.
@@ -14,7 +14,6 @@
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
@@ -155,37 +154,6 @@ function EconomyService.upgradeBuilding(player: Player, buildingId: Types.Buildi
 	PlayerService.markDirty(player)
 
 	return true
-end
-
--- PIT-Level kaufen (prueft Kosten, zieht ab, erhoeht island.pitLevel).
--- Der visuelle Neuaufbau der Plattform passiert NICHT hier — das macht
--- IslandService ueber MapService.updatePitLevel.
-function EconomyService.upgradePit(player: Player): (boolean, Types.LocMsg?, number)
-	local data = PlayerService.getData(player)
-	if not data then return false, Loc.msg("err.player_not_loaded"), 0 end
-
-	local currentLevel = data.island.pitLevel
-	local nextLevel    = currentLevel + 1
-
-	if nextLevel > EconomyConfig.MAX_PIT_LEVEL then
-		return false, Loc.msg("err.max_pit_level"), currentLevel
-	end
-
-	local cost = EconomyConfig.getPitUpgradeCost(nextLevel)
-	if not cost then
-		return false, Loc.msg("err.no_pit_cost", { level = nextLevel }), currentLevel
-	end
-
-	local ok, reason = EconomyService.spendGummies(player, cost)
-	if not ok then return false, reason, currentLevel end
-
-	data.island.pitLevel = nextLevel
-	if nextLevel > data.stats.highestPitLevel then
-		data.stats.highestPitLevel = nextLevel
-	end
-
-	PlayerService.markDirty(player)
-	return true, nil, nextLevel
 end
 
 function EconomyService.init()

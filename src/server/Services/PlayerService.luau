@@ -346,6 +346,19 @@ local function saveToDataStore(player: Player, data: Types.PlayerData, release: 
 	end
 end
 
+-- v15: wer die Login-Bonus-Sicht baut (LoginBonusService haengt sich ein —
+-- dort liegt der Debug-Zeitversatz; ein require waere ein Ringschluss).
+local _dailyViewProvider: ((Types.PlayerData) -> Types.DailyView)? = nil
+
+local function dailyView(data: Types.PlayerData): Types.DailyView
+	local provider = _dailyViewProvider
+	if provider then
+		local ok, view = pcall(provider, data)
+		if ok then return view end
+	end
+	return { day = 1, claimable = false, streak = 0, resetIn = 0 }
+end
+
 -- Baut das Client-Paket aus den Serverdaten.
 -- Stats bleiben bewusst draussen (kein Leak sensibler Serverdaten).
 local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
@@ -360,6 +373,12 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		discovered   = data.discovered,
 		quests       = QuestProgress.buildView(data, os.time()),
 		eggTree      = data.eggTree,
+		towers       = data.towers,
+		daily        = dailyView(data),
+		-- HBB Paket 2: Zaehler und Konto-Alter fuer Fuehrung/Freischaltung
+		stats        = data.stats :: any,
+		createdAt    = data.createdAt,
+		uiSeen       = data.uiSeen,   -- HBB Paket 3
 	}
 end
 
@@ -432,11 +451,23 @@ function PlayerService.saveNow(player: Player)
 	end
 end
 
+-- v15: LoginBonusService haengt hier ein, wie die Login-Bonus-Sicht im
+-- Client-Paket gebaut wird.
+function PlayerService.setDailyViewProvider(provider: (Types.PlayerData) -> Types.DailyView)
+	_dailyViewProvider = provider
+end
+
 -- Frische Standard-Insel. Einzige erlaubte Quelle fuer einen Insel-Reset —
 -- RebirthService benutzt dies statt Types.createDefaultPlayerData selbst
 -- aufzurufen (Regel: nur PlayerService ruft die Default-Fabrik auf).
 function PlayerService.buildDefaultIsland(): Types.IslandData
 	return Types.createDefaultPlayerData().island
+end
+
+-- HBB Paket 0: kompletter Startstand fuer den Debug-Zustand "fresh"
+-- (DebugService). Aus demselben Grund wie oben hier und nicht dort.
+function PlayerService.buildDefaultData(): Types.PlayerData
+	return Types.createDefaultPlayerData()
 end
 
 -- Registriert einen Callback der laeuft sobald die Daten eines Spielers

@@ -26,14 +26,22 @@ local Loc              = require(ReplicatedStorage.Localization.Loc)
 
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
+local Icons        = require(script.Parent.Icons)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
+local Unlock       = require(script.Parent.Unlock)
+
+-- HBB Paket 3: Kachel (Panel-Name) → Element-Id der Freischaltung
+local TILE_ELEMENT: { [string]: string } = {
+	Hatch = "tile_eggs", Inventory = "tile_bears", EggTree = "tile_tree",
+	Leaderboard = "tile_leaderboard", DailyBonus = "tile_daily",
+}
 
 local MenuBar = {}
 
 -- Groessen. TILE ist gleichzeitig die Antippflaeche — darunter wird es auf dem
 -- Handy zur Geduldsprobe.
-local TILE   = 46
-local LABEL  = 15
+local TILE   = 54
+local LABEL  = 16
 local GAP    = 6
 local WIDTH  = 76
 
@@ -48,6 +56,8 @@ type Entry = {
 	title  : () -> string,
 	color  : Color3,
 	symbol : string,
+	-- Name des Bild-Icons (siehe Icons); `symbol` ist der Text-Rueckfall
+	icon   : string,
 	live   : Live?,
 }
 
@@ -58,6 +68,8 @@ type Tile = {
 	tile  : TextButton,
 	alert : Frame,
 	label : TextLabel,
+	-- true, wenn die Kachel ein Bild zeigt: dann bleibt ihr Text leer
+	image : boolean,
 }
 
 local _tiles: { Tile } = {}
@@ -68,13 +80,20 @@ local _tiles: { Tile } = {}
 
 local function buildEntries(): { Entry }
 	return {
-		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI" },
-		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA" },
+		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI", icon = "egg" },
+		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear" },
 		-- v14: Ei-Baum. Das "!" zeigt eine ungenutzte Blaupause an.
-		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM",
+		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM", icon = "tree",
 			live = function(data: Types.PlayerDataUpdate)
 				local bp = if data.eggTree then data.eggTree.blueprints or 0 else 0
 				return "BAUM", bp > 0
+			end },
+		-- v15: Bestenlisten und Login-Bonus ("!" = heute noch nicht abgeholt)
+		{ panel = "Leaderboard", title = function() return Loc.t("ui.menu.leaderboard") end, color = Theme.COLORS.goldGummy, symbol = "TOP", icon = "trophy" },
+		{ panel = "DailyBonus", title = function() return Loc.t("ui.menu.daily") end, color = Theme.COLORS.gummy, symbol = "7", icon = "gift",
+			live = function(data: Types.PlayerDataUpdate)
+				local daily = data.daily
+				return if daily then tostring(daily.day) else "7", daily ~= nil and daily.claimable
 			end },
 	}
 end
@@ -95,7 +114,20 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	button.TextColor3  = Theme.COLORS.outline
 	Theme.gradient(button, Theme.shade(entry.color, 0.34), Theme.shade(entry.color, -0.16))
 
+	-- Bild-Icon gross in die Kachel. Ohne Asset bleibt das Text-Kuerzel stehen.
+	local hasImage = Icons.has(entry.icon)
+	if hasImage then
+		button.Text = ""
+		local icon = Icons.make(button, entry.icon)
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Position    = UDim2.fromScale(0.5, 0.52)
+		icon.Size        = UDim2.fromScale(0.86, 0.86)
+		icon.ZIndex      = 3
+	end
+
 	button.Activated:Connect(function()
+		local element = TILE_ELEMENT[entry.panel]
+		if element then Unlock.markSeen(element) end
 		PanelManager.toggle(entry.panel)
 	end)
 
@@ -119,10 +151,10 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	label.Size           = UDim2.new(1, 0, 0, LABEL)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextScaled     = false
-	label.TextSize       = 13
+	label.TextSize       = 14
 	Theme.outlineText(label)
 
-	return { entry = entry, tile = button, alert = alert, label = label }
+	return { entry = entry, tile = button, alert = alert, label = label, image = hasImage }
 end
 
 --------------------------------------------------------------------------------
@@ -131,6 +163,19 @@ end
 
 local function refresh(data: Types.PlayerDataUpdate)
 	for _, tile in _tiles do
+		-- HBB Paket 3: Kachel erst zeigen, wenn sie gebraucht wird; neue
+		-- Kacheln tragen das "!" bis zum ersten Antippen.
+		local element = TILE_ELEMENT[tile.entry.panel]
+		local isNew = false
+		if element then
+			local slot = tile.tile.Parent
+			if slot and slot:IsA("GuiObject") then
+				Unlock.apply(element, slot)
+			end
+			isNew = Unlock.isNew(element)
+			tile.alert.Visible = isNew
+		end
+
 		local live = tile.entry.live
 		if live then
 			local ok, value, alert = pcall(live, data)
@@ -139,11 +184,26 @@ local function refresh(data: Types.PlayerDataUpdate)
 			-- lahmlegen. Ein alter Spielstand ohne ein Gebaeude waere sonst
 			-- genau so ein Fall.
 			if ok then
-				tile.tile.Text     = value
-				tile.alert.Visible = alert
+				if not tile.image then
+					tile.tile.Text = value
+				end
+				tile.alert.Visible = alert or isNew
 			end
 		end
 	end
+end
+
+--------------------------------------------------------------------------------
+-- HBB Paket 1: Ziel fliegender Icons (Eier fliegen zur Eier-Kachel)
+--------------------------------------------------------------------------------
+
+function MenuBar.getTileAnchor(panel: string): GuiObject?
+	for _, tile in _tiles do
+		if tile.entry.panel == panel then
+			return tile.tile
+		end
+	end
+	return nil
 end
 
 --------------------------------------------------------------------------------
@@ -165,6 +225,17 @@ function MenuBar.init(screenGui: ScreenGui)
 
 	local layout = Theme.listLayout(root, GAP)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+	-- Auf niedrigen Fenstern (Handy quer, kleines Studio-Fenster) schrumpfen,
+	-- damit die Leiste nicht ueber den unteren Rand ragt.
+	local scale = Instance.new("UIScale")
+	scale.Parent = root
+	local function rescale()
+		local room = screenGui.AbsoluteSize.Y - 108 - 12
+		scale.Scale = math.clamp(room / height, 0.55, 1)
+	end
+	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
+	rescale()
 
 	for order, entry in entries do
 		table.insert(_tiles, buildTile(root, order, entry))

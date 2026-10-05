@@ -17,12 +17,17 @@
 -- mehr. Wer schneller leveln will, baut die Honig-Presse aus — deshalb haengt
 -- die gesamte Progression an diesem Service.
 --
--- DREI HONIG-SORTEN (seit v7):
+-- ZWEI HONIG-SORTEN (seit v15, vorher drei):
 -- Jedes Gebaeude hat eine eigene Rolle (siehe Config/BuildingBehavior). Fuer
 -- diesen Service heisst das: WIE VIEL ein Honig heilt, haengt am Gebaeude, aus
--- dem er kommt; WIE VIEL XP er gibt, haengt am Level der Honig-Presse und ist
--- fuer jeden Honig gleich. Welches Gebaeude was kann, weiss dieser Service
+-- dem er kommt; WIE VIEL XP er gibt, haengt am Level des Honig-Veredlers und
+-- ist fuer jeden Honig gleich. Welches Gebaeude was kann, weiss dieser Service
 -- nicht — er fragt BuildingBehavior und verzweigt nirgends nach einer id.
+--
+-- v15: AUTO-ABNAHME (Bienenstock-Faehigkeit ab Level 10): ist das Lager des
+-- Bienenstocks voll, verfuettert der Takt unten einen Honig daraus an den
+-- ausgeruesteten Baerchi (ohne Laufweg, ohne Meldung) — die Produktion steht
+-- dann nie still.
 --
 -- PRODUKTION OHNE TIMER:
 -- Jedes Gebaeude merkt sich in `lastProducedAt`, bis wann sein Honig schon
@@ -55,6 +60,7 @@ local MapService     = require(ServerScriptService.Services.MapService)
 -- v12: nur fuer die Frage "kaempft der gerade?" (siehe feed)
 local PitArenaService = require(ServerScriptService.Services.PitArenaService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
+local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 
 -- Feier-Farbe fuer einen Level-Up (siehe MapService.celebrateBaerchi) — Gold,
 -- derselbe Ton wie Theme.COLORS.goldGummy auf dem Client. Server und Client
@@ -242,20 +248,25 @@ end
 -- `buildingId` ist optional: der Spieler waehlt im UI aus, welchen Honig er
 -- verfuettert. Wer nicht fragen kann (BaerchiAutopilotService, DebugService),
 -- laesst es weg und bekommt die automatische Wahl.
-function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types.BuildingId?)
+-- `quiet` (v15, Auto-Abnahme): keine Fehlermeldung und kein Ergebnis-Remote.
+function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types.BuildingId?, quiet: boolean?)
 	local data = PlayerService.getData(player)
 	if not data then return end
 
+	local function reject(reason: Types.LocMsg)
+		if not quiet then fail(player, reason) end
+	end
+
 	local baerchi = data.island.baerchis[baerchiUid]
 	if not baerchi then
-		fail(player, Loc.msg("err.baerchi_not_found"))
+		reject(Loc.msg("err.baerchi_not_found"))
 		return
 	end
 
 	local def = BaerchiConfig.getById(baerchi.configId)
 	if not def then
 		warn("[HoneyService] Unbekannter configId:", baerchi.configId)
-		fail(player, Loc.msg("err.baerchi_data_corrupt"))
+		reject(Loc.msg("err.baerchi_data_corrupt"))
 		return
 	end
 
@@ -263,7 +274,7 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 	-- auf den Wert nach der letzten Stage. Eine Heilung mittendrin waere
 	-- danach einfach weg — also lieber gleich ablehnen.
 	if PitArenaService.isFighting(player, baerchiUid) then
-		fail(player, Loc.msg("err.honey_in_pit"))
+		reject(Loc.msg("err.honey_in_pit"))
 		return
 	end
 
@@ -280,7 +291,7 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 		else pickAutoBuilding(data, hpRatio)
 
 	if not chosen then
-		fail(player, Loc.msg(if buildingId then "err.feed_building_empty" else "err.feed_no_honey"))
+		reject(Loc.msg(if buildingId then "err.feed_building_empty" else "err.feed_no_honey"))
 		return
 	end
 
@@ -320,7 +331,9 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 		maxHp      = statsAfter.maxHp,
 	}
 
-	Remotes.FeedResultReceived:FireClient(player, result)
+	if not quiet or leveled then
+		Remotes.FeedResultReceived:FireClient(player, result)
+	end
 
 	-- Sichtbar auf dem Plot feiern statt nur im Toast zu vermelden — alle
 	-- Spieler auf dem Server sehen es mit, nicht nur der Besitzer (siehe
@@ -329,6 +342,7 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 		MapService.celebrateBaerchi(player, baerchiUid, LEVEL_UP_CELEBRATE_COLOR)
 	end
 
+	FunnelService.step(player, "F07_FirstHoneyEaten")
 	PlayerService.markDirty(player)
 
 	if DebugConfig.VERBOSE_LOG then
@@ -357,6 +371,16 @@ local function tick()
 			-- sich, das soll nicht jede Sekunde ins Leere laufen.
 			if HoneyService.accrue(data, now) > 0 then
 				PlayerService.markDirty(player)
+			end
+
+			-- v15: Auto-Abnahme des Bienenstocks (Faehigkeit ab Level 10).
+			local hive = data.island.buildings.Beehive
+			local uid  = data.island.equippedUid
+			if hive and uid
+				and BuildingBehavior.hasAbility("Beehive", hive.level, "AutoHarvest")
+				and (hive.honey or 0) >= BuildingBehavior.getCapacity("Beehive", hive.level)
+			then
+				HoneyService.feed(player, uid, "Beehive", true)
 			end
 		end
 	end

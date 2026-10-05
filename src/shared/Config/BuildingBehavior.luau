@@ -4,100 +4,110 @@
 --
 -- Einzige Zustaendigkeit:
 --   - Alles, was pro Types.BuildingId unterschiedlich ist: was ein Gebaeude
---     kann, was sein Ausbau kostet und wie sein Effekt heisst.
+--     kann, was sein Ausbau kostet, wie sein Effekt heisst, welche Look-Stufe
+--     es hat und welche Meilenstein-Faehigkeiten es freischaltet.
 --
 -- ============================================================
--- DIE DREI ROLLEN
+-- ZWEI HONIG-GEBAEUDE (v15, Option B)
 -- ============================================================
--- Bis v6 taten die drei Gebaeude bis auf eine einzige Zahl dasselbe: Honig
--- produzieren, dessen XP am eigenen Level hing. Ausbauen war dreimal dieselbe
--- Entscheidung mit einem anderen Namen darueber. Seit v7 hat jedes Gebaeude
--- genau EINE eigene Achse — und damit einen eigenen Grund, es auszubauen:
+-- Bis v14 gab es drei: Bienenstock (Vorrat), Honigtopf (Heilung), Honig-Presse
+-- (XP). Die Entscheidung "Heil-Honig oder XP-Honig?" war schwach, und jedes
+-- Gebaeude braucht in Prompt 4 sechs Looks. Seit v15:
 --
---   Beehive     VOLUMEN    Lager waechst, und es produziert schneller.
---                          Der "ich brauche ueberhaupt viel Honig"-Baustein.
+--   Beehive       VORRAT    Lager waechst, und es produziert schneller.
 --
---   HoneyPot    HEILUNG    Sein Honig heilt mehr HP — nur SEINER.
---                          Der "ich will zwischen zwei PIT-Laeufen schnell
---                          wieder kampffaehig sein"-Baustein. Passt zu seinem
---                          Teich auf dem Plot, an dem der Baerchi frisst.
+--   HoneyRefiner  VEREDELN  Sein Level hebt die XP JEDES Honigs (die alte
+--                           Kurve der Presse) und die Heilung SEINES Honigs
+--                           (die alte Achse des Topfs, 25 % -> 60 % auf Level 10,
+--                           -> 100 % auf Level 60). Name "Honig-Veredler" ist
+--                           ein Platzhalter (steht nur in Strings/MapConfig).
 --
---   HoneyPress  WACHSTUM   Ihr Level hebt die XP von JEDEM Honig, egal aus
---                          welchem Gebaeude er kommt. Der "ich will schneller
---                          leveln"-Baustein.
+-- Damit niemand Honig verliert, produziert der Veredler im Tempo von Topf und
+-- Presse zusammen (halbes Intervall, doppeltes Lager). Die Gesamtmenge Honig
+-- pro Minute ist dieselbe wie bis v14.
 --
--- Daraus entsteht die eigentliche Entscheidung im Spiel: Honigtopf-Honig heilt
--- am meisten, ist aber knapp — verfuettert man ihn jetzt fuer XP, fehlt er
--- nach dem naechsten Kampf. Die XP sind ueberall gleich, es lohnt sich also,
--- den Heil-Honig aufzuheben.
+-- Das dritte Gebaeude, der Waben-Recycler, hat seine Zahlen in CombConfig; nur
+-- seine Meilenstein-Faehigkeiten stehen hier (MILESTONES.Recycler), damit alle
+-- Faehigkeiten an einer Stelle sind.
 --
 -- ============================================================
 -- WARUM ALLES HIER STEHT
 -- ============================================================
--- Kein Service und kein Panel verzweigt mehr nach einer BuildingId. Ein
--- Gebaeude aendern oder hinzufuegen heisst: EINEN Eintrag in BEHAVIORS
--- anfassen. Auch die Ausbau-Tabellen liegen deshalb hier und nicht mehr in
--- EconomyConfig — sie tragen den Effekt-Text, und der beschreibt genau die
--- Mechanik, die hier definiert ist.
---
--- Die Abhaengigkeit geht nur in EINE Richtung: BuildingBehavior kennt
--- EconomyConfig (Basiswerte, Kostenkurve), EconomyConfig kennt
--- BuildingBehavior nicht. Andersherum waere es ein Ringschluss.
---
--- BALANCE-AUFTEILUNG: was fuer ALLE gilt (Basis-Intervall, Basis-Lager,
--- Basis-Heilung, XP-Kurve, Kostenkurve, Maximal-Level) steht in EconomyConfig.
--- Hier steht nur, wie weit ein EINZELNES Gebaeude davon abweicht.
+-- Kein Service und kein Panel verzweigt nach einer BuildingId. Ein Gebaeude
+-- aendern heisst: EINEN Eintrag in BEHAVIORS anfassen. Die Abhaengigkeit geht
+-- nur in EINE Richtung: BuildingBehavior kennt EconomyConfig (Basiswerte,
+-- Kostenkurve, XP-Kurve, Look-Stufen), EconomyConfig kennt BuildingBehavior
+-- nicht.
 
 local EconomyConfig = require(script.Parent.EconomyConfig)
 local Types         = require(script.Parent.Parent.Network.Types)
 
 --------------------------------------------------------------------------------
--- Abweichungen der einzelnen Gebaeude (Werte auf Maximal-Level)
+-- Abweichungen der einzelnen Gebaeude
 --------------------------------------------------------------------------------
 
--- Bienenstock — Volumen.
--- Lager waechst von EconomyConfig.HONEY_CAPACITY auf diesen Wert, das
--- Produktions-Intervall faellt von EconomyConfig.HONEY_INTERVAL_SECONDS auf
--- dieses Minimum. Beides linear ueber die Level.
---
--- Das schnellere Produzieren lag bis v6 beim Honigtopf. Es ist mit dem Redesign
--- zum Bienenstock gewandert, weil "mehr Honig pro Zeit" und "mehr Honig auf
--- Lager" dieselbe Achse sind — und der Honigtopf dafuer die Heilung bekommt.
---
--- 14 ist mit Absicht kein runder Wert: 5 auf Level 1 und 14 auf Level 10 sind
--- neun Stufen und neun Honig — so bringt JEDER Ausbau genau einen Platz mehr.
--- Bei 12 waeren zwei Stufen dabei, auf denen sich am Lager nichts tut, und ein
--- Ausbau, der sichtbar nichts bringt, ist genau die Enttaeuschung, die dieses
--- Redesign abschaffen soll.
-local BEEHIVE_MAX_CAPACITY         = 14
-local BEEHIVE_MIN_INTERVAL_SECONDS = 8
+-- Bienenstock — Vorrat. Bis Level 10 wie bisher (Lager 5 -> 14, je Ausbau ein
+-- Platz; Intervall 20 s -> 8 s). Danach langsamer weiter: +1 Lager je
+-- BEEHIVE_CAPACITY_STEP Level und Intervall bis BEEHIVE_MIN_INTERVAL_L60.
+local BEEHIVE_CAPACITY_L10        = 14
+local BEEHIVE_CAPACITY_STEP       = 2      -- ab Level 11: alle 2 Level +1 Platz (L60 = 39)
+local BEEHIVE_INTERVAL_L10        = 8
+local BEEHIVE_MIN_INTERVAL_L60    = 4
 
--- Honigtopf — Heilung.
--- Heil-Anteil pro Honig AUS DIESEM TOPF, waechst von
--- EconomyConfig.HONEY_HEAL_PERCENT auf diesen Wert. Auf Maximal-Level machen
--- also zwei seiner Honige einen erschoepften Baerchi wieder voll.
-local HONEYPOT_MAX_HEAL_PERCENT = 0.60
+-- Honig-Veredler — Tempo/Lager wie Topf + Presse zusammen.
+local REFINER_INTERVAL_FACTOR = 0.5    -- halbes Basis-Intervall (= zwei Gebaeude)
+local REFINER_CAPACITY        = 10     -- doppeltes Basis-Lager
+-- Heilung SEINES Honigs: Basis (Level 1) -> 60 % (Level 10) -> 100 % (Level 60)
+local REFINER_HEAL_L10 = 0.60
+local REFINER_HEAL_L60 = 1.00
 
--- Honig-Presse — Wachstum.
--- Ihr XP-Multiplikator kommt NICHT aus einer eigenen Zahl, sondern direkt aus
--- der vorhandenen XP-Kurve (EconomyConfig.HONEY_XP), geteilt durch deren
--- Startwert. Damit ist die Progression bei "Presse auf Level N" exakt
--- dieselbe wie vorher bei "Gebaeude auf Level N" — das Redesign verschiebt nur,
--- WER die Kurve besitzt, und aendert keine einzige XP-Zahl.
+--------------------------------------------------------------------------------
+-- Meilenstein-Faehigkeiten (README 4.3) — Daten + Effekt-Hook
+--------------------------------------------------------------------------------
+-- Pro Gebaeude: ab welchem Level welche Faehigkeit gilt. `implemented = false`
+-- heisst: nur als Daten da, der Effekt kommt spaeter (Liste im Bericht). Ein
+-- Service fragt mit BuildingBehavior.hasAbility(...) — er muss nie selbst
+-- wissen, auf welchem Level etwas freigeschaltet wird.
+export type Ability = {
+	id          : string,
+	level       : number,
+	implemented : boolean,
+}
+
+local MILESTONES: { [string]: { Ability } } = {
+	Beehive = {
+		-- Volles Lager wird automatisch an den ausgeruesteten Baerchi verfuettert
+		-- (XP + Heilung), die Produktion steht also nie still (HoneyService).
+		{ id = "AutoHarvest",   level = 10, implemented = true },
+		{ id = "GoldenDrops",   level = 30, implemented = false },
+	},
+	HoneyRefiner = {
+		{ id = "RefinerBoost",  level = 10, implemented = false },
+		{ id = "RoyalJelly",    level = 30, implemented = false },
+		{ id = "NectarOfAges",  level = 60, implemented = false },
+	},
+	Recycler = {
+		-- Groesserer Aufheb-Radius fuer Waben im Event-Pit (CombService).
+		{ id = "CollectRadius", level = 20, implemented = true },
+		{ id = "AutoDeposit",   level = 45, implemented = false },
+	},
+}
 
 --------------------------------------------------------------------------------
 -- Kleine Rechen-Hilfen
 --------------------------------------------------------------------------------
 
--- Linear von `from` (Level 1) nach `to` (Maximal-Level).
-local function byLevel(from: number, to: number, level: number): number
-	local clamped = EconomyConfig.clampBuildingLevel(level)
+local MAX = EconomyConfig.MAX_BUILDING_LEVEL
 
-	-- max(1, ...) nur als Division-durch-Null-Schutz, falls MAX_BUILDING_LEVEL
-	-- je auf 1 gesetzt wird. Bei jedem sinnvollen Wert aendert es nichts.
-	local steps = math.max(1, EconomyConfig.MAX_BUILDING_LEVEL - 1)
+-- Linear von `fromValue` (Level fromLevel) nach `toValue` (Level toLevel).
+local function lerpLevel(fromLevel: number, fromValue: number, toLevel: number, toValue: number, level: number): number
+	local span = math.max(1, toLevel - fromLevel)
+	local t = math.clamp((level - fromLevel) / span, 0, 1)
+	return fromValue + (toValue - fromValue) * t
+end
 
-	return from + (to - from) * ((clamped - 1) / steps)
+local function clampLevel(level: number): number
+	return EconomyConfig.clampBuildingLevel(level)
 end
 
 local function roundToInt(value: number): number
@@ -125,7 +135,8 @@ export type Behavior = {
 	-- Faktor, den dieses Gebaeude zur XP JEDES Honigs beitraegt (1 = keiner).
 	getXpMultiplier : (level: number) -> number,
 
-	-- Der Effekt dieses Gebaeudes auf diesem Level, in eigenen Worten.
+	-- Der Effekt dieses Gebaeudes auf diesem Level, in eigenen Worten
+	-- (deutsch; das UI zeigt die lokalisierten Werte selbst an).
 	describe : (level: number) -> string,
 }
 
@@ -133,22 +144,29 @@ local BASE_INTERVAL = EconomyConfig.HONEY_INTERVAL_SECONDS
 local BASE_CAPACITY = EconomyConfig.HONEY_CAPACITY
 local BASE_HEAL     = EconomyConfig.HONEY_HEAL_PERCENT
 
--- Vorgaben fuer jede Achse, auf der ein Gebaeude NICHT sein Schwerpunkt hat.
 local function baseInterval(_level: number): number  return BASE_INTERVAL end
 local function baseCapacity(_level: number): number  return BASE_CAPACITY end
 local function baseHeal(_level: number): number      return BASE_HEAL end
 local function noXpBonus(_level: number): number     return 1 end
 
 --------------------------------------------------------------------------------
--- Beehive — Volumen
+-- Beehive — Vorrat
 --------------------------------------------------------------------------------
 
 local function beehiveInterval(level: number): number
-	return byLevel(BASE_INTERVAL, BEEHIVE_MIN_INTERVAL_SECONDS, level)
+	local l = clampLevel(level)
+	if l <= 10 then
+		return lerpLevel(1, BASE_INTERVAL, 10, BEEHIVE_INTERVAL_L10, l)
+	end
+	return lerpLevel(10, BEEHIVE_INTERVAL_L10, MAX, BEEHIVE_MIN_INTERVAL_L60, l)
 end
 
 local function beehiveCapacity(level: number): number
-	return roundToInt(byLevel(BASE_CAPACITY, BEEHIVE_MAX_CAPACITY, level))
+	local l = clampLevel(level)
+	if l <= 10 then
+		return roundToInt(lerpLevel(1, BASE_CAPACITY, 10, BEEHIVE_CAPACITY_L10, l))
+	end
+	return BEEHIVE_CAPACITY_L10 + math.floor((l - 10) / BEEHIVE_CAPACITY_STEP)
 end
 
 local function beehiveDescribe(level: number): string
@@ -160,40 +178,39 @@ local function beehiveDescribe(level: number): string
 end
 
 --------------------------------------------------------------------------------
--- HoneyPot — Heilung
+-- HoneyRefiner — Veredeln (XP fuer jeden Honig + Heilung seines Honigs)
 --------------------------------------------------------------------------------
 
-local function honeyPotHeal(level: number): number
-	return byLevel(BASE_HEAL, HONEYPOT_MAX_HEAL_PERCENT, level)
+local function refinerInterval(_level: number): number
+	return BASE_INTERVAL * REFINER_INTERVAL_FACTOR
 end
 
-local function honeyPotDescribe(level: number): string
-	return string.format(
-		"Sein Honig heilt %s der HP  —  der beste nach einem Kampf",
-		percentText(honeyPotHeal(level))
-	)
+local function refinerCapacity(_level: number): number
+	return REFINER_CAPACITY
 end
 
---------------------------------------------------------------------------------
--- HoneyPress — Wachstum
---------------------------------------------------------------------------------
+local function refinerHeal(level: number): number
+	local l = clampLevel(level)
+	if l <= 10 then
+		return lerpLevel(1, BASE_HEAL, 10, REFINER_HEAL_L10, l)
+	end
+	return lerpLevel(10, REFINER_HEAL_L10, MAX, REFINER_HEAL_L60, l)
+end
 
 -- Der Multiplikator ist die XP-Kurve, bezogen auf ihren eigenen Startwert:
--- Level 1 = Faktor 1 (kein Bonus), Maximal-Level = voller Kurvenwert.
-local function pressXpMultiplier(level: number): number
+-- Level 1 = Faktor 1, Level 10 = 25x (wie die alte Presse), danach weiter.
+local function refinerXpMultiplier(level: number): number
 	local base = EconomyConfig.getHoneyXp(1)
 	if base <= 0 then return 1 end
 	return EconomyConfig.getHoneyXp(level) / base
 end
 
-local function pressDescribe(level: number): string
-	local bonus = pressXpMultiplier(level) - 1
-
-	if bonus <= 0 then
-		return "Noch kein XP-Bonus — jede Stufe hebt die XP JEDES Honigs"
-	end
-
-	return string.format("+%s XP auf JEDEN Honig, egal woher er kommt", percentText(bonus))
+local function refinerDescribe(level: number): string
+	return string.format(
+		"+%s XP auf jeden Honig  —  sein Honig heilt %s",
+		percentText(refinerXpMultiplier(level) - 1),
+		percentText(refinerHeal(level))
+	)
 end
 
 --------------------------------------------------------------------------------
@@ -209,20 +226,12 @@ local BEHAVIORS: { [Types.BuildingId]: Behavior } = {
 		describe           = beehiveDescribe,
 	},
 
-	HoneyPot = {
-		getIntervalSeconds = baseInterval,
-		getCapacity        = baseCapacity,
-		getHealPercent     = honeyPotHeal,
-		getXpMultiplier    = noXpBonus,
-		describe           = honeyPotDescribe,
-	},
-
-	HoneyPress = {
-		getIntervalSeconds = baseInterval,
-		getCapacity        = baseCapacity,
-		getHealPercent     = baseHeal,
-		getXpMultiplier    = pressXpMultiplier,
-		describe           = pressDescribe,
+	HoneyRefiner = {
+		getIntervalSeconds = refinerInterval,
+		getCapacity        = refinerCapacity,
+		getHealPercent     = refinerHeal,
+		getXpMultiplier    = refinerXpMultiplier,
+		describe           = refinerDescribe,
 	},
 }
 
@@ -239,17 +248,9 @@ local DEFAULT_BEHAVIOR: Behavior = {
 --------------------------------------------------------------------------------
 -- Ausbau-Kosten und -Texte, pro Gebaeude
 --------------------------------------------------------------------------------
---
--- Drei EIGENE Tabellen statt der einen gemeinsamen von frueher: der
--- Effekt-Text unterscheidet sich jetzt pro Gebaeude, weil sich die Mechanik
--- unterscheidet. Die KOSTEN sind bewusst weiterhin fuer alle drei gleich
--- (EconomyConfig.HONEY_UPGRADE_COSTS) — an den Preisen zu drehen waere eine
--- Balance-Aenderung, die niemand bestellt hat, und laufende Spielstaende
--- wuerden es sofort merken.
---
--- Der Text wird ERZEUGT, nicht von Hand gepflegt: er ist genau die describe()
--- des Gebaeudes auf der Stufe, die man kauft. Anzeige und Wirkung koennen
--- damit gar nicht auseinanderlaufen.
+-- Die KOSTEN sind fuer alle gleich (EconomyConfig.HONEY_UPGRADE_COSTS), der
+-- Effekt-Text ist die describe() des Gebaeudes auf der gekauften Stufe —
+-- Anzeige und Wirkung koennen nicht auseinanderlaufen.
 
 export type UpgradeDef = {
 	costGummies     : number,
@@ -258,9 +259,8 @@ export type UpgradeDef = {
 }
 
 local BUILDING_UPGRADES: { [Types.BuildingId]: { [number]: UpgradeDef } } = {
-	Beehive    = {},
-	HoneyPot   = {},
-	HoneyPress = {},
+	Beehive      = {},
+	HoneyRefiner = {},
 }
 
 for id, table_ in BUILDING_UPGRADES do
@@ -282,6 +282,7 @@ end
 local BuildingBehavior = {}
 
 BuildingBehavior.BUILDING_UPGRADES = BUILDING_UPGRADES
+BuildingBehavior.MILESTONES        = MILESTONES
 
 function BuildingBehavior.get(buildingId: Types.BuildingId): Behavior
 	return BEHAVIORS[buildingId] or DEFAULT_BEHAVIOR
@@ -301,9 +302,7 @@ function BuildingBehavior.getCapacity(buildingId: Types.BuildingId, level: numbe
 	return BuildingBehavior.get(buildingId).getCapacity(level)
 end
 
--- Groesstes Lager, das dieses Gebaeude je haben kann. MapService baut danach
--- seine Honig-Tropfen, weil die nur EINMAL beim Aufbau entstehen und danach
--- nur noch ein- und ausgeblendet werden.
+-- Groesstes Lager, das dieses Gebaeude je haben kann.
 function BuildingBehavior.getMaxCapacity(buildingId: Types.BuildingId): number
 	return BuildingBehavior.getCapacity(buildingId, EconomyConfig.MAX_BUILDING_LEVEL)
 end
@@ -326,12 +325,34 @@ function BuildingBehavior.getUpgrade(buildingId: Types.BuildingId, targetLevel: 
 	return upgrades[targetLevel]
 end
 
+-- v15: Look-Stufe (1-6) eines Gebaeude-Levels. Gilt fuer Bienenstock,
+-- Veredler UND Recycler (gleiche Stufen). PlotDisplayService baut ein Gebaeude
+-- nur neu, wenn sich DIESE Zahl aendert, nicht bei jedem Level.
+function BuildingBehavior.getLook(level: number): number
+	return EconomyConfig.getLook(level)
+end
+
+-- v15: Hat dieses Gebaeude (oder "Recycler") auf diesem Level die Faehigkeit?
+-- Nur umgesetzte Faehigkeiten zaehlen — eine reine Daten-Faehigkeit hat noch
+-- keinen Effekt und darf deshalb auch keinen ausloesen.
+function BuildingBehavior.hasAbility(buildingKey: string, level: number, abilityId: string): boolean
+	for _, ability in MILESTONES[buildingKey] or {} do
+		if ability.id == abilityId then
+			return ability.implemented and level >= ability.level
+		end
+	end
+	return false
+end
+
+-- Alle Faehigkeiten eines Gebaeudes mit Freischalt-Level (fuers Panel).
+function BuildingBehavior.getAbilities(buildingKey: string): { Ability }
+	return MILESTONES[buildingKey] or {}
+end
+
 -- XP, die EIN Honig gibt — egal aus welchem Gebaeude er kommt.
 --
 -- Die Multiplikatoren ALLER Gebaeude werden aufmultipliziert. Heute traegt nur
--- die Honig-Presse etwas bei (alle anderen geben 1), aber genau deshalb muss
--- kein Aufrufer wissen, WELCHES Gebaeude das ist: kaeme spaeter ein zweites
--- mit XP-Anteil dazu, aendert sich hier nichts.
+-- der Veredler etwas bei (der Bienenstock gibt 1).
 function BuildingBehavior.getXpPerHoney(buildings: { [Types.BuildingId]: Types.Building }): number
 	local multiplier = 1
 
@@ -339,11 +360,8 @@ function BuildingBehavior.getXpPerHoney(buildings: { [Types.BuildingId]: Types.B
 		multiplier *= BuildingBehavior.getXpMultiplier(id, building.level)
 	end
 
-	-- RUNDEN, nicht abschneiden. Der Multiplikator ist ein Quotient aus der
-	-- XP-Kurve (z.B. 65/30), und Basis mal Quotient landet in Fliesskomma
-	-- knapp NEBEN der ganzen Zahl: 30 * (65/30) ist 64.99999999999999, und
-	-- math.floor haette daraus 64 XP gemacht statt der 65, die genau hier
-	-- herauskommen muessen, damit die Kurve unveraendert bleibt.
+	-- RUNDEN, nicht abschneiden: Basis mal Quotient landet in Fliesskomma knapp
+	-- NEBEN der ganzen Zahl (30 * (65/30) = 64.999...).
 	return math.max(1, math.floor(EconomyConfig.getHoneyXp(1) * multiplier + 0.5))
 end
 

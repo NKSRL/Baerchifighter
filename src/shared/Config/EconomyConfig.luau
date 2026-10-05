@@ -2,8 +2,14 @@
 -- EconomyConfig.luau
 -- ReplicatedStorage/Config/EconomyConfig.luau
 --
--- Alle Preise, Kosten und Ertraege.
+-- Einzige Zustaendigkeit:
+--   - Alle Preise, Kosten und Ertraege, die nicht zu einem eigenen System
+--     gehoeren: Rebirth, Honig, Gebaeude-Ausbau (Level 1-60), Recycling,
+--     Fusion, Rang.
 -- EconomyService liest nur von hier — keine Zahl ist im Service selbst.
+--
+-- Seit v15 stehen die Zahlen des Kampfs (Stage-Gummies, GoldGummies pro Lauf,
+-- Fortsetzen) in Config/TowerConfig — das PIT-Level gibt es nicht mehr.
 --
 -- Die "effect"-Strings in BUILDING_UPGRADES werden aus HONEY_XP ERZEUGT und
 -- nicht von Hand gepflegt. Frueher standen Text und Zahl getrennt da und
@@ -15,13 +21,30 @@ local Types = require(script.Parent.Parent.Network.Types)
 -- Rebirth
 --------------------------------------------------------------------------------
 
--- Gummies-Kosten fuer Rebirth n (Index = rebirthCount + 1)
+-- Gummies-Kosten fuer Rebirth n (Index = rebirthCount + 1).
+--
+-- v15: NEU KALIBRIERT fuer das Tower-System (tools/sim/progression_pacing.lua,
+-- Profil "Normal" 90 min/Tag). Mit dem Tower-Einkommen waeren die alten Preise
+-- (10.000 / 35.000 / ...) nach Minuten bezahlt gewesen. Ziel-Dauer eines
+-- Lebens: Rebirth 1 nach ~3 h aktiver Zeit (Spieltag 2-3), danach 3,5 / 4,5 /
+-- 6 h; die Rebirths 4-6 und 14-15 werden vom Tower-Deckel bzw. der
+-- Baerchi-Staerke begrenzt, ihre Preise sind geglaettet. ANNAHME, im Bericht.
 local REBIRTH_COST_GUMMIES: { number } = {
-	10_000,    -- Rebirth 1
-	35_000,    -- Rebirth 2
-	100_000,   -- Rebirth 3
-	300_000,   -- Rebirth 4
-	1_000_000, -- Rebirth 5+
+	1_500_000,             -- Rebirth 1
+	230_000_000,           -- Rebirth 2
+	4_400_000_000,         -- Rebirth 3
+	25_000_000_000,        -- Rebirth 4
+	120_000_000_000,       -- Rebirth 5
+	300_000_000_000,       -- Rebirth 6
+	570_000_000_000,       -- Rebirth 7 (oeffnet den Final-Tower)
+	1_160_000_000_000,     -- Rebirth 8
+	1_600_000_000_000,     -- Rebirth 9
+	3_500_000_000_000,     -- Rebirth 10
+	6_500_000_000_000,     -- Rebirth 11
+	11_000_000_000_000,    -- Rebirth 12
+	17_000_000_000_000,    -- Rebirth 13
+	25_000_000_000_000,    -- Rebirth 14
+	40_000_000_000_000,    -- Rebirth 15 (Final-Deckel 100)
 }
 
 -- Multiplikator nach Rebirth n (Index = rebirthCount nach dem Reset)
@@ -45,10 +68,11 @@ local REBIRTH_START_GUMMIES = 100
 -- stoppte bei x8. Fuer die Ascensions-Eier bei Rebirth 50 bis 100 geht die
 -- Kurve jetzt weiter:
 --
---   Kosten  Rebirth n (n >= 6) = 1 Mio x REBIRTH_COST_GROWTH ^ (n - 5)
+--   Kosten  Rebirth n (n >= 16) = Kosten 15 x REBIRTH_COST_GROWTH ^ (n - 15)
 --   Multi   nach Rebirth n (n >= 6) = 8 x REBIRTH_MULT_GROWTH ^ (n - 5)
 --
--- Die Rebirths 1 bis 5 bleiben exakt wie bisher (bestehende Spielstaende).
+-- (v15: die Kosten-Tabelle oben reicht bis Rebirth 15, danach waechst sie wie
+-- bisher mit 1.13. Die Multiplikatoren sind unveraendert.)
 --
 -- Warum diese beiden Zahlen: die Zeit fuer einen Rebirth ist ungefaehr
 -- Kosten / (Einkommen x Multiplikator). Waechst die Kosten-Kurve nur ein
@@ -139,13 +163,13 @@ local HONEY_HEAL_PERCENT = 0.25
 -- Spieler verfuettern will — im UI waehlt der Spieler selbst (BaerchiPanel).
 local HONEY_AUTO_HEAL_HP_RATIO = 0.5
 
--- Die XP-Kurve fuer EINEN Honig. Index = Level der HONIG-PRESSE.
+-- Die XP-Kurve fuer EINEN Honig. Index = Level des HONIG-VEREDLERS (bis v14:
+-- der Honig-Presse; die Migration uebernimmt das hoehere Level von Topf und
+-- Presse, siehe PlayerMigration).
 --
--- Bis v6 hing das am Level des Gebaeudes, aus dem der Honig kam — jedes der
--- drei tat also dasselbe. Seit v7 besitzt die Presse diese Kurve allein
--- (BuildingBehavior rechnet daraus ihren Multiplikator, der auf JEDEN Honig
--- wirkt). Die Zahlen selbst sind unveraendert: bei "Presse auf Level N" gibt
--- ein Honig genau so viel XP wie frueher bei "Gebaeude auf Level N".
+-- BuildingBehavior rechnet daraus den Multiplikator des Veredlers, der auf
+-- JEDEN Honig wirkt. Level 1-10 sind unveraendert seit v7; ab Level 11 waechst
+-- die Kurve mit HONEY_XP_GROWTH pro Level weiter (siehe getHoneyXp).
 --
 -- Zusammen mit der XP-Kurve in BaerchiConfig (ca. 730 XP bis Level 7) heisst
 -- Level 1: rund 24 Honig bis Level 7 — bei drei Gebaeuden gut zweieinhalb
@@ -163,19 +187,28 @@ local HONEY_XP: { number } = {
 	[10] = 750,
 }
 
+-- v15: XP-Zuwachs pro Veredler-Level ab Level 11 (Level 30 ≈ 12.300, Level 60
+-- ≈ 820.000 XP pro Honig). Kalibriert mit tools/sim/progression_pacing.lua: ein
+-- hoher Veredler bringt einen frisch zurueckgesetzten Baerchi nach einem
+-- Rebirth in Minuten statt Stunden wieder auf Level 50.
+local HONEY_XP_GROWTH = 1.15
+
 --------------------------------------------------------------------------------
--- Gebaeude-Upgrades
+-- Gebaeude-Upgrades (v15: Level 1-60)
 --------------------------------------------------------------------------------
 
-local MAX_BUILDING_LEVEL = 10
+local MAX_BUILDING_LEVEL = 60
 
 -- Kosten fuer das Upgrade AUF dieses Level. Beginnt bei Index 2, weil Level 1
 -- der Startzustand ist — deshalb bewusst als Map und nicht als Array.
 --
--- Die KOSTENKURVE gilt weiterhin fuer alle drei Gebaeude: sie kosten gleich
--- viel, koennen aber seit v7 voellig Verschiedenes. Wer sie unterschiedlich
--- teuer machen will, findet die drei Ausbau-Tabellen in
--- Config/BuildingBehavior.luau — dort werden sie aus dieser Kurve gebaut.
+-- Die KOSTENKURVE gilt fuer ALLE Gebaeude inklusive Recycler (CombConfig): sie
+-- kosten gleich viel, koennen aber Verschiedenes. Die Ausbau-Tabellen mit
+-- Effekt-Text baut BuildingBehavior aus dieser Kurve.
+--
+-- Level 2-10 sind seit v7 unveraendert (Vorgabe: bestehende Spielstaende).
+-- Ab Level 11 setzt sich die Kurve exponentiell fort (unten erzeugt), flacher
+-- als bisher (x2,3 je Level bis 10, danach COST_GROWTH_AFTER_10).
 local HONEY_UPGRADE_COSTS: { [number]: { gummies: number, goldGummies: number } } = {
 	[2]  = { gummies = 250,    goldGummies = 0  },
 	[3]  = { gummies = 700,    goldGummies = 0  },
@@ -187,6 +220,20 @@ local HONEY_UPGRADE_COSTS: { [number]: { gummies: number, goldGummies: number } 
 	[9]  = { gummies = 140_000,goldGummies = 55 },
 	[10] = { gummies = 320_000,goldGummies = 95 },
 }
+
+-- v15: Fortsetzung der Kostenkurve ab Level 11. ANNAHME, per
+-- tools/sim/progression_pacing.lua kalibriert auf die Look-Zielzeiten (README
+-- 4.4): Look 3 (L20) ~Tag 2-3, Look 4 (L30) ~Woche 1, Look 5 (L45) ~Woche 2-3,
+-- Look 6 (L60) ~Woche 5-8 bei 1,5 h aktiver Spielzeit pro Tag.
+-- Zwei Abschnitte: bis Level 30 flacher (Look 3 und 4 sollen in der ersten
+-- Woche kommen), danach steiler (Look 5 und 6 sind das Langzeitziel).
+local COST_GROWTH_AFTER_10 = 1.22   -- Level 11-30
+local COST_GROWTH_AFTER_30 = 1.33   -- Level 31-60
+local GOLD_GROWTH_AFTER_10 = 1.035
+
+-- v15: Look-Stufen der Gebaeude (Modelle kommen in Prompt 4). Index = Look,
+-- Wert = erstes Level dieses Looks: 1-9 / 10-19 / 20-29 / 30-44 / 45-59 / 60.
+local LOOK_THRESHOLDS: { number } = { 1, 10, 20, 30, 45, 60 }
 
 -- Die fertigen Ausbau-Tabellen (Kosten + Effekt-Text) stehen seit v7 in
 -- Config/BuildingBehavior.luau, eine pro Gebaeude. Sie muessen dort stehen und
@@ -232,74 +279,9 @@ local RECYCLE_LEVEL_BONUS = 0.10
 -- kein Gebaeude mehr, sondern ein reines GUI-Feature ohne Unlock-Level.
 local FUSION_STAT_BONUS = 0.50
 
---------------------------------------------------------------------------------
--- PIT (Kampfplattform)
---------------------------------------------------------------------------------
-
-local MAX_PIT_LEVEL = 8
-
--- [pitLevel] = Gummies-Kosten um auf dieses Level zu steigen
-local PIT_UPGRADE_COSTS: { [number]: number } = {
-	[2]  = 500,
-	[3]  = 1_500,
-	[4]  = 4_000,
-	[5]  = 10_000,
-	[6]  = 25_000,
-	[7]  = 60_000,
-	[8]  = 150_000,
-}
-
--- Gummy-Belohnung fuer die ERSTE Stage eines Laufs auf diesem PIT-Level
--- (Basiswert vor rebirthMult).
-local PIT_GUMMY_REWARDS: { number } = {
-	[1] = 10,
-	[2] = 25,
-	[3] = 60,
-	[4] = 140,
-	[5] = 320,
-	[6] = 700,
-	[7] = 1_500,
-	[8] = 3_500,
-}
-
--- Jede weitere Stage im selben Lauf gibt entsprechend mehr. Tiefer kommen
--- lohnt sich dadurch ueberproportional — genau der Anreiz, den Baerchi
--- vorher mit Honig moeglichst weit hochzufuettern.
-local PIT_STAGE_REWARD_GROWTH = 0.15
-
--- GoldGummies gibt es als Meilenstein im PIT: alle N geschafften Stages
--- eines Laufs, multipliziert mit dem PIT-Level. Seit die GummyFarm weg ist,
--- ist das ihre einzige Quelle — sie haengen damit direkt am Kern-Loop statt
--- an passivem Warten.
---
--- Das PIT-Level steht bewusst mit im Produkt. Ohne es waere die Gold-Menge
--- fast flach (ein Baerchi schafft mit Level 10 zehn Stages, mit Level 40
--- zweiunddreissig — also 2 statt 6 Gold), waehrend die Gold-Kosten der
--- Gebaeude von 3 auf 95 steigen. Die letzten Ausbaustufen haetten dann rund
--- 16 Laeufe gekostet, obwohl ihr Gummy-Anteil in zweien drin ist. Mit dem
--- Faktor liegt jede Stufe bei ein bis vier Laeufen — und auf PIT-Level 1
--- (Spielanfang) aendert sich nichts, weil dort mal 1 gerechnet wird.
-local PIT_GOLD_EVERY_STAGES = 5
-local PIT_GOLD_AMOUNT       = 1
-
--- ============================================================
--- PIT-FORTSETZUNG (v12, PET_STEUERUNG_UND_EI_ANIMATION_KONZEPT Abschnitt 4b)
--- ============================================================
--- Vor einem PIT-Lauf darf der Spieler gegen Gummies weiter oben einsteigen:
--- bei 65 % der Stage-Tiefe seines letzten Laufs oder direkt bei der letzten
--- erreichten Stage.
---
--- Kosten = Anteil der Belohnungen, die die UEBERSPRUNGENEN Stages gebracht
--- haetten. Das skaliert automatisch mit dem PIT-Level (die Belohnungen tun
--- es) und mit rebirthMult (das Einkommen tut es auch — ohne ihn waere das
--- Ueberspringen nach ein paar Rebirths praktisch umsonst).
---
--- 0,35 ist ein PLATZHALTER aus dem Konzept: zu billig, und jeder startet
--- immer oben; zu teuer, und niemand nutzt es. Muss im Playtest geprueft werden.
-local PIT_RESUME_COST_FACTOR = 0.35
-
--- "65 %" = 65 % der STAGE-TIEFE des letzten Laufs (nicht der HP).
-local PIT_RESUME_PERCENT = 0.65
+-- (v15: der Abschnitt "PIT" ist entfallen. Stage-Gummies, GoldGummies pro Lauf
+-- und Fortsetzen stehen in Config/TowerConfig, die alten PIT-Ausbaukosten nur
+-- noch fuer die Erstattung in TowerConfig.LEGACY_PIT_UPGRADE_COSTS.)
 
 --------------------------------------------------------------------------------
 -- Rang-Schwellwerte (Arena PvP)
@@ -339,6 +321,31 @@ local function roundSignificant(value: number): number
 	return math.floor(value / factor + 0.5) * factor
 end
 
+-- v15: Ausbaukosten ab Level 11 erzeugen (einmal beim Laden).
+do
+	local base = HONEY_UPGRADE_COSTS[10]
+	for level = 11, MAX_BUILDING_LEVEL do
+		local steps = level - 10
+		local early = math.min(steps, 20)
+		local late  = math.max(0, steps - 20)
+		HONEY_UPGRADE_COSTS[level] = {
+			gummies     = roundSignificant(base.gummies * COST_GROWTH_AFTER_10 ^ early * COST_GROWTH_AFTER_30 ^ late),
+			goldGummies = roundSignificant(base.goldGummies * GOLD_GROWTH_AFTER_10 ^ steps),
+		}
+	end
+end
+
+-- Look-Stufe (1-6) eines Gebaeude-Levels.
+local function getLook(level: number): number
+	local look = 1
+	for index, from in LOOK_THRESHOLDS do
+		if level >= from then
+			look = index
+		end
+	end
+	return look
+end
+
 -- Kosten fuer den NAECHSTEN Rebirth (rebirthCount = bisherige Anzahl).
 local function getRebirthCost(rebirthCount: number): number
 	local n = rebirthCount + 1
@@ -374,73 +381,14 @@ local function getRebirthMilestone(rebirthCount: number): RebirthMilestone?
 	return REBIRTH_MILESTONES[rebirthCount]
 end
 
--- XP die ein Honig aus einem Gebaeude dieses Levels gibt
+-- XP die ein Honig bei diesem Veredler-Level gibt (Level 1-10 aus der
+-- Tabelle, danach mit HONEY_XP_GROWTH weiter).
 local function getHoneyXp(buildingLevel: number): number
-	return HONEY_XP[clampBuildingLevel(buildingLevel)]
-end
-
--- Wie lange EIN bestimmtes Gebaeude fuer seinen naechsten Honig braucht,
--- stand frueher hier als `if buildingId ~= "HoneyPot"`. Das ist jetzt
--- BuildingBehavior.getIntervalSeconds — siehe Kommentar bei
--- HONEY_INTERVAL_SECONDS weiter oben.
-
--- Basis-Belohnung der ERSTEN Stage eines Laufs, OHNE rebirthMult.
--- Der Multiplikator wird zentral von EconomyService.awardGummies angewendet —
--- wer ihn hier nochmal drauf rechnet, verdoppelt ihn.
-local function getPitBaseReward(pitLevel: number): number
-	local lvl = math.clamp(math.floor(pitLevel), 1, #PIT_GUMMY_REWARDS)
-	return PIT_GUMMY_REWARDS[lvl]
-end
-
--- Basis-Belohnung fuer eine bestimmte Stage eines Laufs, OHNE rebirthMult.
-local function getPitStageReward(pitLevel: number, stage: number): number
-	local growth = math.pow(1 + PIT_STAGE_REWARD_GROWTH, math.max(stage, 1) - 1)
-	return math.max(1, math.floor(getPitBaseReward(pitLevel) * growth))
-end
-
--- Nur fuer UI-Vorschau ("du wuerdest X Gummies bekommen") — erste Stage.
--- Server-Code benutzt getPitStageReward + EconomyService.awardGummies.
-local function getPitReward(pitLevel: number, rebirthMult: number): number
-	return math.floor(getPitBaseReward(pitLevel) * rebirthMult)
-end
-
-local function getPitUpgradeCost(targetPitLevel: number): number?
-	return PIT_UPGRADE_COSTS[targetPitLevel]
-end
-
--- Wie viele GoldGummies ein Lauf bringt: pro angefangene N Stages einer,
--- mal PIT-Level (Begruendung siehe PIT_GOLD_EVERY_STAGES oben).
-local function getPitGoldReward(stagesCleared: number, pitLevel: number): number
-	if stagesCleared < PIT_GOLD_EVERY_STAGES then
-		return 0
+	local level = clampBuildingLevel(buildingLevel)
+	if level <= #HONEY_XP then
+		return HONEY_XP[level]
 	end
-
-	local milestones = math.floor(stagesCleared / PIT_GOLD_EVERY_STAGES)
-	local level      = math.clamp(math.floor(pitLevel), 1, MAX_PIT_LEVEL)
-
-	return milestones * PIT_GOLD_AMOUNT * level
-end
-
--- Startstage fuer "ab 65 %" bei einem letzten Lauf bis reachedStage.
-local function getPitResumePercentStage(reachedStage: number): number
-	return math.max(1, math.floor(PIT_RESUME_PERCENT * reachedStage))
-end
-
--- Gummy-Kosten, um bei `startStage` einzusteigen (Stage 1 = kostenlos).
--- Summe der Basis-Belohnungen aller uebersprungenen Stages, mal Faktor, mal
--- rebirthMult. Server (CombatService) und Client (PitResumeDialog) rechnen
--- beide hiermit — dieselbe Zahl im Dialog und beim Abbuchen.
-local function getPitResumeCost(pitLevel: number, startStage: number, rebirthMult: number): number
-	if startStage <= 1 then
-		return 0
-	end
-
-	local skipped = 0
-	for stage = 1, startStage - 1 do
-		skipped += getPitStageReward(pitLevel, stage)
-	end
-
-	return math.floor(PIT_RESUME_COST_FACTOR * skipped * math.max(rebirthMult, 1))
+	return math.floor(HONEY_XP[#HONEY_XP] * HONEY_XP_GROWTH ^ (level - #HONEY_XP) + 0.5)
 end
 
 -- Fester Wert seit v3 (siehe FUSION_STAT_BONUS oben) — keine Level-Eingabe
@@ -482,9 +430,15 @@ return {
 	HONEY_HEAL_PERCENT       = HONEY_HEAL_PERCENT,
 	HONEY_AUTO_HEAL_HP_RATIO = HONEY_AUTO_HEAL_HP_RATIO,
 	HONEY_XP                 = HONEY_XP,
+	HONEY_XP_GROWTH          = HONEY_XP_GROWTH,
 
-	HONEY_UPGRADE_COSTS = HONEY_UPGRADE_COSTS,
-	MAX_BUILDING_LEVEL  = MAX_BUILDING_LEVEL,
+	HONEY_UPGRADE_COSTS  = HONEY_UPGRADE_COSTS,
+	MAX_BUILDING_LEVEL   = MAX_BUILDING_LEVEL,
+	COST_GROWTH_AFTER_10 = COST_GROWTH_AFTER_10,
+	COST_GROWTH_AFTER_30 = COST_GROWTH_AFTER_30,
+	GOLD_GROWTH_AFTER_10 = GOLD_GROWTH_AFTER_10,
+	LOOK_THRESHOLDS      = LOOK_THRESHOLDS,
+	getLook              = getLook,
 
 	RECYCLE_RETURN      = RECYCLE_RETURN,
 	RECYCLE_BASE_VALUE  = RECYCLE_BASE_VALUE,
@@ -492,29 +446,14 @@ return {
 
 	FUSION_STAT_BONUS = FUSION_STAT_BONUS,
 
-	MAX_PIT_LEVEL           = MAX_PIT_LEVEL,
-	PIT_UPGRADE_COSTS       = PIT_UPGRADE_COSTS,
-	PIT_GUMMY_REWARDS       = PIT_GUMMY_REWARDS,
-	PIT_STAGE_REWARD_GROWTH = PIT_STAGE_REWARD_GROWTH,
-	PIT_GOLD_EVERY_STAGES   = PIT_GOLD_EVERY_STAGES,
-	PIT_GOLD_AMOUNT         = PIT_GOLD_AMOUNT,
-	PIT_RESUME_COST_FACTOR  = PIT_RESUME_COST_FACTOR,
-	PIT_RESUME_PERCENT      = PIT_RESUME_PERCENT,
-
 	RANK_TIERS = RANK_TIERS,
 
 	clampBuildingLevel    = clampBuildingLevel,
+	roundSignificant      = roundSignificant,
 	getRebirthCost        = getRebirthCost,
 	getRebirthMult        = getRebirthMult,
 	getAscensionEggReward = getAscensionEggReward,
 	getHoneyXp            = getHoneyXp,
-	getPitBaseReward      = getPitBaseReward,
-	getPitStageReward     = getPitStageReward,
-	getPitReward          = getPitReward,
-	getPitUpgradeCost     = getPitUpgradeCost,
-	getPitGoldReward      = getPitGoldReward,
-	getPitResumePercentStage = getPitResumePercentStage,
-	getPitResumeCost      = getPitResumeCost,
 	getFusionStatBonus    = getFusionStatBonus,
 	getBaerchiBaseValue   = getBaerchiBaseValue,
 	getRankForPoints      = getRankForPoints,

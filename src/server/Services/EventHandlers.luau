@@ -7,7 +7,14 @@
 --     Ufo, HotEgg, MutationsSturm, Koenigshuegel, Schatzgraeber
 --
 -- Kein eigener Eintrag im GameManager: EventParticipationService ruft den
--- passenden Handler beim Event-Start auf.
+-- passenden Handler beim Event-Start auf. Das sechste Event (Wespenkoenigin)
+-- steht wegen seiner Groesse in Util/WaspQueenEvent; gemeinsame Typen und
+-- Werkzeuge in Util/EventKit.
+--
+-- Bewegte Dinge (UFO, Kisten, Koenigin) sind reine Funktionen der Serverzeit
+-- (Modules/EventMotion): der Server schreibt nur die Startzeit als Attribut,
+-- der Client (EventFXController) bewegt die Optik. Waben-Themen und
+-- fliegende Waben laufen ueber CombService (setTheme, launchCombs).
 --
 -- Jeder Handler hat die Signatur   handler(api, def) -> session
 -- und die Session hat   session.stop() -> results
@@ -23,74 +30,37 @@
 -- Zufallsstreuung), stehen in EventConfig. Reine Optik (Farben, Groessen,
 -- Animationszeiten) steht als benannte Konstante unten in dieser Datei.
 
+local Players             = game:GetService("Players")
 local RunService          = game:GetService("RunService")
+local Workspace           = game:GetService("Workspace")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local EventConfig     = require(ReplicatedStorage.Config.EventConfig)
 local FigureFX        = require(ServerScriptService.Util.FigureFX)
 local FigurePlacement = require(ServerScriptService.Util.FigurePlacement)
+local EventKit        = require(ServerScriptService.Util.EventKit)
+local JackpotRoll     = require(ServerScriptService.Util.JackpotRoll)
+local WaspQueenEvent  = require(ServerScriptService.Util.WaspQueenEvent)
+local CombService     = require(ServerScriptService.Services.CombService)
+local EventMotion     = require(ReplicatedStorage.Modules.EventMotion)
+local Loc             = require(ReplicatedStorage.Localization.Loc)
 
 local EventHandlers = {}
 
 --------------------------------------------------------------------------------
--- Typen
+-- Typen (stehen in Util/EventKit, hier unter den gewohnten Namen)
 --------------------------------------------------------------------------------
 
--- Ein Teilnehmer, wie EventParticipationService ihn liefert (dort: Presence).
--- Die Handler lesen ihn und setzen nur die drei Steuerfelder unten.
-export type Part = {
-	player     : Player,
-	figure     : Model,
-	baerchiUid : string,
-	homeFoot   : Vector3,
-	standFoot  : Vector3,
-	busy       : boolean?,   -- Figur laeuft gerade (walkTo)
-	cancelWalk : boolean?,   -- laufende Bewegung abbrechen
-	abducting  : boolean?,   -- UFO hat die Figur gerade
-}
-
--- Was EventParticipationService den Handlern bereitstellt (buildApi).
-export type Api = {
-	center       : Vector3,
-	radius       : number,
-	running      : () -> boolean,
-	footOf       : (Model) -> Vector3,
-	participants : () -> { Part },
-	stillHere    : (Part) -> boolean,
-	plotPosition : (Player) -> Vector3?,
-	level        : (Part) -> number,
-	power        : (Part) -> number,
-	toast        : (Player, string) -> (),
-	recall       : (Player) -> (),
-	finishHome   : (Part) -> (),
-	ufoReward    : (Part) -> (),
-	walkTo       : (Part, Vector3) -> boolean,
-}
-
--- Belohnung eines Spielers am Event-Ende.
-export type Reward = {
-	egg          : EventConfig.EventBonus?,
-	mutationRoll : boolean?,
-}
-
-export type Session = {
-	stop : () -> { [Player]: Reward },
-}
-
-export type Handler = (Api, EventConfig.EventDef) -> Session
+export type Part    = EventKit.Part
+export type Api     = EventKit.Api
+export type Reward  = EventKit.Reward
+export type Session = EventKit.Session
+export type Handler = EventKit.Handler
 
 --------------------------------------------------------------------------------
 -- Optik (keine Balance — aendert nur, wie es aussieht)
 --------------------------------------------------------------------------------
-
--- Textmarke ueber der Figur
-local LABEL_SIZE              = UDim2.fromOffset(120, 26)
-local LABEL_OFFSET            = Vector3.new(0, 6, 0)
-local LABEL_MAX_DISTANCE      = 220
-local LABEL_BACK_TRANSPARENCY = 0.35
-local LABEL_BACK_COLOR        = Color3.fromRGB(20, 20, 30)
-local LABEL_TEXT_COLOR        = Color3.new(1, 1, 1)
 
 -- Duell: abwechselnde Ausfallschritte, am Ende blitzt der Verlierer rot
 local DUEL_LUNGE_DISTANCE      = 2
@@ -112,7 +82,7 @@ local CHEER_BOB   = { height = 1.6, rate = 2.2 }
 local DIG_BOB     = { height = 0.35, rate = 3 }
 
 -- UFO
-local UFO_HOVER_HEIGHT        = 40
+local UFO_HOVER_HEIGHT        = EventMotion.UFO_HOVER_HEIGHT
 local UFO_COLOR               = Color3.fromRGB(120, 255, 190)
 local UFO_CLOSED_COLOR        = Color3.fromRGB(255, 90, 90)
 local UFO_DISC_COLOR          = Color3.fromRGB(170, 180, 195)
@@ -139,6 +109,26 @@ local UFO_HOVER_SPIN_RATE     = 1.5
 local UFO_HOVER_STEP_SECONDS  = 0.1
 local UFO_DROP_HEIGHT         = 4
 local UFO_DROP_SECONDS        = 1.5
+-- Abgeworfene Kiste (die Kiste bewegt der Client, siehe EventFXController)
+local CRATE_SIZE              = Vector3.new(3, 3, 3)
+local CRATE_COLOR             = Color3.fromRGB(150, 105, 60)
+local CRATE_GOLD_COLOR        = Color3.fromRGB(255, 205, 60)
+local CANOPY_SIZE             = Vector3.new(8, 3, 8)
+local CANOPY_LIFT             = 6
+local CANOPY_COLOR            = Color3.fromRGB(120, 255, 190)
+local MARK_THICKNESS          = 0.25
+local MARK_TRANSPARENCY       = 0.35
+local MARK_COLOR              = Color3.fromRGB(120, 255, 190)
+local MARK_GOLD_COLOR         = Color3.fromRGB(255, 215, 70)
+local PILLAR_HEIGHT           = 90
+local PILLAR_WIDTH            = 2.2
+local PILLAR_TRANSPARENCY     = 0.45
+
+-- Hot Egg: Warnring vor dem Vulkan-Ausbruch
+local ERUPTION_RING_RADIUS    = 7
+local ERUPTION_RING_COLOR     = Color3.fromRGB(255, 90, 30)
+local ERUPTION_RING_THICKNESS = 0.35
+local ERUPTION_ORIGIN_LIFT    = 2
 
 -- Hot Egg
 local HOT_EGG_FIRE_SIZE       = 8
@@ -183,86 +173,12 @@ local TREASURE_JOIN_CHECK_SECONDS = 1
 -- Hilfen
 --------------------------------------------------------------------------------
 
-local function flatDist(a: Vector3, b: Vector3): number
-	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
-end
-
--- Eigenschaften per Tabelle setzen. Ueber `any`, weil der Klassenname erst
--- zur Laufzeit feststeht und --!strict die Felder sonst nicht kennt.
-local function make(className: string, props: { [string]: any }, parent: Instance): Instance
-	local inst: any = Instance.new(className)
-	for key, value in props do
-		inst[key] = value
-	end
-	inst.Parent = parent
-	return inst
-end
-
-local function fxPart(props: { [string]: any }, parent: Instance): BasePart
-	props.Anchored   = true
-	props.CanCollide = false
-	props.CanQuery   = false
-	props.CanTouch   = false
-	props.CastShadow = false
-	return make("Part", props, parent) :: BasePart
-end
-
-local function rootOf(figure: Model): BasePart?
-	return figure.PrimaryPart or figure:FindFirstChildWhichIsA("BasePart", true)
-end
-
--- Kleine Textmarke ueber der Figur (Fortschritt, "Ei!", ...). nil entfernt sie.
-local function setLabel(part: Part, text: string?)
-	local figure = part.figure
-	if not figure or not figure.Parent then
-		return
-	end
-
-	local gui = figure:FindFirstChild("EventLabel")
-	if not text then
-		if gui then
-			gui:Destroy()
-		end
-		return
-	end
-
-	if not gui then
-		local root = rootOf(figure)
-		if not root then
-			return
-		end
-		local created = make("BillboardGui", {
-			Name         = "EventLabel",
-			Size         = LABEL_SIZE,
-			StudsOffset  = LABEL_OFFSET,
-			AlwaysOnTop  = true,
-			Adornee      = root,
-			MaxDistance  = LABEL_MAX_DISTANCE,
-		}, figure)
-		make("TextLabel", {
-			Name                   = "Text",
-			Size                   = UDim2.fromScale(1, 1),
-			BackgroundTransparency = LABEL_BACK_TRANSPARENCY,
-			BackgroundColor3       = LABEL_BACK_COLOR,
-			TextColor3             = LABEL_TEXT_COLOR,
-			TextScaled             = true,
-			Font                   = Enum.Font.GothamBold,
-		}, created)
-		gui = created
-	end
-
-	local label = (gui :: Instance):FindFirstChild("Text")
-	if label and label:IsA("TextLabel") then
-		label.Text = text
-	end
-end
-
-local function newFolder(name: string): Folder
-	local folder = Instance.new("Folder")
-	folder.Name   = name
-	folder.Parent = workspace
-	return folder
-end
+local flatDist  = EventKit.flatDist
+local make      = EventKit.make
+local fxPart    = EventKit.fxPart
+local rootOf    = EventKit.rootOf
+local setLabel  = EventKit.setLabel
+local newFolder = EventKit.newFolder
 
 -- Kurzer Kampf zweier Teilnehmer: serverseitiger Vergleich (ATK/HP-basiert,
 -- siehe api.power) mit etwas Zufall. Dauert fix `seconds`. Gibt Gewinner und
@@ -329,7 +245,7 @@ type UfoState = {
 	inBeam     : boolean,
 }
 
-function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
+function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	local cfg    = EventConfig.UFO
 	local center = api.center
 	local ringR  = api.radius * cfg.BEAM_RADIUS_FACTOR
@@ -345,31 +261,53 @@ function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
 
 	local folder = newFolder("EventUfo")
 
-	-- UFO-Optik: Scheibe, Kuppel, Beam, Ring am Boden
-	local discPos = Vector3.new(center.X, hoverY, center.Z)
+	-- PATROUILLE: das UFO fliegt auf der Bahn aus EventMotion. Der Server
+	-- rechnet nur Positionen aus (Beam, Abwurf), bewegt aber nichts: die
+	-- Teile stehen am Startpunkt, der Client zieht das Model jedes Frame aus
+	-- derselben Funktion nach (Attribute StartTime/Center am Ordner).
+	local startTime = Workspace:GetServerTimeNow()
+	folder:SetAttribute("StartTime", startTime)
+	folder:SetAttribute("Center", center)
+
+	local function ringCenterAt(serverTime: number): Vector3
+		return EventMotion.ufoGround(center, startTime, serverTime)
+	end
+
+	local ufoModel = Instance.new("Model")
+	ufoModel.Name = "Ufo"
+	ufoModel.Parent = folder
+
+	local ground0 = ringCenterAt(startTime)
+
+	-- UFO-Optik: Scheibe, Kuppel, Beam, Ring am Boden (alles im Model, ein
+	-- PivotTo pro Frame beim Client)
+	local discPos = Vector3.new(ground0.X, hoverY, ground0.Z)
 	fxPart({
 		Name = "Disc", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Metal,
 		Color = UFO_DISC_COLOR, Size = UFO_DISC_SIZE,
 		CFrame = CFrame.new(discPos) * CFrame.Angles(0, 0, math.rad(90)),
-	}, folder)
+	}, ufoModel)
 	fxPart({
 		Name = "Dome", Shape = Enum.PartType.Ball, Material = Enum.Material.Glass,
 		Color = UFO_COLOR, Transparency = UFO_DOME_TRANSPARENCY, Size = UFO_DOME_SIZE,
 		CFrame = CFrame.new(discPos + Vector3.new(0, UFO_DOME_LIFT, 0)),
-	}, folder)
+	}, ufoModel)
 	local beamHeight = hoverY - center.Y
 	local beam = fxPart({
 		Name = "Beam", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,
 		Color = UFO_COLOR, Transparency = UFO_BEAM_TRANSPARENCY,
 		Size = Vector3.new(beamHeight, ringR * 2, ringR * 2),
-		CFrame = CFrame.new(Vector3.new(center.X, center.Y + beamHeight / 2, center.Z)) * CFrame.Angles(0, 0, math.rad(90)),
-	}, folder)
+		CFrame = CFrame.new(Vector3.new(ground0.X, center.Y + beamHeight / 2, ground0.Z)) * CFrame.Angles(0, 0, math.rad(90)),
+	}, ufoModel)
 	local ring = fxPart({
 		Name = "Ring", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,
 		Color = UFO_COLOR, Transparency = UFO_RING_TRANSPARENCY,
 		Size = Vector3.new(UFO_RING_THICKNESS, ringR * 2, ringR * 2),
-		CFrame = CFrame.new(Vector3.new(center.X, center.Y + UFO_RING_LIFT, center.Z)) * CFrame.Angles(0, 0, math.rad(90)),
-	}, folder)
+		CFrame = CFrame.new(Vector3.new(ground0.X, center.Y + UFO_RING_LIFT, ground0.Z)) * CFrame.Angles(0, 0, math.rad(90)),
+	}, ufoModel)
+	-- Drehpunkt = Bodenpunkt unter dem UFO: der Client setzt das Model mit
+	-- PivotTo(CFrame.new(EventMotion.ufoGround(...))) genau dorthin.
+	ufoModel.WorldPivot = CFrame.new(ground0)
 
 	local function setBeam(open: boolean)
 		beamOpen = open
@@ -400,7 +338,8 @@ function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
 				api.toast(player, "UFO: Dein Baerchi wird entfuehrt!")
 
 				local startFoot = api.footOf(figure)
-				local ufoFoot   = Vector3.new(center.X, hoverY - UFO_PICKUP_BELOW_DISC, center.Z)
+				local here      = ringCenterAt(Workspace:GetServerTimeNow())
+				local ufoFoot   = Vector3.new(here.X, hoverY - UFO_PICKUP_BELOW_DISC, here.Z)
 				pcall(FigureFX.burstAt, startFoot, UFO_COLOR, folder, UFO_BURST_COUNT)
 
 				-- 1) hochgezogen
@@ -499,6 +438,7 @@ function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
 			"UFO: Geh in den Strahl! %ds Beam-Fortschritt bis zur Entfuehrung", cfg.BEAM_REQUIRED_SECONDS
 		))
 	end
+	api.announce(Loc.msg("msg.ufo.patrol"), "info")
 
 	local dt = cfg.TICK_SECONDS
 	task.spawn(function()
@@ -510,13 +450,18 @@ function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
 				local anyInBeam = false
 				local inBeamList: { Part } = {}
 
+				-- Der Ring wandert mit dem UFO: jetzt hier, gleich dort.
+				local serverNow  = Workspace:GetServerTimeNow()
+				local ringCenter = ringCenterAt(serverNow)
+				local ringAhead  = ringCenterAt(serverNow + cfg.FOLLOW_LEAD_SECONDS)
+
 				for _, part in parts do
 					local st = stateOf(part)
 					if st.abducting or taken[part.player] then
 						continue
 					end
 					local foot = api.footOf(part.figure)
-					st.inBeam = beamOpen and flatDist(foot, center) <= ringR
+					st.inBeam = beamOpen and flatDist(foot, ringCenter) <= ringR
 					if st.inBeam and now >= st.fightUntil then
 						anyInBeam = true
 						table.insert(inBeamList, part)
@@ -541,13 +486,30 @@ function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
 							if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
 							target = af + dir.Unit * (cfg.TOUCH_DISTANCE * APPROACH_SHARE)
 						else
-							local dir = Vector3.new(part.standFoot.X - center.X, 0, part.standFoot.Z - center.Z)
+							local dir = Vector3.new(part.standFoot.X - ringAhead.X, 0, part.standFoot.Z - ringAhead.Z)
 							if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
-							target = center + dir.Unit * (ringR * INNER_TARGET_SHARE)
+							target = ringAhead + dir.Unit * (ringR * INNER_TARGET_SHARE)
 						end
 
 						task.spawn(function()
 							api.walkTo(part, target)
+							st.moving = false
+							if running and api.stillHere(part) and not st.abducting then
+								pcall(FigureFX.idleBob, part.figure, WAIT_BOB)
+							end
+						end)
+					end
+				end
+
+				-- Wer im Ring steht, bleibt drin: rutscht der Ring weg, laeuft der
+				-- Baerchi zur Ring-Mitte von gleich nach (Fortschritt laeuft weiter).
+				for _, part in inBeamList do
+					local st = stateOf(part)
+					if not st.moving and not part.busy and now >= st.fightUntil
+						and flatDist(api.footOf(part.figure), ringAhead) > ringR * cfg.FOLLOW_SHARE then
+						st.moving = true
+						task.spawn(function()
+							api.walkTo(part, ringAhead)
 							st.moving = false
 							if running and api.stillHere(part) and not st.abducting then
 								pcall(FigureFX.idleBob, part.figure, WAIT_BOB)
@@ -603,6 +565,123 @@ function EventHandlers.Ufo(api: Api, _def: EventConfig.EventDef): Session
 		end
 	end)
 
+	----------------------------------------------------------------------------
+	-- EI-ABWURF (alle DROP_INTERVAL_SECONDS, 1 % Jackpot mit Pity)
+	----------------------------------------------------------------------------
+	type Drop = { model: Model, landing: Vector3, landAt: number, jackpot: boolean, taken: boolean }
+	local drops: { Drop } = {}
+	local duration = EventConfig.getDuration(def)
+
+	local function buildDrop(landing: Vector3, releaseAt: number, landAt: number, jackpot: boolean): Model
+		local model = Instance.new("Model")
+		model.Name = "UfoDrop"
+		model:SetAttribute("ReleaseAt", releaseAt)
+		model:SetAttribute("LandAt", landAt)
+		model:SetAttribute("Jackpot", jackpot)
+
+		local crateColor = if jackpot then CRATE_GOLD_COLOR else CRATE_COLOR
+		fxPart({
+			Name = "Crate", Material = if jackpot then Enum.Material.Neon else Enum.Material.WoodPlanks,
+			Color = crateColor, Size = CRATE_SIZE,
+			CFrame = CFrame.new(landing + Vector3.new(0, CRATE_SIZE.Y / 2, 0)),
+		}, model)
+		fxPart({
+			Name = "Canopy", Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
+			Color = if jackpot then CRATE_GOLD_COLOR else CANOPY_COLOR, Size = CANOPY_SIZE,
+			CFrame = CFrame.new(landing + Vector3.new(0, CRATE_SIZE.Y + CANOPY_LIFT, 0)),
+		}, model)
+		model.WorldPivot = CFrame.new(landing)
+
+		-- Landekreis (Telegraph) und beim Jackpot die Lichtsaeule: liegen fest
+		-- am Boden, gehoeren deshalb NICHT zum fallenden Model.
+		fxPart({
+			Name = "Mark", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,
+			Color = if jackpot then MARK_GOLD_COLOR else MARK_COLOR, Transparency = MARK_TRANSPARENCY,
+			Size = Vector3.new(MARK_THICKNESS, cfg.DROP_PICKUP_RADIUS * 2, cfg.DROP_PICKUP_RADIUS * 2),
+			CFrame = CFrame.new(landing + Vector3.new(0, UFO_RING_LIFT, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		}, model)
+		if jackpot then
+			fxPart({
+				Name = "Pillar", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,
+				Color = CRATE_GOLD_COLOR, Transparency = PILLAR_TRANSPARENCY,
+				Size = Vector3.new(PILLAR_HEIGHT, PILLAR_WIDTH, PILLAR_WIDTH),
+				CFrame = CFrame.new(landing + Vector3.new(0, PILLAR_HEIGHT / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			}, model)
+		end
+		model.Parent = folder
+		return model
+	end
+
+	-- Plant die Abwuerfe: DROP_FIRST_SECONDS, dann alle DROP_INTERVAL_SECONDS,
+	-- solange die Landung noch im Event liegt. Ein Thread fuer alle Abwuerfe.
+	task.spawn(function()
+		local landRel = cfg.DROP_FIRST_SECONDS
+		while running and landRel < duration do
+			local landAt    = startTime + landRel
+			local releaseAt = landAt - cfg.DROP_TELEGRAPH_SECONDS
+			local waitFor   = releaseAt - Workspace:GetServerTimeNow()
+			if waitFor > 0 then task.wait(waitFor) end
+			if not running then break end
+
+			local ok, err = pcall(function()
+				-- Landepunkt = Bodenpunkt unter dem UFO im Moment der Landung.
+				local landing = ringCenterAt(landAt)
+				local jackpot = JackpotRoll.roll(JackpotRoll.ufo, cfg.JACKPOT_CHANCE, cfg.JACKPOT_PITY_DROPS, math.random())
+				local model = buildDrop(landing, releaseAt, landAt, jackpot)
+				table.insert(drops, { model = model, landing = landing, landAt = landAt, jackpot = jackpot, taken = false })
+				if jackpot then
+					api.announce(Loc.msg("msg.ufo.jackpot_drop"), "big")
+				end
+			end)
+			if not ok then
+				warn("[EventHandlers.Ufo] Abwurf fehlgeschlagen:", err)
+			end
+			landRel += cfg.DROP_INTERVAL_SECONDS
+		end
+	end)
+
+	-- Aufheben: Spieler-CHARAKTER am Landepunkt, der Naechste gewinnt. Der
+	-- Server prueft im Takt (wie bei den Waben), der Client meldet nichts.
+	task.spawn(function()
+		while running do
+			task.wait(cfg.DROP_CHECK_SECONDS)
+			local ok, err = pcall(function()
+				local serverNow = Workspace:GetServerTimeNow()
+				for _, drop in drops do
+					if drop.taken or serverNow < drop.landAt then continue end
+
+					local winner: Player? = nil
+					local best = math.huge
+					for _, player in Players:GetPlayers() do
+						local character = player.Character
+						local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+						if root and root:IsA("BasePart") then
+							local d = flatDist(root.Position, drop.landing)
+							if d <= cfg.DROP_PICKUP_RADIUS and math.abs(root.Position.Y - drop.landing.Y) <= cfg.DROP_PICKUP_MAX_HEIGHT and d < best then
+								winner, best = player, d
+							end
+						end
+					end
+
+					if winner then
+						local eggType = if drop.jackpot then cfg.JACKPOT_EGG else cfg.DROP_EGG
+						if api.grantEgg(winner, eggType, 1) then
+							drop.taken = true
+							drop.model:Destroy()
+							api.notify(winner, Loc.msg("msg.ufo.drop_picked", { egg = Loc.msg("egg." .. eggType .. ".name") }), "good")
+							if drop.jackpot then
+								api.announce(Loc.msg("msg.ufo.jackpot_picked", { player = winner.DisplayName }), "big")
+							end
+						end
+					end
+				end
+			end)
+			if not ok then
+				warn("[EventHandlers.Ufo] Aufheben fehlgeschlagen:", err)
+			end
+		end
+	end)
+
 	return {
 		stop = function()
 			running = false
@@ -631,6 +710,41 @@ function EventHandlers.HotEgg(api: Api, def: EventConfig.EventDef): Session
 	local cooldownUntil = 0
 	local chasing       = false
 	local fire: Instance? = nil
+
+	-- LAVA-WABEN: das Wabenthema gilt fuer die ganze Event-Dauer (CombService
+	-- kennt Skin, Wert, Slots und Tempo). Hier steht nur der Aufruf.
+	CombService.setTheme(cfg.COMB_THEME)
+	api.announce(Loc.msg("msg.hotegg.lava"), "info")
+
+	-- VULKAN-AUSBRUCH: Warnring in der Mitte, dann fliegen Lava-Waben in
+	-- alle Richtungen (Landepunkte legt CombService fest, den Flug zeichnet
+	-- der Client aus der Serverzeit).
+	local volcano = newFolder("EventVolcano")
+	task.spawn(function()
+		while running do
+			task.wait(math.max(0, cfg.ERUPTION_INTERVAL_SECONDS - cfg.ERUPTION_WARN_SECONDS))
+			if not running then break end
+			local ok, err = pcall(function()
+				local ring = fxPart({
+					Name = "EruptionWarning", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,
+					Color = ERUPTION_RING_COLOR, Transparency = 0.2,
+					Size = Vector3.new(ERUPTION_RING_THICKNESS, ERUPTION_RING_RADIUS * 2, ERUPTION_RING_RADIUS * 2),
+					CFrame = CFrame.new(api.center + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+				}, volcano)
+				task.wait(cfg.ERUPTION_WARN_SECONDS)
+				ring:Destroy()
+				if running then
+					CombService.launchCombs(
+						math.random(cfg.ERUPTION_MIN, cfg.ERUPTION_MAX),
+						api.center + Vector3.new(0, ERUPTION_ORIGIN_LIFT, 0)
+					)
+				end
+			end)
+			if not ok then
+				warn("[EventHandlers.HotEgg] Ausbruch fehlgeschlagen:", err)
+			end
+		end
+	end)
 
 	local function setHolder(part: Part?)
 		if fire then
@@ -737,6 +851,9 @@ function EventHandlers.HotEgg(api: Api, def: EventConfig.EventDef): Session
 			if flame then
 				flame:Destroy()
 			end
+			volcano:Destroy()
+			-- Waben im Pit werden wieder normal; getragene behalten ihren Wert.
+			CombService.clearTheme()
 			return results
 		end,
 	}
@@ -1075,6 +1192,14 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 			return results
 		end,
 	}
+end
+
+--------------------------------------------------------------------------------
+-- Wespenkoenigin (Boss-Event, Ablauf in Util/WaspQueenEvent)
+--------------------------------------------------------------------------------
+
+function EventHandlers.WaspQueen(api: Api, def: EventConfig.EventDef): Session
+	return WaspQueenEvent.run(api, def)
 end
 
 return EventHandlers

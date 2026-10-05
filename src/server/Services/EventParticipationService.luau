@@ -68,6 +68,9 @@ local MapService      = require(ServerScriptService.Services.MapService)
 local EventService    = require(ServerScriptService.Services.EventService)
 local EventHandlers   = require(ServerScriptService.Services.EventHandlers)
 local EggTreeService  = require(ServerScriptService.Services.EggTreeService)
+local EggService      = require(ServerScriptService.Services.EggService)
+local CombRecyclerService = require(ServerScriptService.Services.CombRecyclerService)
+local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local EventParticipationService = {}
@@ -627,6 +630,78 @@ local function awardBonus(
 	return nil, nil
 end
 
+-- Wurf auf einen Rarity-Aufstieg um EINE Stufe (UFO-Absetzen, Boss-Top-Rang).
+-- Gibt die neue Rarity zurueck oder nil.
+local function rollRarityUp(baerchi: Types.Baerchi, chance: number): string?
+	if chance <= 0 or math.random() >= chance then
+		return nil
+	end
+	local nextRarity = BaerchiConfig.getNextRarity(baerchi.rarity)
+	if nextRarity then
+		baerchi.rarity = nextRarity
+		return nextRarity
+	end
+	return nil
+end
+
+-- v17: Zusatz-Belohnungen eines Handler-Ergebnisses (Boss): Gummies,
+-- Wabeneinheiten, zweites Ei, Rarity-Up-Wurf. Waehrungen ueber
+-- EconomyService, Waben ueber CombRecyclerService, nie direkt.
+-- Gibt (Meldungen als LocMsg, Text des zweiten Eis, neue Rarity) zurueck.
+local function awardExtras(
+	player: Player,
+	data: Types.PlayerData,
+	baerchi: Types.Baerchi,
+	result: EventHandlers.Reward
+): ({ Types.LocMsg }, string?, string?)
+	local notes: { Types.LocMsg } = {}
+	local eggText: string? = nil
+
+	if result.extraEgg then
+		eggText = awardBonus(player, data, baerchi, result.extraEgg)
+	end
+
+	-- HBB Paket 7: Mutations-Wurf der Boss-Stufe 4 (gleicher Weg wie der
+	-- Mutations-Sturm). Der Text haengt an die Ei-Zeile an.
+	if result.tierBonus then
+		local tierText = awardBonus(player, data, baerchi, result.tierBonus)
+		if tierText then
+			eggText = if eggText then eggText .. "  •  " .. tierText else tierText
+		end
+	end
+	if (result.tierEggs or 0) > 0 then
+		EggService.grantEggs(player, "BasicEgg", result.tierEggs :: number)
+	end
+	if result.bossTier and result.bossTier > 0 then
+		table.insert(notes, Loc.msg("msg.boss.tier", { tier = result.bossTier }))
+	end
+
+	local gummies = result.gummies or 0
+	if gummies > 0 then
+		local final = EconomyService.awardGummies(player, gummies)
+		if final > 0 then table.insert(notes, Loc.msg("msg.event.gummies", { n = final })) end
+	end
+
+	local units = result.combUnits or 0
+	if units > 0 and CombRecyclerService.deposit(player, units) then
+		table.insert(notes, Loc.msg("msg.event.combs", { n = units }))
+	end
+
+	local rarityUp: string? = nil
+	if (result.rarityUpFactor or 0) > 0 then
+		local oldRarity = baerchi.rarity
+		local chance = (result.rarityUpFactor :: number) * EventConfig.getRarityUpChance(oldRarity)
+		rarityUp = rollRarityUp(baerchi, chance)
+		if rarityUp then
+			table.insert(notes, Loc.msg("msg.event.rarity_up", {
+				from = Loc.msg("rarity." .. oldRarity), to = Loc.msg("rarity." .. rarityUp),
+			}))
+		end
+	end
+
+	return notes, eggText, rarityUp
+end
+
 local function onEventEnded(finished: EventConfig.EventDef)
 	-- Handler zuerst beenden: er liefert, wer was bekommt.
 	local results: any = {}
@@ -676,6 +751,8 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		if not result then
 			continue
 		end
+		FunnelService.step(player, "F09_FirstEventCompleted")
+		data.stats.totalEventsCompleted = (data.stats.totalEventsCompleted or 0) + 1
 
 		local bonus: EventConfig.EventBonus? = nil
 		if result.egg then
@@ -687,9 +764,27 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		local key: string? = nil
 		local bonusText, mutation = awardBonus(player, data, baerchi, bonus)
 
+		-- v17: Zusatz-Belohnungen (Boss) und die lokalisierte Zusammenfassung
+		-- des Handlers.
+		local notes, extraEggText, rarityUp = awardExtras(player, data, baerchi, result)
+		if extraEggText then
+			bonusText = if bonusText then bonusText .. "  •  " .. extraEggText else extraEggText
+		end
+		if player.Parent ~= nil then
+			if result.notice then
+				Remotes.EventNotice:FireClient(player, result.notice, "good")
+			end
+			for _, note in notes do
+				Remotes.EventNotice:FireClient(player, note, "good")
+			end
+		end
+		if rarityUp then
+			MapService.celebrateBaerchi(player, presence.baerchiUid, BaerchiConfig.getRarityColor(baerchi.rarity))
+		end
+
 		-- Weder eine Stufe (alles am Rarity-Cap) noch ein Bonus: dann gibt es
 		-- auch nichts zu melden und nichts zu speichern.
-		if not key and not bonusText then
+		if not key and not bonusText and #notes == 0 then
 			continue
 		end
 
@@ -831,15 +926,7 @@ local function applyUfoReward(presence: any)
 
 	-- Rarity-Up: nur eine Stufe, Chance sinkt mit der aktuellen Rarity.
 	local oldRarity = baerchi.rarity
-	local rarityUp: string? = nil
-	local chance = EventConfig.getRarityUpChance(oldRarity)
-	if chance > 0 and math.random() < chance then
-		local nextRarity = BaerchiConfig.getNextRarity(oldRarity)
-		if nextRarity then
-			baerchi.rarity = nextRarity
-			rarityUp = nextRarity
-		end
-	end
+	local rarityUp = rollRarityUp(baerchi, EventConfig.getRarityUpChance(oldRarity))
 
 	-- Mehr maxHp (Stat-Stufe, hoehere Rarity): Differenz gutschreiben.
 	if def then
@@ -948,6 +1035,42 @@ local function buildApi(token: number): any
 
 	api.finishHome = finishHome
 	api.ufoReward  = applyUfoReward
+
+	-- v17: Eier direkt ins Lager (UFO-Abwurf), ueber EggService.
+	api.grantEgg = function(player: Player, eggType: Types.EggType, amount: number): boolean
+		return EggService.grantEggs(player, eggType, amount)
+	end
+
+	-- v17: lokalisierte Meldungen (LocMsg) an einen Spieler bzw. an alle.
+	api.notify = function(player: Player, msg: Types.LocMsg, style: string?)
+		if player.Parent ~= nil then
+			Remotes.EventNotice:FireClient(player, msg, style)
+		end
+	end
+	api.announce = function(msg: Types.LocMsg, style: string?)
+		Remotes.EventNotice:FireAllClients(msg, style)
+	end
+
+	-- v17: effektive Kampfwerte des Baerchis (fuer den Boss-Schaden, siehe
+	-- Modules/BossBalance). nil, wenn Daten oder Baerchi fehlen.
+	api.fightStats = function(part: any): any
+		local data = PlayerService.getData(part.player)
+		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
+		if not baerchi then return nil end
+		local def = BaerchiConfig.getById(baerchi.configId)
+		if not def then return nil end
+		local ok, stats = pcall(CombatCalculator.getEffectiveStats, baerchi, def.baseStats)
+		return if ok then stats else nil
+	end
+
+	-- v17: das laufende Event vorzeitig beenden (Boss besiegt). Laeuft ueber
+	-- den normalen Weg: EventService stellt nur die Uhr vor, das Ende samt
+	-- Auszahlung macht der naechste Takt.
+	api.finishEarly = function()
+		if _sessionToken == token then
+			EventService.skipPhase()
+		end
+	end
 
 	-- Laeuft die Figur zu `target` (nur X/Z, Y bleibt). Blockiert bis zur
 	-- Ankunft oder bis die Bewegung abgebrochen wurde. true = angekommen.
