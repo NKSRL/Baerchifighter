@@ -46,6 +46,8 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig = require(ReplicatedStorage.Config.MapConfig)
+local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local CombConfig = require(ReplicatedStorage.Config.CombConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types     = require(ReplicatedStorage.Network.Types)
@@ -437,6 +439,14 @@ function MapService.getPondPosition(player: Player): Vector3?
 	return PondBuilder.pondStand(slot).Position
 end
 
+-- Mitte des Beckens (Weltposition) — z. B. damit gelegte Eier nicht im Honig
+-- landen, seit der Baerchi am Becken wohnt (HONEY_POND_V2).
+function MapService.getPondCenter(player: Player): Vector3?
+	local slot = _playerSlot[player]
+	if not slot then return nil end
+	return PondBuilder.pondGround(slot).Position
+end
+
 -- Fuellstand des Teichs nachziehen. Billig — das ist der Weg fuer
 -- Honig-Aenderungen (siehe MapService.updateBuildingSigns, das das mit
 -- aufruft, weil beides an denselben Werten haengt).
@@ -598,7 +608,7 @@ end
 -- setPitBanner blendet das hier NICHT ein/aus — die Tafel steht permanent
 -- (siehe buildEventPit): sie zeigt entweder den Countdown bis zum naechsten
 -- Event oder Name + Restzeit des laufenden.
-function MapService.setEventBanner(title: string, subtitle: string, color: Color3)
+function MapService.setEventBanner(title: string, subtitle: string, color: Color3, reward: string?)
 	local container = findEventPitContainer()
 	if not container then return end
 
@@ -617,6 +627,11 @@ function MapService.setEventBanner(title: string, subtitle: string, color: Color
 	local subLabel = banner:FindFirstChild("Sub")
 	if subLabel and subLabel:IsA("TextLabel") then
 		subLabel.Text = subtitle
+	end
+
+	local rewardLabel = banner:FindFirstChild("Reward")
+	if rewardLabel and rewardLabel:IsA("TextLabel") then
+		rewardLabel.Text = reward or ""
 	end
 end
 
@@ -777,12 +792,16 @@ function MapService.getPitTowerFloorY(level: number): number
 	return MapConfig.PLATFORM_TOP_Y + math.max(0, level) * MapConfig.PIT_TOWER_STEP_HEIGHT
 end
 
--- v15: die Bestenlisten-Tafel beschriften (Titel + bis zu
+-- v15: die Bestenlisten-Tafel(n) beschriften (Titel + bis zu
 -- LEADERBOARD_BOARD.lines Zeilen). Aufrufer ist LeaderboardService.
-local _leaderboardBoard: BasePart? = nil
+-- HBB Paket 5: eine Tafel je Liste; Schluessel = listId, "_rotating" = die
+-- eine wechselnde Tafel ohne MAP_V2_BOARDS.
+local ROTATING = "_rotating"
+local _leaderboardBoards: { [string]: BasePart } = {}
+local _liveBoard: BasePart? = nil
+local _waspNest: Model? = nil
 
-function MapService.writeLeaderboardBoard(title: string, lines: { string })
-	local board = _leaderboardBoard
+local function writeBoard(board: BasePart?, title: string, lines: { string }, lineCount: number, titleColor: Color3?)
 	if not board then return end
 	local surface = board:FindFirstChild("Board")
 	if not surface then return end
@@ -790,12 +809,47 @@ function MapService.writeLeaderboardBoard(title: string, lines: { string })
 	local titleLabel = surface:FindFirstChild("Title")
 	if titleLabel and titleLabel:IsA("TextLabel") then
 		titleLabel.Text = title
+		if titleColor then titleLabel.TextColor3 = titleColor end
 	end
-	for i = 1, MapConfig.LEADERBOARD_BOARD.lines do
+	for i = 1, lineCount do
 		local line = surface:FindFirstChild("Line" .. i)
 		if line and line:IsA("TextLabel") then
 			line.Text = lines[i] or ""
 		end
+	end
+end
+
+-- Gibt es eine feste Tafel fuer `listId`? (sonst: wechselnde Tafel)
+function MapService.hasLeaderboardBoard(listId: string): boolean
+	return _leaderboardBoards[listId] ~= nil
+end
+
+function MapService.writeLeaderboardBoard(title: string, lines: { string }, listId: string?)
+	local board = (if listId then _leaderboardBoards[listId] else nil) or _leaderboardBoards[ROTATING]
+	writeBoard(board, title, lines, MapConfig.LEADERBOARD_BOARD.lines)
+end
+
+-- HBB Paket 6: Live-Kampf-Board beschriften. Aufrufer ist LiveBoardService.
+function MapService.writeLiveBoard(title: string, lines: { string }, live: boolean)
+	local cfg = MapConfig.LIVE_BOARD
+	writeBoard(_liveBoard, title, lines, cfg.lines, if live then cfg.liveColor else cfg.textColor)
+end
+
+-- HBB Paket 6: Schild und Leuchten des Wespen-Nests. Aufrufer ist EventService.
+function MapService.setWaspNest(text: string, glowing: boolean)
+	local nest = _waspNest
+	if not nest then return end
+	local cfg = MapConfig.WASP_NEST
+	local body = nest:FindFirstChild("Body")
+	if body and body:IsA("BasePart") then
+		body.Material = if glowing then Enum.Material.Neon else Enum.Material.Sand
+		body.Color    = if glowing then cfg.glowColor else cfg.color
+	end
+	local anchor = nest:FindFirstChild("SignAnchor")
+	local sign = if anchor then anchor:FindFirstChild("Sign") else nil
+	local title = if sign then sign:FindFirstChild("Title") else nil
+	if title and title:IsA("TextLabel") then
+		title.Text = text
 	end
 end
 
@@ -892,9 +946,20 @@ function MapService.init()
 	WorldBuilder.buildPlatform()
 	WorldBuilder.buildGlobalLighting()
 
-	-- v15: Bestenlisten-Tafel (LeaderboardService beschriftet sie)
-	local platform = workspace:FindFirstChild("Platform")
-	_leaderboardBoard = WorldBuilder.buildLeaderboardBoard(platform or workspace)
+	-- v15: Bestenlisten-Tafel(n) (LeaderboardService beschriftet sie).
+	-- HBB Paket 5/6: Positionen aus MapLayout (dort auch der Layout-Test).
+	local platform = workspace:FindFirstChild("Platform") or workspace
+	for _, b in MapLayout.leaderboardBoards() do
+		local listId = b.listId
+		local name = if listId then "LeaderboardBoard_" .. listId else "LeaderboardBoard"
+		_leaderboardBoards[listId or ROTATING] = WorldBuilder.buildLeaderboardBoard(platform, b.angleDegrees, name)
+	end
+	if FeatureFlags.isOn("MAP_V2_LIVE_BOARD") then
+		_liveBoard = WorldBuilder.buildLiveBoard(platform)
+	end
+	if FeatureFlags.isOn("MAP_V2_WASP_NEST") then
+		_waspNest = WorldBuilder.buildWaspNest(platform, MapLayout.waspNestCenter())
+	end
 
 	-- Sicherheitsnetz: falls PlayerService den Leave-Fall mal verpasst,
 	-- bleibt sonst ein Slot dauerhaft belegt.

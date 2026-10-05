@@ -23,6 +23,7 @@
 -- einen Eintrag hier, keinen Eingriff in andere Services.
 
 local Types = require(script.Parent.Parent.Network.Types)
+local FeatureFlags = require(script.Parent.FeatureFlags)
 
 -- Welche Groesse eine Quest misst. Gesamtwerte (Kette) lesen den Zaehler
 -- direkt, Tages-Quests ziehen den Stand zu Tagesbeginn ab.
@@ -39,6 +40,7 @@ export type Metric =
 export type Reward = {
 	gummies : number,
 	eggType : Types.EggType?,   -- optional: ein Ei dazu ("gelegentlich")
+	goldGummies : number?,      -- nur mit GOLD_CHARMS_ONLY ausgezahlt (goldReward)
 }
 
 export type QuestDef = {
@@ -67,10 +69,16 @@ local CHAIN: { QuestDef } = {
 }
 
 -- Tages-Quests: Fortschritt = Zuwachs seit Tagesbeginn.
+-- GOLD_CHARMS_ONLY: die Tages-Quests sind die einzige GoldGummies-Quelle.
+-- Entscheidung Projektinhaber 05.10.: 12 Charm-Wuerfe pro Tag. Bei 25 Gold je
+-- Wurf (CharmConfig.ROLL_COST_GOLD_GUMMIES) = 300 Gold = 100 je Tages-Quest.
+-- Acht Legendary-Charms (~730 Wuerfe) dann nach ~60 Tagen. Kommt der
+-- Gratis-Griff im Shop (Paket 10), wird diese Zahl um seinen Anteil kleiner.
+local DAILY_GOLD = 100
 local DAILY: { QuestDef } = {
-	{ id = "d_hatch3",  metric = "hatched",       target = 3,    reward = { gummies = 150 } },
-	{ id = "d_fight8",  metric = "fightsWon",     target = 8,    reward = { gummies = 250 } },
-	{ id = "d_earn",    metric = "gummiesEarned", target = 1500, reward = { gummies = 100, eggType = "BasicEgg" } },
+	{ id = "d_hatch3",  metric = "hatched",       target = 3,    reward = { gummies = 150, goldGummies = DAILY_GOLD } },
+	{ id = "d_fight8",  metric = "fightsWon",     target = 8,    reward = { gummies = 250, goldGummies = DAILY_GOLD } },
+	{ id = "d_earn",    metric = "gummiesEarned", target = 1500, reward = { gummies = 100, eggType = "BasicEgg", goldGummies = DAILY_GOLD } },
 }
 
 local SECONDS_PER_DAY = 86400
@@ -109,6 +117,13 @@ return {
 	end,
 
 	dayOf = dayOf,
+
+	-- GoldGummies, die diese Quest wirklich auszahlt (0 ohne GOLD_CHARMS_ONLY).
+	-- Server (Auszahlung) und Client (Belohnungstext) fragen nur hier.
+	goldReward = function(def: QuestDef): number
+		if not FeatureFlags.isOn("GOLD_CHARMS_ONLY") then return 0 end
+		return def.reward.goldGummies or 0
+	end,
 
 	-- Sekunden bis zum naechsten Tageswechsel.
 	secondsUntilReset = function(unixTime: number): number

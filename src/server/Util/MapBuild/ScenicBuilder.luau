@@ -27,6 +27,7 @@ local EggConfig      = require(ReplicatedStorage.Config.EggConfig)
 local MapConfig      = require(ReplicatedStorage.Config.MapConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 
 local ScenicBuilder = {}
 
@@ -209,6 +210,10 @@ local function buildMainIslandScenery(parent: Instance, placed: { Placed }, isOn
 		z = MapConfig.CENTER.Z + merchant.radius * math.sin(merchantAngle),
 		r = AmbienceConfig.MERCHANT_CLEAR,
 	})
+	-- HBB Paket 5/6: Tafeln, Schau-Tuerme, neuer Haendler-Platz bleiben frei
+	for _, landmark in MapLayout.landmarks() do
+		table.insert(placed, { x = landmark.x, z = landmark.z, r = landmark.r + 2 })
+	end
 
 	local y = MapConfig.PLATFORM_TOP_Y
 

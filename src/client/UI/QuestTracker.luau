@@ -33,7 +33,8 @@ local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local QuestTracker = {}
 
 local CARD_W = 236
-local CARD_H = 124
+-- Playtest 05.10.: 124 liess "Abholen" und "Tagesbonus" ineinander laufen
+local CARD_H = 142
 
 local _card: Frame?          = nil
 local _header: TextLabel?    = nil
@@ -235,8 +236,10 @@ function QuestTracker.init(screenGui: ScreenGui)
 	_bar = bar
 
 	local claim = Theme.bigButton("Claim", card, "", Theme.COLORS.good)
-	claim.Position = UDim2.new(0, 10, 0, 76)
-	claim.Size     = UDim2.new(1, -20, 0, 26)
+	-- Mittig verankert: das Pulsieren waechst nach beiden Seiten statt nach rechts unten
+	claim.AnchorPoint = Vector2.new(0.5, 0)
+	claim.Position = UDim2.new(0.5, 0, 0, 78)
+	claim.Size     = UDim2.new(1, -20, 0, 28)
 	claim.ZIndex   = 3
 	claim.Visible  = false
 	Loc.bind(claim, "ui.quest.claim")
@@ -250,13 +253,13 @@ function QuestTracker.init(screenGui: ScreenGui)
 
 	-- Sanftes Pulsieren, damit ein abholbarer Knopf auffaellt.
 	_pulse = TweenService:Create(claim, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-		Size = UDim2.new(1, -14, 0, 28),
+		Size = UDim2.new(1, -14, 0, 30),
 	})
 	_pulse:Play()
 
 	local daily = Theme.button("Daily", card, "", Theme.COLORS.panelLight)
-	daily.Position   = UDim2.new(0, 10, 1, -24)
-	daily.Size       = UDim2.new(1, -20, 0, 20)
+	daily.Position   = UDim2.new(0, 10, 1, -30)
+	daily.Size       = UDim2.new(1, -20, 0, 22)
 	daily.TextColor3 = Theme.COLORS.text
 	daily.ZIndex     = 3
 	_daily = daily

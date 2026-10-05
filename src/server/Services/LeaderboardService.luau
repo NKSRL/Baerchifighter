@@ -259,16 +259,27 @@ local BOARD_TITLES: { [string]: string } = {
 	Collection = "TOP 10  ·  INDEX",
 }
 
-local function paintBoard()
-	_boardIndex = (_boardIndex % #LeaderboardConfig.LISTS) + 1
-	local listId = LeaderboardConfig.LISTS[_boardIndex]
+local function paintList(listId: string)
 	local cached = _cache[listId]
 	local lines: { string } = {}
 	for _, entry in (if cached then cached.entries else {}) do
 		if entry.rank > LeaderboardConfig.BOARD_TOP_N then break end
 		table.insert(lines, string.format("%2d.  %s   —   %s", entry.rank, entry.name, LeaderboardService.formatValue(listId, entry.value)))
 	end
-	MapService.writeLeaderboardBoard(BOARD_TITLES[listId] or listId, lines)
+	MapService.writeLeaderboardBoard(BOARD_TITLES[listId] or listId, lines, listId)
+end
+
+-- HBB Paket 5: Hat jede Liste ihre feste Tafel, werden alle beschrieben;
+-- sonst wechselt die eine Tafel reihum (v15).
+local function paintBoard()
+	if MapService.hasLeaderboardBoard(LeaderboardConfig.LISTS[1]) then
+		for _, listId in LeaderboardConfig.LISTS do
+			paintList(listId)
+		end
+		return
+	end
+	_boardIndex = (_boardIndex % #LeaderboardConfig.LISTS) + 1
+	paintList(LeaderboardConfig.LISTS[_boardIndex])
 end
 
 -- Die Sicht eines Spielers auf eine Liste (Top N + eigener Rang).

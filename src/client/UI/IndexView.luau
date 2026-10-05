@@ -26,6 +26,7 @@ local IndexCalculator = require(ReplicatedStorage.Modules.IndexCalculator)
 local BaerchiMesh     = require(ReplicatedStorage.Modules.BaerchiMesh)
 
 local Theme       = require(script.Parent.Theme)
+local UiScale     = require(script.Parent.UiScale)
 local ClientState = require(script.Parent.Parent.Controllers.ClientState)
 
 local IndexView = {}
@@ -199,9 +200,10 @@ local function showPopup(configId: string, anchor: GuiObject)
 	popup.Size = UDim2.new(0, POP_W, 0, y + 10)
 
 	-- Neben die Kachel setzen und im Dialog halten.
-	local hostPos  = host.AbsolutePosition
-	local hostSize = host.AbsoluteSize
-	local aPos, aSize = anchor.AbsolutePosition, anchor.AbsoluteSize
+	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale)
+	local hostPos  = UiScale.toGui(host.AbsolutePosition)
+	local hostSize = UiScale.toGui(host.AbsoluteSize)
+	local aPos, aSize = UiScale.toGui(anchor.AbsolutePosition), UiScale.toGui(anchor.AbsoluteSize)
 
 	local x = aPos.X - hostPos.X + aSize.X + 6
 	if x + POP_W > hostSize.X then

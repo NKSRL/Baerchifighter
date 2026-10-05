@@ -171,6 +171,8 @@ return {
 	["building.HoneyRefiner.name"] = "Raffinerie de miel",
 	["building.Beehive.short"]     = "Ruche",
 	["building.HoneyRefiner.short"] = "Raffinerie",
+	["building.HoneyPond.name"]    = "Fontaine de miel",
+	["building.HoneyPond.short"]   = "Fontaine",
 
 	----------------------------------------------------------------------------
 	-- Noms : rangs
@@ -216,6 +218,7 @@ return {
 	["ui.quest.claim_short"] = "Récupérer",
 	["ui.quest.reward_gummies"] = "+{n} Gummies",
 	["ui.quest.reward_with_egg"] = "+{n} Gummies et un {egg}",
+	["ui.quest.reward_gold"] = "+{n} GoldGummies",
 	["ui.quest.toast"] = "Quête terminée : {text}",
 	["err.quest_unknown"] = "Quête inconnue",
 	["err.quest_already_claimed"] = "Déjà récupérée",
@@ -446,6 +449,8 @@ return {
 	["ui.profile.rebirths"]            = "Rebirths : {n}",
 	["ui.profile.index"]               = "Index : {have}/{total}",
 	["ui.profile.top"]                 = "Meilleurs Baerchis :",
+	["ui.home.button"]                  = "Maison",
+	["ui.card.details"]                 = "Statistiques",
 	["ui.daily.title"]                 = "Bonus quotidien",
 	["ui.daily.day"]                   = "Jour {day}",
 	["ui.daily.egg"]                   = "Oeuf",

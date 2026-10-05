@@ -19,6 +19,8 @@ local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 
 local PondBuilder = {}
 
@@ -65,24 +67,14 @@ end
 function PondBuilder.pondGround(slot: number): CFrame
 	local plotCFrame = MapParts.plotCFrame(slot)
 
-	local center = CFrame.new(
-		MapConfig.POND_OFFSET.X,
-		MapParts.plotSurfaceOffset() + MapConfig.POND_OFFSET.Y,
-		MapConfig.POND_OFFSET.Z
-	)
-
-	local toHome = Vector3.new(
-		MapConfig.BAERCHI_HOME_OFFSET.X - MapConfig.POND_OFFSET.X,
-		0,
-		MapConfig.BAERCHI_HOME_OFFSET.Z - MapConfig.POND_OFFSET.Z
-	)
-
-	if toHome.Magnitude < 1e-3 then
-		return plotCFrame * center
-	end
+	-- Lage und Richtung aus MapLayout (HONEY_POND_V2: Teich in der Plot-Mitte
+	-- hinten, Standplatz nach +Z; sonst wie bisher zum Baerchi-Platz).
+	local offset = MapLayout.pondOffset()
+	local center = CFrame.new(offset.X, MapParts.plotSurfaceOffset() + offset.Y, offset.Z)
+	local toHome = MapLayout.pondFacing()
 
 	-- CFrame.lookAt richtet -Z auf das Ziel aus (siehe buildPlotCFrame).
-	local facing = CFrame.lookAt(center.Position, center.Position + toHome.Unit)
+	local facing = CFrame.lookAt(center.Position, center.Position + toHome)
 	return plotCFrame * facing
 end
 
@@ -90,7 +82,7 @@ end
 -- Abstand von der Mitte entfernt. Hier landet der Baerchi, hier liegen die
 -- Bohlen, und genau hier hat der Steinkranz seine Luecke.
 function PondBuilder.pondStandDistance(): number
-	return MapConfig.POND_RADIUS + MapConfig.POND_STAND_GAP
+	return MapLayout.pondStandDistance()
 end
 
 function PondBuilder.pondStand(slot: number): CFrame
@@ -262,7 +254,11 @@ function PondBuilder.buildPond(plotModel: Model, slot: number, islandData: Types
 
 	PondBuilder.buildPondStones(pond, ground)
 	PondBuilder.buildPondPlanks(pond, ground)
-	MapParts.buildDecor(pond, ground, MapConfig.POND_DECOR)
+	-- Mit HONEY_POND_V2 schmueckt der Brunnen (Gebaeude HoneyPond) das
+	-- Becken; der Honigloeffel wuerde in seine Schale ragen.
+	if not FeatureFlags.isOn("HONEY_POND_V2") then
+		MapParts.buildDecor(pond, ground, MapConfig.POND_DECOR)
+	end
 
 	-- Als Platzhalter-Groesse angelegt — writePondFill setzt Groesse und
 	-- Position gleich im Anschluss auf den echten Vorrat.

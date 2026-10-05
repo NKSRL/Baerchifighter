@@ -28,6 +28,7 @@ local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local Theme           = require(script.Parent.Theme)
+local UiScale         = require(script.Parent.UiScale)
 local Icons           = require(script.Parent.Icons)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
 local ClientState     = require(script.Parent.Parent.Controllers.ClientState)
@@ -338,7 +339,7 @@ function PetBar.init(screenGui: ScreenGui)
 	local scale = Instance.new("UIScale")
 	scale.Parent = bar
 	local function rescale()
-		local width = screenGui.AbsoluteSize.X
+		local width = UiScale.toGui(screenGui.AbsoluteSize.X)
 		scale.Scale = math.clamp((width - 32) / (BUTTON_WIDTH * 2 + GAP), 0.6, 1)
 	end
 	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)

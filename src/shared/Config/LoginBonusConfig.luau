@@ -20,6 +20,7 @@
 --     Tage verpasst, faengt wieder bei Tag 1 an.
 
 local Types = require(script.Parent.Parent.Network.Types)
+local FeatureFlags = require(script.Parent.FeatureFlags)
 
 local LoginBonusConfig = {}
 
@@ -50,8 +51,22 @@ LoginBonusConfig.DAYS = {
 	[7] = { goldGummies = 60, highestEgg = 1, blueprintChance = 0.25 },
 } :: { [number]: DayReward }
 
+-- GOLD_CHARMS_ONLY: dieselbe Woche ohne GoldGummies. Tage, die nur Gold
+-- hatten (5, 7), bekommen Gummies in der Reihe 500 / 1.500 / 3.000 / 6.000 /
+-- 10.000 / 15.000 / 30.000; Eier und Blaupause bleiben.
+LoginBonusConfig.DAYS_V2 = {
+	[1] = { gummies = 500 },
+	[2] = { gummies = 1_500 },
+	[3] = { gummies = 3_000, eggType = "BasicEgg", eggs = 3 },
+	[4] = { gummies = 6_000 },
+	[5] = { gummies = 10_000, eggType = "BasicEgg", eggs = 5 },
+	[6] = { gummies = 15_000 },
+	[7] = { gummies = 30_000, highestEgg = 1, blueprintChance = 0.25 },
+} :: { [number]: DayReward }
+
 function LoginBonusConfig.getDay(day: number): DayReward
-	return LoginBonusConfig.DAYS[math.clamp(math.floor(day), 1, LoginBonusConfig.CYCLE_DAYS)]
+	local days = if FeatureFlags.isOn("GOLD_CHARMS_ONLY") then LoginBonusConfig.DAYS_V2 else LoginBonusConfig.DAYS
+	return days[math.clamp(math.floor(day), 1, LoginBonusConfig.CYCLE_DAYS)]
 end
 
 return LoginBonusConfig

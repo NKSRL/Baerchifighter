@@ -82,6 +82,7 @@ end
 local BUILDING_COLORS: { [string]: Color3 } = {
 	Beehive    = Theme.COLORS.volume,
 	HoneyRefiner = Theme.COLORS.growth,
+	HoneyPond  = Theme.COLORS.goldGummy,   -- Honig-Teich / -Brunnen (HONEY_POND_V2)
 }
 
 -- HBB Paket 4: Farben der fuenf Rarity-Baender (Zuordnung in

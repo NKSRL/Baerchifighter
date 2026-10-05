@@ -86,6 +86,15 @@ local MILESTONES: { [string]: { Ability } } = {
 		{ id = "RoyalJelly",    level = 30, implemented = false },
 		{ id = "NectarOfAges",  level = 60, implemented = false },
 	},
+	-- Honig-Teich (HONEY_POND_V2): die Faehigkeiten von Stock und Veredler
+	-- zusammen, auf denselben Leveln.
+	HoneyPond = {
+		{ id = "AutoHarvest",   level = 10, implemented = true },
+		{ id = "RefinerBoost",  level = 10, implemented = false },
+		{ id = "GoldenDrops",   level = 30, implemented = false },
+		{ id = "RoyalJelly",    level = 30, implemented = false },
+		{ id = "NectarOfAges",  level = 60, implemented = false },
+	},
 	Recycler = {
 		-- Groesserer Aufheb-Radius fuer Waben im Event-Pit (CombService).
 		{ id = "CollectRadius", level = 20, implemented = true },
@@ -214,6 +223,46 @@ local function refinerDescribe(level: number): string
 end
 
 --------------------------------------------------------------------------------
+-- HoneyPond — Honig-Teich (HONEY_POND_V2): Stock + Veredler in einem
+--------------------------------------------------------------------------------
+-- Auf Level L genau so viel wie Stock UND Veredler auf Level L: dieselbe
+-- Honigmenge pro Minute (Raten addiert), beide Lager, XP und Heilung wie der
+-- Veredler. Ein Ausbau kostet dafuer POND_COST_FACTOR x die Grundkosten
+-- (statt zwei Gebaeude einzeln). tools/luau-tests/honey_pond.test.lua prueft
+-- die Gleichheit; tools/sim/progression_pacing.lua den Kostenfaktor.
+
+local function pondInterval(level: number): number
+	local perSecond = 1 / beehiveInterval(level) + 1 / refinerInterval(level)
+	return 1 / perSecond
+end
+
+local function pondCapacity(level: number): number
+	return beehiveCapacity(level) + refinerCapacity(level)
+end
+
+local function pondDescribe(level: number): string
+	return string.format(
+		"Lager: %d Honig  —  alle %.1f s ein neuer  —  +%s XP  —  heilt %s",
+		pondCapacity(level),
+		pondInterval(level),
+		percentText(refinerXpMultiplier(level) - 1),
+		percentText(refinerHeal(level))
+	)
+end
+
+-- Kosten eines Teich-Ausbaus relativ zu EconomyConfig.HONEY_UPGRADE_COSTS,
+-- abgestimmt mit progression_pacing (Bericht docs/HBB_HONIG_TEICH_2026-10-05.md):
+--   bis Level 10: 1,2 — Look 2 (L10) nach ~24 min, also in der ERSTEN Sitzung
+--   ab Level 11:  2,2 — der Teich kann so viel wie zwei Gebaeude; mit 2,2
+--                 halten Look 3-6 ihre Zielzeiten (Look 4 ~8 h, Look 6 Woche 8)
+local POND_COST_FACTOR_EARLY = 1.2
+local POND_COST_FACTOR       = 2.2
+
+local function pondCostFactor(level: number): number
+	return if level <= 10 then POND_COST_FACTOR_EARLY else POND_COST_FACTOR
+end
+
+--------------------------------------------------------------------------------
 -- Die Tabelle
 --------------------------------------------------------------------------------
 
@@ -232,6 +281,14 @@ local BEHAVIORS: { [Types.BuildingId]: Behavior } = {
 		getHealPercent     = refinerHeal,
 		getXpMultiplier    = refinerXpMultiplier,
 		describe           = refinerDescribe,
+	},
+
+	HoneyPond = {
+		getIntervalSeconds = pondInterval,
+		getCapacity        = pondCapacity,
+		getHealPercent     = refinerHeal,
+		getXpMultiplier    = refinerXpMultiplier,
+		describe           = pondDescribe,
 	},
 }
 
@@ -261,19 +318,21 @@ export type UpgradeDef = {
 local BUILDING_UPGRADES: { [Types.BuildingId]: { [number]: UpgradeDef } } = {
 	Beehive      = {},
 	HoneyRefiner = {},
+	HoneyPond    = {},
 }
 
 for id, table_ in BUILDING_UPGRADES do
 	local behavior = BEHAVIORS[id]
-
 	for level, cost in EconomyConfig.HONEY_UPGRADE_COSTS do
+		local factor = if id == "HoneyPond" then pondCostFactor(level) else 1
 		table_[level] = {
-			costGummies     = cost.gummies,
-			costGoldGummies = cost.goldGummies,
+			costGummies     = cost.gummies * factor,
+			costGoldGummies = cost.goldGummies * factor,
 			effect          = behavior.describe(level),
 		}
 	end
 end
+
 
 --------------------------------------------------------------------------------
 -- Oeffentliche API
@@ -283,6 +342,8 @@ local BuildingBehavior = {}
 
 BuildingBehavior.BUILDING_UPGRADES = BUILDING_UPGRADES
 BuildingBehavior.MILESTONES        = MILESTONES
+BuildingBehavior.POND_COST_FACTOR  = POND_COST_FACTOR
+BuildingBehavior.pondCostFactor    = pondCostFactor
 
 function BuildingBehavior.get(buildingId: Types.BuildingId): Behavior
 	return BEHAVIORS[buildingId] or DEFAULT_BEHAVIOR

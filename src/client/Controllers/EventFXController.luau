@@ -428,6 +428,39 @@ local function setBossSky(active: boolean)
 end
 
 --------------------------------------------------------------------------------
+-- Belohnungs-Momente (Icon-Weg von "event_notice_good")
+--------------------------------------------------------------------------------
+
+-- HBB Paket 7: Truhenfarbe je Boss-Stufe 1..4 (Bronze, Silber, Gold, Lila)
+local BOSS_TIER_COLORS = {
+	Color3.fromRGB(205, 127, 50), Color3.fromRGB(200, 210, 225),
+	Color3.fromRGB(255, 200, 40), Color3.fromRGB(190, 110, 255),
+}
+
+-- Zeigt zu einer bekannten Belohnungsnotiz das passende Bild ohne Text.
+-- Rueckgabe false = Notiz unbekannt, der Aufrufer faellt auf den Toast zurueck.
+local function playRewardMoment(key: any, args: any): boolean
+	if key == "msg.boss.tier" then
+		-- Truhe in der Stufenfarbe; die Inhalte fliegen danach ueber den
+		-- Datenstand in die Pillen.
+		local tier = if typeof(args) == "table" and typeof(args.tier) == "number" then args.tier else 1
+		Moment.show("chest", BOSS_TIER_COLORS[math.clamp(tier, 1, 4)], nil)
+	elseif key == "msg.event.rarity_up" then
+		local to = if typeof(args) == "table" and Loc.isMsg(args.to) then args.to.k else nil
+		local rarity = if typeof(to) == "string" then string.gsub(to, "^rarity%.", "") else nil
+		Moment.show("rarity", if rarity then Theme.rarityColor(rarity :: any) else Theme.COLORS.goldGummy, "ui.moment.rarity")
+	elseif key == "msg.event.combs" then
+		local n = if typeof(args) == "table" and typeof(args.n) == "number" then args.n else 1
+		Feedback.gain("comb", n)
+	elseif key == "msg.event.gummies" or key == "msg.ufo.drop_picked" then
+		-- schon ueber den Datenstand sichtbar
+	else
+		return false
+	end
+	return true
+end
+
+--------------------------------------------------------------------------------
 -- Initialisierung
 --------------------------------------------------------------------------------
 
@@ -463,27 +496,7 @@ function EventFXController.init()
 			end, function()
 				-- Gummies und Eier fliegen schon ueber den Datenstand
 				-- (UI/Feedback). Hier nur, was dort nicht sichtbar wird.
-				local key = if Loc.isMsg(msg) then (msg :: any).k else nil
-				local args = if Loc.isMsg(msg) then (msg :: any).a else nil
-				if key == "msg.boss.tier" then
-					-- HBB Paket 7: Truhe in vier Farben, ohne Text. Die Inhalte
-					-- fliegen danach ueber den Datenstand in die Pillen.
-					local tier = if typeof(args) == "table" and typeof(args.tier) == "number" then args.tier else 1
-					local TIER_COLORS = {
-						Color3.fromRGB(205, 127, 50), Color3.fromRGB(200, 210, 225),
-						Color3.fromRGB(255, 200, 40), Color3.fromRGB(190, 110, 255),
-					}
-					Moment.show("chest", TIER_COLORS[math.clamp(tier, 1, 4)], nil)
-				elseif key == "msg.event.rarity_up" then
-					local to = if typeof(args) == "table" and Loc.isMsg(args.to) then args.to.k else nil
-					local rarity = if typeof(to) == "string" then string.gsub(to, "^rarity%.", "") else nil
-					Moment.show("rarity", if rarity then Theme.rarityColor(rarity :: any) else Theme.COLORS.goldGummy, "ui.moment.rarity")
-				elseif key == "msg.event.combs" then
-					local n = if typeof(args) == "table" and typeof(args.n) == "number" then args.n else 1
-					Feedback.gain("comb", n)
-				elseif key == "msg.event.gummies" or key == "msg.ufo.drop_picked" then
-					return
-				else
+				if not (Loc.isMsg(msg) and playRewardMoment((msg :: any).k, (msg :: any).a)) then
 					-- Unbekannte Belohnungsnotiz: lieber lesen als verlieren
 					Toast.success(msg)
 				end

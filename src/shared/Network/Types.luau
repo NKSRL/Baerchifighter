@@ -10,6 +10,9 @@
 -- Enums
 --------------------------------------------------------------------------------
 
+local HoneyPondMode = require(script.Parent.Parent.Modules.HoneyPondMode)
+local FeatureFlags  = require(script.Parent.Parent.Config.FeatureFlags)
+
 export type Rarity =
 	| "Common"
 	| "Uncommon"
@@ -96,9 +99,16 @@ export type MutationId =
 --
 -- Level 1-60 (EconomyConfig.MAX_BUILDING_LEVEL), Look-Stufe aus dem Level
 -- (BuildingBehavior.getLook).
+--
+-- Seit dem Honig-Teich (FeatureFlags.HONEY_POND_V2) ist es EIN Gebaeude:
+--   HoneyPond     Honig-Teich — kann alles, was Stock und Veredler zusammen
+--                 koennen; seine Looks wachsen bis zum Honig-Springbrunnen.
+-- Die jeweils nicht aktiven liegen in IslandData.retiredBuildings
+-- (Modules/HoneyPondMode).
 export type BuildingId =
 	| "Beehive"        -- Bienenstock
 	| "HoneyRefiner"   -- Honig-Veredler (Platzhalter-Name)
+	| "HoneyPond"      -- Honig-Teich (HONEY_POND_V2)
 -- Fusion ist seit v3 kein Gebaeude mehr — sie laeuft rein ueber GUI
 -- (FusionPanel/BaerchiInventory) und ist von Anfang an freigeschaltet.
 -- Recycling ist seit v4 ebenfalls eine reine GUI-Funktion mit festem Wert
@@ -299,6 +309,10 @@ export type RecyclerData = {
 
 export type IslandData = {
 	buildings    : { [BuildingId]: Building },
+	-- HONEY_POND_V2: Gebaeude, die im aktuellen Modus nicht gelten (Teich
+	-- bzw. Stock + Veredler). Bleiben erhalten, kommen beim Zurueckschalten
+	-- wieder (Modules/HoneyPondMode). nil = keine.
+	retiredBuildings : { [BuildingId]: Building }?,
 	baerchis     : { [string]: Baerchi },     -- key = Baerchi.uid
 	eggStock     : { [EggType]: number },     -- Eier im Lager (Legen, Events, Rebirth, Haendler)
 
@@ -399,6 +413,7 @@ export type QuestReward = {
 	questId : string,
 	gummies : number,
 	eggType : EggType?,
+	goldGummies : number?,   -- GOLD_CHARMS_ONLY: Tages-Quests
 }
 
 --------------------------------------------------------------------------------
@@ -867,7 +882,7 @@ export type OfflineReport = {
 local function createDefaultPlayerData(): PlayerData
 	local now = os.time()
 
-	return {
+	local data: PlayerData = {
 		-- v11: das binaere isInverted-Feld weicht dem gestuften Mutation-System
 		-- (siehe Baerchi.mutation und BaerchiConfig.MUTATIONS). Die Migration in
 		-- PlayerService bildet alte isInverted=true-Eintraege auf eine feste
@@ -927,6 +942,7 @@ local function createDefaultPlayerData(): PlayerData
 			buildings = {
 				Beehive      = { id = "Beehive",      level = 1, honey = 0, lastProducedAt = now },
 				HoneyRefiner = { id = "HoneyRefiner", level = 1, honey = 0, lastProducedAt = now },
+				HoneyPond    = { id = "HoneyPond",    level = 1, honey = 0, lastProducedAt = now },
 			},
 			baerchis     = {},
 			eggStock     = {
@@ -984,6 +1000,11 @@ local function createDefaultPlayerData(): PlayerData
 			dailyClaimed = {},
 		},
 	}
+
+	-- Honig-Teich oder Stock + Veredler, je nach Schalter (neue Spieler und
+	-- Rebirth gehen beide hierueber).
+	HoneyPondMode.apply(data.island, FeatureFlags.isOn("HONEY_POND_V2"), now)
+	return data
 end
 
 return {

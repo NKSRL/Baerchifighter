@@ -20,6 +20,7 @@ local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 
 local ArenaBuilder = {}
 
@@ -216,12 +217,11 @@ export type ShowcaseView = {
 	color  : Color3,
 }
 
--- Mitte des Turm-Fusses (Arena-Hoehe), aussen an der Arena-Insel.
+-- Mitte des Turm-Fusses (Inselhoehe). HBB Paket 5: am Brueckenkopf auf der
+-- Hauptinsel (MAP_V2_SHOWCASE), sonst aussen an der Arena-Insel. Die Formel
+-- steht in MapLayout, damit Test und Deko-Freiraum dieselbe benutzen.
 function ArenaBuilder.showcaseFoot(slot: number): Vector3
-	local center  = MapParts.pitCenter(slot)
-	local outward = MapParts.outwardDirection(slot)
-	local pos = center + outward * MapConfig.TOWER_SHOWCASE.distance
-	return Vector3.new(pos.X, MapConfig.PLATFORM_TOP_Y, pos.Z)
+	return MapLayout.showcaseFoot(slot)
 end
 
 -- Baut den Turm neu (der alte wird ersetzt). Teile: Sockel (bis ins Wasser),

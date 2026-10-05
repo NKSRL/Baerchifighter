@@ -29,6 +29,8 @@ local EggTree          = require(ReplicatedStorage.Modules.EggTree)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
+local HoneyPondMode    = require(ReplicatedStorage.Modules.HoneyPondMode)
 
 local PlayerMigration = {}
 
@@ -311,6 +313,12 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 			local pot     = buildings.HoneyPot
 			local press   = buildings.HoneyPress
 			local refiner = buildings.HoneyRefiner
+			-- Mit HONEY_POND_V2 legt der Standard keinen Veredler mehr an; fuer
+			-- die Zusammenlegung (und danach den Teich) wird er hier angelegt.
+			if refiner == nil and (pot or press) then
+				refiner = { id = "HoneyRefiner", level = 1, honey = 0, lastProducedAt = os.time() }
+				buildings.HoneyRefiner = refiner
+			end
 			if refiner and (pot or press) then
 				local level = math.max(refiner.level or 1,
 					if pot then pot.level or 1 else 1,
@@ -320,6 +328,16 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 				local honey = (if pot then pot.honey or 0 else 0) + (if press then press.honey or 0 else 0)
 				refiner.honey = math.clamp(honey, 0, BuildingBehavior.getCapacity("HoneyRefiner", refiner.level))
 			end
+		end
+
+		-- Honig-Teich (HONEY_POND_V2) bzw. zurueck zu Stock + Veredler. MUSS vor
+		-- dem Aufraeumen unten laufen: sonst waeren die gerade nicht geltenden
+		-- Gebaeude schon geloescht statt im Ruhestand (island.retiredBuildings).
+		HoneyPondMode.apply(island, FeatureFlags.isOn("HONEY_POND_V2"), os.time())
+		local pond = buildings[HoneyPondMode.POND]
+		if pond then
+			pond.level = EconomyConfig.clampBuildingLevel(pond.level or 1)
+			pond.honey = math.clamp(pond.honey or 0, 0, BuildingBehavior.getCapacity("HoneyPond", pond.level))
 		end
 
 		-- Alles, was es nicht (mehr) gibt, verschwindet — auch Topf und Presse

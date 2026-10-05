@@ -26,7 +26,7 @@
 -- Die Vorlage kennt eine eigene Ressource ("Charm Dust"). In Baerchi Fighter
 -- gibt es die bewusst NICHT — der Projektinhaber will das Ressourcen-System
 -- einfach halten. Ein Wurf kostet direkt GoldGummies, die bereits bestehende
--- zweite Waehrung aus den PIT-Meilensteinen.
+-- zweite Waehrung (seit GOLD_CHARMS_ONLY nur noch aus den Tages-Quests).
 --
 -- ============================================================
 -- WARUM NUR VIER STAT-TYPEN

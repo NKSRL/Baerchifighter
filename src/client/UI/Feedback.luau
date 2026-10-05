@@ -32,6 +32,7 @@ local FeedbackConfig = require(ReplicatedStorage.Config.FeedbackConfig)
 local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
 
 local Theme       = require(script.Parent.Theme)
+local UiScale     = require(script.Parent.UiScale)
 local Icons       = require(script.Parent.Icons)
 local Hud         = require(script.Parent.Hud)
 local MenuBar     = require(script.Parent.MenuBar)
@@ -122,7 +123,8 @@ end
 --------------------------------------------------------------------------------
 
 local function guiCenter(gui: GuiObject): Vector2
-	return gui.AbsolutePosition + gui.AbsoluteSize * 0.5
+	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale)
+	return UiScale.toGui(gui.AbsolutePosition + gui.AbsoluteSize * 0.5)
 end
 
 local function worldToScreen(position: Vector3): Vector2?
@@ -133,13 +135,13 @@ local function worldToScreen(position: Vector3): Vector2?
 	-- Die ScreenGui laesst Platz fuer die Topbar (IgnoreGuiInset = false):
 	-- Viewport-Koordinaten muessen um diesen Rand verschoben werden.
 	local inset = GuiService:GetGuiInset()
-	return Vector2.new(point.X, point.Y) - inset
+	return UiScale.toGui(Vector2.new(point.X, point.Y) - inset)
 end
 
 local function defaultOrigin(): Vector2
 	local layer = _layer
 	if not layer then return Vector2.zero end
-	local size = layer.AbsoluteSize
+	local size = UiScale.toGui(layer.AbsoluteSize)
 	-- Ueber der Pet-Leiste, wo der Blick ohnehin ist
 	return Vector2.new(size.X * 0.5, size.Y * 0.72)
 end

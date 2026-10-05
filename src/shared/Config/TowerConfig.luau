@@ -38,6 +38,7 @@
 -- bleiben waehlbar (dort gilt die volle Stage-Zahl als Deckel).
 
 local Types        = require(script.Parent.Parent.Network.Types)
+local FeatureFlags = require(script.Parent.FeatureFlags)
 local CombatConfig = require(script.Parent.CombatConfig)
 
 local TowerConfig = {}
@@ -276,6 +277,8 @@ TowerConfig.GOLD_EVERY_STAGES = 5
 
 function TowerConfig.getRunGold(towerId: string, stagesCleared: number): number
 	local def = BY_ID[towerId] or TOWERS[1]
+	-- GOLD_CHARMS_ONLY: Tower-Laeufe geben kein Gold mehr
+	if FeatureFlags.isOn("GOLD_CHARMS_ONLY") then return 0 end
 	return math.floor(math.max(0, stagesCleared) / TowerConfig.GOLD_EVERY_STAGES) * def.goldPerFive
 end
 
@@ -289,6 +292,7 @@ end
 --   * jede 25er-Stage GoldGummies + eine Blaupause.
 --   * Ein Meilenstein ueber Stage 25, der sonst leer bliebe (35, 45, ...),
 --     gibt MILESTONE_GOLD_SMALL x goldPerFive GoldGummies — leer soll keiner sein.
+--   * GOLD_CHARMS_ONLY: kein Gold; leere Meilensteine geben stattdessen Gummies.
 
 TowerConfig.MILESTONE_EVERY        = 5
 TowerConfig.MILESTONE_GUMMY_UNTIL  = 25
@@ -327,7 +331,14 @@ function TowerConfig.getMilestone(towerId: string, stage: number): Milestone?
 		result.goldGummies += TowerConfig.MILESTONE_GOLD_BIG * def.goldPerFive
 		result.blueprints = TowerConfig.MILESTONE_BLUEPRINTS
 	end
-	if result.gummies == 0 and result.eggs == 0 and result.goldGummies == 0 then
+	if FeatureFlags.isOn("GOLD_CHARMS_ONLY") then
+		-- Kein Gold aus Meilensteinen. Was sonst leer bliebe (35, 45, ...),
+		-- gibt flache Gummies wie die Meilensteine bis Stage 25.
+		result.goldGummies = 0
+		if result.gummies == 0 and result.eggs == 0 then
+			result.gummies = TowerConfig.MILESTONE_GUMMY_FACTOR * TowerConfig.getStageReward(towerId, stage)
+		end
+	elseif result.gummies == 0 and result.eggs == 0 and result.goldGummies == 0 then
 		result.goldGummies = TowerConfig.MILESTONE_GOLD_SMALL * def.goldPerFive
 	end
 	return result

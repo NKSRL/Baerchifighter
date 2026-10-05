@@ -57,6 +57,7 @@ local GuideController    = require(Controllers:WaitForChild("GuideController"))
 local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
 
 local Toast            = require(UI:WaitForChild("Toast"))
+local UiScale          = require(UI:WaitForChild("UiScale"))
 local Hud              = require(UI:WaitForChild("Hud"))
 local MenuBar          = require(UI:WaitForChild("MenuBar"))
 local BaerchiPanel     = require(UI:WaitForChild("BaerchiPanel"))
@@ -90,6 +91,9 @@ screenGui.ResetOnSpawn     = false   -- ueberlebt den Tod des Charakters
 screenGui.IgnoreGuiInset   = false   -- laesst Platz fuer die Roblox-Topbar
 screenGui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
 screenGui.Parent           = playerGui
+
+-- Playtest 05.10.: auf grossen Monitoren mitwachsen (siehe UI/UiScale)
+UiScale.init(screenGui)
 
 --------------------------------------------------------------------------------
 -- Start

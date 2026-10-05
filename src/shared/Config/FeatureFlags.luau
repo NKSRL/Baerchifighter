@@ -33,12 +33,28 @@ local FLAGS: { [string]: boolean } = {
 	MAP_V2_HOME       = true,
 	MAP_V2_SHOWCASE   = true,
 	MAP_V2_BOARDS     = true,
+	MAP_V2_ARENA_SPRINT = true,   -- Baerchi sprintet zur Arena und zurueck
 	-- Paket 6
 	MAP_V2_LIVE_BOARD = true,
+	MAP_V2_WASP_NEST  = true,
 	EVENT_V2_TIMER    = true,
+
+	-- Honig-Teich statt Stock + Veredler: EIN Gebaeude, Looks bis zum
+	-- Honig-Springbrunnen, Baerchi wohnt am Becken (kein Hin- und Herlaufen).
+	-- Bericht: docs/HBB_HONIG_TEICH_2026-10-05.md
+	HONEY_POND_V2      = true,
+
+	-- Playtest 05.10.: Basis-Eier (unbegrenzt beim Haendler) nicht pressbar
+	PRESS_NO_BASIC_EGG = true,
 
 	-- Paket 7: Boss-Belohnung nach Stufen
 	BOSS_TIERS        = true,
+
+	-- GoldGummies nur noch aus Tages-Quests (spaeter: Gratis-Griff im Shop)
+	-- und nur noch fuer Charms. Keine Gold-Kosten bei Gebaeuden/Recycler, kein
+	-- Gold aus Tower-Laeufen, Meilensteinen oder Login-Bonus.
+	-- Bericht: docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md
+	GOLD_CHARMS_ONLY  = true,
 
 	-- Paket 8/9: neue Pacing-Werte. Bleibt aus, bis der Mensch die Tabelle
 	-- freigegeben hat (Stopp-Punkt im Plan).

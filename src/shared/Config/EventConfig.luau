@@ -557,6 +557,38 @@ local function getDuration(def: EventDef): number
 	return def.durationSeconds or EVENT_DURATION_SECONDS
 end
 
+-- HBB Paket 6: Sekunden, bis Event `targetId` das naechste Mal STARTET
+-- (0 = laeuft gerade). Rein, nach demselben Ablauf wie EventService:
+-- Event -> Pause (EVENT_GAP_SECONDS) -> naechstes geplantes Event.
+--   activeId  laufendes Event oder nil (Pause)
+--   remaining Restsekunden der aktuellen Phase
+--   nextIndex/nextCycle  Stand von EventService (_nextIndex, _nextCycle)
+-- nil, wenn das Event im Zyklus nie vorkommt.
+local function secondsUntilStart(targetId: string, activeId: string?, remaining: number,
+	nextIndex: number, nextCycle: number): number?
+	if activeId == targetId then return 0 end
+	local t = math.max(0, remaining)
+	if activeId then
+		t += EVENT_GAP_SECONDS   -- erst endet das laufende Event, dann Pause
+	end
+
+	local index, cycle = nextIndex, nextCycle
+	local count = #EVENTS
+	for _ = 1, count * 8 do
+		local def = EVENTS[index]
+		if isScheduledInCycle(def, cycle) then
+			if def.id == targetId then return t end
+			t += getDuration(def) + EVENT_GAP_SECONDS
+		end
+		index += 1
+		if index > count then
+			index = 1
+			cycle += 1
+		end
+	end
+	return nil
+end
+
 local function getRarityUpChance(rarity: string): number
 	return RARITY_UP_CHANCE[rarity] or 0
 end
@@ -636,6 +668,7 @@ return {
 	getById           = getById,
 	getDuration       = getDuration,
 	isScheduledInCycle = isScheduledInCycle,
+	secondsUntilStart  = secondsUntilStart,
 	getRarityUpChance = getRarityUpChance,
 	getMutationFactor = getMutationFactor,
 	describeBonus     = describeBonus,

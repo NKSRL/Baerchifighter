@@ -85,6 +85,7 @@ local HOME_MARKER_HEIGHT   = 7
 local BUILDING_NAMES: { [string]: boolean } = {
 	Beehive      = true,
 	HoneyRefiner = true,
+	HoneyPond    = true,
 }
 
 -- Bereits verbundene ClickDetectors, damit nichts doppelt haengt

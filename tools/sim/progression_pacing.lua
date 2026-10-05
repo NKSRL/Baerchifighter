@@ -10,12 +10,13 @@
 -- Einkommen: Tower-Stage-Gummies (+ GoldGummies, Meilensteine), Recycler
 -- (Wabeneinheiten aus dem Event-Pit), Events (Boss-Teilnahme), Login-Bonus,
 -- alles mit Rebirth-Multiplikator wie im Spiel.
--- Ausgaben: Gebaeude 1-60 (Bienenstock, Veredler, Recycler), Rebirth-Kosten.
+-- Ausgaben: Gebaeude 1-60 (Honig-Teich bzw. Bienenstock + Veredler je nach
+-- FeatureFlags.HONEY_POND_V2, dazu Recycler), Rebirth-Kosten.
 -- Baerchi: Level aus Honig (Veredler-XP x Honig pro Minute), Staerke im Tower
 -- als Aequivalenz-Stage = Level + Ausbau-Bonus (Rarity/Promotion/Charms/Stats,
 -- siehe POWER_BONUS).
 --
--- Ziele (README 4.4 / Prompt 2): Look 2 (L10) 45-60 min, Look 3 (L20) Tag 2-3,
+-- Ziele (README 4.4 / Prompt 2, HBB Paket 8): Look 2 (L10) 20-45 min, Look 3 (L20) Tag 2-3,
 -- Look 4 (L30) ~Woche 1, Look 5 (L45) Woche 2-3, Look 6 (L60) Woche 5-8;
 -- Rebirth 1 nach ~2-3 Spieltagen, Final Stage 100 nicht vor ~Woche 8
 -- (jeweils Profil "Normal").
@@ -27,6 +28,7 @@ local TowerConfig      = require(RS.Config.TowerConfig)
 local BaerchiConfig    = require(RS.Config.BaerchiConfig)
 local LoginBonusConfig = require(RS.Config.LoginBonusConfig)
 local EventConfig      = require(RS.Config.EventConfig)
+local FeatureFlags     = require(RS.Config.FeatureFlags)
 
 --------------------------------------------------------------------------------
 -- ANNAHMEN (Verhalten, nicht Spielzahlen)
@@ -47,7 +49,7 @@ local SIM_DAYS           = 112   -- 16 Wochen
 -- wie PATIENCE_MINUTES Einkommen (gleitender Mittelwert). Teureres wartet. Bei
 -- mehreren kaufbaren der guenstigste nach Gewicht (der Veredler zuerst: XP).
 local PATIENCE_MINUTES = 20
-local SHOP_WEIGHT = { HoneyRefiner = 1.6, Recycler = 1.2, Beehive = 1.0 }
+local SHOP_WEIGHT = { HoneyRefiner = 1.6, Recycler = 1.2, Beehive = 1.0, HoneyPond = 1.6 }
 
 -- Ausbau-Bonus in Aequivalenz-Stages ueber der Level-Zahl, nach aktiven
 -- Stunden. Herkunft: tools/sim/tower_calibration.lua (Level 50 Common nackt
@@ -76,28 +78,59 @@ end
 -- Modell
 --------------------------------------------------------------------------------
 
-local function upgradeCost(level)
-	return EconomyConfig.HONEY_UPGRADE_COSTS[level]
+-- Honig-Gebaeude wie im Spiel: der Teich (HONEY_POND_V2) oder Stock + Veredler.
+local HONEY_BUILDINGS = if FeatureFlags.isOn("HONEY_POND_V2") then { "HoneyPond" } else { "Beehive", "HoneyRefiner" }
+local SHOP_KEYS = table.clone(HONEY_BUILDINGS)
+table.insert(SHOP_KEYS, "Recycler")
+
+-- Kosten wie im Spiel: Honig-Gebaeude aus BuildingBehavior (Teich mit
+-- POND_COST_FACTOR), Recycler aus der Grundkurve (CombConfig.getUpgradeCost).
+local function upgradeCost(key, level)
+	if key == "Recycler" then
+		return EconomyConfig.HONEY_UPGRADE_COSTS[level]
+	end
+	local def = BuildingBehavior.getUpgrade(key, level)
+	return if def then { gummies = def.costGummies, goldGummies = def.costGoldGummies } else nil
 end
 
 local function newLife(p)
-	p.levels = { Beehive = 1, HoneyRefiner = 1, Recycler = 1 }
+	p.levels = { Recycler = 1 }
+	for _, id in HONEY_BUILDINGS do p.levels[id] = 1 end
 	p.baerchiLevel = 1
 	p.baerchiXp = 0
 	p.capReached = false
 end
 
 local function honeyPerMinute(p)
-	local hive = 60 / BuildingBehavior.getIntervalSeconds("Beehive", p.levels.Beehive)
-	local ref  = 60 / BuildingBehavior.getIntervalSeconds("HoneyRefiner", p.levels.HoneyRefiner)
-	return hive + ref
+	local total = 0
+	for _, id in HONEY_BUILDINGS do
+		total += 60 / BuildingBehavior.getIntervalSeconds(id, p.levels[id])
+	end
+	return total
+end
+
+local function honeyBuildings(p)
+	local t = {}
+	for _, id in HONEY_BUILDINGS do
+		t[id] = { id = id, level = p.levels[id], honey = 0, lastProducedAt = 0 }
+	end
+	return t
 end
 
 local function xpPerHoney(p)
-	return BuildingBehavior.getXpPerHoney({
-		Beehive      = { id = "Beehive", level = p.levels.Beehive, honey = 0, lastProducedAt = 0 },
-		HoneyRefiner = { id = "HoneyRefiner", level = p.levels.HoneyRefiner, honey = 0, lastProducedAt = 0 },
-	})
+	return BuildingBehavior.getXpPerHoney(honeyBuildings(p))
+end
+
+local function maxBuildingLevel(p)
+	local best = 0
+	for _, level in p.levels do best = math.max(best, level) end
+	return best
+end
+
+local function levelsText(p)
+	local parts = {}
+	for _, key in SHOP_KEYS do table.insert(parts, tostring(p.levels[key])) end
+	return table.concat(parts, "/")
 end
 
 local function gainXp(p, xp)
@@ -180,9 +213,9 @@ end
 
 local function cheapestUpgrade(p)
 	local bestKey, bestCost = nil, math.huge
-	for _, key in { "Beehive", "HoneyRefiner", "Recycler" } do
+	for _, key in SHOP_KEYS do
 		local nextLevel = p.levels[key] + 1
-		local cost = upgradeCost(nextLevel)
+		local cost = upgradeCost(key, nextLevel)
 		if cost and cost.gummies / SHOP_WEIGHT[key] < bestCost then
 			bestKey, bestCost = key, cost.gummies / SHOP_WEIGHT[key]
 		end
@@ -194,14 +227,16 @@ local function shop(p)
 	for _ = 1, 20 do
 		local key = cheapestUpgrade(p)
 		if not key then return end
-		local cost = upgradeCost(p.levels[key] + 1)
+		local cost = upgradeCost(key, p.levels[key] + 1)
 		if cost.gummies > p.incomePerMin * PATIENCE_MINUTES then return end
 		if p.gummies < cost.gummies or p.gold < cost.goldGummies then return end
 		p.gummies -= cost.gummies
 		p.gold -= cost.goldGummies
 		p.levels[key] += 1
 		local lvl = p.levels[key]
-		for _, threshold in EconomyConfig.LOOK_THRESHOLDS do
+		-- Looks zaehlen am Honig-Gebaeude (dem Brunnen bzw. Stock/Veredler),
+		-- nicht am Recycler: das ist der Fortschritt, den man auf dem Plot sieht.
+		for _, threshold in (if table.find(HONEY_BUILDINGS, key) then EconomyConfig.LOOK_THRESHOLDS else {}) do
 			if lvl == threshold and not p.lookAt[threshold] then
 				p.lookAt[threshold] = p.minutes
 			end
@@ -215,9 +250,9 @@ local function tryRebirth(p)
 	if p.gummies < cost then return end
 	table.insert(p.lives, {
 		n = p.rebirths, endMin = p.minutes, cost = cost,
-		maxLevel = math.max(p.levels.Beehive, p.levels.HoneyRefiner, p.levels.Recycler),
+		maxLevel = maxBuildingLevel(p),
 		income = p.incomePerMin, baerchi = p.baerchiLevel, gold = p.gold,
-		levels = string.format("%d/%d/%d", p.levels.Beehive, p.levels.HoneyRefiner, p.levels.Recycler),
+		levels = levelsText(p),
 	})
 	p.rebirths += 1
 	p.rebirthAt[p.rebirths] = p.minutes
@@ -246,8 +281,7 @@ local function simulate(profile, stopAfterRebirth)
 	for day = 1, SIM_DAYS do
 		loginBonus(p, day)
 		-- Offline: beide Lager voll beim Zurueckkommen (wird gegessen).
-		local offlineHoney = BuildingBehavior.getCapacity("Beehive", p.levels.Beehive)
-			+ BuildingBehavior.getCapacity("HoneyRefiner", p.levels.HoneyRefiner)
+		local offlineHoney = BuildingBehavior.getTotalCapacity(honeyBuildings(p))
 		gainXp(p, offlineHoney * xpPerHoney(p))
 
 		for _ = 1, profile.minutesPerDay do
@@ -285,7 +319,7 @@ local function simulate(profile, stopAfterRebirth)
 		end
 
 		if day % 7 == 0 then
-			local maxLevel = math.max(p.levels.Beehive, p.levels.HoneyRefiner, p.levels.Recycler)
+			local maxLevel = maxBuildingLevel(p)
 			local towerId, record = TowerConfig.bestRecord({ records = p.records, claimed = {}, highestTower = p.highestTower, selected = "I" })
 			table.insert(weekly, {
 				week = day // 7, rebirths = p.rebirths, tower = towerId, record = record,
@@ -319,7 +353,7 @@ for _, profile in PROFILES do
 	__log("---------------------------+---------------------------")
 	for index, threshold in EconomyConfig.LOOK_THRESHOLDS do
 		if index > 1 then
-			__log(string.format("Look %d (erstes Gebaeude L%-2d) | %s", index, threshold, fmtTime(p.lookAt[threshold], profile.minutesPerDay)))
+			__log(string.format("Look %d (Honig-Gebaeude L%-2d) | %s", index, threshold, fmtTime(p.lookAt[threshold], profile.minutesPerDay)))
 		end
 	end
 	for _, n in { 1, 2, 3, 5, 7, 10, 15 } do
@@ -327,7 +361,7 @@ for _, profile in PROFILES do
 	end
 	__log(string.format("Final-Tower Stage 100      | %s", fmtTime(p.final100, profile.minutesPerDay)))
 	__log("")
-	__log("Leben | Ende (h) | Dauer (h) | Rebirth-Kosten | Stock/Veredler/Recycler | Einkommen/min am Ende | Gold")
+	__log("Leben | Ende (h) | Dauer (h) | Rebirth-Kosten | " .. table.concat(SHOP_KEYS, "/") .. " | Einkommen/min am Ende | Gold")
 	local lastEnd = 0
 	for _, life in p.lives do
 		__log(string.format("%5d | %8.1f | %9.1f | %14s | %23s | %21s | %d", life.n, life.endMin / 60,
@@ -350,7 +384,8 @@ local function within(name, minutes, loH, hiH)
 end
 local p = normalResult
 __log("")
-within("Normal: Look 2 in 30-75 min",                 p.lookAt[10], 0.5, 1.25)
+-- HBB Paket 8: Look 2 soll in die erste Sitzung fallen (Roblox: 20-30 min)
+within("Normal: Look 2 in 20-45 min",                 p.lookAt[10], 20 / 60, 0.75)
 within("Normal: Look 3 an Tag 2-3 (1,5-4,5 h)",       p.lookAt[20], 1.5, 4.5)
 within("Normal: Look 4 ~Woche 1 (6-13,5 h)",          p.lookAt[30], 6, 13.5)
 within("Normal: Look 5 Woche 2-3 (13,5-31,5 h)",      p.lookAt[45], 13.5, 31.5)

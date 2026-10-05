@@ -16,6 +16,7 @@
 -- liefen beim Balancing auseinander — das kann jetzt nicht mehr passieren.
 
 local Types = require(script.Parent.Parent.Network.Types)
+local FeatureFlags = require(script.Parent.FeatureFlags)
 
 --------------------------------------------------------------------------------
 -- Rebirth
@@ -227,7 +228,9 @@ local HONEY_UPGRADE_COSTS: { [number]: { gummies: number, goldGummies: number } 
 -- Look 6 (L60) ~Woche 5-8 bei 1,5 h aktiver Spielzeit pro Tag.
 -- Zwei Abschnitte: bis Level 30 flacher (Look 3 und 4 sollen in der ersten
 -- Woche kommen), danach steiler (Look 5 und 6 sind das Langzeitziel).
-local COST_GROWTH_AFTER_10 = 1.22   -- Level 11-30
+-- GOLD_CHARMS_ONLY: ohne Gold-Kosten bremsen nur noch die Gummies; 1,23 haelt
+-- Look 4 (L30) bei ~6,3 h statt 5,9 h (progression_pacing, Profil Normal).
+local COST_GROWTH_AFTER_10 = if FeatureFlags.isOn("GOLD_CHARMS_ONLY") then 1.23 else 1.22   -- Level 11-30
 local COST_GROWTH_AFTER_30 = 1.33   -- Level 31-60
 local GOLD_GROWTH_AFTER_10 = 1.035
 
@@ -332,6 +335,14 @@ do
 			gummies     = roundSignificant(base.gummies * COST_GROWTH_AFTER_10 ^ early * COST_GROWTH_AFTER_30 ^ late),
 			goldGummies = roundSignificant(base.goldGummies * GOLD_GROWTH_AFTER_10 ^ steps),
 		}
+	end
+	-- GOLD_CHARMS_ONLY: Ausbauten kosten nur noch Gummies. Erst NACH dem
+	-- Erzeugen nullen, damit die alte Kurve bei ausgeschaltetem Flag gleich bleibt.
+	-- Gilt fuer alle drei Gebaeude und den Recycler (CombConfig liest diese Tabelle).
+	if FeatureFlags.isOn("GOLD_CHARMS_ONLY") then
+		for _, cost in HONEY_UPGRADE_COSTS do
+			cost.goldGummies = 0
+		end
 	end
 end
 

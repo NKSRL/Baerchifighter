@@ -53,6 +53,7 @@ local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
+local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
 local EggCalculator = require(ReplicatedStorage.Modules.EggCalculator)
 local EggTree       = require(ReplicatedStorage.Modules.EggTree)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
@@ -136,11 +137,19 @@ local function pickDropPosition(player: Player, baerchiUid: string): Vector3?
 	local angle    = math.random() * math.pi * 2
 	local distance = math.random() * EggConfig.LAY_SCATTER_RADIUS
 
-	local world = Vector3.new(
-		origin.X + math.cos(angle) * distance,
-		origin.Y,
-		origin.Z + math.sin(angle) * distance
-	)
+	local dx, dz = math.cos(angle) * distance, math.sin(angle) * distance
+	local world = Vector3.new(origin.X + dx, origin.Y, origin.Z + dz)
+
+	-- Seit der Baerchi am Becken wohnt (HONEY_POND_V2), koennte ein Ei im
+	-- Honig landen. Dann auf die andere Seite des Baerchis spiegeln — dort
+	-- ist es immer weiter vom Becken weg als der Baerchi selbst.
+	local pond = MapService.getPondCenter(player)
+	if pond then
+		local keepOut = MapConfig.POND_RADIUS + MapConfig.POND_RIM_WIDTH + 1.5
+		if Vector3.new(world.X - pond.X, 0, world.Z - pond.Z).Magnitude < keepOut then
+			world = Vector3.new(origin.X - dx, origin.Y, origin.Z - dz)
+		end
+	end
 
 	return MapService.worldToPlot(player, world)
 end

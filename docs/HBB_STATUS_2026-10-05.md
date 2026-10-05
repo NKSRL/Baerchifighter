@@ -6,12 +6,22 @@
 | 1 Feedback | Code fertig | nein (Laptop gesperrt) |
 | 2 Führung | Code fertig | nein |
 | 3 Freischaltung | Code fertig | nein |
-| 4 Upgrade/Kampfwert | Teil (kein echter Tab, kein Aufklapper) | nein |
-| 5 Map | Teil (Händler, Heim-Knopf); Schau-Turm, 3 Tafeln, Weg zur Arena offen | nein |
-| 6 Timer/Board | Teil (Timer, erste Pause); Live-Board offen | nein |
+| 4 Upgrade/Kampfwert | Code fertig (zweispaltige Karte, Einzelwerte im Aufklapper; kein eigener Tab) | nein |
+| 5 Map | Code fertig (Händler, Heim-Knopf, Schau-Turm, 3 Tafeln, Arena-Sprint) – `docs/HBB_PAKET_5_6_MAP_2026-10-05.md` | nein |
+| 6 Timer/Board | Code fertig (Timer, erste Pause, Live-Board, Wespen-Nest) | nein |
 | 7 Boss-Stufen | Code fertig | nein |
-| 8 Pacing | **blockiert**: `sim/progression_pacing.lua` liegt nur auf dem Heim-PC; danach Stopp für die Freigabe der Tabelle | – |
-| 9, 10 | warten auf Paket 8 | – |
+| 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. Charm-Gold: 12 Würfe/Tag (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
+| 9, 10 | offen; 9 braucht einen freigegebenen Entwurf, 10 teilt sich die 12 Würfe/Tag mit den Tages-Quests | – |
+
+## Playtest 05.10.2026
+Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredler → Honig-Teich mit Brunnen-Looks: `docs/HBB_HONIG_TEICH_2026-10-05.md`.
+
+## Nachtrag Cloud-Sitzung 05.10.2026
+- Repo enthält jetzt auch `tools/sim/*` und `tools/check_*.py` (vom Heim-PC); es fehlen weiterhin `tools/luau-tests/run.mjs`, `migration.test.lua` und die übrigen Node-Tests.
+- `run_local.py` führt alle `tools/sim/*.lua` aus (alle zehn grün) und meldet `FAIL` per Exit-Code 1.
+- `check_feedback.py` war rot (Fehlalarm durch den längeren Paket-7-Rückruf): Belohnungs-Momente nach `EventFXController.playRewardMoment` ausgelagert, Verhalten gleich.
+- Alle Prüfungen grün: Syntax (alle `.luau`), 5 Luau-Tests (neu: `gold_rules.test.lua`), alle Sims, `check_feedback/members/consistency/loc/decor`.
+- Studio-Einspielung offen: geänderte Skripte seit dem Laptop-Export siehe `git diff a85f360 --stat -- src`.
 
 ## Wo der Code liegt
 - Laptop: `Dokumente\Neuer Ordner\RBL` (Git-Repo, Tag `pre-ui-v2` = Stand vor HBB).

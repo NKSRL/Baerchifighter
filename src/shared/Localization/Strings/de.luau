@@ -178,6 +178,8 @@ return {
 	["building.HoneyRefiner.name"] = "Honig-Raffinerie",
 	["building.Beehive.short"]     = "Stock",
 	["building.HoneyRefiner.short"] = "Raffinerie",
+	["building.HoneyPond.name"]    = "Honig-Brunnen",
+	["building.HoneyPond.short"]   = "Brunnen",
 
 	----------------------------------------------------------------------------
 	-- Namen: Raenge (Types.Rank.tier)
@@ -223,6 +225,7 @@ return {
 	["ui.quest.claim_short"] = "Abholen",
 	["ui.quest.reward_gummies"] = "+{n} Gummies",
 	["ui.quest.reward_with_egg"] = "+{n} Gummies und ein {egg}",
+	["ui.quest.reward_gold"] = "+{n} GoldGummies",
 	["ui.quest.toast"] = "Quest geschafft: {text}",
 	["err.quest_unknown"] = "Unbekannte Quest",
 	["err.quest_already_claimed"] = "Schon abgeholt",
@@ -453,6 +456,8 @@ return {
 	["ui.profile.rebirths"]            = "Rebirths: {n}",
 	["ui.profile.index"]               = "Index: {have}/{total}",
 	["ui.profile.top"]                 = "Top-Baerchis:",
+	["ui.home.button"]                  = "Heim",
+	["ui.card.details"]                 = "Einzelwerte",
 	["ui.daily.title"]                 = "Täglicher Bonus",
 	["ui.daily.day"]                   = "Tag {day}",
 	["ui.daily.egg"]                   = "Ei",

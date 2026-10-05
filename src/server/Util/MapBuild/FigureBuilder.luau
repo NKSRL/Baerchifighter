@@ -16,6 +16,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiMesh      = require(ReplicatedStorage.Modules.BaerchiMesh)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
@@ -292,7 +293,7 @@ function FigureBuilder.renderBaerchis(plotModel: Model, slot: number, islandData
 	end
 
 	local plotCFrame = MapParts.plotCFrame(slot)
-	local home       = MapConfig.BAERCHI_HOME_OFFSET
+	local home       = MapLayout.baerchiHomeOffset()   -- HONEY_POND_V2: am Becken
 	local footPos    = (plotCFrame * CFrame.new(home.X, MapParts.plotSurfaceOffset() + home.Y, home.Z)).Position
 
 	local figure = FigureBuilder.buildBaerchiFigure(folder, equipped, footPos, plotCFrame)
