@@ -188,8 +188,10 @@ function EggMerchantService.init()
 	local merchant = EggConfig.MERCHANT
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name                  = "BuyPrompt"
-	prompt.ActionText            = string.format("Basis-Ei kaufen (%d Gummies)", merchant.priceGummies)
-	prompt.ObjectText            = "Eier-Stand"
+	-- Sammel-Update 2.4: der Prompt ist fuer alle gleich (Server-Objekt) —
+	-- deshalb sprachneutral: Ei + Preis.
+	prompt.ActionText            = string.format("🥚 +1  (%d G)", merchant.priceGummies)
+	prompt.ObjectText            = "🥚"
 	prompt.MaxActivationDistance = merchant.promptDistance
 	prompt.RequiresLineOfSight   = false
 	prompt.HoldDuration          = 0

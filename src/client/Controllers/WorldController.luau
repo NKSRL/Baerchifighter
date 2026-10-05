@@ -245,7 +245,7 @@ local function addHomeMarker(board: BasePart)
 	label.BackgroundTransparency = 1
 	label.Font                   = Theme.FONT
 	label.TextScaled             = true
-	label.Text                   = "\u{25BC} Dein Plot"
+	label.Text                   = "\u{25BC} " .. Loc.t("ui.world.your_plot")
 	label.TextColor3             = Theme.COLORS.goldGummy
 	label.TextStrokeTransparency = 0.2
 	label.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)

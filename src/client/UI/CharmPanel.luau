@@ -148,21 +148,15 @@ local function fill(baerchi: Types.Baerchi)
 	local cost     = CharmConfig.ROLL_COST_GOLD_GUMMIES
 
 	if _costLabel then
-		_costLabel.Text = string.format(
-			"%s GoldGummies  —  ein Wurf kostet %d",
-			Theme.formatNumber(gold), cost
-		)
+		_costLabel.Text = Loc.t("ui.charm.cost", { gold = gold, cost = cost })
 		_costLabel.TextColor3 = if gold >= cost then Theme.COLORS.goldGummy else Theme.COLORS.bad
 	end
 
 	if _hintLabel then
 		if rollable == 0 then
-			_hintLabel.Text = "Alle offenen Slots sind gesperrt — tippe einen an, um ihn wieder freizugeben."
+			_hintLabel.Text = Loc.t("ui.charm.all_locked")
 		else
-			_hintLabel.Text = string.format(
-				"Ein Wurf wuerfelt alle %d offenen Slots neu. Tippe einen Slot an, um ihn zu sperren.",
-				rollable
-			)
+			_hintLabel.Text = Loc.t("ui.charm.roll_hint", { n = rollable })
 		end
 	end
 
@@ -348,7 +342,7 @@ function CharmPanel.init(screenGui: ScreenGui)
 	_hintLabel.Position = UDim2.new(0, 0, 0, 22)
 	_hintLabel.Size     = UDim2.new(1, 0, 0, 26)
 
-	local roll = Theme.button("Roll", footer, "Charms wuerfeln", Theme.COLORS.gummy)
+	local roll = Theme.button("Roll", footer, Loc.t("ui.charm.roll"), Theme.COLORS.gummy)
 	roll.Position = UDim2.new(0, 0, 0, 52)
 	roll.Size     = UDim2.new(0.5, -4, 0, 34)
 	_rollButton = roll

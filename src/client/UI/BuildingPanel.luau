@@ -280,7 +280,7 @@ local function buildMenu(
 	local feedButton: TextButton? = nil
 	if withFeed and onFeed then
 		local feedRow = row(38)
-		local feed    = Theme.bigButton("Feed", feedRow, "Honig fuettern", Theme.shade(accent, -0.10))
+		local feed    = Theme.bigButton("Feed", feedRow, Loc.t("ui.building.feed", { n = 0 }), Theme.shade(accent, -0.10))
 		feed.Size = UDim2.new(1, 0, 1, 0)
 		feed.Activated:Connect(onFeed)
 		feedButton = feed
@@ -337,18 +337,18 @@ local function refreshBuilding(buildingId: Types.BuildingId)
 		menu.priceText.Text  = priceText(next_.costGummies, next_.costGoldGummies)
 		menu.priceText.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.bad
 
-		menu.upgrade.Text = "AUSBAUEN"
+		menu.upgrade.Text = Loc.t("ui.building.upgrade_button")
 		Theme.setEnabled(menu.upgrade, affordable)
 	else
 		menu.nextText.Text        = Loc.t("ui.building.max")
 		menu.priceText.Text       = ""
-		menu.upgrade.Text         = "VOLL AUSGEBAUT"
+		menu.upgrade.Text         = Loc.t("ui.building.maxed_button")
 		Theme.setEnabled(menu.upgrade, false)
 	end
 
 	local feed = menu.feed
 	if feed then
-		feed.Text = string.format("Fuettern  (%d Honig)", honey)
+		feed.Text = Loc.t("ui.building.feed", { n = honey })
 		Theme.setEnabled(feed, honey > 0 and data.island.equippedUid ~= nil)
 	end
 end
