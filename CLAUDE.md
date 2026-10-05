@@ -11,8 +11,9 @@ Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md`, dann den Beric
 - `luau-compile --null <datei>` (Syntax)
 - `luau tools/luau-tests/guide_steps.test.lua`, `unlock_rules.test.lua`, `boss_tiers.test.lua`
 - `python tools/luau-tests/run_local.py tools/luau-tests/combat_rating.test.lua`
-- `python tools/check_feedback.py`
-- Luau-CLI: https://github.com/luau-lang/luau/releases (luau-windows.zip)
+- `python tools/check_feedback.py` (plus `check_members.py`, `check_consistency.py`, `check_loc.py`, `check_decor.py`)
+- Sims ohne Node: `python tools/luau-tests/run_local.py tools/sim/<name>.lua` (Exit 1 bei `FAIL`); Pflicht bei Balance-Änderungen: `progression_pacing.lua`, `tower_calibration.lua`
+- Luau-CLI: https://github.com/luau-lang/luau/releases (luau-windows.zip; Linux/Cloud: luau-ubuntu.zip)
 
 ## In Studio bringen (kein Rojo auf dem Laptop)
 Option A: Rojo installieren (`aftman`/Rojo 7.7.0), `rojo serve`, im Studio-Plugin verbinden.
@@ -23,4 +24,5 @@ Option B: geänderte Skripte von Hand in Studio einfügen.
 Nach Änderungen in Studio: Datei → Auf Roblox speichern.
 
 ## Nicht hier verfügbar
-`tools/check_*.py`, `sim/*`, `migration.test.lua` liegen nur auf dem Heim-PC. Paket 8–10 brauchen `sim/progression_pacing.lua`.
+`tools/luau-tests/run.mjs` und die Node-Tests (`migration.test.lua`, `client.test.lua`, `loc.test.lua` …) liegen nur auf dem Heim-PC.
+`tools/sim/*` und `tools/check_*.py` sind da. Paket 8: Tabelle liegt vor und wartet auf Freigabe (`docs/HBB_PAKET_8_TABELLE_2026-10-05.md`); Paket 9–10 erst danach.

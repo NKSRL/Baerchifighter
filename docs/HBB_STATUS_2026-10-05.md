@@ -10,8 +10,14 @@
 | 5 Map | Teil (Händler, Heim-Knopf); Schau-Turm, 3 Tafeln, Weg zur Arena offen | nein |
 | 6 Timer/Board | Teil (Timer, erste Pause); Live-Board offen | nein |
 | 7 Boss-Stufen | Code fertig | nein |
-| 8 Pacing | **blockiert**: `sim/progression_pacing.lua` liegt nur auf dem Heim-PC; danach Stopp für die Freigabe der Tabelle | – |
-| 9, 10 | warten auf Paket 8 | – |
+| 8 Pacing | **Tabelle fertig, wartet auf Freigabe** (`docs/HBB_PAKET_8_TABELLE_2026-10-05.md`, 3 Fragen); `PACING_V2` aus | – (reine Config) |
+| 9, 10 | warten auf Freigabe Paket 8 | – |
+
+## Nachtrag Cloud-Sitzung 05.10.2026
+- Repo enthält jetzt auch `tools/sim/*` und `tools/check_*.py` (vom Heim-PC); es fehlen weiterhin `tools/luau-tests/run.mjs`, `migration.test.lua` und die übrigen Node-Tests.
+- `run_local.py` führt alle `tools/sim/*.lua` aus (alle zehn grün) und meldet `FAIL` per Exit-Code 1.
+- `check_feedback.py` war rot (Fehlalarm durch den längeren Paket-7-Rückruf): Belohnungs-Momente nach `EventFXController.playRewardMoment` ausgelagert, Verhalten gleich.
+- Alle Prüfungen grün: Syntax (alle `.luau`), 4 Luau-Tests, `check_feedback/members/consistency/loc/decor`.
 
 ## Wo der Code liegt
 - Laptop: `Dokumente\Neuer Ordner\RBL` (Git-Repo, Tag `pre-ui-v2` = Stand vor HBB).

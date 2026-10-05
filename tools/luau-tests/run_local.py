@@ -6,10 +6,15 @@ Instanz-Pfade, Color3/Vector3/Enum-Stubs) und fuehrt den Test mit dem
 `luau`-CLI aus.
 
 Aufruf:  python tools/luau-tests/run_local.py tools/luau-tests/combat_rating.test.lua
+         python tools/luau-tests/run_local.py <vorspann.lua> tools/sim/progression_pacing.lua
+         (mehrere Dateien laufen hintereinander im selben Buendel, z.B. ein
+         Wert-Vorschlag vor einer Simulation)
 Umgebung: LUAU=/pfad/zu/luau (Standard: "luau" im PATH)
 
 Im Test steht `rbxRequire("ReplicatedStorage/Modules/CombatRating")` statt
-eines normalen require.
+eines normalen require. Die Simulationen unter tools/sim (geschrieben fuer
+`node run.mjs` auf dem Heim-PC) laufen ebenfalls: `RS`/`SSS` sind die
+Instanz-Pfade, und `require(RS.Config.X)` geht ueber rbxRequire.
 """
 import os, sys, subprocess, tempfile
 
@@ -92,10 +97,30 @@ function rbxRequire(target)
 	cache[path] = result
 	return result
 end
+
+-- Wie run.mjs: __log, REAL_CLOCK, Kurzpfade fuer tools/sim, require nimmt auch
+-- Instanz-Pfade. Eine Zeile "FAIL ..." der Sims macht den Exit-Code 1 (TRAILER).
+__failed = false
+__log = function(first, ...)
+	if first == "FAIL" then __failed = true end
+	print(first, ...)
+end
+REAL_CLOCK = os.clock
+RS  = proxy("ReplicatedStorage")
+SSS = proxy("ServerScriptService")
+local __builtinRequire = require
+require = function(target)
+	if type(target) == "table" and rawget(target, "__path") then return rbxRequire(target) end
+	return __builtinRequire(target)
+end
+'''
+
+TRAILER = '''
+if __failed then error("mindestens ein FAIL (siehe oben)", 0) end
 '''
 
 def main():
-    test = sys.argv[1]
+    tests = sys.argv[1:]
     parts = ["local __SOURCES = {}"]
     for rel, root in MAPS.items():
         base = os.path.join(ROOT, rel)
@@ -111,7 +136,7 @@ def main():
                         break
                 key = root + "/" + inner
                 parts.append("__SOURCES[%s] = %s" % (repr(key).replace("'", '"'), long_string(open(full, encoding="utf-8").read())))
-    bundle = "\n".join(parts) + "\n" + SHIM + "\n" + open(test, encoding="utf-8").read()
+    bundle = "\n".join(parts) + "\n" + SHIM + "\n" + "\n".join(open(t, encoding="utf-8").read() for t in tests) + "\n" + TRAILER
     with tempfile.NamedTemporaryFile("w", suffix=".luau", delete=False, encoding="utf-8") as handle:
         handle.write(bundle)
         path = handle.name
