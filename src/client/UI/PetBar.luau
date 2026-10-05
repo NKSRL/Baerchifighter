@@ -62,6 +62,7 @@ local _fight: ButtonView? = nil
 local _state   = "Home"
 -- Sammel-Update 05.10. (Paket 4.3): gewaehltes Wiedergabe-Tempo (0 = sofort)
 local SPEED_STEPS = { 1, 2, 4, 0 }
+local _bossAt: number? = nil   -- Sammel-Update 5.3
 local _speedChoice = 1
 local _speedButton: TextButton? = nil
 local _pending: string? = nil
@@ -105,6 +106,15 @@ local function eventLine(): string
 		return Loc.t("ui.petbar.next_event", { t = clock(remaining) })
 	end
 	return ""
+end
+
+-- Sammel-Update 5.3: "🐝 Boss in 12 min" (bzw. "🐝 Boss LIVE").
+local function bossLine(): string
+	local at = _bossAt
+	if not at then return "" end
+	local left = at - os.clock()
+	if left <= 0 then return Loc.t("ui.petbar.boss_live") end
+	return Loc.t("ui.petbar.boss_in", { min = math.max(1, math.ceil(left / 60)) })
 end
 
 -- "Tower II" fuer eine Tower-Id.
@@ -224,7 +234,7 @@ local function refresh()
 		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
 		-- keine Woerter.
 		setEventIcon(event, _eventId or _nextEventId)
-		paint(event, clock(_phaseEndsAt - os.clock()), "", "normal")
+		paint(event, clock(_phaseEndsAt - os.clock()), bossLine(), "normal")
 	else
 		paint(event, "Event", eventLine(), "normal")
 	end
@@ -421,7 +431,9 @@ function PetBar.init(screenGui: ScreenGui)
 		refresh()
 	end)
 
-	Remotes.EventPhaseChanged.OnClientEvent:Connect(function(eventId: any, remaining: any, nextEventId: any)
+	Remotes.EventPhaseChanged.OnClientEvent:Connect(function(eventId: any, remaining: any, nextEventId: any, untilBoss: any)
+		-- Sammel-Update 5.3: Countdown bis zum Boss
+		_bossAt      = if typeof(untilBoss) == "number" then os.clock() + untilBoss else nil
 		_eventId     = if typeof(eventId) == "string" then eventId else nil
 		_nextEventId = if typeof(nextEventId) == "string" then nextEventId else nil
 		_phaseEndsAt = os.clock() + (if typeof(remaining) == "number" then remaining else 0)

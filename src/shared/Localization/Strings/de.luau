@@ -669,4 +669,9 @@ return {
 	["area.recycler"] = "Waben-Recycler",
 	["area.incubator"] = "Ei-Inkubator",
 	["area.arena"] = "Tower-Arena",
+	-- Sammel-Update 05.10.2026
+	["ui.brawl.hit"] = "Ein Baerchi hat dich weggestoßen! Schick dein eigenes in die Mitte.",
+	-- Sammel-Update 05.10.2026
+	["ui.petbar.boss_in"] = "🐝 Boss in {min} min",
+	["ui.petbar.boss_live"] = "🐝 Boss LIVE!",
 }

@@ -647,6 +647,28 @@ local function describeReward(def: EventDef): string
 	return "Belohnung unbekannt"
 end
 
+--------------------------------------------------------------------------------
+-- Sammel-Update 05.10. (Paket 5.2): KAMPF UM DIE MITTE
+--------------------------------------------------------------------------------
+-- Waehrend eines Events stossen die Event-Baerchis Spieler, die KEIN eigenes
+-- Baerchi im Event haben und ihnen im Pit zu nahe kommen (Rueckstoss + kurze
+-- Verlangsamung + kurze Waben-Pause). Die Baerchis kaempfen zuerst
+-- untereinander (Handler); greifen tun sie nur, wenn sie gerade frei sind.
+-- Annahmen (Abschnitt 11.10, Standard): kein Angriff auf Spieler mit eigenem
+-- Baerchi im Pit, kein Festhalten (Abklingzeit je Spieler), nur im Pit-Radius.
+local PIT_BRAWL = {
+	TICK_SECONDS        = 0.5,
+	REACH               = 9,      -- Studs: so nah muss der Spieler am Baerchi sein
+	PLAYER_COOLDOWN     = 4,      -- Sekunden: so oft wird ein Spieler hoechstens gestossen
+	BAERCHI_COOLDOWN    = 2.5,    -- Sekunden: so oft greift ein Baerchi hoechstens an
+	KNOCKBACK_SPEED     = 55,
+	SLOW_FACTOR         = 0.7,
+	SLOW_SECONDS        = 1.5,
+	PICKUP_PAUSE_SECONDS = 1.5,
+	LUNGE_DISTANCE      = 2.5,
+	LUNGE_SECONDS       = 0.3,
+}
+
 return {
 	EMERGENCY_BASIC_EGG_CHANCE = EMERGENCY_BASIC_EGG_CHANCE,
 	EVENT_DURATION_SECONDS = EVENT_DURATION_SECONDS,
@@ -673,4 +695,5 @@ return {
 	getMutationFactor = getMutationFactor,
 	describeBonus     = describeBonus,
 	describeReward    = describeReward,
+	PIT_BRAWL         = PIT_BRAWL,   -- Sammel-Update 5.2
 }

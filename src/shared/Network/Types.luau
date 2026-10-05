@@ -844,6 +844,9 @@ export type HazardHit = {
 	push        : Vector3,   -- Rueckstoss (Studs/s, waagerecht)
 	slowFactor  : number,    -- WalkSpeed-Faktor fuer slowSeconds
 	slowSeconds : number,
+	-- Sammel-Update 05.10. (Paket 5.2): "boss" (Standard) oder "brawl"
+	-- (gegnerischer Event-Baerchi) — nur fuer die Meldung beim Client.
+	source      : string?,
 }
 
 export type RebirthResult = {

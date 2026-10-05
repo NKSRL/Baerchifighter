@@ -662,4 +662,9 @@ return {
 	["area.recycler"] = "Recycleur de rayons",
 	["area.incubator"] = "Incubateur d'œufs",
 	["area.arena"] = "Arène de la tour",
+	-- Sammel-Update 05.10.2026
+	["ui.brawl.hit"] = "Un Baerchi t'a repoussé ! Envoie le tien au centre.",
+	-- Sammel-Update 05.10.2026
+	["ui.petbar.boss_in"] = "🐝 Boss dans {min} min",
+	["ui.petbar.boss_live"] = "🐝 Boss EN DIRECT !",
 }

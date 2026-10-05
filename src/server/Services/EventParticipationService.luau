@@ -1204,6 +1204,24 @@ function EventParticipationService.getPhase(player: Player): string?
 	return nil
 end
 
+-- Sammel-Update 05.10. (Paket 5.2): wer steht gerade mit welcher Figur am
+-- Event (fuer PitBrawlService). Nur lesend; "busy" = laeuft/kaempft gerade,
+-- dann greift die Figur niemanden an.
+function EventParticipationService.getParticipants(): { { player: Player, figure: Model, busy: boolean } }
+	local list = {}
+	for player, presence in _present do
+		local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
+		if figure and figure.Parent and not presence.abducting then
+			table.insert(list, { player = player, figure = figure, busy = presence.busy == true })
+		end
+	end
+	return list
+end
+
+function EventParticipationService.isPresent(player: Player): boolean
+	return _present[player] ~= nil
+end
+
 -- v12: wird der Baerchi gerade vom UFO entfuehrt? (Event-Knopf gesperrt)
 function EventParticipationService.isAbducting(player: Player): boolean
 	local presence = _present[player]

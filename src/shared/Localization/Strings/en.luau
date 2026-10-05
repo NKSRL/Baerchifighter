@@ -661,4 +661,9 @@ return {
 	["area.recycler"] = "Comb Recycler",
 	["area.incubator"] = "Egg Incubator",
 	["area.arena"] = "Tower Arena",
+	-- Sammel-Update 05.10.2026
+	["ui.brawl.hit"] = "A Baerchi pushed you away! Send your own into the middle.",
+	-- Sammel-Update 05.10.2026
+	["ui.petbar.boss_in"] = "🐝 Boss in {min} min",
+	["ui.petbar.boss_live"] = "🐝 Boss LIVE!",
 }

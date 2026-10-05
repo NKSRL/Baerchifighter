@@ -66,6 +66,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Events
 	{ name = "EventService",              module = ServerScriptService.Services.EventService },
 	{ name = "EventParticipationService", module = ServerScriptService.Services.EventParticipationService },
+	-- Sammel-Update 05.10. (Paket 5.2): Kampf um die Mitte
+	{ name = "PitBrawlService",           module = ServerScriptService.Services.PitBrawlService },
 
 	-- Waben: Sammeln im Event-Pit und der Recycler auf dem Plot
 	{ name = "CombRecyclerService", module = ServerScriptService.Services.CombRecyclerService },

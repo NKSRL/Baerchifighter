@@ -95,6 +95,9 @@ local _carried: { [Player]: Carried } = {}
 -- wieder an: ein Spieler, der nie Waben getragen hat, behaelt, was immer ein
 -- anderes System ihm gesetzt hat.
 local _slowed: { [Player]: boolean } = {}
+-- Sammel-Update 05.10. (Paket 5.2): kurze Aufheb-Pause nach einem Stoss im
+-- Kampf um die Mitte (PitBrawlService).
+local _pickupPausedUntil: { [Player]: number } = {}
 
 local _random = Random.new()
 
@@ -375,6 +378,7 @@ end
 --------------------------------------------------------------------------------
 
 local function tryPickup(player: Player, root: BasePart)
+	if os.clock() < (_pickupPausedUntil[player] or 0) then return end   -- Paket 5.2
 	local carried = getCarried(player)
 	if #carried.items >= CombConfig.MAX_CARRY then return end
 
@@ -506,6 +510,11 @@ end
 --------------------------------------------------------------------------------
 
 -- Wie viele Waben liegen gerade im Pit (fuer Debug und Tests).
+-- Sammel-Update 05.10. (Paket 5.2): Waben-Aufheben kurz pausieren.
+function CombService.pausePickup(player: Player, seconds: number)
+	_pickupPausedUntil[player] = math.max(_pickupPausedUntil[player] or 0, os.clock() + seconds)
+end
+
 function CombService.getWorldCount(): number
 	return #_world
 end
