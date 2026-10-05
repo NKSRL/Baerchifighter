@@ -439,6 +439,14 @@ function MapService.getPondPosition(player: Player): Vector3?
 	return PondBuilder.pondStand(slot).Position
 end
 
+-- Mitte des Beckens (Weltposition) — z. B. damit gelegte Eier nicht im Honig
+-- landen, seit der Baerchi am Becken wohnt (HONEY_POND_V2).
+function MapService.getPondCenter(player: Player): Vector3?
+	local slot = _playerSlot[player]
+	if not slot then return nil end
+	return PondBuilder.pondGround(slot).Position
+end
+
 -- Fuellstand des Teichs nachziehen. Billig — das ist der Weg fuer
 -- Honig-Aenderungen (siehe MapService.updateBuildingSigns, das das mit
 -- aufruft, weil beides an denselben Werten haengt).

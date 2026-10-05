@@ -466,14 +466,19 @@ local function fill(baerchi: Types.Baerchi)
 	-- Weg zum Server.
 	local data = ClientState.get()
 
+	-- Nur Gebaeude, die es auf dieser Insel gibt (HONEY_POND_V2: nur der
+	-- Teich); die Knoepfe teilen sich die Zeile gleichmaessig.
+	local shown = 0
+	for id in _feedButtons do
+		if data and data.island.buildings[id :: Types.BuildingId] then shown += 1 end
+	end
 	for id, button in _feedButtons do
-		local honey = 0
-		if data then
-			local building = data.island.buildings[id :: Types.BuildingId]
-			honey = if building then (building.honey or 0) else 0
-		end
+		local building = if data then data.island.buildings[id :: Types.BuildingId] else nil
+		local honey = if building then (building.honey or 0) else 0
 
 		local config = MapConfig.BUILDING_OFFSETS[id]
+		button.Visible = building ~= nil
+		button.Size = UDim2.new(1 / math.max(1, shown), -6, 1, 0)
 		button.Text = string.format("%s %d", if config then config.shortName else id, honey)
 		Theme.setEnabled(button, honey > 0)
 	end

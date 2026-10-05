@@ -170,6 +170,8 @@ return {
 	["building.HoneyRefiner.name"] = "Honey Refiner",
 	["building.Beehive.short"]     = "Hive",
 	["building.HoneyRefiner.short"] = "Refiner",
+	["building.HoneyPond.name"]    = "Honey Fountain",
+	["building.HoneyPond.short"]   = "Fountain",
 
 	----------------------------------------------------------------------------
 	-- Names: ranks

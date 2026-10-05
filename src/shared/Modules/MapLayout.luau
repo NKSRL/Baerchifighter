@@ -57,6 +57,45 @@ function MapLayout.atAngle(angleDegrees: number, radius: number): Vector3
 end
 
 --------------------------------------------------------------------------------
+-- Honig-Teich und Baerchi-Platz auf dem Plot (plot-lokal, siehe MapConfig-Kopf)
+--------------------------------------------------------------------------------
+-- HONEY_POND_V2: der Teich steht dort, wo das Gebaeude HoneyPond steht (Mitte
+-- des hinteren Plot-Teils), sein Standplatz zeigt nach +Z (ins Plot hinein),
+-- und der Baerchi WOHNT auf diesem Standplatz — er frisst ohne hinzulaufen.
+-- Ohne Schalter: alter Teich (POND_OFFSET) und alter Baerchi-Platz.
+
+local function pondV2(): boolean
+	return FeatureFlags.isOn("HONEY_POND_V2")
+end
+
+function MapLayout.pondOffset(): Vector3
+	return if pondV2() then MapConfig.BUILDING_OFFSETS.HoneyPond.offset else MapConfig.POND_OFFSET
+end
+
+-- Richtung (plot-lokal, waagerecht, Einheitsvektor) vom Teich zum Standplatz.
+function MapLayout.pondFacing(): Vector3
+	if pondV2() then
+		return Vector3.new(0, 0, 1)
+	end
+	local toHome = MapConfig.BAERCHI_HOME_OFFSET - MapConfig.POND_OFFSET
+	local flat = Vector3.new(toHome.X, 0, toHome.Z)
+	return if flat.Magnitude > 1e-3 then flat.Unit else Vector3.new(0, 0, 1)
+end
+
+-- Abstand Teich-Mitte -> Standplatz (Beckenrand + Luecke).
+function MapLayout.pondStandDistance(): number
+	return MapConfig.POND_RADIUS + MapConfig.POND_STAND_GAP
+end
+
+-- Wo der ausgeruestete Baerchi steht, wenn er nichts tut.
+function MapLayout.baerchiHomeOffset(): Vector3
+	if pondV2() then
+		return MapLayout.pondOffset() + MapLayout.pondFacing() * MapLayout.pondStandDistance()
+	end
+	return MapConfig.BAERCHI_HOME_OFFSET
+end
+
+--------------------------------------------------------------------------------
 -- Wahrzeichen
 --------------------------------------------------------------------------------
 

@@ -39,6 +39,11 @@ local FLAGS: { [string]: boolean } = {
 	MAP_V2_WASP_NEST  = true,
 	EVENT_V2_TIMER    = true,
 
+	-- Honig-Teich statt Stock + Veredler: EIN Gebaeude, Looks bis zum
+	-- Honig-Springbrunnen, Baerchi wohnt am Becken (kein Hin- und Herlaufen).
+	-- Bericht: docs/HBB_HONIG_TEICH_2026-10-05.md
+	HONEY_POND_V2      = true,
+
 	-- Playtest 05.10.: Basis-Eier (unbegrenzt beim Haendler) nicht pressbar
 	PRESS_NO_BASIC_EGG = true,
 

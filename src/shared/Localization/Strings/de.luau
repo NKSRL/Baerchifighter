@@ -178,6 +178,8 @@ return {
 	["building.HoneyRefiner.name"] = "Honig-Raffinerie",
 	["building.Beehive.short"]     = "Stock",
 	["building.HoneyRefiner.short"] = "Raffinerie",
+	["building.HoneyPond.name"]    = "Honig-Brunnen",
+	["building.HoneyPond.short"]   = "Brunnen",
 
 	----------------------------------------------------------------------------
 	-- Namen: Raenge (Types.Rank.tier)

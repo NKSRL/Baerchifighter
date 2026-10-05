@@ -68,6 +68,7 @@ local BuildingPanel = {}
 local BUILDINGS: { { id: Types.BuildingId } } = {
 	{ id = "Beehive"      },
 	{ id = "HoneyRefiner" },
+	{ id = "HoneyPond"    },
 }
 
 -- Alles, was ein einzelnes Menue zum Aktualisieren braucht.

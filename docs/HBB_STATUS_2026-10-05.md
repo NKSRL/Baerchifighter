@@ -14,7 +14,7 @@
 | 9, 10 | offen; 9 braucht einen freigegebenen Entwurf, 10 teilt sich die 12 Würfe/Tag mit den Tages-Quests | – |
 
 ## Playtest 05.10.2026
-Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Offen: Entscheidung Stock/Veredler → Honig-Teich.
+Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredler → Honig-Teich mit Brunnen-Looks: `docs/HBB_HONIG_TEICH_2026-10-05.md`.
 
 ## Nachtrag Cloud-Sitzung 05.10.2026
 - Repo enthält jetzt auch `tools/sim/*` und `tools/check_*.py` (vom Heim-PC); es fehlen weiterhin `tools/luau-tests/run.mjs`, `migration.test.lua` und die übrigen Node-Tests.

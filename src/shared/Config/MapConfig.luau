@@ -314,12 +314,24 @@ local BUILDING_OFFSETS: { [string]: { offset: Vector3, size: Vector3, color: Col
 		displayName = "Honig-Veredler",
 		shortName   = "Veredler",
 	},
+	-- Honig-Teich (HONEY_POND_V2): ersetzt Stock und Veredler. Steht mitten im
+	-- hinteren Plot-Teil (wo die beiden standen), damit sein Brunnen vom Steg
+	-- aus zu sehen ist. Der Koerper ist so gross wie Becken + Steinkranz; die
+	-- Look-Deko (BUILDING_LOOK_DECOR.HoneyPond) waechst darin bis zum
+	-- Honig-Springbrunnen. Das Becken selbst baut PondBuilder an derselben Stelle.
+	HoneyPond = {
+		offset      = Vector3.new(0, 0, -14),
+		size        = Vector3.new(20, 15, 20),
+		color       = Color3.fromRGB(255, 190, 60),    -- Honig-Gold
+		displayName = "Honig-Brunnen",
+		shortName   = "Brunnen",
+	},
 }
 
 -- Feste Reihenfolge fuer alles was die Gebaeude AUFLISTET (Panel, Schilder).
 -- Die Gebaeude-Tabelle in IslandData ist eine Hash-Tabelle und damit nicht
 -- stabil sortiert.
-local BUILDING_ORDER: { string } = { "Beehive", "HoneyRefiner" }
+local BUILDING_ORDER: { string } = { "Beehive", "HoneyRefiner", "HoneyPond" }
 
 --------------------------------------------------------------------------------
 -- Aussehen der Gebaeude
@@ -399,6 +411,14 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 		{ name = "Topf",        shape = Enum.PartType.Ball,     size = Vector3.new( 2.6, 2.0,  2.6), offset = Vector3.new( 2.8, 9.60,  2.8), color = HONEY_DEEP },
 		{ name = "Topfdeckel",  shape = Enum.PartType.Cylinder, size = Vector3.new( 0.4, 1.8,  1.8), offset = Vector3.new( 2.8, 10.70, 2.8), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT },
 	},
+
+	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe. Alles
+	-- steht auf Beet-Hoehe in der Beckenmitte; der Boden (0,45) und der Honig
+	-- verdecken die Fuesse. Die Looks 2-6 bauen darum den Brunnen auf.
+	HoneyPond = {
+		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(2.4, 0.9, 0.9),   offset = Vector3.new(0, 1.20, 0), color = WOOD,  material = Enum.Material.Wood, rotation = UPRIGHT },
+		{ name = "Wabe",       shape = Enum.PartType.Block,    size = Vector3.new(1.6, 1.2, 0.5),   offset = Vector3.new(0, 2.90, 0), color = HONEY, material = Enum.Material.Neon },
+	},
 }
 
 -- ============================================================
@@ -415,6 +435,7 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 local GOLD_TRIM   = Color3.fromRGB(255, 205, 70)
 local GLOW_AMBER  = Color3.fromRGB(255, 170, 40)
 local CRYSTAL     = Color3.fromRGB(150, 225, 255)
+local POND_STONE  = Color3.fromRGB(214, 204, 186)   -- heller Brunnenstein
 local PENNANT_RED = Color3.fromRGB(220, 70, 60)
 
 -- Hoechstens so viele Teile pro Look (Grund-Deko + Zusaetze), README 4.2.
@@ -440,6 +461,52 @@ local BUILDING_LOOK_DECOR: { [string]: { [number]: { DecorPiece } } } = {
 		[6] = {
 			{ name = "L6Kristall1", shape = Enum.PartType.Block,   size = Vector3.new(1.2, 2.4, 1.2),   offset = Vector3.new(-4.4, 1.20,  4.4), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
 			{ name = "L6Kristall2", shape = Enum.PartType.Block,   size = Vector3.new(1.2, 2.4, 1.2),   offset = Vector3.new( 4.4, 1.20, -4.4), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+		},
+	},
+	-- Honig-Teich -> Honig-Springbrunnen (HONEY_POND_V2). Jede Stufe kommt dazu:
+	-- 2 Rinne mit Honigstrahl, 3 Steinsaeule + Schale, 4 zweite Schale, Goldring,
+	-- Kaskaden, 5 goldene Bienen + Fontaene, 6 Riesentropfen mit Krone, sechs
+	-- Honigfaelle, Kristalle. Neon-Honig leuchtet mit dem Bloom der Welt.
+	HoneyPond = {
+		[2] = {
+			{ name = "L2Rinne",    shape = Enum.PartType.Block,    size = Vector3.new(0.6, 0.5, 3.2),   offset = Vector3.new(0, 2.55, -1.6), color = WOOD_DARK, material = Enum.Material.Wood },
+			{ name = "L2Strahl",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.3, 0.5, 0.5), offset = Vector3.new(0, 1.15, -3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L2Topf",     shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.6, 1.8),   offset = Vector3.new(5.5, 0.80, 3.0), color = HONEY_DEEP },
+		},
+		[3] = {
+			{ name = "L3Saeule",   shape = Enum.PartType.Cylinder, size = Vector3.new(4.0, 4.0, 4.0),   offset = Vector3.new(0, 2.00, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+			{ name = "L3Schale",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.8, 9.0, 9.0),   offset = Vector3.new(0, 4.40, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT },
+			{ name = "L3Honig",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.2, 8.2, 8.2),   offset = Vector3.new(0, 4.90, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+		[4] = {
+			{ name = "L4Saeule",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.4, 2.2, 2.2),   offset = Vector3.new(0, 6.20, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT },
+			{ name = "L4Schale",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.6, 5.6, 5.6),   offset = Vector3.new(0, 7.70, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT },
+			{ name = "L4Honig",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.15, 5.0, 5.0),  offset = Vector3.new(0, 8.075, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L4Goldring", shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 9.4, 9.4),   offset = Vector3.new(0, 4.65, 0), color = GOLD_TRIM, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L4Kaskade1", shape = Enum.PartType.Cylinder, size = Vector3.new(4.4, 0.6, 0.6),   offset = Vector3.new( 4.2, 2.60, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L4Kaskade2", shape = Enum.PartType.Cylinder, size = Vector3.new(4.4, 0.6, 0.6),   offset = Vector3.new(-4.2, 2.60, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+		},
+		[5] = {
+			{ name = "L5Biene1",   shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.5, 2.2),   offset = Vector3.new( 2.9, 5.55, -2.9), color = GOLD_TRIM, material = Enum.Material.Metal },
+			{ name = "L5Biene2",   shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.5, 2.2),   offset = Vector3.new(-2.9, 5.55,  2.9), color = GOLD_TRIM, material = Enum.Material.Metal },
+			{ name = "L5Fluegel1", shape = Enum.PartType.Block,    size = Vector3.new(0.1, 0.9, 1.4),   offset = Vector3.new( 2.9, 6.65, -2.9), color = CRYSTAL, material = Enum.Material.Glass },
+			{ name = "L5Fluegel2", shape = Enum.PartType.Block,    size = Vector3.new(0.1, 0.9, 1.4),   offset = Vector3.new(-2.9, 6.65,  2.9), color = CRYSTAL, material = Enum.Material.Glass },
+			{ name = "L5Fontaene", shape = Enum.PartType.Cylinder, size = Vector3.new(3.0, 0.8, 0.8),   offset = Vector3.new(0, 9.65, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L5Kuppe",    shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.8, 1.8),   offset = Vector3.new(0, 11.50, 0), color = HONEY, material = Enum.Material.Neon },
+		},
+		[6] = {
+			{ name = "L6Tropfen",  shape = Enum.PartType.Ball,     size = Vector3.new(3.4, 4.4, 3.4),   offset = Vector3.new(0, 13.70, 0), color = HONEY, material = Enum.Material.Neon },
+			{ name = "L6Krone",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.5, 3.0, 3.0),   offset = Vector3.new(0, 16.10, 0), color = GOLD_TRIM, material = Enum.Material.Metal, rotation = UPRIGHT },
+			{ name = "L6Zacke1",   shape = Enum.PartType.Ball,     size = Vector3.new(0.7, 0.7, 0.7),   offset = Vector3.new( 1.2, 16.60, 0), color = GOLD_TRIM, material = Enum.Material.Metal },
+			{ name = "L6Zacke2",   shape = Enum.PartType.Ball,     size = Vector3.new(0.7, 0.7, 0.7),   offset = Vector3.new(-1.2, 16.60, 0), color = GOLD_TRIM, material = Enum.Material.Metal },
+			{ name = "L6Zacke3",   shape = Enum.PartType.Ball,     size = Vector3.new(0.7, 0.7, 0.7),   offset = Vector3.new(0, 16.60,  1.2), color = GOLD_TRIM, material = Enum.Material.Metal },
+			{ name = "L6Zacke4",   shape = Enum.PartType.Ball,     size = Vector3.new(0.7, 0.7, 0.7),   offset = Vector3.new(0, 16.60, -1.2), color = GOLD_TRIM, material = Enum.Material.Metal },
+			{ name = "L6Fall1",    shape = Enum.PartType.Cylinder, size = Vector3.new(4.6, 0.55, 0.55), offset = Vector3.new( 3.0, 2.50,  3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L6Fall2",    shape = Enum.PartType.Cylinder, size = Vector3.new(4.6, 0.55, 0.55), offset = Vector3.new(-3.0, 2.50,  3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L6Fall3",    shape = Enum.PartType.Cylinder, size = Vector3.new(4.6, 0.55, 0.55), offset = Vector3.new( 3.0, 2.50, -3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L6Fall4",    shape = Enum.PartType.Cylinder, size = Vector3.new(4.6, 0.55, 0.55), offset = Vector3.new(-3.0, 2.50, -3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+			{ name = "L6Kristall1", shape = Enum.PartType.Block,   size = Vector3.new(0.7, 1.6, 0.7),   offset = Vector3.new( 2.0, 8.95, 0), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
+			{ name = "L6Kristall2", shape = Enum.PartType.Block,   size = Vector3.new(0.7, 1.6, 0.7),   offset = Vector3.new(-2.0, 8.95, 0), color = CRYSTAL, material = Enum.Material.Glass, rotation = Vector3.new(0, 45, 0) },
 		},
 	},
 	HoneyRefiner = {

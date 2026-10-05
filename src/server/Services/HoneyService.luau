@@ -373,14 +373,18 @@ local function tick()
 				PlayerService.markDirty(player)
 			end
 
-			-- v15: Auto-Abnahme des Bienenstocks (Faehigkeit ab Level 10).
-			local hive = data.island.buildings.Beehive
-			local uid  = data.island.equippedUid
-			if hive and uid
-				and BuildingBehavior.hasAbility("Beehive", hive.level, "AutoHarvest")
-				and (hive.honey or 0) >= BuildingBehavior.getCapacity("Beehive", hive.level)
-			then
-				HoneyService.feed(player, uid, "Beehive", true)
+			-- v15: Auto-Abnahme (Faehigkeit ab Level 10): Bienenstock bzw. seit
+			-- HONEY_POND_V2 der Honig-Teich. Jedes Gebaeude mit der Faehigkeit,
+			-- dessen Lager voll ist, fuettert den ausgeruesteten Baerchi.
+			local uid = data.island.equippedUid
+			if uid then
+				for id, building in data.island.buildings do
+					if BuildingBehavior.hasAbility(id, building.level, "AutoHarvest")
+						and (building.honey or 0) >= BuildingBehavior.getCapacity(id, building.level)
+					then
+						HoneyService.feed(player, uid, id, true)
+					end
+				end
 			end
 		end
 	end

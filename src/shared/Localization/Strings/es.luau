@@ -171,6 +171,8 @@ return {
 	["building.HoneyRefiner.name"] = "Refinería de miel",
 	["building.Beehive.short"]     = "Colmena",
 	["building.HoneyRefiner.short"] = "Refinería",
+	["building.HoneyPond.name"]    = "Fuente de miel",
+	["building.HoneyPond.short"]   = "Fuente",
 
 	----------------------------------------------------------------------------
 	-- Nombres: rangos

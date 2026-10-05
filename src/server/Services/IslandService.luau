@@ -36,6 +36,7 @@ local IslandService = {}
 local VALID_BUILDINGS: { [string]: boolean } = {
 	Beehive      = true,
 	HoneyRefiner = true,
+	HoneyPond    = true,
 }
 
 local function fail(player: Player, action: string, reason: Types.LocMsg?)

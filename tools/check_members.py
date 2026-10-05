@@ -40,7 +40,8 @@ for f in files:
         keys.add(m.group(1))
 
     # a) function Mod.foo(...)  /  Mod.foo = ...
-    for m in re.finditer(r"\bfunction\s+([A-Za-z_]\w*)[.:](\w+)\s*\(", src):
+    # (auch generisch: function Mod.foo<T>(...))
+    for m in re.finditer(r"\bfunction\s+([A-Za-z_]\w*)[.:](\w+)\s*(?:<[^>]*>)?\s*\(", src):
         keys.add(m.group(2))
     for m in re.finditer(r"^\s*([A-Za-z_]\w*)\.(\w+)\s*=", src, re.M):
         keys.add(m.group(2))

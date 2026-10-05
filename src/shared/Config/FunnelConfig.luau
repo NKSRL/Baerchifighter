@@ -82,7 +82,7 @@ return {
 		Charms = true, Combat = true, Rebirth = true, Language = true,
 		Quests = true, EggTree = true, Leaderboard = true, Profile = true,
 		DailyBonus = true,
-		Building_Beehive = true, Building_HoneyRefiner = true,
+		Building_Beehive = true, Building_HoneyRefiner = true, Building_HoneyPond = true,
 	} :: { [string]: boolean },
 
 	-- Schliessen unter dieser Zeit = "aus Versehen geoeffnet / nicht verstanden"
