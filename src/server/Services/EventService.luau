@@ -198,16 +198,18 @@ local function tick()
 	if _active then
 		MapService.setEventBanner(
 			string.format("%s  •  LIVE", _active.displayName),
-			string.format("noch %s  •  %s", formatCountdown(remaining), EventConfig.describeReward(_active)),
-			_active.bannerColor
+			string.format("noch %s", formatCountdown(remaining)),
+			_active.bannerColor,
+			EventConfig.describeReward(_active)
 		)
 	else
 		local upcoming = EventConfig.EVENTS[_nextIndex]
 
 		MapService.setEventBanner(
 			string.format("Naechstes: %s", upcoming.displayName),
-			string.format("in %s  •  %s", formatCountdown(remaining), EventConfig.describeReward(upcoming)),
-			MapConfig.EVENT_PIT_BANNER_IDLE_COLOR
+			string.format("in %s", formatCountdown(remaining)),
+			MapConfig.EVENT_PIT_BANNER_IDLE_COLOR,
+			EventConfig.describeReward(upcoming)
 		)
 	end
 

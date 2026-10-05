@@ -27,6 +27,7 @@ local EggConfig    = require(ReplicatedStorage.Config.EggConfig)
 
 local UI          = script.Parent.Parent:WaitForChild("UI")
 local Theme       = require(UI:WaitForChild("Theme"))
+local UiScale     = require(UI:WaitForChild("UiScale"))
 local MenuBar     = require(UI:WaitForChild("MenuBar"))
 local PetBar      = require(UI:WaitForChild("PetBar"))
 local ClientState = require(script.Parent.ClientState)
@@ -171,7 +172,8 @@ local function showHighlight(target: GuiObject, strong: boolean, t: number)
 		hideHighlight()
 		return
 	end
-	local pos, size = target.AbsolutePosition, target.AbsoluteSize
+	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale)
+	local pos, size = UiScale.toGui(target.AbsolutePosition), UiScale.toGui(target.AbsoluteSize)
 	local pad = 6
 	frame.Position = UDim2.fromOffset(pos.X - pad, pos.Y - pad)
 	frame.Size = UDim2.fromOffset(size.X + pad * 2, size.Y + pad * 2)
@@ -183,7 +185,7 @@ local function showHighlight(target: GuiObject, strong: boolean, t: number)
 
 	-- Pfeil zeigt von oben auf den Knopf (die Kachelleiste rechts: von links)
 	local screen = frame.Parent :: GuiObject
-	local fromLeft = pos.X > screen.AbsoluteSize.X * 0.8
+	local fromLeft = pos.X > UiScale.toGui(screen.AbsoluteSize.X) * 0.8
 	local bounce = wave * (if strong then 18 else 8)
 	arrow.Visible = true
 	if fromLeft then

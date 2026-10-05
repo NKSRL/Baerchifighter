@@ -600,7 +600,7 @@ end
 -- setPitBanner blendet das hier NICHT ein/aus — die Tafel steht permanent
 -- (siehe buildEventPit): sie zeigt entweder den Countdown bis zum naechsten
 -- Event oder Name + Restzeit des laufenden.
-function MapService.setEventBanner(title: string, subtitle: string, color: Color3)
+function MapService.setEventBanner(title: string, subtitle: string, color: Color3, reward: string?)
 	local container = findEventPitContainer()
 	if not container then return end
 
@@ -619,6 +619,11 @@ function MapService.setEventBanner(title: string, subtitle: string, color: Color
 	local subLabel = banner:FindFirstChild("Sub")
 	if subLabel and subLabel:IsA("TextLabel") then
 		subLabel.Text = subtitle
+	end
+
+	local rewardLabel = banner:FindFirstChild("Reward")
+	if rewardLabel and rewardLabel:IsA("TextLabel") then
+		rewardLabel.Text = reward or ""
 	end
 end
 

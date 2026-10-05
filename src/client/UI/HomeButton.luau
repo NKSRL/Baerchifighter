@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes      = require(ReplicatedStorage.Network.Remotes)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local Loc          = require(ReplicatedStorage.Localization.Loc)
 
 local Theme = require(script.Parent.Theme)
 
@@ -23,13 +24,16 @@ local HomeButton = {}
 
 local SHOW_DISTANCE = 60
 local CHECK_SECONDS = 0.5
-local SIZE = 64
+-- Breiter als hoch: das Wort ("Maison") braucht Platz
+local SIZE = Vector2.new(104, 56)
 
 function HomeButton.init(screenGui: ScreenGui)
-	local button = Theme.bigButton("HomeButton", screenGui, "🏠", Theme.COLORS.good)
+	-- Playtest 05.10.: Wort statt Haus-Emoji (das Emoji war winzig und unklar)
+	local button = Theme.bigButton("HomeButton", screenGui, Loc.t("ui.home.button"), Theme.COLORS.good)
+	Loc.bind(button, "ui.home.button")
 	button.AnchorPoint = Vector2.new(0, 1)
 	button.Position    = UDim2.new(0, 16, 1, -16)
-	button.Size        = UDim2.fromOffset(SIZE, SIZE)
+	button.Size        = UDim2.fromOffset(SIZE.X, SIZE.Y)
 	button.Visible     = false
 	button.ZIndex      = 5
 	button.Activated:Connect(function()

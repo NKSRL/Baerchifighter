@@ -88,7 +88,7 @@ function EggTreeService.press(player: Player, eggType: Types.EggType, path: Type
 		return nil
 	end
 
-	if EggConfig.PRESS.blockedPaths[egg.path] then
+	if not EggConfig.canPress(eggType) then
 		fail(player, "RequestPressEggs", Loc.msg("err.press_blocked"))
 		return nil
 	end

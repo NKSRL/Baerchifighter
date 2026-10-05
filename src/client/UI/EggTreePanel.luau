@@ -305,7 +305,7 @@ local function buildDetail(detail: ScrollingFrame, data: Types.PlayerDataUpdate)
 	end)
 
 	-- Presse: beim Zucker-Ei zwei Wege (Gold / Void)
-	if not EggConfig.PRESS.blockedPaths[def.path] then
+	if EggConfig.canPress(eggId :: any) then
 		local targets: { { path: string?, egg: Types.EggType } } = {}
 		if eggId == "SugarEgg" then
 			for _, path in { "Gold", "Void" } do

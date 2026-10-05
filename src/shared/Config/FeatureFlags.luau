@@ -39,6 +39,9 @@ local FLAGS: { [string]: boolean } = {
 	MAP_V2_WASP_NEST  = true,
 	EVENT_V2_TIMER    = true,
 
+	-- Playtest 05.10.: Basis-Eier (unbegrenzt beim Haendler) nicht pressbar
+	PRESS_NO_BASIC_EGG = true,
+
 	-- Paket 7: Boss-Belohnung nach Stufen
 	BOSS_TIERS        = true,
 

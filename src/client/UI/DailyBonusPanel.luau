@@ -19,7 +19,10 @@ local LoginBonusConfig = require(ReplicatedStorage.Config.LoginBonusConfig)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local GuideSteps       = require(ReplicatedStorage.Modules.GuideSteps)
 
+local TweenService = game:GetService("TweenService")
+
 local Theme        = require(script.Parent.Theme)
+local Icons        = require(script.Parent.Icons)
 local Toast        = require(script.Parent.Toast)
 -- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
 local Notify       = require(script.Parent.Notify)
@@ -32,19 +35,31 @@ local PANEL_NAME = "DailyBonus"
 
 local _root: Frame? = nil
 local _cells: { Frame } = {}
+local _pulses: { [Frame]: Tween } = {}
 local _claim: TextButton? = nil
 local _status: TextLabel? = nil
 local _autoOpened = false
 
-local function rewardText(day: number): string
+-- Playtest 05.10.: statt reiner Textzeilen je Tag ein grosses Icon, eine
+-- grosse Zahl und die Extras klein darunter. Hauptbild: Tag 7 Geschenk,
+-- sonst Gummies, sonst Ei.
+local function dayVisual(day: number): (string, string, string)
 	local reward = LoginBonusConfig.getDay(day)
-	local parts: { string } = {}
-	if reward.gummies then table.insert(parts, Loc.formatNumber(reward.gummies) .. " G") end
-	if reward.goldGummies then table.insert(parts, Loc.formatNumber(reward.goldGummies) .. " GG") end
-	if reward.eggs and reward.eggType then table.insert(parts, string.format("%dx %s", reward.eggs, Loc.t("ui.daily.egg"))) end
-	if reward.highestEgg then table.insert(parts, Loc.t("ui.daily.best_egg")) end
-	if reward.blueprintChance then table.insert(parts, Loc.t("ui.daily.blueprint_chance", { pct = math.floor(reward.blueprintChance * 100 + 0.5) })) end
-	return table.concat(parts, "\n")
+	local extras: { string } = {}
+	if reward.eggs and reward.eggType then table.insert(extras, string.format("+%d %s", reward.eggs, Loc.t("ui.daily.egg"))) end
+	if reward.highestEgg then table.insert(extras, Loc.t("ui.daily.best_egg")) end
+	if reward.blueprintChance then table.insert(extras, Loc.t("ui.daily.blueprint_chance", { pct = math.floor(reward.blueprintChance * 100 + 0.5) })) end
+	if reward.goldGummies then table.insert(extras, "+" .. Loc.formatNumber(reward.goldGummies) .. " GG") end
+
+	local icon = if day == LoginBonusConfig.CYCLE_DAYS then "gift"
+		elseif reward.gummies then "gummy"
+		elseif reward.eggType then "egg"
+		else "goldgummy"
+	local amount = if reward.gummies then Theme.formatNumber(reward.gummies)
+		elseif reward.eggs then string.format("%dx", reward.eggs)
+		elseif reward.goldGummies then Loc.formatNumber(reward.goldGummies)
+		else ""
+	return icon, amount, table.concat(extras, "\n")
 end
 
 local function refresh()
@@ -55,12 +70,34 @@ local function refresh()
 	for day, cell in _cells do
 		local done = day <= view.streak and not (view.claimable and day == view.day)
 		local today = day == view.day
-		cell.BackgroundColor3 = if today and view.claimable then Theme.COLORS.goldGummy
-			elseif done or (today and not view.claimable) then Theme.COLORS.good
-			else Theme.COLORS.disabled
+		local claimed = done or (today and not view.claimable)
+		local open = today and view.claimable
+		cell.BackgroundColor3 = if open then Theme.COLORS.goldGummy
+			elseif claimed then Theme.COLORS.good
+			elseif day == LoginBonusConfig.CYCLE_DAYS then Theme.shade(Theme.COLORS.goldGummy, -0.35)
+			else Theme.COLORS.panelLight
+
 		local mark = cell:FindFirstChild("Mark")
-		if mark and mark:IsA("TextLabel") then
-			mark.Text = if done or (today and not view.claimable) then "✓" else ""
+		if mark and mark:IsA("GuiObject") then
+			mark.Visible = claimed
+		end
+		local stroke = cell:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = if open then Color3.fromRGB(255, 245, 190) else Theme.COLORS.outline
+			stroke.Thickness = if open then 4 else Theme.OUTLINE_THICKNESS
+		end
+		-- Kommende Tage etwas gedaempft, damit "heute" heraussticht
+		local icon = cell:FindFirstChild("Icon", true)
+		if icon and icon:IsA("ImageLabel") then
+			icon.ImageTransparency = if claimed or open then 0 else 0.25
+		end
+		local pulse = _pulses[cell]
+		if pulse then
+			if open then pulse:Play() else
+				pulse:Cancel()
+				local scale = cell:FindFirstChildOfClass("UIScale")
+				if scale then scale.Scale = 1 end
+			end
 		end
 	end
 
@@ -115,22 +152,61 @@ function DailyBonusPanel.init(screenGui: ScreenGui)
 		cell.Size = UDim2.new(1 / LoginBonusConfig.CYCLE_DAYS, -6, 1, 0)
 		cell.LayoutOrder = day
 
+		local iconName, amount, extra = dayVisual(day)
+		local isBig = day == LoginBonusConfig.CYCLE_DAYS
+
 		local head = Theme.label("Head", cell, Loc.t("ui.daily.day", { day = day }))
 		head.Position = UDim2.new(0, 4, 0, 4)
 		head.Size = UDim2.new(1, -8, 0, 18)
 		head.TextXAlignment = Enum.TextXAlignment.Center
 
-		local text = Theme.bodyText("Reward", cell, rewardText(day))
-		text.Position = UDim2.new(0, 4, 0, 24)
-		text.Size = UDim2.new(1, -8, 1, -28)
+		-- Hauptgewinn: Krone ueber dem Tag-7-Feld
+		if isBig then
+			local crown = Icons.make(cell, "crown", "♛")
+			crown.Name = "Crown"
+			crown.AnchorPoint = Vector2.new(0.5, 0.5)
+			crown.Position = UDim2.new(0.5, 0, 0, -4)
+			crown.Size = UDim2.fromOffset(30, 30)
+			crown.ZIndex = 4
+		end
+
+		local holder = Instance.new("Frame")
+		holder.Name = "IconHolder"
+		holder.BackgroundTransparency = 1
+		holder.AnchorPoint = Vector2.new(0.5, 0)
+		holder.Position = UDim2.new(0.5, 0, 0, 26)
+		holder.Size = UDim2.new(if isBig then 0.95 else 0.8, 0, 0.38, 0)
+		holder.Parent = cell
+		local icon = Icons.make(holder, iconName, "★")
+		icon.Size = UDim2.fromScale(1, 1)
+
+		local amountLabel = Theme.label("Amount", cell, amount)
+		amountLabel.AnchorPoint = Vector2.new(0.5, 0)
+		amountLabel.Position = UDim2.new(0.5, 0, 0.38, 30)
+		amountLabel.Size = UDim2.new(1, -6, 0, 22)
+		amountLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+		local text = Theme.bodyText("Reward", cell, extra)
+		text.Position = UDim2.new(0, 3, 0.38, 54)
+		text.Size = UDim2.new(1, -6, 0.62, -58)
 		text.TextSize = 11
-		text.TextColor3 = Theme.COLORS.outline
+		text.TextColor3 = Theme.COLORS.text
 		text.TextXAlignment = Enum.TextXAlignment.Center
 
-		local mark = Theme.label("Mark", cell, "")
-		mark.AnchorPoint = Vector2.new(1, 1)
-		mark.Position = UDim2.new(1, -4, 1, -2)
-		mark.Size = UDim2.new(0, 20, 0, 20)
+		-- Abgeholt: Haken oben rechts
+		local mark = Icons.make(cell, "check", "✓")
+		mark.Name = "Mark"
+		mark.AnchorPoint = Vector2.new(1, 0)
+		mark.Position = UDim2.new(1, 4, 0, -6)
+		mark.Size = UDim2.fromOffset(24, 24)
+		mark.ZIndex = 4
+		mark.Visible = false
+
+		-- Heute abholbar: sanftes Pulsieren
+		local scale = Instance.new("UIScale")
+		scale.Parent = cell
+		_pulses[cell] = TweenService:Create(scale,
+			TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Scale = 1.06 })
 
 		table.insert(_cells, cell)
 	end

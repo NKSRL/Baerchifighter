@@ -25,6 +25,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
 
 local Theme        = require(script.Parent.Theme)
+local UiScale      = require(script.Parent.UiScale)
 local PanelManager = require(script.Parent.PanelManager)
 local Icons        = require(script.Parent.Icons)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
@@ -231,7 +232,7 @@ function MenuBar.init(screenGui: ScreenGui)
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
 	local function rescale()
-		local room = screenGui.AbsoluteSize.Y - 108 - 12
+		local room = UiScale.toGui(screenGui.AbsoluteSize.Y) - 108 - 12
 		scale.Scale = math.clamp(room / height, 0.55, 1)
 	end
 	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)

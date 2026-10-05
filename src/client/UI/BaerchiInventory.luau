@@ -57,6 +57,7 @@ local _footer: Frame?             = nil
 local _slotLabels: { TextLabel }  = {}
 local _fuseButton: TextButton?    = nil
 local _modeButton: TextButton?    = nil
+local _hint: TextLabel?           = nil
 local _listPage: Frame?           = nil
 local _tabButtons: { [string]: TextButton } = {}
 local _tab = "Pets"   -- "Pets" | "Index"
@@ -244,6 +245,13 @@ local function updateFooter()
 	if modeButton then
 		modeButton.Text = if _fusionMode then "Fusion: an" else "Fusion: aus"
 	end
+
+	local hint = _hint
+	if hint then
+		hint.Text = if _fusionMode
+			then "Zwei Baerchis derselben Rarity antippen"
+			else "Zeile antippen oeffnet die Karte"
+	end
 end
 
 function BaerchiInventory.refresh()
@@ -319,9 +327,17 @@ local function openInternal(...: any)
 
 	-- PanelManager.open("Inventory", "Index") springt direkt in den Index
 	-- (zum Beispiel aus einer Quest heraus).
-	local wanted = ...
+	local wanted, uid = ...
 	if wanted == "Index" or wanted == "Pets" then
 		_tab = wanted
+	elseif wanted == "Fuse" then
+		-- Playtest 05.10.: Fusion von der Baerchi-Karte aus. Das Fusions-
+		-- Fenster selbst hat keine Auswahl; ausgewaehlt wird hier. A ist
+		-- dieser Baerchi, B tippt der Spieler in der Liste an.
+		_tab = "Pets"
+		_fusionMode = true
+		table.clear(_selection)
+		if typeof(uid) == "string" then table.insert(_selection, uid) end
 	end
 
 	root.Visible = true
@@ -397,6 +413,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	_modeButton = modeButton
 
 	local hint = Theme.bodyText("Hint", toolbar, "Zeile antippen oeffnet die Karte")
+	_hint = hint
 	hint.Position       = UDim2.new(0, 140, 0, 0)
 	hint.Size           = UDim2.new(1, -140, 1, 0)
 	hint.TextYAlignment = Enum.TextYAlignment.Center
@@ -406,9 +423,6 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		if not _fusionMode then
 			table.clear(_selection)
 		end
-		hint.Text = if _fusionMode
-			then "Zwei Baerchis derselben Rarity antippen"
-			else "Zeile antippen oeffnet die Karte"
 		BaerchiInventory.refresh()
 	end)
 

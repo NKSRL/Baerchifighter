@@ -76,27 +76,48 @@ function PlotBuilder.buildPlotSign(plotModel: Model, slot: number, ownerName: st
 	local plotCFrame = MapParts.plotCFrame(slot)
 	local halfZ = MapConfig.PLOT_SIZE.Z * 0.5
 
-	local postY = MapParts.plotSurfaceOffset() + MapConfig.SIGN_POST_SIZE.Y * 0.5
-	local post = MapParts.newPart(
-		"SignPost",
-		MapConfig.SIGN_POST_SIZE,
-		plotCFrame * CFrame.new(0, postY, -halfZ + 2),
-		MapConfig.SIGN_POST_COLOR,
-		Enum.Material.Wood
-	)
-	post.CanCollide = false
-	post.Parent     = plotModel
+	local boardSize = MapConfig.SIGN_BOARD_SIZE
+	local postSize  = MapConfig.SIGN_POST_SIZE
 
-	local boardY = MapParts.plotSurfaceOffset() + MapConfig.SIGN_POST_SIZE.Y - MapConfig.SIGN_BOARD_SIZE.Y * 0.5
+	-- Zwei Pfosten an den Raendern, HINTER dem Brett (lokal +Z = weg von der
+	-- Mitte; die Schrift zeigt nach -Z). So verdeckt kein Pfosten die Schrift.
+	local postY = MapParts.plotSurfaceOffset() + postSize.Y * 0.5
+	local behind = boardSize.Z * 0.5 + postSize.Z * 0.5
+	for _, side in { -1, 1 } do
+		local post = MapParts.newPart(
+			"SignPost",
+			postSize,
+			plotCFrame * CFrame.new(side * (boardSize.X * 0.5 - postSize.X), postY, -halfZ + 2 + behind),
+			MapConfig.SIGN_POST_COLOR,
+			Enum.Material.Wood
+		)
+		post.CanCollide = false
+		post.Parent     = plotModel
+	end
+
+	local boardY = MapParts.plotSurfaceOffset() + postSize.Y - boardSize.Y * 0.5
 	local board = MapParts.newPart(
 		"SignBoard",
-		MapConfig.SIGN_BOARD_SIZE,
+		boardSize,
 		plotCFrame * CFrame.new(0, boardY, -halfZ + 2),
 		MapConfig.SIGN_COLOR,
 		Enum.Material.Wood
 	)
 	board.CanCollide = false
 	board.Parent     = plotModel
+
+	-- Dunkle Leisten oben und unten (Rahmen statt nacktem Brett)
+	for i, dy in { boardSize.Y * 0.5, -boardSize.Y * 0.5 } do
+		local trim = MapParts.newPart(
+			"SignTrim" .. i,
+			Vector3.new(boardSize.X + 0.6, 0.45, boardSize.Z + 0.2),
+			plotCFrame * CFrame.new(0, boardY + dy, -halfZ + 2),
+			MapConfig.SIGN_TRIM_COLOR,
+			Enum.Material.Wood
+		)
+		trim.CanCollide = false
+		trim.Parent     = plotModel
+	end
 
 	-- Die Schrift kommt auf die Seite, die zur Plattform-Mitte zeigt. Das ist
 	-- die lokale -Z-Seite des Plots und damit die Vorderseite des Boards.
@@ -107,12 +128,12 @@ function PlotBuilder.buildPlotSign(plotModel: Model, slot: number, ownerName: st
 	surface.Adornee     = board
 	surface.Parent      = board
 
-	local label = MapParts.newTextLabel("Owner", surface, UDim2.fromScale(1, 0.72), UDim2.fromScale(0, 0))
+	local label = MapParts.newTextLabel("Owner", surface, UDim2.fromScale(0.9, 0.56), UDim2.fromScale(0.05, 0.08))
 	label.TextColor3             = Color3.fromRGB(70, 50, 30)
 	label.TextStrokeTransparency = 1
 	label.Text                   = ownerName
 
-	local badge = MapParts.newTextLabel("TowerBadge", surface, UDim2.fromScale(1, 0.28), UDim2.fromScale(0, 0.72))
+	local badge = MapParts.newTextLabel("TowerBadge", surface, UDim2.fromScale(0.9, 0.28), UDim2.fromScale(0.05, 0.64))
 	badge.TextStrokeTransparency = 1
 	badge.Text                   = ""
 end

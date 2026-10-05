@@ -199,7 +199,9 @@ local EVENT_PIT_FENCE_INSET       = 1.6
 
 -- Anzeigetafel: anders als bei den Spieler-Arenen IMMER eingeblendet — sie
 -- ist der einzige Ort, an dem der Event-Countdown steht.
-local EVENT_PIT_BANNER_HEIGHT   = 16
+-- Playtest 05.10.: bei 16 lag die Tafel im Honigmast (Spitze ~33) und die
+-- Schrift lief durch ihn hindurch. 38 = Unterkante ueber dem Tropfen.
+local EVENT_PIT_BANNER_HEIGHT   = 38
 local EVENT_PIT_BANNER_SIZE     = Vector2.new(22, 6)
 local EVENT_PIT_BANNER_DISTANCE = 300
 local EVENT_PIT_BANNER_IDLE_COLOR = Color3.fromRGB(230, 220, 200)
@@ -244,7 +246,11 @@ local FENCE_COLOR        = Color3.fromRGB(225, 215, 190)
 
 -- Schild an der zur Mitte zeigenden Kante: zeigt, wem der Plot gehoert
 local SIGN_POST_SIZE  = Vector3.new(0.8, 7, 0.8)
-local SIGN_BOARD_SIZE = Vector3.new(16, 5, 0.6)
+-- Playtest 05.10.: 16 breit wirkte langgezogen, und EIN Pfosten in der Mitte
+-- ragte vorne durch die Schrift. Jetzt 12 breit, zwei Pfosten HINTER dem Brett
+-- an den Raendern, dunkle Leisten oben und unten.
+local SIGN_BOARD_SIZE = Vector3.new(12, 5.2, 0.6)
+local SIGN_TRIM_COLOR = Color3.fromRGB(150, 105, 60)
 local SIGN_POST_COLOR = Color3.fromRGB(150, 105, 60)
 local SIGN_COLOR      = Color3.fromRGB(245, 235, 205)
 
@@ -1286,6 +1292,7 @@ return {
 	SIGN_POST_SIZE  = SIGN_POST_SIZE,
 	SIGN_BOARD_SIZE = SIGN_BOARD_SIZE,
 	SIGN_POST_COLOR = SIGN_POST_COLOR,
+	SIGN_TRIM_COLOR = SIGN_TRIM_COLOR,
 	SIGN_COLOR      = SIGN_COLOR,
 
 	FLOWER_COUNT      = FLOWER_COUNT,

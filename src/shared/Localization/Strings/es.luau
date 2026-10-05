@@ -447,6 +447,8 @@ return {
 	["ui.profile.rebirths"]            = "Rebirths: {n}",
 	["ui.profile.index"]               = "Índice: {have}/{total}",
 	["ui.profile.top"]                 = "Mejores Baerchis:",
+	["ui.home.button"]                  = "Casa",
+	["ui.card.details"]                 = "Estadísticas",
 	["ui.daily.title"]                 = "Bono diario",
 	["ui.daily.day"]                   = "Día {day}",
 	["ui.daily.egg"]                   = "Huevo",

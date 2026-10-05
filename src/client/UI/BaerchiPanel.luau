@@ -535,7 +535,10 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	local root = Theme.panel("BaerchiPanel", screenGui, Theme.COLORS.panelDeep)
 	root.AnchorPoint = Vector2.new(0.5, 0.5)
 	root.Position    = UDim2.fromScale(0.5, 0.5)
-	root.Size        = UDim2.fromScale(0.46, 0.72)
+	-- Playtest 05.10.: die einspaltige Karte war zu schmal und lang. Jetzt
+	-- zwei Spalten: links wer der Baerchi ist und wie er staerker wird,
+	-- rechts Zustand, Werte, Eier und Aktionen.
+	root.Size        = UDim2.fromScale(0.72, 0.74)
 	root.Visible     = false
 	root.ZIndex      = 10
 
@@ -545,8 +548,8 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	-- noch fuer eine bequem lesbare Flaeche reichen, nicht mehr fuer JEDE
 	-- Zeile gleichzeitig.
 	local sizeConstraint = Instance.new("UISizeConstraint")
-	sizeConstraint.MinSize = Vector2.new(300, 420)
-	sizeConstraint.MaxSize = Vector2.new(500, 720)
+	sizeConstraint.MinSize = Vector2.new(560, 400)
+	sizeConstraint.MaxSize = Vector2.new(920, 680)
 	sizeConstraint.Parent  = root
 
 	-- Farbiger Rarity-Streifen am oberen Rand
@@ -564,16 +567,23 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	shell.Size     = UDim2.new(1, 0, 1, -16)
 	Theme.padding(shell, 14)
 
-	local body = Theme.scroller("Content", shell)
-	body.Size = UDim2.fromScale(1, 1)
-
-	local layout = Theme.listLayout(body, 6)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	-- Zwei Spalten, jede scrollt fuer sich. `row()` haengt an die Spalte, die
+	-- gerade in `column` steht (umgeschaltet vor dem Abschnitt "Zustand").
+	local leftColumn = Theme.scroller("Content", shell)
+	leftColumn.Size = UDim2.new(0.5, -6, 1, 0)
+	local rightColumn = Theme.scroller("ContentRight", shell)
+	rightColumn.Position = UDim2.new(0.5, 6, 0, 0)
+	rightColumn.Size = UDim2.new(0.5, -6, 1, 0)
+	for _, columnFrame in { leftColumn, rightColumn } do
+		local layout = Theme.listLayout(columnFrame, 6)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	end
+	local column: ScrollingFrame = leftColumn
 
 	local nextOrder = 0
 	local function row(height: number): Frame
 		nextOrder += 1
-		local entry = Theme.container("Row", body)
+		local entry = Theme.container("Row", column)
 		-- -8: Platz fuer den Scrollbalken, sonst ragt jede Zeile darunter
 		-- (Konvention aus Theme.scroller).
 		entry.Size        = UDim2.new(1, -8, 0, height)
@@ -659,8 +669,8 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 	-- HBB Paket 4: "Baerchi staerker machen" — Befoerdern (unten, wie bisher)
 	-- und Fusion an einer Stelle. Die Fusion oeffnet das bestehende
-	-- Fusions-Fenster mit diesem Baerchi vorgewaehlt; Services und Remotes
-	-- bleiben unveraendert.
+	-- Inventar im Fusions-Modus mit diesem Baerchi als A (Playtest 05.10.:
+	-- direkt ins Fusions-Fenster ging B nicht auszuwaehlen).
 	local upgradeRow = row(34)
 	upgradeRow.Visible = false
 	local fuse = Theme.button("UpgradeFuse", upgradeRow, "⬆ + 🐻", Theme.COLORS.gummy)
@@ -669,7 +679,8 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		local uid = _openUid
 		if not uid then return end
 		Unlock.markSeen("tab_upgrade")
-		PanelManager.open("Fusion", uid)
+		-- Auswahl des zweiten Baerchis passiert im Inventar (Fusions-Modus)
+		PanelManager.open("Inventory", "Fuse", uid)
 	end)
 	_upgradeRow = upgradeRow
 
@@ -739,6 +750,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	end)
 
 	-- ------------------------------------------------------------------- Werte
+	column = rightColumn
 	section("Zustand")
 
 	-- HP-Balken (steht bewusst ueber dem XP-Balken: ob der Baerchi kaempfen
@@ -756,17 +768,44 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	_xpFill = xp.fill
 	_xpText = xp.text
 
+	-- HBB Paket 4: Einzelwerte (ATK/SPD/PWR) und Stat-Stufen in einem
+	-- Aufklapper. Der Kampfwert oben ist die eine Zahl, die man meistens
+	-- braucht; wer es genau wissen will, klappt auf. Ohne UI_V2_UPGRADE_TAB
+	-- bleibt alles offen wie bisher.
+	local detailRows: { Frame } = {}
+	local toggleRow = row(26)
+	local toggle = Theme.button("DetailsToggle", toggleRow, "", Theme.COLORS.panelLight)
+	toggle.Size = UDim2.fromScale(1, 1)
+	toggle.TextColor3 = Theme.COLORS.text
+	local expanded = not FeatureFlags.isOn("UI_V2_UPGRADE_TAB")
+	toggleRow.Visible = not expanded
+	local function applyDetails()
+		toggle.Text = (if expanded then "▾  " else "▸  ") .. Loc.t("ui.card.details")
+		for _, detail in detailRows do
+			detail.Visible = expanded
+		end
+	end
+	toggle.Activated:Connect(function()
+		expanded = not expanded
+		applyDetails()
+	end)
+
 	-- Kampfwerte
 	local statsRow = row(22)
+	table.insert(detailRows, statsRow)
 	_statsLabel = Theme.label("Stats", statsRow, "—")
 	_statsLabel.Size      = UDim2.fromScale(1, 1)
 	_statsLabel.TextColor3 = Theme.COLORS.textDim
 
 	-- ------------------------------------------------------------- Stat-Level
-	section("Stat-Stufen (Event-Teilnahme)")
+	local statHeader = row(16)
+	table.insert(detailRows, statHeader)
+	local statHeaderLabel = Theme.sectionLabel("Section", statHeader, "Stat-Stufen (Event-Teilnahme)")
+	statHeaderLabel.Size = UDim2.fromScale(1, 1)
 
 	for _, key in PromotionConfig.ALL_STATS do
 		local statRow = row(20)
+		table.insert(detailRows, statRow)
 		local bar     = Theme.progress(statRow)
 		bar.track.Size = UDim2.new(1, 0, 1, 0)
 		bar.text.TextScaled = false
@@ -774,6 +813,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 		table.insert(_statRows, { key = key, fill = bar.fill, text = bar.text })
 	end
+	applyDetails()
 
 	-- Skill
 	section("Skill")

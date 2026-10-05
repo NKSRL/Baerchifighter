@@ -241,10 +241,15 @@ function WorldBuilder.buildEventPit(parent: Instance)
 	banner.Enabled     = true
 	banner.Parent      = anchor
 
-	local bannerTitle = MapParts.newTextLabel("Title", banner, UDim2.fromScale(1, 0.6), UDim2.fromScale(0, 0))
+	-- Drei feste Zeilen: Titel, Zeit, Belohnung. Die Zeit hat eine EIGENE
+	-- kurze Zeile: stand sie mit der Belohnung in einem Text, aenderte sich
+	-- dessen Breite jede Sekunde und TextScaled brach abwechselnd in eine und
+	-- zwei Zeilen um (Flackern, Playtest 05.10.).
+	local bannerTitle = MapParts.newTextLabel("Title", banner, UDim2.fromScale(1, 0.45), UDim2.fromScale(0, 0))
 	bannerTitle.Text  = "..."
 	bannerTitle.TextColor3 = MapConfig.EVENT_PIT_BANNER_IDLE_COLOR
-	MapParts.newTextLabel("Sub", banner, UDim2.fromScale(1, 0.4), UDim2.fromScale(0, 0.6))
+	MapParts.newTextLabel("Sub", banner, UDim2.fromScale(1, 0.3), UDim2.fromScale(0, 0.45))
+	MapParts.newTextLabel("Reward", banner, UDim2.fromScale(1, 0.25), UDim2.fromScale(0, 0.75))
 end
 
 -- Die ganze feste Welt: Wasser, Hauptinsel, die acht Plot-Inseln und die acht
