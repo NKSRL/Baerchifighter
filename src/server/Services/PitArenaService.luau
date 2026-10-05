@@ -63,6 +63,7 @@ local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
+local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 local MapConfig   = require(ReplicatedStorage.Config.MapConfig)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 local SkillConfig = require(ReplicatedStorage.Config.SkillConfig)
@@ -86,6 +87,18 @@ local FightBars       = require(ServerScriptService.Util.FightBars)
 local LOCK_HOLDER = "Kampf"
 
 local PitArenaService = {}
+
+-- HBB Paket 5 (MAP_V2_ARENA_SPRINT): auf dem Weg Plot <-> Arena sprintet der
+-- Baerchi (MapConfig.ARENA_WALK_SPEED) statt zu gehen — weniger Warten je Lauf.
+local function arenaWalkSpeed(): number
+	return if FeatureFlags.isOn("MAP_V2_ARENA_SPRINT") then MapConfig.ARENA_WALK_SPEED else MapConfig.WALK_SPEED
+end
+
+-- Gleich viele Hopser pro SEKUNDE wie beim Gehen, dafuer weitere: schnelleres
+-- Huepfen liest das Auge als Zittern (siehe MapConfig.WALK_BOB_PER_STUD).
+local function arenaBobPerStud(): number
+	return MapConfig.WALK_BOB_PER_STUD * MapConfig.WALK_SPEED / arenaWalkSpeed()
+end
 
 -- Laufende Wiedergabe pro Spieler. Startet ein neuer Lauf, wird der alte
 -- Token ungueltig und die alte Schleife beendet sich beim naechsten Schritt.
@@ -475,7 +488,8 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			-- Teleport. FigureWalker haelt den Fusspunkt waehrenddessen exakt
 			-- auf Plot-/Bruecken-Hoehe.
 			FigureWalker.walk(figure, homeFoot, selfPos, {
-				speed       = MapConfig.WALK_SPEED,
+				speed       = arenaWalkSpeed(),
+				bobPerStud  = arenaBobPerStud(),
 				isCancelled = function()
 					return not stillValid(player, token, figure, fighters) or recallWanted(player, token)
 				end,
@@ -494,7 +508,8 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				local box, size = figure:GetBoundingBox()
 				local here = Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
 				FigureWalker.walk(figure, here, homeFoot, {
-					speed       = MapConfig.WALK_SPEED,
+					speed       = arenaWalkSpeed(),
+					bobPerStud  = arenaBobPerStud(),
 					isCancelled = function() return not stillValid(player, token, figure, fighters) end,
 				})
 				return
@@ -833,7 +848,8 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				end
 
 				FigureWalker.walk(figure, finalSelfPos, homeFoot, {
-					speed       = MapConfig.WALK_SPEED,
+					speed       = arenaWalkSpeed(),
+					bobPerStud  = arenaBobPerStud(),
 					isCancelled = function() return not stillValid(player, token, figure, fighters) end,
 				})
 			end
@@ -876,6 +892,20 @@ end
 -- _home ist dafuer das richtige Signal: es wird exakt fuer die Dauer einer
 -- Wiedergabe gesetzt (startPlayback) und von restoreHome() wieder geleert,
 -- egal ob sie normal zu Ende lief oder abgebrochen wurde.
+-- HBB Paket 6: alle laufenden Laeufe fuer das Live-Kampf-Board (nur lesen).
+function PitArenaService.liveRuns(): { { name: string, towerId: string?, stage: number?, phase: string } }
+	local list = {}
+	for player, active in _active do
+		table.insert(list, {
+			name    = player.DisplayName,
+			towerId = active.run.towerId,
+			stage   = active.stage,
+			phase   = active.phase,
+		})
+	end
+	return list
+end
+
 function PitArenaService.isRunning(player: Player): boolean
 	return _home[player] ~= nil
 end

@@ -7,8 +7,8 @@
 | 2 Führung | Code fertig | nein |
 | 3 Freischaltung | Code fertig | nein |
 | 4 Upgrade/Kampfwert | Teil (kein echter Tab, kein Aufklapper) | nein |
-| 5 Map | Teil (Händler, Heim-Knopf); Schau-Turm, 3 Tafeln, Weg zur Arena offen | nein |
-| 6 Timer/Board | Teil (Timer, erste Pause); Live-Board offen | nein |
+| 5 Map | Code fertig (Händler, Heim-Knopf, Schau-Turm, 3 Tafeln, Arena-Sprint) – `docs/HBB_PAKET_5_6_MAP_2026-10-05.md` | nein |
+| 6 Timer/Board | Code fertig (Timer, erste Pause, Live-Board, Wespen-Nest) | nein |
 | 7 Boss-Stufen | Code fertig | nein |
 | 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. Charm-Gold: 12 Würfe/Tag (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
 | 9, 10 | offen; 9 braucht einen freigegebenen Entwurf, 10 teilt sich die 12 Würfe/Tag mit den Tages-Quests | – |

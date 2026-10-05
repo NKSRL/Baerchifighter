@@ -89,6 +89,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "UiStateService",     module = ServerScriptService.Services.UiStateService },
 	-- HBB Paket 5: Heim-Knopf (zurueck auf den eigenen Plot)
 	{ name = "HomeService",        module = ServerScriptService.Services.HomeService },
+	-- HBB Paket 6: Live-Kampf-Board auf der Hauptinsel
+	{ name = "LiveBoardService",   module = ServerScriptService.Services.LiveBoardService },
 
 	-- Kein Spiel-Service: die Studio-Test-Schnittstelle
 	{ name = "DebugService", module = ServerScriptService.Services.DebugService },

@@ -33,8 +33,10 @@ local FLAGS: { [string]: boolean } = {
 	MAP_V2_HOME       = true,
 	MAP_V2_SHOWCASE   = true,
 	MAP_V2_BOARDS     = true,
+	MAP_V2_ARENA_SPRINT = true,   -- Baerchi sprintet zur Arena und zurueck
 	-- Paket 6
 	MAP_V2_LIVE_BOARD = true,
+	MAP_V2_WASP_NEST  = true,
 	EVENT_V2_TIMER    = true,
 
 	-- Paket 7: Boss-Belohnung nach Stufen

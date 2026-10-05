@@ -261,11 +261,20 @@ end
 --
 -- Bewusst idempotent (FindFirstChild-Pruefung wie buildPlatform): ein
 -- Server-Neustart im selben Studio-Prozess soll keine zweiten Kopien anlegen.
--- v15: die Bestenlisten-Tafel auf der Hauptinsel (zwei Pfosten, ein Brett mit
--- SurfaceGui: Titel + LEADERBOARD_BOARD.lines Zeilen). Beschriftet wird sie von
--- LeaderboardService ueber MapService.writeLeaderboardBoard.
-function WorldBuilder.buildLeaderboardBoard(parent: Instance): BasePart
-	local cfg = MapConfig.LEADERBOARD_BOARD
+-- Eine Tafel auf der Hauptinsel (zwei Pfosten, ein Brett mit SurfaceGui:
+-- Titel + cfg.lines Zeilen), Schrift nach aussen. Beschriftet wird sie ueber
+-- MapService (Bestenliste: writeLeaderboardBoard, Live: writeLiveBoard).
+type BoardCfg = {
+	angleDegrees : number,
+	radius       : number,
+	size         : Vector3,
+	postHeight   : number,
+	color        : Color3,
+	textColor    : Color3,
+	lines        : number,
+}
+
+local function buildBoard(parent: Instance, name: string, cfg: BoardCfg): BasePart
 	local angle = math.rad(cfg.angleDegrees)
 	local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
 	local groundY = MapConfig.PLATFORM_TOP_Y
@@ -273,14 +282,14 @@ function WorldBuilder.buildLeaderboardBoard(parent: Instance): BasePart
 	local center = Vector3.new(base.X, groundY + cfg.postHeight + cfg.size.Y * 0.5, base.Z)
 	local frame = CFrame.lookAt(center, center + outward)
 
-	local board = MapParts.newPart("LeaderboardBoard", cfg.size, frame, cfg.color, Enum.Material.Wood)
+	local board = MapParts.newPart(name, cfg.size, frame, cfg.color, Enum.Material.Wood)
 	board.CanCollide = true
 	board.Parent = parent
 
 	for _, side in { -1, 1 } do
 		local postHeight = cfg.postHeight + cfg.size.Y
 		local post = MapParts.newPart(
-			"LeaderboardPost",
+			name .. "Post",
 			Vector3.new(0.8, postHeight, 0.8),
 			frame * CFrame.new(side * (cfg.size.X * 0.5 - 0.6), -cfg.size.Y * 0.5 - cfg.postHeight + postHeight * 0.5, 0.8),
 			cfg.color,
@@ -311,6 +320,77 @@ function WorldBuilder.buildLeaderboardBoard(parent: Instance): BasePart
 	end
 
 	return board
+end
+
+-- v15: die Bestenlisten-Tafel auf der Hauptinsel. HBB Paket 5: mit
+-- `angleDegrees`/`name` mehrfach (eine feste Tafel je Liste, siehe
+-- MapLayout.leaderboardBoards); ohne = die eine wechselnde Tafel wie bisher.
+function WorldBuilder.buildLeaderboardBoard(parent: Instance, angleDegrees: number?, name: string?): BasePart
+	local cfg = table.clone(MapConfig.LEADERBOARD_BOARD) :: any
+	cfg.angleDegrees = angleDegrees or cfg.angleDegrees
+	return buildBoard(parent, name or "LeaderboardBoard", cfg)
+end
+
+-- HBB Paket 6: Live-Kampf-Board (MapConfig.LIVE_BOARD)
+function WorldBuilder.buildLiveBoard(parent: Instance): BasePart
+	return buildBoard(parent, "LiveBoard", MapConfig.LIVE_BOARD :: any)
+end
+
+-- HBB Paket 6: Wespen-Nest am Honigmast (MapConfig.WASP_NEST). Koerper,
+-- zwei Streifen, Flugloch, darueber ein Schild mit der Zeit bis zum Boss.
+-- Teile: 4 + Schild-Anker. Leuchten schaltet MapService.setWaspNest um.
+function WorldBuilder.buildWaspNest(parent: Instance, center: Vector3): Model
+	local cfg = MapConfig.WASP_NEST
+	local nest = Instance.new("Model")
+	nest.Name = "WaspNest"
+
+	local function piece(name: string, shape: Enum.PartType, size: Vector3, frame: CFrame, color: Color3): BasePart
+		local part = MapParts.newPart(name, size, frame, color, Enum.Material.SmoothPlastic)
+		part.Shape      = shape
+		part.CanCollide = false
+		part.CanQuery   = false
+		part.CanTouch   = false
+		part.CastShadow = false
+		part.Parent     = nest
+		return part
+	end
+
+	local body = piece("Body", Enum.PartType.Ball, cfg.bodySize, CFrame.new(center), cfg.color)
+	body.Material = Enum.Material.Sand
+	for i, dy in { 0.8, -0.8 } do
+		piece("Stripe" .. i, Enum.PartType.Cylinder,
+			Vector3.new(0.35, cfg.bodySize.X * 0.98, cfg.bodySize.Z * 0.98),
+			CFrame.new(center + Vector3.new(0, dy, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			cfg.stripeColor)
+	end
+	-- Flugloch nach aussen (weg vom Mast)
+	local away = Vector3.new(cfg.offset.X, 0, cfg.offset.Z)
+	away = if away.Magnitude > 1e-3 then away.Unit else Vector3.new(1, 0, 0)
+	piece("Hole", Enum.PartType.Ball, Vector3.new(1.2, 1.2, 1.2),
+		CFrame.new(center + away * (cfg.bodySize.X * 0.47) + Vector3.new(0, -1.2, 0)),
+		cfg.stripeColor)
+
+	local anchor = MapParts.newPart("SignAnchor", Vector3.new(1, 1, 1),
+		CFrame.new(center + Vector3.new(0, cfg.bodySize.Y * 0.5 + cfg.signGap, 0)), cfg.glowColor, Enum.Material.SmoothPlastic)
+	anchor.Transparency = 1
+	anchor.CanCollide   = false
+	anchor.CanQuery     = false
+	anchor.CanTouch     = false
+	anchor.Parent       = nest
+
+	local sign = Instance.new("BillboardGui")
+	sign.Name        = "Sign"
+	sign.Size        = UDim2.fromScale(8, 2.2)
+	sign.AlwaysOnTop = false
+	sign.MaxDistance = cfg.signDistance
+	sign.Adornee     = anchor
+	sign.Parent      = anchor
+	local title = MapParts.newTextLabel("Title", sign, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0))
+	title.TextColor3 = cfg.glowColor
+	title.Text = ""
+
+	nest.Parent = parent
+	return nest
 end
 
 function WorldBuilder.buildGlobalLighting()

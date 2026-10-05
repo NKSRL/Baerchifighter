@@ -40,6 +40,9 @@ local MapService   = require(ServerScriptService.Services.MapService)
 
 local EventService = {}
 
+-- Das Boss-Event, auf das das Wespen-Nest zeigt (EventConfig.EVENTS)
+local WASP_QUEEN_ID = "WaspQueen"
+
 --------------------------------------------------------------------------------
 -- Zustand
 --------------------------------------------------------------------------------
@@ -206,6 +209,19 @@ local function tick()
 			string.format("in %s  •  %s", formatCountdown(remaining), EventConfig.describeReward(upcoming)),
 			MapConfig.EVENT_PIT_BANNER_IDLE_COLOR
 		)
+	end
+
+	-- HBB Paket 6: Wespen-Nest am Mast zaehlt bis zur Koenigin herunter
+	-- (sprachneutral: Biene + Uhr) und leuchtet kurz davor und waehrenddessen.
+	if FeatureFlags.isOn("MAP_V2_WASP_NEST") then
+		local activeId = if _active then _active.id else nil
+		local untilBoss = EventConfig.secondsUntilStart(WASP_QUEEN_ID, activeId, remaining, _nextIndex, _nextCycle)
+		if untilBoss then
+			MapService.setWaspNest(
+				if untilBoss == 0 then "🐝 LIVE" else "🐝 " .. formatCountdown(untilBoss),
+				untilBoss <= MapConfig.WASP_NEST.glowSeconds
+			)
+		end
 	end
 end
 

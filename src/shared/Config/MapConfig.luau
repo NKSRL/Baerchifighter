@@ -942,7 +942,62 @@ local TOWER_SHOWCASE = {
 	plinthHeight = 1.2,
 	signGap      = 2.5,     -- Schild ueber der Spitze
 	signDistance = 260,
+	-- HBB Paket 5 (MAP_V2_SHOWCASE): der Turm steht am BRUECKENKOPF auf der
+	-- Hauptinsel, wo alle vorbeilaufen, statt draussen auf der Arena-Insel.
+	-- In Steg-Koordinaten: `along` = Abstand zur Weltmitte entlang des
+	-- eigenen Stegs, `across` = seitlich davon (zum naechsten Plot hin).
+	-- 18 haelt Steg (6), Laternen (7,5 bei r 100) und Deko-Gasse (15) frei;
+	-- 106 + Sockelradius bleibt unter dem Inselrand (120).
+	bridgeheadAlong  = 106,
+	bridgeheadAcross = 18,
 }
+
+-- HBB Paket 5 (MAP_V2_BOARDS): drei FESTE Bestenlisten-Tafeln statt einer
+-- wechselnden. Je eine in einer Luecke zwischen zwei Stegen (Mitte der
+-- Luecke = 22,5 + k x 45 Grad), verteilt, damit jeder Plot eine in der
+-- Naehe hat. 67,5 ist der Ei-Haendler, 202,5 das Live-Kampf-Board.
+-- Masse wie LEADERBOARD_BOARD.
+local LEADERBOARD_BOARDS_V2: { { listId: string, angleDegrees: number } } = {
+	{ listId = "Tower",      angleDegrees = 22.5 },
+	{ listId = "Rebirths",   angleDegrees = 157.5 },
+	{ listId = "Collection", angleDegrees = 292.5 },
+}
+
+-- HBB Paket 6 (MAP_V2_LIVE_BOARD): Tafel "LIVE" auf der Hauptinsel. Zeigt,
+-- wer gerade in welchem Tower kaempft — Zuschauen ohne Hinlaufen, und ein
+-- Grund, selbst einen Lauf zu starten. Bau wie die Bestenlisten-Tafel.
+local LIVE_BOARD = {
+	angleDegrees = 202.5,
+	radius       = 80,
+	size         = Vector3.new(20, 11, 0.8),
+	postHeight   = 3,
+	color        = Color3.fromRGB(60, 42, 30),
+	textColor    = Color3.fromRGB(255, 236, 190),
+	liveColor    = Color3.fromRGB(255, 90, 70),
+	lines        = 8,
+	refreshSeconds = 1,
+}
+
+-- HBB Paket 6 (MAP_V2_WASP_NEST): Wespen-Nest am Honigmast. Zeigt die Zeit
+-- bis zur naechsten Wespenkoenigin (Termin-Gefuehl: "in 12 min ist Boss")
+-- und leuchtet in den letzten `glowSeconds` vor dem Boss und waehrenddessen.
+-- `offset` relativ zum Mast-Fuss (Weltmitte, PLATFORM_TOP_Y): seitlich am
+-- Mast (Radius 0,9) zwischen Wimpeln (bis y 11,8) und oberem Querholz (y 19).
+local WASP_NEST = {
+	offset       = Vector3.new(3.0, 16.0, 0),
+	bodySize     = Vector3.new(4.2, 5.0, 4.2),
+	color        = Color3.fromRGB(196, 168, 120),
+	stripeColor  = Color3.fromRGB(70, 52, 34),
+	glowColor    = Color3.fromRGB(255, 190, 40),
+	glowSeconds  = 300,
+	signGap      = 2.5,
+	signDistance = 320,
+}
+
+-- HBB Paket 5 (MAP_V2_ARENA_SPRINT): der Baerchi sprintet den Weg zwischen
+-- Plot und Arena (hin und zurueck) statt zu gehen — kuerzere Wartezeit pro
+-- Lauf, ohne die Weltgeometrie (Stege, Inselringe) anzufassen.
+local ARENA_WALK_SPEED = 21
 
 export type TowerLook = {
 	floor : { DecorPiece },   -- Teile EINER Etage (relativ zur Etagen-Unterkante)
@@ -1326,6 +1381,10 @@ return {
 
 	TOWER_SHOWCASE = TOWER_SHOWCASE,
 	LEADERBOARD_BOARD = LEADERBOARD_BOARD,
+	LEADERBOARD_BOARDS_V2 = LEADERBOARD_BOARDS_V2,
+	LIVE_BOARD = LIVE_BOARD,
+	WASP_NEST = WASP_NEST,
+	ARENA_WALK_SPEED = ARENA_WALK_SPEED,
 	TOWER_LOOKS    = TOWER_LOOKS,
 
 	PIT_TOWER_STEP_HEIGHT = PIT_TOWER_STEP_HEIGHT,
