@@ -639,4 +639,34 @@ return {
 	["msg.incubator.start"] = "Ei liegt im Inkubator",
 	["msg.incubator.speedup"] = "Fertig gebrütet!",
 	["msg.incubator.upgrade"] = "Inkubator verbessert",
+	-- Sammel-Update 05.10.2026
+	["guide.hatch"] = "Öffne ein Ei — darin wartet dein erster Baerchi!",
+	["guide.fight"] = "Schick deinen Baerchi in den Tower — jede Stage bringt Gummies.",
+	["guide.collect"] = "Sammle die gelegten Eier auf deinem Plot ein.",
+	["guide.merchant"] = "Kauf beim Ei-Händler ein neues Ei.",
+	["guide.combs"] = "Hol Waben aus der Mitte und bring sie zu deinem Recycler — das gibt Gummies.",
+	["guide.upgrade"] = "Verbessere dein Honig-Gebäude: mehr Honig = mehr XP für deinen Baerchi.",
+	["guide.event"] = "Event in der Mitte: dein Baerchi wird dort stärker.",
+	["ui.menu.building"] = "Verbessern",
+	-- Sammel-Update 05.10.2026
+	["hint.gummies"] = "Gummies! Damit verbesserst du Gebäude und baust den Inkubator aus.",
+	["hint.gold"] = "GoldGummies! Damit würfelst du Charms und beschleunigst den Inkubator.",
+	-- Sammel-Update 05.10.2026
+	["ui.building.why"] = "Verbessern = mehr Honig. Mehr Honig = mehr XP = dein Baerchi schafft höhere Stages.",
+	["ui.building.honey_head"] = "Honig im Lager",
+	["ui.building.now_head"] = "Was es kann",
+	["ui.building.next_head"] = "Nächste Stufe",
+	["ui.building.upgrade_button"] = "VERBESSERN",
+	["ui.building.max"] = "Höchste Stufe erreicht.",
+	-- Sammel-Update 05.10.2026
+	["ui.stats.help"] = "❤ HP: wie viel er aushält\n⚔ ATK: Schaden pro Treffer\n⚡ SPD: wie oft er zuschlägt\n✨ PWR: Stärke seiner Fähigkeit\n🥚 EGG: wie schnell er Eier legt",
+	["ui.stats.levels_head"] = "Stat-Stufen (Event-Teilnahme)",
+	-- Sammel-Update 05.10.2026
+	["area.pit"] = "Event · Waben",
+	["area.merchant"] = "Ei-Händler",
+	["area.live"] = "Live-Kämpfe",
+	["area.pond"] = "Honig-Teich",
+	["area.recycler"] = "Waben-Recycler",
+	["area.incubator"] = "Ei-Inkubator",
+	["area.arena"] = "Tower-Arena",
 }

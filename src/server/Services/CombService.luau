@@ -55,6 +55,7 @@ local CombSlots   = require(ServerScriptService.Util.CombSlots)
 
 local MapService          = require(ServerScriptService.Services.MapService)
 local CombRecyclerService = require(ServerScriptService.Services.CombRecyclerService)
+local PlayerService = require(ServerScriptService.Services.PlayerService)   -- Sammel-Update 3.5
 
 local CombService = {}
 
@@ -412,6 +413,14 @@ local function deliver(player: Player)
 	-- geladen), behaelt der Spieler seinen Stapel und es wird beim naechsten
 	-- Takt erneut versucht.
 	if not CombRecyclerService.deposit(player, units) then return end
+
+	-- Sammel-Update 05.10. (Paket 3.5): Zaehler fuer die Einfuehrung
+	-- ("Waben im Recycler abgeben"). Monoton, im Spielstand.
+	local data = PlayerService.getData(player)
+	if data then
+		local stats = data.stats :: any
+		stats.totalCombsDelivered = (stats.totalCombsDelivered or 0) + count
+	end
 
 	-- Jede abgegebene Wabe kommt nach der Respawn-Zeit zurueck ins Pit.
 	local delay = CombConfig.getRespawnDelay(CombRecyclerService.getLevel(player))

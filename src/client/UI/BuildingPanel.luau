@@ -227,9 +227,16 @@ local function buildMenu(
 		return frame
 	end
 
+	-- Sammel-Update 3.6: ein Satz, was Verbessern bringt
+	local whyRow = row(34)
+	local whyText = Theme.bodyText("Why", whyRow, Loc.t("ui.building.why"))
+	whyText.Size = UDim2.fromScale(1, 1)
+	whyText.TextColor3 = Theme.COLORS.goldGummy
+	Loc.onChanged(function() whyText.Text = Loc.t("ui.building.why") end)
+
 	-- Honig-Balken: der Wert, den man beim Reinschauen zuerst sucht.
 	local honeyHead = row(18)
-	Theme.sectionLabel("HoneyHead", honeyHead, "Honig im Lager", accent).Size = UDim2.fromScale(1, 1)
+	Theme.sectionLabel("HoneyHead", honeyHead, Loc.t("ui.building.honey_head"), accent).Size = UDim2.fromScale(1, 1)
 
 	local honeyRow  = row(26)
 	local honeyBar  = Theme.progress(honeyRow, accent)
@@ -237,7 +244,7 @@ local function buildMenu(
 
 	-- Was das Gebaeude JETZT kann
 	local nowHead = row(18)
-	Theme.sectionLabel("NowHead", nowHead, "Was es kann", accent).Size = UDim2.fromScale(1, 1)
+	Theme.sectionLabel("NowHead", nowHead, Loc.t("ui.building.now_head"), accent).Size = UDim2.fromScale(1, 1)
 
 	local nowRow  = row(38)
 	local nowText = Theme.bodyText("Now", nowRow, "")
@@ -246,7 +253,7 @@ local function buildMenu(
 
 	-- Was die naechste Stufe braechte
 	local nextHead = row(18)
-	Theme.sectionLabel("NextHead", nextHead, "Naechste Stufe", accent).Size = UDim2.fromScale(1, 1)
+	Theme.sectionLabel("NextHead", nextHead, Loc.t("ui.building.next_head"), accent).Size = UDim2.fromScale(1, 1)
 
 	local nextRow  = row(38)
 	local nextText = Theme.bodyText("Next", nextRow, "")
@@ -266,7 +273,7 @@ local function buildMenu(
 
 	-- Die Knoepfe ganz unten, in der Reihenfolge, in der man sie braucht.
 	local upgradeRow = row(44)
-	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, "AUSBAUEN", accent)
+	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, Loc.t("ui.building.upgrade_button"), accent)
 	upgrade.Size = UDim2.new(1, 0, 1, 0)
 	upgrade.Activated:Connect(onUpgrade)
 
@@ -333,7 +340,7 @@ local function refreshBuilding(buildingId: Types.BuildingId)
 		menu.upgrade.Text = "AUSBAUEN"
 		Theme.setEnabled(menu.upgrade, affordable)
 	else
-		menu.nextText.Text        = "Hoechste Stufe erreicht."
+		menu.nextText.Text        = Loc.t("ui.building.max")
 		menu.priceText.Text       = ""
 		menu.upgrade.Text         = "VOLL AUSGEBAUT"
 		Theme.setEnabled(menu.upgrade, false)

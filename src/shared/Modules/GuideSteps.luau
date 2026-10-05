@@ -20,7 +20,10 @@
 -- Keine requires: das Modul laeuft unveraendert im Luau-Test
 -- (tools/luau-tests/guide_steps.test.lua).
 
-export type Step = "hatch" | "fight" | "collect" | "merchant" | "event"
+-- Sammel-Update 05.10. (Paket 3.5): Einsteiger-Kette Ei oeffnen -> kaempfen ->
+-- Waben holen und im Recycler abgeben -> Gebaeude verbessern -> Event. Jeder
+-- Schritt bekommt im Client einen Satz, was er bringt ("guide.<step>").
+export type Step = "hatch" | "fight" | "collect" | "merchant" | "combs" | "upgrade" | "event"
 
 -- Nur die Felder, die hier gelesen werden. PlayerDataUpdate (Client) und
 -- PlayerData (Server) passen beide hinein.
@@ -31,10 +34,12 @@ export type View = {
 		eggStock      : { [string]: number },
 		laidEggs      : { any },
 		towerProgress : { [string]: number }?,
+		buildings     : { [string]: { level: number } }?,   -- Sammel-Update 3.5
+		recycler      : { level: number }?,
 	},
 	towers : { records: { [string]: number } }?,
 	quests : { chainDone: number }?,
-	stats  : { totalEventsCompleted: number? }?,
+	stats  : { totalEventsCompleted: number?, totalCombsDelivered: number? }?,
 	gummies : number?,
 }
 
@@ -72,6 +77,16 @@ function GuideSteps.hasFought(view: View): boolean
 	local towers = view.towers
 	if towers and not isEmpty(towers.records) then return true end
 	return not isEmpty(view.island.towerProgress)
+end
+
+-- Sammel-Update 3.5: irgendein Gebaeude (oder der Recycler) ueber Level 1.
+function GuideSteps.hasUpgraded(view: View): boolean
+	local recycler = view.island.recycler
+	if recycler and (recycler.level or 1) > 1 then return true end
+	for _, building in view.island.buildings or {} do
+		if (building.level or 1) > 1 then return true end
+	end
+	return false
 end
 
 function GuideSteps.eventsDone(view: View): number
@@ -113,7 +128,18 @@ function GuideSteps.current(view: View, options: Options?): Step?
 		return "collect"
 	end
 
-	-- 4. Erstes Event
+	-- 4. Sammel-Update 3.5: Waben holen und im Recycler abgeben
+	local stats = view.stats
+	if onboarding and stats and (stats.totalCombsDelivered or 0) == 0 then
+		return "combs"
+	end
+
+	-- 5. Sammel-Update 3.5: ein Gebaeude verbessern
+	if onboarding and not GuideSteps.hasUpgraded(view) then
+		return "upgrade"
+	end
+
+	-- 6. Erstes Event (der Client zeigt diesen Schritt nur kurz, Paket 3.2)
 	if onboarding then
 		return "event"
 	end

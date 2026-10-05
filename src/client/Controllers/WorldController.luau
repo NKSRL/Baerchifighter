@@ -316,9 +316,9 @@ local function hookOwnedPart(instance: BasePart)
 	-- niemand mehr.
 	local buildingId = instance.Name
 
-	-- Sammel-Update 2.6: am Honig-Teich keine Klick-Aufforderung mehr. Der
-	-- Ausbau bleibt ueber die Gebaeude-Kachel erreichbar.
-	if buildingId == "HoneyPond" then return end
+	-- Sammel-Update 2.6: am Honig-Teich gibt es kein Schild und kein
+	-- "Honig essen"-Klicken mehr (der Baerchi isst selbst). Der Prompt hier
+	-- ist nur noch "Verbessern" — dazu die Gebaeude-Kachel rechts (MenuBar).
 
 	local function attach()
 		addPrompt(instance, "OpenPanel", Loc.t("ui.building.prompt_upgrade"), Loc.name("building." .. buildingId .. ".name", buildingId), Enum.KeyCode.E, function()

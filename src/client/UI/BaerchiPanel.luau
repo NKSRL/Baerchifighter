@@ -375,7 +375,8 @@ local function fill(baerchi: Types.Baerchi)
 		-- Eine Verteidigung gibt es nicht mehr (siehe BaerchiConfig): die drei
 		-- Zahlen, die einen Kampf entscheiden, sind Schaden pro Treffer,
 		-- Angriffstempo und Ability-Staerke.
-		_statsLabel.Text = string.format("ATK %d    SPD %.2f    PWR %d%%",
+		-- Sammel-Update 3.7: Symbole vor den Kuerzeln
+		_statsLabel.Text = string.format("⚔ ATK %d   ⚡ SPD %.2f   ✨ PWR %d%%",
 			stats.atk, stats.spd, math.floor(stats.pwr * 100 + 0.5))
 	end
 
@@ -822,13 +823,30 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	local statsRow = row(22)
 	table.insert(detailRows, statsRow)
 	_statsLabel = Theme.label("Stats", statsRow, "—")
-	_statsLabel.Size      = UDim2.fromScale(1, 1)
+	_statsLabel.Size      = UDim2.new(1, -34, 1, 0)
 	_statsLabel.TextColor3 = Theme.COLORS.textDim
+
+	-- Sammel-Update 05.10. (Paket 3.7, "Stats sind unintuitiv"): "?" zeigt
+	-- je Stat einen kurzen Satz. Kein Dauertext, nur auf Antippen.
+	local statHelpButton = Theme.button("StatHelp", statsRow, "?", Theme.COLORS.panelLight)
+	statHelpButton.AnchorPoint = Vector2.new(1, 0.5)
+	statHelpButton.Position = UDim2.new(1, 0, 0.5, 0)
+	statHelpButton.Size = UDim2.fromOffset(30, 22)
+	statHelpButton.TextColor3 = Theme.COLORS.text
+	local helpRow = row(96)
+	helpRow.Visible = false
+	local helpText = Theme.bodyText("StatHelpText", helpRow, Loc.t("ui.stats.help"))
+	helpText.Size = UDim2.fromScale(1, 1)
+	helpText.TextColor3 = Theme.COLORS.text
+	statHelpButton.Activated:Connect(function()
+		helpText.Text = Loc.t("ui.stats.help")
+		helpRow.Visible = not helpRow.Visible
+	end)
 
 	-- ------------------------------------------------------------- Stat-Level
 	local statHeader = row(16)
 	table.insert(detailRows, statHeader)
-	local statHeaderLabel = Theme.sectionLabel("Section", statHeader, "Stat-Stufen (Event-Teilnahme)")
+	local statHeaderLabel = Theme.sectionLabel("Section", statHeader, Loc.t("ui.stats.levels_head"))
 	statHeaderLabel.Size = UDim2.fromScale(1, 1)
 
 	for _, key in PromotionConfig.ALL_STATS do

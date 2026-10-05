@@ -72,8 +72,13 @@ local _rewardIcon: Frame? = nil
 local _rewardLabel: TextLabel? = nil
 local _claimCheck: GuiObject? = nil
 
+-- Sammel-Update 05.10. (Paket 3.10, "Quest-UI am Anfang schwierig"): die
+-- ERSTE Kettenquest steht immer gross mit Volltext und Fortschritt da, die
+-- Tages-Quests erscheinen erst nach ihrem Abschluss.
+local _firstQuest = false
+
 local function compact(): boolean
-	return FeatureFlags.isOn("UI_V2_GUIDE") and not _expanded
+	return FeatureFlags.isOn("UI_V2_GUIDE") and not _expanded and not _firstQuest
 end
 
 local function setIcon(holder: Frame?, name: string, fallback: string)
@@ -97,6 +102,7 @@ local function refresh(data: Types.PlayerDataUpdate)
 	end
 
 	local chain = quests.chain
+	_firstQuest = quests.chainDone == 0 and chain ~= nil
 	if chain then
 		local done = chain.progress >= chain.target
 		header.Text = Loc.t("ui.quest.header", { done = quests.chainDone + 1, total = quests.chainTotal })
@@ -151,6 +157,7 @@ local function refresh(data: Types.PlayerDataUpdate)
 	end
 
 	local doneCount, claimable = dailyReady(quests)
+	daily.Visible = not _firstQuest   -- Paket 3.10: erst nach der ersten Quest
 	-- v15: ist der Login-Bonus noch nicht abgeholt, zeigt der untere Knopf
 	-- darauf (und oeffnet das Bonus-Fenster statt der Quests).
 	local bonusOpen = data.daily ~= nil and data.daily.claimable

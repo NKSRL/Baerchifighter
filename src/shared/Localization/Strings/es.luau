@@ -632,4 +632,34 @@ return {
 	["msg.incubator.start"] = "Huevo puesto en la incubadora",
 	["msg.incubator.speedup"] = "¡Incubación lista!",
 	["msg.incubator.upgrade"] = "Incubadora mejorada",
+	-- Sammel-Update 05.10.2026
+	["guide.hatch"] = "¡Abre un huevo — tu primer Baerchi te espera dentro!",
+	["guide.fight"] = "Envía a tu Baerchi a la torre — cada fase da Gummies.",
+	["guide.collect"] = "Recoge los huevos puestos en tu parcela.",
+	["guide.merchant"] = "Compra un huevo nuevo en el vendedor.",
+	["guide.combs"] = "Coge panales del centro y llévalos a tu reciclador — eso da Gummies.",
+	["guide.upgrade"] = "Mejora tu edificio de miel: más miel = más XP para tu Baerchi.",
+	["guide.event"] = "Evento en el centro: allí tu Baerchi se hace más fuerte.",
+	["ui.menu.building"] = "Mejorar",
+	-- Sammel-Update 05.10.2026
+	["hint.gummies"] = "¡Gummies! Sirven para mejorar edificios y la incubadora.",
+	["hint.gold"] = "¡GoldGummies! Sirven para tirar charms y acelerar la incubadora.",
+	-- Sammel-Update 05.10.2026
+	["ui.building.why"] = "Mejorar = más miel. Más miel = más XP = tu Baerchi llega a fases más altas.",
+	["ui.building.honey_head"] = "Miel en el almacén",
+	["ui.building.now_head"] = "Lo que hace",
+	["ui.building.next_head"] = "Siguiente nivel",
+	["ui.building.upgrade_button"] = "MEJORAR",
+	["ui.building.max"] = "Nivel máximo alcanzado.",
+	-- Sammel-Update 05.10.2026
+	["ui.stats.help"] = "❤ HP: cuánto aguanta\n⚔ ATK: daño por golpe\n⚡ SPD: con qué frecuencia ataca\n✨ PWR: fuerza de su habilidad\n🥚 EGG: qué tan rápido pone huevos",
+	["ui.stats.levels_head"] = "Niveles de estadísticas (eventos)",
+	-- Sammel-Update 05.10.2026
+	["area.pit"] = "Evento · Panales",
+	["area.merchant"] = "Tienda de huevos",
+	["area.live"] = "Combates en vivo",
+	["area.pond"] = "Estanque de miel",
+	["area.recycler"] = "Reciclador de panales",
+	["area.incubator"] = "Incubadora de huevos",
+	["area.arena"] = "Arena de la torre",
 }

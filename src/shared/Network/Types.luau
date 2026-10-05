@@ -545,6 +545,9 @@ export type PlayerData = {
 		-- Sammel-Update 05.10. (Paket 6.2): Boss-Siege mit eigenem Schaden
 		-- (besonderer Meilenstein "erster Boss-Sieg"). Alte Staende starten bei 0.
 		bossVictories : number,
+		-- Sammel-Update 05.10. (Paket 3.5): im Recycler abgegebene Waben
+		-- (Einfuehrung "Waben abgeben"). Alte Staende starten bei 0.
+		totalCombsDelivered : number,
 	},
 
 	-- v13: Index. Jede configId, die der Spieler je besessen hat (auch nach
@@ -1060,6 +1063,7 @@ local function createDefaultPlayerData(): PlayerData
 			totalHatched        = 0,
 			totalEventsCompleted = 0,
 			bossVictories        = 0,   -- v16: Paket 6.2
+			totalCombsDelivered  = 0,   -- v16: Paket 3.5
 			sessions             = 0,   -- HBB Paket 10: Sitzungen (Shop ab der 2.)
 		},
 

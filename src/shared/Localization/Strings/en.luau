@@ -631,4 +631,34 @@ return {
 	["msg.incubator.start"] = "Egg placed in the incubator",
 	["msg.incubator.speedup"] = "Done hatching!",
 	["msg.incubator.upgrade"] = "Incubator upgraded",
+	-- Sammel-Update 05.10.2026
+	["guide.hatch"] = "Open an egg — your first Baerchi is waiting inside!",
+	["guide.fight"] = "Send your Baerchi into the tower — every stage pays Gummies.",
+	["guide.collect"] = "Collect the eggs laid on your plot.",
+	["guide.merchant"] = "Buy a new egg at the egg merchant.",
+	["guide.combs"] = "Grab combs in the middle and bring them to your recycler — that pays Gummies.",
+	["guide.upgrade"] = "Upgrade your honey building: more honey = more XP for your Baerchi.",
+	["guide.event"] = "Event in the middle: your Baerchi gets stronger there.",
+	["ui.menu.building"] = "Upgrade",
+	-- Sammel-Update 05.10.2026
+	["hint.gummies"] = "Gummies! Use them to upgrade buildings and the incubator.",
+	["hint.gold"] = "GoldGummies! Use them to roll charms and speed up the incubator.",
+	-- Sammel-Update 05.10.2026
+	["ui.building.why"] = "Upgrade = more honey. More honey = more XP = your Baerchi clears higher stages.",
+	["ui.building.honey_head"] = "Honey in storage",
+	["ui.building.now_head"] = "What it does",
+	["ui.building.next_head"] = "Next level",
+	["ui.building.upgrade_button"] = "UPGRADE",
+	["ui.building.max"] = "Maximum level reached.",
+	-- Sammel-Update 05.10.2026
+	["ui.stats.help"] = "❤ HP: how much it can take\n⚔ ATK: damage per hit\n⚡ SPD: how often it attacks\n✨ PWR: strength of its ability\n🥚 EGG: how fast it lays eggs",
+	["ui.stats.levels_head"] = "Stat levels (events)",
+	-- Sammel-Update 05.10.2026
+	["area.pit"] = "Event · Combs",
+	["area.merchant"] = "Egg Shop",
+	["area.live"] = "Live Fights",
+	["area.pond"] = "Honey Pond",
+	["area.recycler"] = "Comb Recycler",
+	["area.incubator"] = "Egg Incubator",
+	["area.arena"] = "Tower Arena",
 }

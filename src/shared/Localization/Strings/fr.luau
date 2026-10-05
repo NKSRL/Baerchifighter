@@ -632,4 +632,34 @@ return {
 	["msg.incubator.start"] = "Œuf placé dans l'incubateur",
 	["msg.incubator.speedup"] = "Éclosion terminée !",
 	["msg.incubator.upgrade"] = "Incubateur amélioré",
+	-- Sammel-Update 05.10.2026
+	["guide.hatch"] = "Ouvre un œuf — ton premier Baerchi t'attend !",
+	["guide.fight"] = "Envoie ton Baerchi dans la tour — chaque étape rapporte des Gummies.",
+	["guide.collect"] = "Ramasse les œufs pondus sur ton terrain.",
+	["guide.merchant"] = "Achète un nouvel œuf chez le marchand.",
+	["guide.combs"] = "Prends des rayons au centre et apporte-les à ton recycleur — ça rapporte des Gummies.",
+	["guide.upgrade"] = "Améliore ton bâtiment à miel : plus de miel = plus d'XP pour ton Baerchi.",
+	["guide.event"] = "Événement au centre : ton Baerchi y devient plus fort.",
+	["ui.menu.building"] = "Améliorer",
+	-- Sammel-Update 05.10.2026
+	["hint.gummies"] = "Des Gummies ! Ils servent à améliorer les bâtiments et l'incubateur.",
+	["hint.gold"] = "Des GoldGummies ! Ils servent à lancer des charms et accélérer l'incubateur.",
+	-- Sammel-Update 05.10.2026
+	["ui.building.why"] = "Améliorer = plus de miel. Plus de miel = plus d'XP = ton Baerchi va plus haut.",
+	["ui.building.honey_head"] = "Miel en réserve",
+	["ui.building.now_head"] = "Ce qu'il fait",
+	["ui.building.next_head"] = "Niveau suivant",
+	["ui.building.upgrade_button"] = "AMÉLIORER",
+	["ui.building.max"] = "Niveau maximum atteint.",
+	-- Sammel-Update 05.10.2026
+	["ui.stats.help"] = "❤ HP : ce qu'il encaisse\n⚔ ATK : dégâts par coup\n⚡ SPD : fréquence d'attaque\n✨ PWR : puissance de sa capacité\n🥚 EGG : vitesse de ponte",
+	["ui.stats.levels_head"] = "Niveaux de stats (événements)",
+	-- Sammel-Update 05.10.2026
+	["area.pit"] = "Événement · Rayons",
+	["area.merchant"] = "Marchand d'œufs",
+	["area.live"] = "Combats en direct",
+	["area.pond"] = "Étang de miel",
+	["area.recycler"] = "Recycleur de rayons",
+	["area.incubator"] = "Incubateur d'œufs",
+	["area.arena"] = "Arène de la tour",
 }

@@ -56,6 +56,7 @@ local UiEventLogger      = require(Controllers:WaitForChild("UiEventLogger"))
 local GuideController    = require(Controllers:WaitForChild("GuideController"))
 local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
 local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
+local AreaSignController    = require(Controllers:WaitForChild("AreaSignController"))    -- Sammel-Update 3.8
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
@@ -84,6 +85,7 @@ local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
 local HomeButton       = require(UI:WaitForChild("HomeButton"))
 local RebirthButton    = require(UI:WaitForChild("RebirthButton"))   -- Sammel-Update 2.7
 local IncubatorPanel   = require(UI:WaitForChild("IncubatorPanel"))  -- Sammel-Update 8
+local CurrencyHint     = require(UI:WaitForChild("CurrencyHint"))    -- Sammel-Update 3.4
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -147,6 +149,7 @@ ReturnSummary.init(screenGui)
 -- HBB Paket 5: Heim-Knopf (erscheint nur weit weg vom eigenen Plot)
 HomeButton.init(screenGui)
 RebirthButton.init(screenGui)   -- Sammel-Update 2.7: fester Rebirth-Knopf
+CurrencyHint.init(screenGui)    -- Sammel-Update 3.4: Waehrungs-Hinweise
 
 -- v13: Quest-Karte links (braucht das Quest-Fenster, das oben angemeldet wird)
 QuestTracker.init(screenGui)
@@ -158,6 +161,7 @@ ResultFeed.init()
 WorldController.init()
 EggTimerController.init()
 IncubatorController.init()   -- Sammel-Update Paket 8
+AreaSignController.init()    -- Sammel-Update Paket 3.8
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
 -- v15: Waben im Event-Pit und Recycler (braucht Toast, ClientState und die Welt)

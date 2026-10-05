@@ -25,6 +25,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
 local IncubatorRules   = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
 local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig) -- Sammel-Update 7
+local BuildingBehavior  = require(ReplicatedStorage.Config.BuildingBehavior)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local Workspace        = game:GetService("Workspace")
 
@@ -82,6 +83,12 @@ type Tile = {
 local _tiles: { Tile } = {}
 local buildAllEntries: () -> { Entry }
 
+-- Sammel-Update 3.5: welches Gebaeude-Menue die Kachel oeffnet
+local function buildingPanel(): string
+	return PanelManager.buildingPanelName(if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner")
+end
+TILE_ELEMENT[buildingPanel()] = "tile_building"
+
 --------------------------------------------------------------------------------
 -- Die Eintraege
 --------------------------------------------------------------------------------
@@ -104,6 +111,16 @@ function buildAllEntries(): { Entry }
 			live = function(data: Types.PlayerDataUpdate)
 				if not FeatureFlags.isOn("INDEX_REWARDS") then return "BA", false end
 				return "BA", #IndexRewardConfig.claimable(data.discovered, data.indexClaimed) > 0
+			end },
+		-- Sammel-Update 05.10. (Paket 3.5/3.6): das Honig-Gebaeude als Kachel
+		-- (Verbessern ohne hinzulaufen). "!" = Ausbau bezahlbar.
+		{ panel = buildingPanel(), title = function() return Loc.t("ui.menu.building") end, color = Theme.COLORS.goldGummy, symbol = "⬆", icon = "upgrade",
+			live = function(data: Types.PlayerDataUpdate)
+				local id = if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"
+				local building = data.island.buildings[id :: any]
+				if not building then return "⬆", false end
+				local cost = BuildingBehavior.getUpgrade(id :: any, building.level + 1)
+				return "⬆", cost ~= nil and data.gummies >= cost.costGummies and data.goldGummies >= (cost.costGoldGummies or 0)
 			end },
 		-- Sammel-Update 05.10. (Paket 8): Inkubator ("!" = ein Ei ist fertig).
 		{ panel = "Incubator", title = function() return Loc.t("ui.incubator.tile") end, color = Theme.COLORS.growth, symbol = "⏳", icon = "incubator",
