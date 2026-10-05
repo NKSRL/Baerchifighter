@@ -13,12 +13,12 @@ Schalter: `FeatureFlags.GOLD_CHARMS_ONLY = true`. Auf `false` gestellt verhält 
 | Tower-Lauf (`TowerConfig.getRunGold`) | Gold je 5 Stages | 0 |
 | Tower-Meilensteine (`TowerConfig.getMilestone`) | Gold alle 25 Stages, leere → Gold | kein Gold; leere (35, 45, …) → flache Gummies (10 × Stage-Belohnung) |
 | Login-Bonus (`LoginBonusConfig.DAYS_V2`) | Tag 2/4/5/6/7 Gold | kein Gold; Tag 5 → 10.000, Tag 7 → 30.000 Gummies |
-| Tages-Quests (`QuestConfig.DAILY`, `goldReward`) | nur Gummies | **+25 Gold je Quest** (= 1 Charm-Wurf, 3 pro Tag) |
+| Tages-Quests (`QuestConfig.DAILY`, `goldReward`) | nur Gummies | **+100 Gold je Quest** (= 4 Charm-Würfe, 12 pro Tag) |
 | Gummi-Kurve L11–30 (`COST_GROWTH_AFTER_10`) | 1,22 | 1,23 (Ausgleich, s. u.) |
 | Charm-Wurf | 25 Gold | unverändert, einzige Ausgabe |
 
 Events vergeben schon heute kein Gold (kein `goldGummies`-Bonus in `EventConfig`). Vorhandenes Gold bleibt den Spielern erhalten.
-Anzeige: Quest-Zeile zeigt „+25 GoldGummies“ (`ui.quest.reward_gold`, 4 Sprachen); Preise mit 0 Gold blendet die UI schon aus.
+Anzeige: Quest-Zeile zeigt „+100 GoldGummies“ (`ui.quest.reward_gold`, 4 Sprachen); Preise mit 0 Gold blendet die UI schon aus.
 
 ## Pacing nur mit Gummies (`progression_pacing.lua`, alle 7 Ziele grün)
 | Meilenstein (Normal 90 min/Tag) | vorher | ohne Gold, 1,22 | **jetzt (1,23)** |
@@ -33,14 +33,14 @@ Anzeige: Quest-Zeile zeigt „+25 GoldGummies“ (`ui.quest.reward_gold`, 4 Spra
 Gold hat vor allem das frühe Spiel gebremst (L5–10). Ab Mitte des Spiels gab ohnehin der Gummi-Preis den Takt vor.
 Ziel Look 2 im Sim von 30–75 auf **20–45 min** gesetzt: Der erste große Moment soll in die erste Sitzung fallen.
 
-## OFFEN – Entscheidung nötig: Charms und Endgame
+## Charms und Endgame – entschieden: 12 Würfe pro Tag (100 Gold je Tages-Quest)
 Ein Legendary-Charm kommt mit 1 % (Ascended 0,1 %). Acht davon brauchen im Mittel ~730 Würfe.
 `tower_calibration.lua` setzt für Final 100 Maximal-Ausbau **mit 8 Legendary-Charms** voraus.
 
 | Würfe pro Tag | Tage bis 8 Legendary (Mittel) |
 | --- | --- |
-| 3 (jetzt: 3 × 25 Gold) | ~240 |
-| 12 | ~60 |
+| 3 (erster Stand: 3 × 25 Gold) | ~240 |
+| **12 (jetzt: 3 × 100 Gold)** | **~60** |
 | 25 | ~30 |
 
 Vorher hatte ein Spieler nach 3,5 h bereits ~1.600 Gold (~64 Würfe).
@@ -59,6 +59,6 @@ Möglichkeiten (einzeln oder kombiniert):
 ## Studio-Testschritte
 1. Gebäude-Menü: nur noch Gummi-Preis, Ausbau ohne Gold möglich.
 2. Tower-Lauf: kein „+GoldGummies“; Meilenstein 35 gibt Gummies.
-3. Tages-Quest abholen: Text „… +25 GoldGummies“, Gold-Pille steigt um 25.
+3. Tages-Quest abholen: Text „… +100 GoldGummies“, Gold-Pille steigt um 100.
 4. Charm würfeln: kostet 25 Gold wie bisher.
 5. `GOLD_CHARMS_ONLY = false` → altes Verhalten (Gold-Preise, Tower-Gold).

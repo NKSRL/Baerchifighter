@@ -25,4 +25,4 @@ Nach Änderungen in Studio: Datei → Auf Roblox speichern.
 
 ## Nicht hier verfügbar
 `tools/luau-tests/run.mjs` und die Node-Tests (`migration.test.lua`, `client.test.lua`, `loc.test.lua` …) liegen nur auf dem Heim-PC.
-`tools/sim/*` und `tools/check_*.py` sind da. Paket 8: umgesetzt bis auf die offene Frage Charm-Gold vs. Endgame (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`); Paket 9–10 erst danach.
+`tools/sim/*` und `tools/check_*.py` sind da. Paket 8: umgesetzt (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`, 12 Charm-Würfe/Tag).

@@ -10,8 +10,8 @@
 | 5 Map | Teil (Händler, Heim-Knopf); Schau-Turm, 3 Tafeln, Weg zur Arena offen | nein |
 | 6 Timer/Board | Teil (Timer, erste Pause); Live-Board offen | nein |
 | 7 Boss-Stufen | Code fertig | nein |
-| 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. **Offen: Charm-Gold vs. Endgame** (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
-| 9, 10 | warten auf Entscheidung Charm-Gold (beeinflusst Final 100 / Endless und Shop-Gratis-Griff) | – |
+| 8 Pacing | Entscheidungen umgesetzt: Gold nur Charms (`GOLD_CHARMS_ONLY`), Look 2 Ziel 20–45 min, Zeitmessung im Funnel. Charm-Gold: 12 Würfe/Tag (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`) | nein |
+| 9, 10 | offen; 9 braucht einen freigegebenen Entwurf, 10 teilt sich die 12 Würfe/Tag mit den Tages-Quests | – |
 
 ## Nachtrag Cloud-Sitzung 05.10.2026
 - Repo enthält jetzt auch `tools/sim/*` und `tools/check_*.py` (vom Heim-PC); es fehlen weiterhin `tools/luau-tests/run.mjs`, `migration.test.lua` und die übrigen Node-Tests.
