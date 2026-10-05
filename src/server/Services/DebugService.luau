@@ -67,6 +67,7 @@
 --   D:Invoke("rebirthcap")          -- Deckel des aktuellen Rebirths in allen Towern
 --   D:Invoke("stagebest", "I", 30)  -- Sammel-Update: beste Stage dieses Lebens (Rebirth-Bedingung)
 --   D:Invoke("incubator", "done")   -- Sammel-Update: Inkubator-Stand, "done" = alle Eier fertig
+--   D:Invoke("incubator", "breed")  -- INCUBATOR_BREED: jedes Baerchi im Inkubator bruetet sofort ein Ei
 --   D:Invoke("dailyshift", 1)       -- Login-Bonus: so tun, als waeren 1 Tag(e) vergangen
 --   D:Invoke("lbflush")             -- Bestenlisten sofort schreiben und neu lesen
 --   D:Invoke("parts")               -- Teile auf der eigenen Insel zaehlen (Budget 250)
@@ -454,8 +455,13 @@ commands.incubator = function(player, data, action: any)
 	if action == "done" then
 		for _, entry in incubator.slots do entry.finishAt = os.time() end
 		PlayerService.markDirty(player)
+	elseif action == "breed" then
+		-- INCUBATOR_BREED: jedes Baerchi im Inkubator bruetet sofort ein Ei.
+		-- Lazy require: kein weiterer Modul-Local (200er-Grenze).
+		local made = require(ServerScriptService.Services.IncubatorService).breedNow(player)
+		return { gebruetet = made, baerchis = incubator.breeders }
 	end
-	return { level = incubator.level, plaetze = incubator.slots }
+	return { level = incubator.level, plaetze = incubator.slots, baerchis = incubator.breeders }
 end
 
 -- v15: Login-Bonus — so tun, als waeren `days` Tage vergangen

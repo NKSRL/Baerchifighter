@@ -22,6 +22,10 @@ local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 
 local PanelManager = require(script.Parent.Parent.UI.PanelManager)
+local ClientState  = require(script.Parent.ClientState)
+local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
+local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
+local EggCalculator = require(ReplicatedStorage.Modules.EggCalculator)
 
 local IncubatorController = {}
 
@@ -128,11 +132,132 @@ local function update(view: DomeView, now: number)
 	end
 end
 
+--------------------------------------------------------------------------------
+-- INCUBATOR_BREED: Schild ueber einem Platz mit Baerchi
+--------------------------------------------------------------------------------
+-- Wunsch Projektinhaber 05.10.: "Der Baerchi zeigt im Inkubator an, mit
+-- welcher Wahrscheinlichkeit welches Ei gebruetet wird." Name, die Chancen
+-- (nach EggTree.resolveLaid zusammengefasst — gesperrte Eier rutschen auf den
+-- freien Vorgaenger, genau wie beim Server) und die Zeit bis zum naechsten Ei.
+
+local BREED_MAX_LINES = 4
+
+type BreedView = { dome: BasePart, gui: BillboardGui, title: TextLabel, odds: TextLabel, timer: TextLabel, key: string }
+local _breedViews: { [BasePart]: BreedView } = {}
+
+local function breedLabel(parent: Instance, name: string, y: number, h: number, color: Color3): TextLabel
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.Position = UDim2.fromScale(0, y)
+	label.Size = UDim2.fromScale(1, h)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0.2
+	label.Text = ""
+	label.Parent = parent
+	return label
+end
+
+local function attachBreedView(dome: BasePart)
+	if _breedViews[dome] then return end
+	local gui = Instance.new("BillboardGui")
+	gui.Name        = "BreederInfo"
+	gui.Size        = UDim2.fromScale(7, 5)
+	gui.StudsOffset = Vector3.new(0, dome.Size.Y * 0.5 + 3.2, 0)
+	gui.MaxDistance = IncubatorConfig.LOOK.signDistance
+	gui.AlwaysOnTop = false
+	gui.Adornee     = dome
+	gui.Enabled     = false
+	gui.Parent      = dome
+
+	local title = breedLabel(gui, "Title", 0, 0.24, Color3.new(1, 1, 1))
+	local odds = breedLabel(gui, "Odds", 0.25, 0.55, Color3.fromRGB(255, 240, 200))
+	odds.TextYAlignment = Enum.TextYAlignment.Top
+	local timer = breedLabel(gui, "Timer", 0.82, 0.18, BAR_COLOR)
+	_breedViews[dome] = { dome = dome, gui = gui, title = title, odds = odds, timer = timer, key = "" }
+end
+
+local function eggName(eggType: string): string
+	local def = EggConfig.data[eggType :: any]
+	return Loc.name("egg." .. eggType .. ".name", if def then def.displayName else eggType)
+end
+
+-- Chancen dieses Baerchis, nach dem tatsaechlich gebrueteten Ei zusammengefasst.
+local function oddsText(baerchi: any, eggTree: any): string
+	local list = EggCalculator.getResolvedChances(baerchi, eggTree)
+	local lines: { string } = {}
+	for i, entry in list do
+		if i > BREED_MAX_LINES then break end
+		local percent = if entry.percent >= 10 then string.format("%d", math.floor(entry.percent + 0.5))
+			else Loc.formatDecimal(entry.percent, 1)
+		table.insert(lines, string.format("%s  %s%%", eggName(entry.eggType), percent))
+	end
+	return table.concat(lines, "\n")
+end
+
+local function updateBreed(view: BreedView, now: number)
+	local dome = view.dome
+	local uid = dome:GetAttribute("BreederUid")
+	local data = ClientState.get()
+	local baerchi = if typeof(uid) == "string" and uid ~= "" and data then data.island.baerchis[uid] else nil
+	if not baerchi or not data then
+		view.gui.Enabled = false
+		view.key = ""
+		return
+	end
+	view.gui.Enabled = true
+
+	-- Name und Chancen nur neu schreiben, wenn sich etwas daran aendert
+	local unlockedCount = 0
+	if data.eggTree then
+		for _ in data.eggTree.unlocked do unlockedCount += 1 end
+	end
+	local key = table.concat({ uid :: string, baerchi.configId, tostring(baerchi.mutation), Loc.getLanguage(),
+		tostring(unlockedCount) }, "|")
+	if key ~= view.key then
+		view.key = key
+		local def = BaerchiConfig.getById(baerchi.configId)
+		local name = Loc.name("baerchi." .. baerchi.configId .. ".name", if def then def.displayName else baerchi.configId)
+		view.title.Text = string.format("%s · %s", name, Loc.name("rarity." .. baerchi.rarity, baerchi.rarity))
+		view.title.TextColor3 = BaerchiConfig.getRarityColor(baerchi.rarity)
+		view.odds.Text = oddsText(baerchi, data.eggTree)
+	end
+
+	local unlocked = dome:GetAttribute("Unlocked")
+	if unlocked == false then
+		view.timer.Text = "🔒"
+		return
+	end
+	local lying = 0
+	for _, egg in data.island.laidEggs do
+		if (egg :: any).fromIncubator then lying += 1 end
+	end
+	if lying >= IncubatorConfig.BREED_MAX_LYING then
+		view.timer.Text = "🥚 " .. Loc.t("ui.incubator.breed_full")
+		view.timer.TextColor3 = READY_COLOR
+		return
+	end
+	local last = dome:GetAttribute("LastEggAt")
+	local seconds = dome:GetAttribute("BreedSeconds")
+	if typeof(last) == "number" and typeof(seconds) == "number" and seconds > 0 then
+		local left = math.max(0, last + seconds - now)
+		view.timer.Text = "🥚 " .. Loc.formatDuration(math.ceil(left))
+		view.timer.TextColor3 = BAR_COLOR
+	end
+end
+
+-- INCUBATOR_BREED: "Baerchi einsetzen" statt "Oeffnen"
+local function actionKey(): string
+	return if FeatureFlags.isOn("INCUBATOR_BREED") then "ui.incubator.prompt_breed" else "ui.incubator.prompt_action"
+end
+
 local function attachPrompt(base: BasePart)
 	if base:FindFirstChild("IncubatorPrompt") then return end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "IncubatorPrompt"
-	prompt.ActionText = Loc.t("ui.incubator.prompt_action")
+	prompt.ActionText = Loc.t(actionKey())
 	prompt.ObjectText = Loc.t("ui.incubator.title")
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.MaxActivationDistance = 14
@@ -142,7 +267,7 @@ local function attachPrompt(base: BasePart)
 		PanelManager.open("Incubator")
 	end)
 	Loc.onChanged(function()
-		prompt.ActionText = Loc.t("ui.incubator.prompt_action")
+		prompt.ActionText = Loc.t(actionKey())
 		prompt.ObjectText = Loc.t("ui.incubator.title")
 	end)
 end
@@ -156,6 +281,9 @@ local function hook(instance: Instance)
 		attachPrompt(instance)
 	elseif string.match(instance.Name, "^Dome_%d+$") then
 		attachView(instance)
+		if FeatureFlags.isOn("INCUBATOR_BREED") then
+			attachBreedView(instance)
+		end
 	end
 end
 
@@ -179,6 +307,14 @@ function IncubatorController.init()
 					_views[dome] = nil
 				else
 					update(view, now)
+				end
+			end
+			for dome, view in _breedViews do
+				if dome.Parent == nil then
+					_breedViews[dome] = nil
+				else
+					local ok, err = pcall(updateBreed, view, now)
+					if not ok then warn("[IncubatorController] Brut-Schild:", err) end
 				end
 			end
 		end

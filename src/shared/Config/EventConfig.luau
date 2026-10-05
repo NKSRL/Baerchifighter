@@ -188,6 +188,13 @@ local UFO = {
 
 	-- Nach einem Beam-Reset bleibt der Beam so lange geschlossen.
 	BEAM_REOPEN_SECONDS = 4,
+
+	-- Wunsch Projektinhaber 05.10.: Ein Baerchi darf im selben UFO-Event
+	-- erneut mitmachen. Nach dem Absetzen ist er aber DROP_WEAKEN_SECONDS lang
+	-- geschwaecht: sein Level zaehlt in Event-Duellen nur mit diesem Faktor.
+	-- Das gibt anderen Spielern eine Chance, ohne den Wiederkehrer auszusperren.
+	DROP_WEAKEN_SECONDS      = 60,
+	DROP_WEAKEN_LEVEL_FACTOR = 0.5,
 }
 
 -- Rarity-Up-Chance beim Absetzen des entfuehrten Baerchis. Aufstieg immer nur

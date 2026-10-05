@@ -45,6 +45,7 @@ local WaspQueenEvent  = require(ServerScriptService.Util.WaspQueenEvent)
 local CombService     = require(ServerScriptService.Services.CombService)
 local EventMotion     = require(ReplicatedStorage.Modules.EventMotion)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 
 local EventHandlers = {}
 
@@ -252,6 +253,7 @@ type UfoState = {
 
 function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	local cfg    = EventConfig.UFO
+	local REJOIN = FeatureFlags.isOn("UFO_REJOIN")
 	local center = api.center
 	local ringR  = api.radius * cfg.BEAM_RADIUS_FACTOR
 	local hoverY = center.Y + UFO_HOVER_HEIGHT
@@ -334,7 +336,11 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 		st.abducting     = true
 		part.abducting   = true
 		part.abductedAt  = os.clock()
-		taken[part.player] = true
+		-- UFO_REJOIN: nicht mehr sperren — wer abgesetzt wurde, darf wieder her,
+		-- ist dann aber geschwaecht (api.weaken beim Absetzen).
+		if not REJOIN then
+			taken[part.player] = true
+		end
 		setLabel(part, "🛸!")
 
 		-- Sammel-Update 1.1 ("Baerchi bleibt bei UFO stehen"): verliert der
@@ -392,6 +398,9 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				moveFoot(figure, overPlot, homeFoot + Vector3.new(0, UFO_DROP_HEIGHT, 0), UFO_DROP_SECONDS, 0)
 				api.finishHome(part)
 				api.ufoReward(part)
+				if REJOIN then
+					api.weaken(part, cfg.DROP_WEAKEN_SECONDS)
+				end
 			end)
 
 			if not ok then

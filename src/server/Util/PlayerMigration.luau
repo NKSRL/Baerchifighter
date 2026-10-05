@@ -663,10 +663,12 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	end
 	local incubator = (island :: any).incubator
 	if typeof(incubator) ~= "table" then
-		island.incubator = { level = 1, slots = {} }
+		island.incubator = { level = 1, slots = {}, breeders = {} }
 	else
 		if typeof(incubator.level) ~= "number" or incubator.level < 1 then incubator.level = 1 end
 		if typeof(incubator.slots) ~= "table" then incubator.slots = {} end
+		-- INCUBATOR_BREED: Liste der bruetenden Baerchis (fehlt in v16-Staenden)
+		if typeof(incubator.breeders) ~= "table" then incubator.breeders = {} end
 	end
 	if typeof((data :: any).indexClaimed) ~= "table" then
 		data.indexClaimed = {}

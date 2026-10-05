@@ -287,7 +287,8 @@ local function fillEgg(baerchi: Types.Baerchi)
 	end
 
 	if _eggCountLabel then
-		local laid = if data then #(data.island.laidEggs or {}) else 0
+		-- INCUBATOR_BREED: nur die Eier des ausgeruesteten zaehlen gegen seine Grenze
+		local laid = if data then EggCalculator.countOwnLaid(data.island.laidEggs) else 0
 
 		_eggCountLabel.Text = Loc.t("ui.baerchi.eggs_on_plot", { n = laid, max = EggConfig.MAX_UNCOLLECTED_EGGS })
 		_eggCountLabel.TextColor3 = if laid >= EggConfig.MAX_UNCOLLECTED_EGGS

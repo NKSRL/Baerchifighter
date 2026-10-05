@@ -82,6 +82,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestIncubatorCollect  = 0.30,
 	RequestIncubatorSpeedUp  = 0.50,   -- kostet GoldGummies
 	RequestUpgradeIncubator  = 0.50,   -- kostet Gummies (wie Recycler)
+	RequestIncubatorBaerchi  = 0.30,   -- Baerchi hinein/heraus (INCUBATOR_BREED)
 
 	-- v15: Bestenliste und Inspektor. Der Server antwortet aus dem Cache bzw.
 	-- aus dem Speicher; die Bremse schuetzt nur vor Spam.

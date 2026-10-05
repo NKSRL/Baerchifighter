@@ -295,6 +295,9 @@ export type LaidEgg = {
 	x       : number,
 	y       : number,     -- Fusspunkt, das Ei sitzt mit seiner Unterkante darauf
 	z       : number,
+	-- INCUBATOR_BREED: vom Inkubator gebruetet (eigene Obergrenze, zaehlt
+	-- nicht gegen die des ausgeruesteten Baerchis).
+	fromIncubator : boolean?,
 }
 
 -- v15: der Waben-Recycler vor der Basis (siehe Config/CombConfig). Er nimmt die
@@ -379,6 +382,18 @@ export type IncubatorSlot = {
 export type IncubatorData = {
 	level : number,
 	slots : { IncubatorSlot },
+	-- INCUBATOR_BREED (Wunsch 05.10.): Baerchis, die im Inkubator sitzen und
+	-- im Takt ihrer Rarity zusaetzliche Eier bruehten. Optional, damit alte
+	-- Staende ohne das Feld gueltig bleiben (PlayerMigration fuellt es).
+	breeders : { IncubatorBreeder }?,
+}
+
+-- INCUBATOR_BREED: ein belegter Platz mit Baerchi. `lastEggAt` ist die
+-- Zeitmarke (os.time) des letzten Eis — wie island.lastEggAt beim Legen.
+export type IncubatorBreeder = {
+	slot      : number,    -- 1 .. IncubatorConfig.MAX_SLOTS
+	uid       : string,    -- island.baerchis[uid]
+	lastEggAt : number,
 }
 
 --------------------------------------------------------------------------------
@@ -1053,7 +1068,7 @@ local function createDefaultPlayerData(): PlayerData
 			pitRefund     = 0,
 
 			stageBest = {},                       -- v16: Paket 4.1
-			incubator = { level = 1, slots = {} },  -- v16: Paket 8
+			incubator = { level = 1, slots = {}, breeders = {} },  -- v16: Paket 8
 		},
 
 		stats = {

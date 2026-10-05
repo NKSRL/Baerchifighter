@@ -102,7 +102,7 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 
 	-- Sammel-Update 05.10. (Paket 8): Eier ab Gold-Stufe gehen in den
 	-- Inkubator statt sofort auf (gleiche Regel wie der Server).
-	local toIncubator = FeatureFlags.isOn("INCUBATOR") and data ~= nil
+	local toIncubator = FeatureFlags.isOn("INCUBATOR") and not FeatureFlags.isOn("INCUBATOR_BREED") and data ~= nil
 		and IncubatorRules.requiresIncubator(eggType, IncubatorRules.isUnlocked(data))
 	local button = Theme.bigButton("Open", card,
 		if toIncubator then Loc.t("ui.hatch.to_incubator") else Loc.t("ui.hatch.open"),

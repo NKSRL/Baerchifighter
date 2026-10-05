@@ -54,6 +54,9 @@ export type Api = {
 	recall       : (Player) -> (),
 	finishHome   : (Part) -> (),
 	ufoReward    : (Part) -> (),
+	-- UFO_REJOIN: befristet geschwaecht (Level halbiert) nach dem Absetzen
+	weaken       : (Part, number) -> (),
+	isWeakened   : (Part) -> boolean,
 	walkTo       : (Part, Vector3) -> boolean,
 
 	-- v17 (lebendige Events)

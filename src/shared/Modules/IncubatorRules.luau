@@ -48,7 +48,61 @@ end
 function IncubatorRules.slotCountFor(data: any): number
 	local incubator = data.island and data.island.incubator
 	local level = if incubator then incubator.level or 1 else 1
-	return IncubatorRules.slotCount(level, data.rebirthCount or 0, data.indexClaimed)
+	--------------------------------------------------------------------------------
+-- INCUBATOR_BREED: Baerchis im Inkubator
+--------------------------------------------------------------------------------
+
+-- Sekunden pro gebruetetes Ei fuer diese Rarity auf diesem Level.
+-- `offline` bremst wie beim Legen (offlineSlowdown, vom Aufrufer).
+function IncubatorRules.breedSeconds(rarity: string, level: number, offlineSlowdown: number?): number
+	local base = IncubatorConfig.BREED_SECONDS_BY_RARITY[rarity] or IncubatorConfig.BREED_DEFAULT_SECONDS
+	local seconds = base / IncubatorRules.speed(level) * (offlineSlowdown or 1)
+	return math.max(1, math.floor(seconds + 0.5))
+end
+
+-- Wie viele Eier seit `lastEggAt` faellig sind (0, wenn keins).
+function IncubatorRules.breedDue(lastEggAt: number, now: number, seconds: number): number
+	if seconds <= 0 or now <= lastEggAt then return 0 end
+	return math.floor((now - lastEggAt) / seconds)
+end
+
+-- Der Eintrag fuer Platz `index` in `breeders`, oder nil.
+function IncubatorRules.findBreeder(breeders: { Types.IncubatorBreeder }?, index: number): (Types.IncubatorBreeder?, number?)
+	for i, entry in breeders or {} do
+		if entry.slot == index then return entry, i end
+	end
+	return nil, nil
+end
+
+-- Sitzt dieser Baerchi im Inkubator? Gibt den Platz zurueck.
+function IncubatorRules.breederSlotOf(breeders: { Types.IncubatorBreeder }?, uid: string): number?
+	for _, entry in breeders or {} do
+		if entry.uid == uid then return entry.slot end
+	end
+	return nil
+end
+
+-- Der erste freie Baerchi-Platz (1 .. count), oder nil.
+function IncubatorRules.firstFreeBreeder(breeders: { Types.IncubatorBreeder }?, count: number): number?
+	for index = 1, count do
+		if not IncubatorRules.findBreeder(breeders, index) then return index end
+	end
+	return nil
+end
+
+-- Darf dieser Baerchi hinein? Gibt (ok, Fehler-Schluessel) zurueck.
+-- Der ausgeruestete legt schon selbst — er bleibt draussen.
+function IncubatorRules.canBreed(island: any, uid: string): (boolean, string?)
+	if not island.baerchis[uid] then return false, "err.baerchi_not_found" end
+	if island.equippedUid == uid then return false, "err.incubator_equipped" end
+	local incubator = island.incubator
+	if incubator and IncubatorRules.breederSlotOf(incubator.breeders, uid) then
+		return false, "err.incubator_already_in"
+	end
+	return true, nil
+end
+
+return IncubatorRules.slotCount(level, data.rebirthCount or 0, data.indexClaimed)
 end
 
 -- Tempo-Faktor des Levels (1 auf Level 1).
@@ -120,6 +174,60 @@ function IncubatorRules.firstFree(slots: { Types.IncubatorSlot }, count: number)
 		if not IncubatorRules.findSlot(slots, index) then return index end
 	end
 	return nil
+end
+
+--------------------------------------------------------------------------------
+-- INCUBATOR_BREED: Baerchis im Inkubator
+--------------------------------------------------------------------------------
+
+-- Sekunden pro gebruetetes Ei fuer diese Rarity auf diesem Level.
+-- `offline` bremst wie beim Legen (offlineSlowdown, vom Aufrufer).
+function IncubatorRules.breedSeconds(rarity: string, level: number, offlineSlowdown: number?): number
+	local base = IncubatorConfig.BREED_SECONDS_BY_RARITY[rarity] or IncubatorConfig.BREED_DEFAULT_SECONDS
+	local seconds = base / IncubatorRules.speed(level) * (offlineSlowdown or 1)
+	return math.max(1, math.floor(seconds + 0.5))
+end
+
+-- Wie viele Eier seit `lastEggAt` faellig sind (0, wenn keins).
+function IncubatorRules.breedDue(lastEggAt: number, now: number, seconds: number): number
+	if seconds <= 0 or now <= lastEggAt then return 0 end
+	return math.floor((now - lastEggAt) / seconds)
+end
+
+-- Der Eintrag fuer Platz `index` in `breeders`, oder nil.
+function IncubatorRules.findBreeder(breeders: { Types.IncubatorBreeder }?, index: number): (Types.IncubatorBreeder?, number?)
+	for i, entry in breeders or {} do
+		if entry.slot == index then return entry, i end
+	end
+	return nil, nil
+end
+
+-- Sitzt dieser Baerchi im Inkubator? Gibt den Platz zurueck.
+function IncubatorRules.breederSlotOf(breeders: { Types.IncubatorBreeder }?, uid: string): number?
+	for _, entry in breeders or {} do
+		if entry.uid == uid then return entry.slot end
+	end
+	return nil
+end
+
+-- Der erste freie Baerchi-Platz (1 .. count), oder nil.
+function IncubatorRules.firstFreeBreeder(breeders: { Types.IncubatorBreeder }?, count: number): number?
+	for index = 1, count do
+		if not IncubatorRules.findBreeder(breeders, index) then return index end
+	end
+	return nil
+end
+
+-- Darf dieser Baerchi hinein? Gibt (ok, Fehler-Schluessel) zurueck.
+-- Der ausgeruestete legt schon selbst — er bleibt draussen.
+function IncubatorRules.canBreed(island: any, uid: string): (boolean, string?)
+	if not island.baerchis[uid] then return false, "err.baerchi_not_found" end
+	if island.equippedUid == uid then return false, "err.incubator_equipped" end
+	local incubator = island.incubator
+	if incubator and IncubatorRules.breederSlotOf(incubator.breeders, uid) then
+		return false, "err.incubator_already_in"
+	end
+	return true, nil
 end
 
 return IncubatorRules

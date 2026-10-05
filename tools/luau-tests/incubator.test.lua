@@ -6,6 +6,7 @@
 -- 2. Plaetze: 1 am Anfang, mehr ueber Level/Rebirth/Index, nie ueber MAX.
 -- 3. Sofort-Oeffnen: Basis/Zucker immer, Gold+ erst nach Freischaltung.
 -- 4. Index-Belohnungen: Ei-Reihe fertig/rueckwirkend, Ascension nur bei "all".
+-- 5. INCUBATOR_BREED: Takt je Rarity, faellige Eier, Plaetze, wer hinein darf.
 
 local IncubatorRules    = rbxRequire("ReplicatedStorage/Modules/IncubatorRules")
 local IncubatorConfig   = rbxRequire("ReplicatedStorage/Config/IncubatorConfig")
@@ -77,6 +78,39 @@ for _, entry in IndexRewardConfig.ENTRIES do
 	end
 	check("Kollektion nicht leer: " .. entry.id, #entry.members > 0)
 end
+
+-- 5. INCUBATOR_BREED: Baerchis bruehten Eier
+local common = IncubatorRules.breedSeconds("Common", 1)
+check("Common-Takt aus der Config", common == IncubatorConfig.BREED_SECONDS_BY_RARITY.Common, common)
+check("hoehere Rarity bruetet schneller", IncubatorRules.breedSeconds("Omega", 1) < common)
+local order = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Divine", "Cosmic", "Secret", "Godly", "Eternal", "Omega" }
+for i = 2, #order do
+	check("Takt faellt: " .. order[i], IncubatorRules.breedSeconds(order[i], 1) <= IncubatorRules.breedSeconds(order[i - 1], 1))
+end
+check("Ausbau beschleunigt", IncubatorRules.breedSeconds("Common", 30) < common)
+check("offline langsamer", IncubatorRules.breedSeconds("Common", 1, 3.5) > common)
+check("unbekannte Rarity = Standard", IncubatorRules.breedSeconds("Gibtsnicht", 1) == IncubatorConfig.BREED_DEFAULT_SECONDS)
+check("nichts faellig kurz davor", IncubatorRules.breedDue(T0, T0 + common - 1, common) == 0)
+check("1 faellig genau nach Takt", IncubatorRules.breedDue(T0, T0 + common, common) == 1)
+check("3 faellig nach 3 Takten", IncubatorRules.breedDue(T0, T0 + 3 * common + 5, common) == 3)
+check("Zeit rueckwaerts = 0", IncubatorRules.breedDue(T0, T0 - 10, common) == 0)
+
+local breeders = { { slot = 1, uid = "a", lastEggAt = T0 }, { slot = 3, uid = "b", lastEggAt = T0 } }
+check("findBreeder", (IncubatorRules.findBreeder(breeders, 3) or {}).uid == "b")
+check("breederSlotOf", IncubatorRules.breederSlotOf(breeders, "a") == 1)
+check("breederSlotOf fehlt", IncubatorRules.breederSlotOf(breeders, "x") == nil)
+check("firstFreeBreeder", IncubatorRules.firstFreeBreeder(breeders, 3) == 2)
+check("firstFreeBreeder voll", IncubatorRules.firstFreeBreeder(breeders, 1) == nil)
+check("firstFreeBreeder ohne Liste", IncubatorRules.firstFreeBreeder(nil, 1) == 1)
+local island = {
+	equippedUid = "eq",
+	baerchis = { eq = {}, a = {}, c = {} },
+	incubator = { level = 1, slots = {}, breeders = breeders },
+}
+check("ausgeruesteter darf nicht hinein", not IncubatorRules.canBreed(island, "eq"))
+check("schon drin darf nicht nochmal", not IncubatorRules.canBreed(island, "a"))
+check("unbekannter darf nicht", not IncubatorRules.canBreed(island, "zz"))
+check("freier darf hinein", IncubatorRules.canBreed(island, "c"))
 
 if failures > 0 then error(failures .. " Fehler", 0) end
 print("incubator: alle Tests gruen")

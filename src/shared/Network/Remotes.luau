@@ -340,6 +340,8 @@ local RequestIncubatorStart   = getOrCreateEvent("RequestIncubatorStart")
 local RequestIncubatorCollect = getOrCreateEvent("RequestIncubatorCollect")
 local RequestIncubatorSpeedUp = getOrCreateEvent("RequestIncubatorSpeedUp")
 local RequestUpgradeIncubator = getOrCreateEvent("RequestUpgradeIncubator")
+-- INCUBATOR_BREED: ("put", baerchiUid) / ("take", platz)
+local RequestIncubatorBaerchi = getOrCreateEvent("RequestIncubatorBaerchi")
 -- Paket 8: S->C Hinweis "Platz belegt / fertig / abgeholt" (Feedback, Ton).
 -- Args: { slot: number, kind: "start" | "ready" | "collect" | "speedup" | "upgrade" }
 local IncubatorChanged = getOrCreateEvent("IncubatorChanged")
@@ -430,6 +432,7 @@ return {
 	RequestIncubatorCollect  = RequestIncubatorCollect,
 	RequestIncubatorSpeedUp  = RequestIncubatorSpeedUp,
 	RequestUpgradeIncubator  = RequestUpgradeIncubator,
+	RequestIncubatorBaerchi  = RequestIncubatorBaerchi,
 	IncubatorChanged         = IncubatorChanged,
 
 	-- Functions

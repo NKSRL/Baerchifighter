@@ -129,7 +129,7 @@ local function refresh()
 		return
 	end
 
-	if #data.island.laidEggs >= EggConfig.MAX_UNCOLLECTED_EGGS then
+	if EggCalculator.countOwnLaid(data.island.laidEggs) >= EggConfig.MAX_UNCOLLECTED_EGGS then
 		label.Text = Loc.t("ui.egg.full")
 		return
 	end

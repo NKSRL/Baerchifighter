@@ -146,6 +146,9 @@ function RebirthService.rebirth(player: Player)
 	local oldIncubator = data.island.incubator
 	if oldIncubator and freshIsland.incubator then
 		freshIsland.incubator.slots = oldIncubator.slots
+		-- INCUBATOR_BREED: die Baerchis bleiben sitzen (die Sammlung bleibt
+		-- beim Rebirth); IncubatorService raeumt fehlende im naechsten Takt.
+		freshIsland.incubator.breeders = oldIncubator.breeders or {}
 	end
 	data.island = freshIsland
 

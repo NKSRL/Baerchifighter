@@ -65,7 +65,7 @@ function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubato
 		return nil
 	end
 
-	if not fromIncubator and FeatureFlags.isOn("INCUBATOR")
+	if not fromIncubator and FeatureFlags.isOn("INCUBATOR") and not FeatureFlags.isOn("INCUBATOR_BREED")
 		and IncubatorRules.requiresIncubator(eggType, IncubatorRules.isUnlocked(data)) then
 		fail(player, "RequestHatchEgg", Loc.msg("err.egg_needs_incubator", { egg = Loc.msg("egg." .. eggType .. ".name") }))
 		return nil

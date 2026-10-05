@@ -48,10 +48,13 @@ local MenuBar = {}
 
 -- Groessen. TILE ist gleichzeitig die Antippflaeche — darunter wird es auf dem
 -- Handy zur Geduldsprobe.
-local TILE   = 54
-local LABEL  = 16
-local GAP    = 6
-local WIDTH  = 76
+-- HUD_ROW_V2: weniger Kacheln (Verbessern, Inkubator und Shop sind weg),
+-- dafuer groesser. Die UIScale unten schrumpft weiterhin auf kleinen Fenstern.
+local BIG    = FeatureFlags.isOn("HUD_ROW_V2")
+local TILE   = if BIG then 70 else 54
+local LABEL  = if BIG then 18 else 16
+local GAP    = if BIG then 8 else 6
+local WIDTH  = if BIG then 94 else 76
 
 -- Was eine Kachel anzeigt: `value` ist die Beschriftung IN der Kachel,
 -- `alert` laesst das rote Ausrufezeichen erscheinen.
@@ -95,10 +98,17 @@ TILE_ELEMENT[buildingPanel()] = "tile_building"
 
 local function buildEntries(): { Entry }
 	local list = buildAllEntries()
-	if not FeatureFlags.isOn("INCUBATOR") then
-		for i = #list, 1, -1 do
-			if list[i].panel == "Incubator" then table.remove(list, i) end
-		end
+	-- HUD_ROW_V2: Honig-Brunnen und Inkubator benutzt man vor Ort (Prompt am
+	-- Plot), der Shop sitzt in der Knopf-Zeile oben links (Hud).
+	local hidden: { [string]: boolean } = {}
+	if not FeatureFlags.isOn("INCUBATOR") then hidden.Incubator = true end
+	if BIG then
+		hidden.Incubator = true
+		hidden.Shop = true
+		hidden[buildingPanel()] = true
+	end
+	for i = #list, 1, -1 do
+		if hidden[list[i].panel] then table.remove(list, i) end
 	end
 	return list
 end
@@ -210,7 +220,7 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	label.Size           = UDim2.new(1, 0, 0, LABEL)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextScaled     = false
-	label.TextSize       = 14
+	label.TextSize       = if BIG then 16 else 14
 	Theme.outlineText(label)
 
 	return { entry = entry, tile = button, alert = alert, label = label, image = hasImage }

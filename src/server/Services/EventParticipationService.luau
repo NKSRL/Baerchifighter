@@ -72,6 +72,7 @@ local EggService      = require(ServerScriptService.Services.EggService)
 local CombRecyclerService = require(ServerScriptService.Services.CombRecyclerService)
 local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 local Loc           = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 
 local EventParticipationService = {}
 
@@ -879,6 +880,71 @@ local function toast(player: Player, text: string | Types.LocMsg)
 	Remotes.EventStatGained:FireClient(player, gain)
 end
 
+--------------------------------------------------------------------------------
+-- UFO_REJOIN: befristete Schwaechung nach dem UFO-Absetzen
+--------------------------------------------------------------------------------
+-- Nur Laufzeit (nicht gespeichert): uid -> os.clock(), bis zu der das Level in
+-- Event-Duellen mit EventConfig.UFO.DROP_WEAKEN_LEVEL_FACTOR zaehlt. Die Figur
+-- traegt das Attribut "WeakUntil" (Serverzeit), damit der Client es zeigen kann.
+local _weakUntil: { [string]: number } = {}
+
+local function isWeakened(baerchiUid: string): boolean
+	local untilAt = _weakUntil[baerchiUid]
+	if not untilAt then return false end
+	if os.clock() >= untilAt then
+		_weakUntil[baerchiUid] = nil
+		return false
+	end
+	return true
+end
+
+local function weakenedLevel(baerchiUid: string, level: number): number
+	if not isWeakened(baerchiUid) then return level end
+	return math.max(1, math.floor(level * EventConfig.UFO.DROP_WEAKEN_LEVEL_FACTOR))
+end
+
+local function weaken(player: Player, baerchiUid: string, seconds: number)
+	if not FeatureFlags.isOn("UFO_REJOIN") or seconds <= 0 then return end
+	_weakUntil[baerchiUid] = os.clock() + seconds
+	local figure = MapService.getBaerchiModel(player, baerchiUid)
+	if figure then
+		figure:SetAttribute("WeakUntil", workspace:GetServerTimeNow() + seconds)
+		-- Sichtbar fuer alle (sprachneutral): "💫 ½ Lv 42s" ueber dem Kopf.
+		local root = figure.PrimaryPart or figure:FindFirstChildWhichIsA("BasePart")
+		local old = figure:FindFirstChild("WeakLabel")
+		if old then old:Destroy() end
+		if root then
+			local gui = Instance.new("BillboardGui")
+			gui.Name        = "WeakLabel"
+			gui.Size        = UDim2.fromOffset(120, 28)
+			gui.StudsOffset = Vector3.new(0, 7.5, 0)
+			gui.AlwaysOnTop = true
+			gui.MaxDistance = 120
+			gui.Adornee     = root
+			local text = Instance.new("TextLabel")
+			text.Size                   = UDim2.fromScale(1, 1)
+			text.BackgroundTransparency = 1
+			text.Font                   = Enum.Font.GothamBold
+			text.TextScaled             = true
+			text.TextColor3             = Color3.fromRGB(190, 170, 255)
+			text.TextStrokeTransparency = 0.2
+			text.Parent = gui
+			gui.Parent = figure
+			local untilAt = _weakUntil[baerchiUid]
+			task.spawn(function()
+				while gui.Parent and _weakUntil[baerchiUid] == untilAt and os.clock() < untilAt do
+					text.Text = string.format("💫 ½ Lv %ds", math.ceil(untilAt - os.clock()))
+					task.wait(1)
+				end
+				gui:Destroy()
+			end)
+		end
+	end
+	if player.Parent ~= nil then
+		Remotes.EventNotice:FireClient(player, Loc.msg("msg.ufo.weakened", { s = seconds }), "info")
+	end
+end
+
 -- Setzt die Figur wieder aufs Plot und beendet die Teilnahme (UFO-Absetzen).
 local function finishHome(presence: any)
 	local player: Player = presence.player
@@ -1016,14 +1082,22 @@ local function buildApi(token: number): any
 	api.level = function(part: any): number
 		local data = PlayerService.getData(part.player)
 		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
-		return if baerchi then baerchi.level else 1
+		return if baerchi then weakenedLevel(part.baerchiUid, baerchi.level) else 1
 	end
 
 	-- Kampfstaerke fuer Duelle: ATK * maxHp (wie CombatCalculator).
 	api.power = function(part: any): number
 		local data = PlayerService.getData(part.player)
-		local baerchi = if data then data.island.baerchis[part.baerchiUid] else nil
-		if not baerchi then return 1 end
+		local found = if data then data.island.baerchis[part.baerchiUid] else nil
+		if not found then return 1 end
+		local baerchi: any = found
+		-- UFO_REJOIN: geschwaecht = mit halbem Level rechnen (Kopie, die
+		-- gespeicherten Daten bleiben unberuehrt).
+		local level = weakenedLevel(part.baerchiUid, baerchi.level)
+		if level ~= baerchi.level then
+			baerchi = table.clone(baerchi)
+			baerchi.level = level
+		end
 		local def = BaerchiConfig.getById(baerchi.configId)
 		if def then
 			local ok, stats = pcall(CombatCalculator.getEffectiveStats, baerchi, def.baseStats)
@@ -1043,6 +1117,14 @@ local function buildApi(token: number): any
 
 	api.finishHome = finishHome
 	api.ufoReward  = applyUfoReward
+
+	-- UFO_REJOIN: nach dem Absetzen geschwaecht (Level halbiert, befristet).
+	api.weaken = function(part: any, seconds: number)
+		weaken(part.player, part.baerchiUid, seconds)
+	end
+	api.isWeakened = function(part: any): boolean
+		return isWeakened(part.baerchiUid)
+	end
 
 	-- v17: Eier direkt ins Lager (UFO-Abwurf), ueber EggService.
 	api.grantEgg = function(player: Player, eggType: Types.EggType, amount: number): boolean

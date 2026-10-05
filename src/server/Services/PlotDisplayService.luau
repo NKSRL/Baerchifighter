@@ -189,6 +189,13 @@ local function incubatorSignature(data: Types.PlayerData): string
 	for _, entry in incubator.slots do
 		table.insert(parts, string.format("%d=%s@%d", entry.slot, entry.eggType, entry.finishAt))
 	end
+	-- INCUBATOR_BREED: Baerchis in den Plaetzen (Figur, Takt, letzte Brut)
+	for _, entry in incubator.breeders or {} do
+		local baerchi = data.island.baerchis[entry.uid]
+		table.insert(parts, string.format("b%d=%s:%s:%s@%d", entry.slot, entry.uid,
+			if baerchi then baerchi.rarity else "?", if baerchi then tostring(baerchi.mutation) else "",
+			entry.lastEggAt))
+	end
 	return table.concat(parts, "|")
 end
 

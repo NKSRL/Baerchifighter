@@ -38,6 +38,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local Types         = require(ReplicatedStorage.Network.Types)
+local EggTree       = require(ReplicatedStorage.Modules.EggTree)
 
 local EggCalculator = {}
 
@@ -162,6 +163,37 @@ function EggCalculator.getChances(baerchi: Types.Baerchi): { ChanceEntry }
 		return a.eggType < b.eggType
 	end)
 
+	return result
+end
+
+-- INCUBATOR_BREED: wie viele der liegenden Eier vom ausgeruesteten Baerchi
+-- stammen (die aus dem Inkubator haben ihre eigene Obergrenze).
+function EggCalculator.countOwnLaid(laidEggs: { Types.LaidEgg }?): number
+	local n = 0
+	for _, egg in laidEggs or {} do
+		if not egg.fromIncubator then n += 1 end
+	end
+	return n
+end
+
+-- INCUBATOR_BREED: die Chancen so, wie sie tatsaechlich herauskommen —
+-- gesperrte Eier rutschen auf den freien Vorgaenger (EggTree.resolveLaid),
+-- genau wie beim Legen und Brueten auf dem Server. Gleiche Eier werden
+-- zusammengezaehlt; absteigend sortiert.
+function EggCalculator.getResolvedChances(baerchi: Types.Baerchi, eggTree: Types.EggTreeState?): { ChanceEntry }
+	local merged: { [string]: number } = {}
+	for _, entry in EggCalculator.getChances(baerchi) do
+		local eggType = EggTree.resolveLaid(eggTree, entry.eggType)
+		merged[eggType] = (merged[eggType] or 0) + entry.percent
+	end
+	local result: { ChanceEntry } = {}
+	for eggType, percent in merged do
+		table.insert(result, { eggType = eggType :: Types.EggType, percent = percent })
+	end
+	table.sort(result, function(a, b)
+		if a.percent ~= b.percent then return a.percent > b.percent end
+		return a.eggType < b.eggType
+	end)
 	return result
 end
 

@@ -80,6 +80,8 @@ local function uiTarget(step: string): GuiObject?
 	elseif step == "event" then
 		return PetBar.getButton("Event")
 	elseif step == "upgrade" then
+		-- HUD_ROW_V2: keine Kachel mehr, der Strahl zeigt zum Brunnen (worldTarget)
+		if FeatureFlags.isOn("HUD_ROW_V2") then return nil end
 		-- Sammel-Update 3.5: Gebaeude-Kachel rechts
 		return MenuBar.getTileAnchor(PanelManager.buildingPanelName(
 			if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"))
@@ -138,8 +140,29 @@ local function ownRecycler(): BasePart?
 	return nil
 end
 
+-- HUD_ROW_V2: Honig-Gebaeude auf dem EIGENEN Plot (Prompt "Verbessern").
+local function ownHoneyBuilding(): BasePart?
+	local id = if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"
+	for _, descendant in Workspace:GetDescendants() do
+		if descendant.Name == id and descendant:IsA("BasePart") then
+			local current: Instance? = descendant
+			while current do
+				local owner = current:GetAttribute("PlotOwner")
+				if typeof(owner) == "number" then
+					if owner == Players.LocalPlayer.UserId then return descendant end
+					break
+				end
+				current = current.Parent
+			end
+		end
+	end
+	return nil
+end
+
 local function worldTarget(step: string): BasePart?
-	if step == "collect" then
+	if step == "upgrade" and FeatureFlags.isOn("HUD_ROW_V2") then
+		return ownHoneyBuilding()
+	elseif step == "collect" then
 		return nearestOwnEgg()
 	elseif step == "merchant" then
 		return merchantCounter()

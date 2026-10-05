@@ -167,7 +167,9 @@ local function layOne(player: Player, data: Types.PlayerData, baerchi: Types.Bae
 	local island = data.island
 
 	-- cap: Offline-Nachholen legt nur bis EggConfig.OFFLINE_MAX_EGGS (Paket 6.1).
-	if #island.laidEggs >= (cap or EggConfig.MAX_UNCOLLECTED_EGGS) then
+	-- INCUBATOR_BREED: Eier aus dem Inkubator haben ihre eigene Grenze.
+	local lying = EggCalculator.countOwnLaid(island.laidEggs)
+	if lying >= (cap or EggConfig.MAX_UNCOLLECTED_EGGS) then
 		return false
 	end
 

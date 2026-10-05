@@ -129,7 +129,7 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	-- Sammel-Update Paket 8: Inkubator (Plaetze liefert der Daten-Lieferant,
 	-- weil sie auch an Rebirths und Index haengen, die nicht in der Insel stehen).
 	if FeatureFlags.isOn("INCUBATOR") and islandData.incubator then
-		IncubatorBuilder.build(plotModel, slot, islandData.incubator, _incubatorSlots(owner))
+		IncubatorBuilder.build(plotModel, slot, islandData.incubator, _incubatorSlots(owner), islandData.baerchis)
 	end
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
@@ -523,10 +523,18 @@ function MapService.updateIncubator(player: Player, islandData: Types.IslandData
 	if not model or not slot then return end
 	local existing = model:FindFirstChild(IncubatorConfig.MODEL_NAME)
 	if existing and existing:IsA("Model") then
-		IncubatorBuilder.writeState(existing, islandData.incubator, slotCount)
+		IncubatorBuilder.writeState(existing, islandData.incubator, slotCount, islandData.baerchis)
 	else
-		IncubatorBuilder.build(model, slot, islandData.incubator, slotCount)
+		IncubatorBuilder.build(model, slot, islandData.incubator, slotCount, islandData.baerchis)
 	end
+end
+
+-- INCUBATOR_BREED: das Inkubator-Modell auf dem Plot des Spielers (Ort der
+-- gebrueteten Eier), oder nil.
+function MapService.getIncubatorModel(player: Player): Model?
+	local model = _plotModels[player]
+	local found = if model then model:FindFirstChild(IncubatorConfig.MODEL_NAME) else nil
+	return if found and found:IsA("Model") then found else nil
 end
 
 -- Liefert die Platz-Zahl des Inkubators (setzt PlotDisplayService, weil sie

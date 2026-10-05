@@ -96,4 +96,45 @@ IncubatorConfig.PART_BUDGET = 20
 
 IncubatorConfig.MODEL_NAME = "Incubator"
 
+--------------------------------------------------------------------------------
+-- INCUBATOR_BREED (Wunsch Projektinhaber 05.10.)
+--------------------------------------------------------------------------------
+-- Man setzt einen Baerchi in den Inkubator, und er bruetet im Takt seiner
+-- Rarity zusaetzliche Eier — zusaetzlich zu denen des ausgeruesteten. Welche
+-- Eier: seine eigene eggTable (wie beim Legen), gesperrte Eier rutschen wie
+-- beim Legen auf den freien Vorgaenger (EggTree.resolveLaid).
+--
+-- Takt in Sekunden pro Ei auf Inkubator-Level 1, je Rarity. Hoehere Rarity =
+-- schnellerer Takt (und bessere Eier aus der eigenen Tabelle). Der Ausbau
+-- beschleunigt wie bisher (SPEED_PER_LEVEL). Bewusst langsamer als das Legen
+-- des ausgeruesteten Baerchis (Common legt alle 2,5-3 min): der Inkubator ist
+-- ein Zusatz, kein Ersatz. ANNAHME, zum Nachstellen.
+IncubatorConfig.BREED_SECONDS_BY_RARITY = {
+	Common    = 900,   -- 15 min
+	Uncommon  = 840,
+	Rare      = 780,
+	Epic      = 720,   -- 12 min
+	Legendary = 660,
+	Mythic    = 600,   -- 10 min
+	Divine    = 570,
+	Cosmic    = 540,
+	Secret    = 510,
+	Godly     = 480,   -- 8 min
+	Eternal   = 450,
+	Omega     = 420,   -- 7 min
+} :: { [string]: number }
+IncubatorConfig.BREED_DEFAULT_SECONDS = 900
+
+-- Gebruetete Eier fallen neben den Inkubator und werden wie gelegte Eier
+-- durch Darueberlaufen eingesammelt. Eigene Obergrenze (zaehlt nicht gegen
+-- EggConfig.MAX_UNCOLLECTED_EGGS); offline langsamer und kleiner gedeckelt,
+-- wie beim Legen (EggConfig.OFFLINE_SLOWDOWN).
+IncubatorConfig.BREED_MAX_LYING        = 8
+IncubatorConfig.BREED_OFFLINE_MAX      = 4
+-- Abstand der Eier von der Sockel-Mitte (Studs, Bereich) — knapp vor dem Rand.
+IncubatorConfig.BREED_DROP_MIN         = 11
+IncubatorConfig.BREED_DROP_MAX         = 13
+-- Hoehe der Mini-Figur in der Kuppel (Studs).
+IncubatorConfig.BREED_FIGURE_HEIGHT    = 2.6
+
 return IncubatorConfig
