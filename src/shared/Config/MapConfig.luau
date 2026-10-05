@@ -1284,30 +1284,11 @@ local FIGHT_HIT_FLASH_COLOR   = Color3.fromRGB(255, 238, 200)
 -- schneller (Tempo bis FIGHT_MIN_TEMPO, also hoechstens gut doppelt so
 -- schnell) — bei 60 Stages wird der Lauf so zur schnellen Montage statt
 -- zu einer Minute Pflichtprogramm.
-local FIGHT_RUN_TARGET_SECONDS  = 30
-local FIGHT_STAGE_MIN_SECONDS   = 0.5
-local FIGHT_STAGE_MAX_SECONDS   = 6.0
-local FIGHT_MIN_TEMPO           = 0.40
-local FIGHT_BEAT_SECONDS        = 0.95   -- ein Stoss (Anlauf, Sprung, Aufprall, zurueck)
-local FIGHT_SKILL_BEAT_SECONDS  = 1.15   -- der Stoss nach einer Faehigkeit (wuchtiger)
-local FIGHT_ENEMY_INTRO_SECONDS = 0.35   -- kurz stehen, wenn ein neuer Gegner erscheint
-local FIGHT_KO_SECONDS          = 0.35   -- besiegter Gegner kippt, bevor der naechste kommt
-local FIGHT_CONTACT_GAP         = 2.4    -- Abstand der Fusspunkte beim Aufprall (Studs)
-local FIGHT_HOP_HEIGHT          = 1.6    -- Hoehe des Ansprungs
-local FIGHT_KNOCKBACK           = 1.3    -- wie weit der Getroffene zurueckgestossen wird
-local FIGHT_SKILL_KNOCKBACK     = 3.2    -- ... nach einer Faehigkeit
-local FIGHT_ENEMY_STEP_SHARE    = 0.40   -- der Getroffene laeuft dem Angreifer entgegen (Treffen eher in der Mitte)
 
 -- Ladeleiste (unter dem HP-Balken des eigenen Baerchis)
-local FIGHT_CHARGE_BAR_HEIGHT   = 0.35
-local FIGHT_CHARGE_COLOR        = Color3.fromRGB(120, 200, 255)
-local FIGHT_CHARGE_FULL_COLOR   = Color3.fromRGB(255, 214, 70)
 
 -- Aufprall: ein leiser, dumpfer Ton (Lautstaerke bewusst niedrig, er kommt
 -- zweimal pro Sekunde) und ein kleiner Funkenstoss.
-local FIGHT_BUMP_SOUND          = "rbxasset://sounds/action_jump_land.mp3"
-local FIGHT_BUMP_VOLUME         = 0.25
-local FIGHT_BUMP_SPARKS         = 6
 
 -- Wie lange der Verlierer der LETZTEN Stage zum Umkippen braucht. Laeuft
 -- innerhalb der Nachlauf-Pause (FIGHT_LINGER_SECONDS) ab, verlaengert die
@@ -1321,14 +1302,6 @@ local FIGHT_COLLAPSE_SECONDS = 0.45
 -- DESIGN_VORSCHLAG_TRENDANALYSE_2026-09-11.md Abschnitt 5. Bewusst dezent:
 -- ein Simulator-Spiel soll die ganze Spielzeit ueber angenehm aussehen, nicht
 -- nach einem einzelnen "Wow"-Moment blenden.
-local LIGHTING_CLOCK_TIME        = 15.5   -- spaeter Nachmittag statt Mittag, waermeres Licht
-local LIGHTING_BLOOM_INTENSITY   = 0.55
-local LIGHTING_BLOOM_THRESHOLD   = 1.4
-local LIGHTING_BLOOM_SIZE        = 20
-local LIGHTING_SATURATION        = 0.15   -- ColorCorrectionEffect, leicht angehoben
-local LIGHTING_CONTRAST          = 0.05
-local LIGHTING_SUNRAYS_INTENSITY = 0.15
-local LIGHTING_SUNRAYS_SPREAD    = 0.6
 
 --------------------------------------------------------------------------------
 -- Rarity-Auren an den Baerchi-Figuren
@@ -1568,34 +1541,34 @@ return {
 	FIGHT_COLLAPSE_SECONDS    = FIGHT_COLLAPSE_SECONDS,
 
 	-- v15
-	FIGHT_RUN_TARGET_SECONDS  = FIGHT_RUN_TARGET_SECONDS,
-	FIGHT_STAGE_MIN_SECONDS   = FIGHT_STAGE_MIN_SECONDS,
-	FIGHT_STAGE_MAX_SECONDS   = FIGHT_STAGE_MAX_SECONDS,
-	FIGHT_MIN_TEMPO           = FIGHT_MIN_TEMPO,
-	FIGHT_KO_SECONDS          = FIGHT_KO_SECONDS,
-	FIGHT_BEAT_SECONDS        = FIGHT_BEAT_SECONDS,
-	FIGHT_SKILL_BEAT_SECONDS  = FIGHT_SKILL_BEAT_SECONDS,
-	FIGHT_ENEMY_INTRO_SECONDS = FIGHT_ENEMY_INTRO_SECONDS,
-	FIGHT_CONTACT_GAP         = FIGHT_CONTACT_GAP,
-	FIGHT_HOP_HEIGHT          = FIGHT_HOP_HEIGHT,
-	FIGHT_KNOCKBACK           = FIGHT_KNOCKBACK,
-	FIGHT_SKILL_KNOCKBACK     = FIGHT_SKILL_KNOCKBACK,
-	FIGHT_ENEMY_STEP_SHARE    = FIGHT_ENEMY_STEP_SHARE,
-	FIGHT_CHARGE_BAR_HEIGHT   = FIGHT_CHARGE_BAR_HEIGHT,
-	FIGHT_CHARGE_COLOR        = FIGHT_CHARGE_COLOR,
-	FIGHT_CHARGE_FULL_COLOR   = FIGHT_CHARGE_FULL_COLOR,
-	FIGHT_BUMP_SOUND          = FIGHT_BUMP_SOUND,
-	FIGHT_BUMP_VOLUME         = FIGHT_BUMP_VOLUME,
-	FIGHT_BUMP_SPARKS         = FIGHT_BUMP_SPARKS,
+	FIGHT_RUN_TARGET_SECONDS  = 30,
+	FIGHT_STAGE_MIN_SECONDS   = 0.5,
+	FIGHT_STAGE_MAX_SECONDS   = 6.0,
+	FIGHT_MIN_TEMPO           = 0.40,
+	FIGHT_KO_SECONDS          = 0.35,
+	FIGHT_BEAT_SECONDS        = 0.95,
+	FIGHT_SKILL_BEAT_SECONDS  = 1.15,
+	FIGHT_ENEMY_INTRO_SECONDS = 0.35,
+	FIGHT_CONTACT_GAP         = 2.4,
+	FIGHT_HOP_HEIGHT          = 1.6,
+	FIGHT_KNOCKBACK           = 1.3,
+	FIGHT_SKILL_KNOCKBACK     = 3.2,
+	FIGHT_ENEMY_STEP_SHARE    = 0.40,
+	FIGHT_CHARGE_BAR_HEIGHT   = 0.35,
+	FIGHT_CHARGE_COLOR        = Color3.fromRGB(120, 200, 255),
+	FIGHT_CHARGE_FULL_COLOR   = Color3.fromRGB(255, 214, 70),
+	FIGHT_BUMP_SOUND          = "rbxasset://sounds/action_jump_land.mp3",
+	FIGHT_BUMP_VOLUME         = 0.25,
+	FIGHT_BUMP_SPARKS         = 6,
 
-	LIGHTING_CLOCK_TIME        = LIGHTING_CLOCK_TIME,
-	LIGHTING_BLOOM_INTENSITY   = LIGHTING_BLOOM_INTENSITY,
-	LIGHTING_BLOOM_THRESHOLD   = LIGHTING_BLOOM_THRESHOLD,
-	LIGHTING_BLOOM_SIZE        = LIGHTING_BLOOM_SIZE,
-	LIGHTING_SATURATION        = LIGHTING_SATURATION,
-	LIGHTING_CONTRAST          = LIGHTING_CONTRAST,
-	LIGHTING_SUNRAYS_INTENSITY = LIGHTING_SUNRAYS_INTENSITY,
-	LIGHTING_SUNRAYS_SPREAD    = LIGHTING_SUNRAYS_SPREAD,
+	LIGHTING_CLOCK_TIME        = 15.5,
+	LIGHTING_BLOOM_INTENSITY   = 0.55,
+	LIGHTING_BLOOM_THRESHOLD   = 1.4,
+	LIGHTING_BLOOM_SIZE        = 20,
+	LIGHTING_SATURATION        = 0.15,
+	LIGHTING_CONTRAST          = 0.05,
+	LIGHTING_SUNRAYS_INTENSITY = 0.15,
+	LIGHTING_SUNRAYS_SPREAD    = 0.6,
 
 	RARITY_AURA_MIN_SPARKLE     = RARITY_AURA_MIN_SPARKLE,
 	RARITY_AURA_MIN_LIGHT       = RARITY_AURA_MIN_LIGHT,
