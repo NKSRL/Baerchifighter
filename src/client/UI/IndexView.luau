@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types           = require(ReplicatedStorage.Network.Types)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local Names           = require(ReplicatedStorage.Localization.Names)
 local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local IndexCalculator = require(ReplicatedStorage.Modules.IndexCalculator)
@@ -135,7 +136,7 @@ local function showPopup(configId: string, anchor: GuiObject)
 	local color = Theme.rarityColor(def.rarity)
 
 	local title = Theme.label("Title", popup,
-		if found then Loc.name("baerchi." .. configId .. ".name", def.displayName) else Loc.t("ui.index.unknown"))
+		if found then Names.baerchi(configId) else Loc.t("ui.index.unknown"))
 	title.Position = UDim2.new(0, 10, 0, 6)
 	title.Size     = UDim2.new(1, -20, 0, 22)
 
@@ -255,7 +256,7 @@ local function buildTile(parent: Instance, order: number, drop: IndexCalculator.
 	end
 
 	local name = Theme.label("Name", tile,
-		if found then Loc.name("baerchi." .. drop.configId .. ".name", def.displayName) else Loc.t("ui.index.unknown"))
+		if found then Names.baerchi(drop.configId) else Loc.t("ui.index.unknown"))
 	name.Position       = UDim2.new(0, 3, 0, VIEW + 7)
 	name.Size           = UDim2.new(1, -6, 0, 14)
 	name.TextXAlignment = Enum.TextXAlignment.Center

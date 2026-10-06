@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
+local Names         = require(ReplicatedStorage.Localization.Names)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local TowerConfig   = require(ReplicatedStorage.Config.TowerConfig)
 local PromotionConfig = require(ReplicatedStorage.Config.PromotionConfig)
@@ -33,8 +34,7 @@ local _lines: TextLabel? = nil
 local _requestId = 0
 
 local function baerchiLine(entry: Types.ProfileBaerchi): string
-	local def = BaerchiConfig.getById(entry.configId)
-	local name = Loc.name("baerchi." .. entry.configId .. ".name", if def then def.displayName else entry.configId)
+	local name = Names.baerchi(entry.configId)
 	local stars = math.floor(math.clamp(entry.promotion, 0, PromotionConfig.MAX_PROMOTION) / 2)
 	local mutation = if entry.mutation then " · " .. Loc.name("mutation." .. entry.mutation .. ".name", entry.mutation) else ""
 	return string.format("%s  (%s%s)  Lv.%d  %s", name, Loc.name("rarity." .. entry.rarity, entry.rarity), mutation,

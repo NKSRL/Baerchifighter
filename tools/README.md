@@ -25,6 +25,7 @@ Aus dem Projektordner:
     python tools/check_members.py
     python tools/check_consistency.py
     python tools/check_loc.py
+    python tools/check_ui.py
     python tools/check_decor.py
 
 Alle Befehle enden mit Exit-Code 0, wenn alles in Ordnung ist, und mit 1 bei
@@ -76,6 +77,30 @@ das nicht, weil die Configs einfache Tabellen zurückgeben.
 
 Hat jede Sprache alle Schlüssel, stimmen die `{platzhalter}`, gibt es jeden im
 Code verwendeten Schlüssel? `--todo` listet Texte, die noch fest im Code stehen.
+
+## `check_ui.py` — Qualitäts-Tor für Spieler-Texte und Menüs
+
+Zerlegt den Code in Tokens und weiß deshalb, wo ein String landet (statt
+anhand von Signalwörtern zu raten wie `check_loc --todo`). Jede Regel ist ein
+Fehler:
+
+| Regel | findet |
+|---|---|
+| T1 | fester Text in einer Anzeige (`.Text =`, `Theme.label/button/…`, Toast, Prompt-Texte, `Icons.make`-Ersatztext, Tabellenfelder wie `label =`) — auch über Hilfsfunktionen, deren Parameter in einer Anzeige landen (`section("…")`, `EventKit.setLabel`, `MapService.setPitBanner`, lokale Aliase) |
+| T2 | Text mit Wörtern ohne `Loc` (Client) bzw. deutscher Text (Server/Shared) außerhalb von Logs |
+| T3 | `.displayName` / `.description` / `.drawback` / `.shortName` direkt gelesen statt über `Localization/Names` |
+| T4 | Config-Eintrag (Bärchi, Ei, Skill, Event, Charm) ohne seine Loc-Schlüssel |
+| T5 | `Loc.t/tn/msg/bind`-Aufruf übergibt nicht alle `{platzhalter}` des Textes |
+| P1 | Panel ohne `Theme.dialog`-Hülle |
+| P2 | `ScrollingFrame` ohne `Theme.scroller` |
+
+Bewusste Ausnahme: Kommentar `-- ui-ok: <Grund>` am Zeilenende (ohne Grund
+zählt sie nicht).
+
+`luau-tests/ui_texts.test.lua` ergänzt das zur Laufzeit: alle Namen,
+Beschreibungen, Event-Belohnungen, Charm-/Gebäude-Effekte und verschachtelte
+Server-Nachrichten in de/en/fr/es — kein `[schlüssel]`, kein `{platzhalter}`,
+kein vergessener deutscher Text.
 
 ## `check_decor.py` — Geometrie der Gebäude
 

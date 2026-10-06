@@ -40,6 +40,7 @@
 -- mehr braucht es nicht.
 
 local Types = require(script.Parent.Parent.Network.Types)
+local Loc   = require(script.Parent.Parent.Localization.Loc)
 
 --------------------------------------------------------------------------------
 -- Slots
@@ -265,7 +266,9 @@ local function rollCharm(slot: number): Types.Charm
 end
 
 -- Lesbarer Effekt-Text ("+3.4% HP-Boost"). Server und Client benutzen
--- denselben, damit die Anzeige nicht zweimal formatiert wird.
+-- denselben, damit die Anzeige nicht zweimal formatiert wird. Text in der
+-- aktiven Sprache (Client: Spielersprache); der Name des Werts kommt aus
+-- `charm.<id>.name`, `displayName` ist nur der deutsche Rueckfall.
 local function describe(charm: Types.Charm): string
 	local statDef = getStatDef(charm.statId)
 	if not statDef then
@@ -276,10 +279,11 @@ local function describe(charm: Types.Charm): string
 	-- und PWR. PWR ist zwar technisch ein FLACHER Zuschlag, aber der Wert
 	-- selbst ist ein Anteil (0.05 = 5% mehr Ability-Schaden) — als "+0.048"
 	-- koennte ihn niemand einordnen.
+	local stat = Loc.name("charm." .. statDef.id .. ".name", statDef.displayName) -- ui-ok: Rueckfall hinter Loc
 	if statDef.mode == "percent" or statDef.target == "pwr" then
-		return string.format("+%.1f%% %s", charm.value * 100, statDef.displayName)
+		return Loc.t("charm.effect_pct", { value = Loc.formatDecimal(charm.value * 100, 1), stat = stat })
 	end
-	return string.format("+%.3f %s", charm.value, statDef.displayName)
+	return Loc.t("charm.effect_flat", { value = Loc.formatDecimal(charm.value, 3), stat = stat })
 end
 
 return {

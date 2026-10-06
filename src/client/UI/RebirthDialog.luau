@@ -208,7 +208,7 @@ function RebirthDialog.init(screenGui: ScreenGui)
 	end
 	rowIcon(-2, "rebirth", "*")
 	rowIcon(25, "gummy", "G")
-	rowIcon(144, "egg", "EI")
+	rowIcon(144, "egg", "🥚")
 
 	local cancel = Theme.button("Cancel", body, "", Theme.COLORS.panelLight)
 	Loc.bind(cancel, "ui.rebirth.cancel")

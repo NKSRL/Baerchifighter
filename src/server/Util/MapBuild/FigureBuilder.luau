@@ -21,6 +21,9 @@ local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiMesh      = require(ReplicatedStorage.Modules.BaerchiMesh)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Names     = require(ReplicatedStorage.Localization.Names)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local FigureFX         = require(ServerScriptService.Util.FigureFX)
 
@@ -37,9 +40,9 @@ function FigureBuilder.writeFigureState(model: Model, rawHp: number, maxHp: numb
 
 	local label = model:FindFirstChild("Health", true)
 	if label and label:IsA("TextLabel") then
-		label.Text = if exhausted
-			then "erschoepft"
-			else string.format("%d / %d HP", hp, maxHp)
+		WorldText.set(label, if exhausted
+			then Loc.msg("ui.world.exhausted")
+			else string.format("%d / %d HP", hp, maxHp))
 
 		label.TextColor3 = if exhausted
 			then Color3.fromRGB(255, 120, 120)
@@ -95,7 +98,6 @@ end
 -- wird diese eine Figur uebersprungen, der Rest des Plots baut sich normal.
 function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerchi, footPos: Vector3, facing: CFrame): Model?
 	local color = BaerchiConfig.getRarityColor(baerchi.rarity)
-	local def   = BaerchiConfig.getById(baerchi.configId)
 
 	-- Ein MUTIERTER Baerchi (seit v11, ersetzt das fruehere binaere Inverted)
 	-- bekommt die Farbe seiner Mutations-Stufe und leuchtet (siehe
@@ -236,18 +238,18 @@ function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerc
 		billboard.Parent      = labelAnchor
 
 		local name = MapParts.newTextLabel("Name", billboard, UDim2.fromScale(1, 0.36), UDim2.fromScale(0, 0))
-		name.Text = string.format(
-			"%s%s  Lv.%d",
-			-- Das Namensschild ist die zweite Stelle, an der eine Mutation
-			-- auffaellt (die erste ist die leuchtende Mutations-Farbe der
-			-- Figur selbst). Beides zusammen, weil die Farbe allein bei einer
-			-- Rarity mit ungewohnter Palette nicht eindeutig genug waere —
-			-- und weil ein Spieler lesen koennen soll, WELCHE der acht Stufen
-			-- es genau ist (die Farbe allein verraet das nicht zuverlaessig).
-			if baerchi.mutation then BaerchiConfig.getMutationBadge(baerchi.mutation) .. " " else "",
-			def and def.displayName or baerchi.configId,
-			baerchi.level
-		)
+		-- Name als Nachricht: jeder Spieler liest ihn in seiner Sprache (WorldText).
+		-- Das Namensschild ist die zweite Stelle, an der eine Mutation
+		-- auffaellt (die erste ist die leuchtende Mutations-Farbe der
+		-- Figur selbst). Beides zusammen, weil die Farbe allein bei einer
+		-- Rarity mit ungewohnter Palette nicht eindeutig genug waere —
+		-- und weil ein Spieler lesen koennen soll, WELCHE der acht Stufen
+		-- es genau ist (die Farbe allein verraet das nicht zuverlaessig).
+		WorldText.set(name, Loc.msg("ui.world.figure_name", {
+			badge = if baerchi.mutation then BaerchiConfig.getMutationBadge(baerchi.mutation) .. " " else "",
+			name  = Names.msg.baerchi(baerchi.configId),
+			level = baerchi.level,
+		}))
 
 		if baerchi.mutation then
 			name.TextColor3 = BaerchiConfig.getMutationColor(baerchi.mutation)

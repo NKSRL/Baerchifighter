@@ -71,6 +71,7 @@ local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
 local BaerchiMesh = require(ReplicatedStorage.Modules.BaerchiMesh)
 local FightTimeline = require(ReplicatedStorage.Modules.FightTimeline)
 local Types       = require(ReplicatedStorage.Network.Types)
+local Loc         = require(ReplicatedStorage.Localization.Loc)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
 
 local PlayerService   = require(ServerScriptService.Services.PlayerService)
@@ -191,9 +192,11 @@ end
 -- MapService; hier wird nur entschieden WAS draufsteht, weil nur dieser
 -- Service den Verlauf des Laufs kennt.
 -- v15: "Tower II · Stage 23"
-local function stageTitle(towerId: string?, stage: number): string
+-- Tafel-Texte sind Nachrichten (LocMsg): die Tafel sieht jeder Spieler auf
+-- der Plattform, und jeder liest sie in seiner Sprache (MapService/WorldText).
+local function stageTitle(towerId: string?, stage: number): Types.LocMsg
 	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
-	return string.format("Tower %s  ·  Stage %d", def.numeral, stage)
+	return Loc.msg("ui.pitboard.stage", { tower = Loc.msg("ui.petbar.tower", { numeral = def.numeral }), stage = stage })
 end
 
 local function showStage(player: Player, towerId: string?, stage: Types.PitStageResult, cleared: number)
@@ -201,8 +204,8 @@ local function showStage(player: Player, towerId: string?, stage: Types.PitStage
 		player,
 		stageTitle(towerId, stage.stage),
 		if cleared > 0
-			then string.format("%d geschafft", cleared)
-			else "erster Gegner",
+			then Loc.msg("ui.pitboard.cleared", { n = cleared })
+			else Loc.msg("ui.pitboard.first_enemy"),
 		MapConfig.PIT_BANNER_RUNNING
 	)
 end
@@ -216,9 +219,9 @@ local function showSummary(player: Player, run: Types.PitRunResult)
 	MapService.setPitBanner(
 		player,
 		if won
-			then string.format("%d Stages geschafft", run.stagesCleared)
-			else "Keine Stage geschafft",
-		string.format("%d Gummies", run.gummiesWon),
+			then Loc.msg("ui.pitboard.won", { n = run.stagesCleared })
+			else Loc.msg("ui.pitboard.none"),
+		Loc.msg("event.bonus.gummies", { n = run.gummiesWon }),
 		if won then MapConfig.PIT_BANNER_WIN else MapConfig.PIT_BANNER_LOSS
 	)
 end
@@ -572,7 +575,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				MapService.setPitBanner(
 					player,
 					stageTitle(run.towerId, run.startStage or 1),
-					"Der Turm waechst …",
+					Loc.msg("ui.pitboard.growing"),
 					MapConfig.PIT_BANNER_RUNNING
 				)
 

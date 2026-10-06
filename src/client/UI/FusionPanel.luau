@@ -41,6 +41,8 @@ local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local EconomyConfig   = require(ReplicatedStorage.Config.EconomyConfig)
 local PromotionConfig = require(ReplicatedStorage.Config.PromotionConfig)
 local SkillConfig     = require(ReplicatedStorage.Config.SkillConfig)
+local Loc             = require(ReplicatedStorage.Localization.Loc)
+local Names           = require(ReplicatedStorage.Localization.Names)
 
 local Theme        = require(script.Parent.Theme)
 local Toast        = require(script.Parent.Toast)
@@ -81,33 +83,32 @@ local _lockedFrom: string?     = nil
 -- worueber man entscheidet.
 type LockDef = {
 	id    : string,
-	label : string,
+	label : string,   -- Loc-Schluessel
 	read  : (Types.Baerchi) -> string,
 }
 
 local LOCK_DEFS: { LockDef } = {
 	{
 		id    = "ability",
-		label = "Ability",
+		label = "ui.fusion.lock_ability",
 		read  = function(baerchi: Types.Baerchi): string
-			local skill = SkillConfig.getById(baerchi.skillId)
-			return if skill then skill.displayName else baerchi.skillId
+			return Names.skill(baerchi.skillId)
 		end,
 	},
 	{
 		id    = "level",
-		label = "Level",
+		label = "ui.fusion.lock_level",
 		read  = function(baerchi: Types.Baerchi): string
 			return "Lv. " .. baerchi.level
 		end,
 	},
 	{
 		id    = "eggs",
-		label = "Eier",
+		label = "ui.fusion.lock_eggs",
 		read  = function(baerchi: Types.Baerchi): string
 			local levels = baerchi.statLevels
 			local value  = if levels then (levels.egg or 0) else 0
-			return string.format("Stufe %d", value)
+			return Loc.t("ui.fusion.stage", { n = value })
 		end,
 	},
 }
@@ -134,18 +135,18 @@ type Preview = {
 local function buildPreview(a: Types.Baerchi?, b: Types.Baerchi?): Preview
 	local data = ClientState.get()
 	if not data or not a or not b then
-		return { ok = false, headline = "Zwei Baerchis auswaehlen", detail = "" }
+		return { ok = false, headline = Loc.t("ui.fusion.pick_two"), detail = "" }
 	end
 
 	if a.uid == b.uid then
-		return { ok = false, headline = "Zwei verschiedene Baerchis noetig", detail = "" }
+		return { ok = false, headline = Loc.t("ui.fusion.need_two"), detail = "" }
 	end
 
 	if a.rarity ~= b.rarity then
 		return {
 			ok = false,
-			headline = "Rarity passt nicht",
-			detail   = "Beide Baerchis muessen dieselbe Rarity haben (" .. a.rarity .. " / " .. b.rarity .. ").",
+			headline = Loc.t("ui.fusion.rarity_mismatch"),
+			detail   = Loc.t("ui.fusion.rarity_mismatch_detail", { a = Names.rarity(a.rarity), b = Names.rarity(b.rarity) }),
 		}
 	end
 
@@ -156,14 +157,12 @@ local function buildPreview(a: Types.Baerchi?, b: Types.Baerchi?): Preview
 
 	-- v14: keine hoehere Rarity mehr — die Art des levelhoeheren Inputs.
 	local keep = if b.level > a.level then b else a
-	local keepDef = BaerchiConfig.getById(keep.configId)
-	local headline = string.format("%s  (%s)", keepDef and keepDef.displayName or keep.configId, keep.rarity)
+	local headline = string.format("%s  (%s)", Names.baerchi(keep.configId), Names.rarity(keep.rarity))
 
-	local detail = string.format(
-		"Level %d  —  Stat-Bonus +%d%%\nDie Rarity bleibt gleich. Basiswerte und Stat-Stufen: pro Stat der bessere der beiden.\nPromotion und Charms fangen bei Null an.",
-		resultLevel,
-		math.floor(bonus * 100 + 0.5)
-	)
+	local detail = Loc.t("ui.fusion.preview_detail", {
+		level = resultLevel,
+		bonus = math.floor(bonus * 100 + 0.5),
+	})
 
 	return { ok = true, headline = headline, detail = detail }
 end
@@ -174,14 +173,13 @@ end
 
 local function describe(baerchi: Types.Baerchi?): (string, Color3)
 	if not baerchi then
-		return "leer", Theme.COLORS.textDim
+		return Loc.t("ui.fusion.empty"), Theme.COLORS.textDim
 	end
 
-	local def = BaerchiConfig.getById(baerchi.configId)
 	return string.format(
 		"%s  —  %s  —  Lv. %d",
-		def and def.displayName or baerchi.configId,
-		baerchi.rarity,
+		Names.baerchi(baerchi.configId),
+		Names.rarity(baerchi.rarity),
 		baerchi.level
 	), Theme.rarityColor(baerchi.rarity)
 end
@@ -287,11 +285,10 @@ end
 
 local function showResult(result: Types.FusionResult)
 	local baerchi = result.resultBaerchi
-	local def     = BaerchiConfig.getById(baerchi.configId)
-	local name    = def and def.displayName or baerchi.configId
+	local name    = Names.baerchi(baerchi.configId)
 
 	Notify.emit("fusion_result", function()
-		Toast.success(string.format("Fusion: %s (%s) Lv. %d", name, baerchi.rarity, baerchi.level))
+		Toast.success(Loc.t("msg.fusion_done", { name = name, rarity = Names.rarity(baerchi.rarity), level = baerchi.level }))
 	end)
 
 	local root = _root
@@ -305,17 +302,20 @@ local function showResult(result: Types.FusionResult)
 		local levels = baerchi.statLevels
 		local cap    = PromotionConfig.getStatCap(baerchi.rarity)
 
-		_resultSub.Text = string.format(
-			"%s  —  Level %d\nStat-Bonus +%d%%\nStat-Stufen: HP %d  ATK %d  SPD %d  DEF %d  (max %d)",
-			baerchi.rarity,
-			baerchi.level,
-			math.floor((baerchi.fusionBonus or 0) * 100 + 0.5),
-			if levels then levels.hp  else 0,
-			if levels then levels.atk else 0,
-			if levels then levels.spd else 0,
-			if levels then levels.def else 0,
-			cap
-		)
+		-- Frueher stand hier noch DEF: das Feld gibt es seit dem Wegfall der
+		-- Verteidigung nicht mehr, string.format("%d", nil) brach ab und der
+		-- Ergebnis-Bildschirm kam nie. Jetzt die fuenf echten Stat-Stufen.
+		_resultSub.Text = Loc.t("ui.fusion.result_detail", {
+			rarity = Names.rarity(baerchi.rarity),
+			level  = baerchi.level,
+			bonus  = math.floor((baerchi.fusionBonus or 0) * 100 + 0.5),
+			hp     = if levels then levels.hp  or 0 else 0,
+			atk    = if levels then levels.atk or 0 else 0,
+			spd    = if levels then levels.spd or 0 else 0,
+			pwr    = if levels then levels.pwr or 0 else 0,
+			egg    = if levels then levels.egg or 0 else 0,
+			cap    = cap,
+		})
 	end
 
 	showView("result")
@@ -334,7 +334,7 @@ function FusionPanel.init(screenGui: ScreenGui)
 	)
 	_root = root
 
-	Theme.dialogHeader(root, "Fusion", function()
+	Theme.dialogHeader(root, Loc.t("ui.fusion.title"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 
@@ -353,7 +353,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 		_slotLabels[slot] = label
 	end
 
-	local arrow = Theme.label("Arrow", selectView, "wird zu")
+	local arrow = Theme.label("Arrow", selectView, "")
+	Loc.bind(arrow, "ui.fusion.becomes")
 	arrow.Position       = UDim2.new(0, 4, 0, 58)
 	arrow.Size           = UDim2.new(1, -8, 0, 18)
 	arrow.TextXAlignment = Enum.TextXAlignment.Center
@@ -375,7 +376,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 	detail.TextXAlignment = Enum.TextXAlignment.Center
 	_detailLabel = detail
 
-	local back = Theme.button("Back", selectView, "Zurueck", Theme.COLORS.panelLight)
+	local back = Theme.button("Back", selectView, "", Theme.COLORS.panelLight)
+	Loc.bind(back, "ui.common.back")
 	back.AnchorPoint = Vector2.new(0, 1)
 	back.Position    = UDim2.new(0, 0, 1, 0)
 	back.Size        = UDim2.new(0.5, -6, 0, 36)
@@ -384,7 +386,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 		PanelManager.open("Inventory")
 	end)
 
-	local next_ = Theme.button("Next", selectView, "Weiter", Theme.COLORS.gummy)
+	local next_ = Theme.button("Next", selectView, "", Theme.COLORS.gummy)
+	Loc.bind(next_, "ui.common.next")
 	next_.AnchorPoint = Vector2.new(1, 1)
 	next_.Position    = UDim2.new(1, -8, 1, 0)
 	next_.Size        = UDim2.new(0.5, -6, 0, 36)
@@ -400,9 +403,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 	lockView.Visible = false
 	_lockView = lockView
 
-	local lockHint = Theme.bodyText("LockHint", lockView,
-		"Genau EINE Eigenschaft darf von einem bestimmten Baerchi kommen — auch die schlechtere. "
-		.. "Alles auf 'auto' nimmt jeweils das Bessere.")
+	local lockHint = Theme.bodyText("LockHint", lockView, "")
+	Loc.bind(lockHint, "ui.fusion.lock_hint")
 	lockHint.Position = UDim2.new(0, 4, 0, 0)
 	lockHint.Size     = UDim2.new(1, -8, 0, 40)
 
@@ -413,7 +415,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 		rowFrame.Position = UDim2.new(0, 0, 0, y)
 		rowFrame.Size     = UDim2.new(1, -8, 0, 46)
 
-		local name = Theme.label("Name", rowFrame, def.label)
+		local name = Theme.label("Name", rowFrame, "")
+		Loc.bind(name, def.label)
 		name.Position   = UDim2.new(0, 10, 0, 2)
 		name.Size       = UDim2.new(0, 70, 0, 20)
 		name.TextScaled = false
@@ -438,6 +441,7 @@ function FusionPanel.init(screenGui: ScreenGui)
 		local choices = { "auto", "A", "B" }
 		for order, choice in choices do
 			local button = Theme.button("Choice_" .. choice, rowFrame, choice, Theme.COLORS.panelLight)
+		if choice == "auto" then Loc.bind(button, "ui.fusion.auto") end
 			button.AnchorPoint = Vector2.new(1, 0.5)
 			button.Position    = UDim2.new(1, -8 - (3 - order) * 46, 0.5, 0)
 			button.Size        = UDim2.new(0, 42, 0, 28)
@@ -473,7 +477,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 		})
 	end
 
-	local lockBack = Theme.button("LockBack", lockView, "Zurueck", Theme.COLORS.panelLight)
+	local lockBack = Theme.button("LockBack", lockView, "", Theme.COLORS.panelLight)
+	Loc.bind(lockBack, "ui.common.back")
 	lockBack.AnchorPoint = Vector2.new(0, 1)
 	lockBack.Position    = UDim2.new(0, 0, 1, 0)
 	lockBack.Size        = UDim2.new(0.5, -6, 0, 36)
@@ -483,7 +488,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 		FusionPanel.refresh()
 	end)
 
-	local confirm = Theme.button("Confirm", lockView, "Fusionieren", Theme.COLORS.gummy)
+	local confirm = Theme.button("Confirm", lockView, "", Theme.COLORS.gummy)
+	Loc.bind(confirm, "ui.fusion.fuse")
 	confirm.AnchorPoint = Vector2.new(1, 1)
 	confirm.Position    = UDim2.new(1, -8, 1, 0)
 	confirm.Size        = UDim2.new(0.5, -6, 0, 36)
@@ -499,7 +505,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 	resultView.Visible = false
 	_resultView = resultView
 
-	local resultHint = Theme.label("Hint", resultView, "Fusion geglueckt")
+	local resultHint = Theme.label("Hint", resultView, "")
+	Loc.bind(resultHint, "ui.fusion.success")
 	resultHint.Position       = UDim2.new(0, 4, 0, 6)
 	resultHint.Size           = UDim2.new(1, -8, 0, 22)
 	resultHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -517,7 +524,8 @@ function FusionPanel.init(screenGui: ScreenGui)
 	resultSub.TextXAlignment = Enum.TextXAlignment.Center
 	_resultSub = resultSub
 
-	local done = Theme.button("Done", resultView, "Zum Inventar", Theme.COLORS.accent)
+	local done = Theme.button("Done", resultView, "", Theme.COLORS.accent)
+	Loc.bind(done, "ui.fusion.to_inventory")
 	done.AnchorPoint = Vector2.new(0.5, 1)
 	done.Position    = UDim2.new(0.5, -4, 1, 0)
 	done.Size        = UDim2.new(1, -8, 0, 36)
@@ -537,6 +545,11 @@ function FusionPanel.init(screenGui: ScreenGui)
 	Remotes.FusionResultReceived.OnClientEvent:Connect(function(result: any)
 		if typeof(result) ~= "table" then return end
 		showResult(result :: Types.FusionResult)
+	end)
+
+	-- Sprachwechsel bei offenem Fenster: Vorschau und Zeilen neu beschriften
+	Loc.onChanged(function()
+		FusionPanel.refresh()
 	end)
 
 	print("[FusionPanel] Initialisiert")

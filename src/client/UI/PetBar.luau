@@ -26,6 +26,8 @@ local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local Loc              = require(ReplicatedStorage.Localization.Loc)
+local Names            = require(ReplicatedStorage.Localization.Names)
 
 local Theme           = require(script.Parent.Theme)
 local UiScale         = require(script.Parent.UiScale)
@@ -93,11 +95,10 @@ end
 local function eventLine(): string
 	local remaining = _phaseEndsAt - os.clock()
 	if _eventId then
-		local def = EventConfig.getById(_eventId)
-		return string.format("%s  %s", if def then def.displayName else _eventId, clock(remaining))
+		return string.format("%s  %s", Names.event(_eventId), clock(remaining))
 	end
 	if _nextEventId then
-		return "Naechstes Event in " .. clock(remaining)
+		return Loc.t("ui.petbar.next_event", { time = clock(remaining) })
 	end
 	return ""
 end
@@ -105,7 +106,7 @@ end
 -- "Tower II" fuer eine Tower-Id.
 local function towerLabel(towerId: string?): string
 	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
-	return "Tower " .. def.numeral
+	return Loc.t("ui.petbar.tower", { numeral = def.numeral })
 end
 
 -- HP-Anteil des ausgeruesteten Baerchis (nil = keiner da) und der gewaehlte
@@ -196,44 +197,49 @@ local function refresh()
 	local hasPet = hpRatio ~= nil
 
 	-- --------------------------------------------------------------- Event
+	local eventTitle = Loc.t("ui.petbar.event")
+	local recall     = Loc.t("ui.petbar.recall")
+	local waiting    = Loc.t("ui.petbar.waiting")
 	if not hasPet then
-		paint(event, "Event", "Kein Baerchi ausgeruestet", "disabled")
+		paint(event, eventTitle, Loc.t("err.event_no_equipped"), "disabled")
 	elseif _abducting then
-		paint(event, "Event", "Vom UFO entfuehrt …", "disabled")
+		paint(event, eventTitle, Loc.t("ui.petbar.abducted"), "disabled")
 	elseif _state == "ToEvent" then
-		paint(event, "Zurueckholen", "laeuft hin • " .. eventLine(), "active")
+		paint(event, recall, Loc.t("ui.petbar.walking_to", { line = eventLine() }), "active")
 	elseif _state == "AtEvent" then
-		paint(event, "Zurueckholen", eventLine(), "active")
+		paint(event, recall, eventLine(), "active")
 	elseif _pending == "Event" then
-		paint(event, "wartet …", "erst heim, dann hin • Klick bricht ab", "waiting")
+		paint(event, waiting, Loc.t("ui.petbar.pending_event"), "waiting")
 	elseif _state == "Returning" and _from == "Event" then
-		paint(event, "Event", "kommt heim …", "normal")
+		paint(event, eventTitle, Loc.t("ui.petbar.coming_home"), "normal")
 	elseif FeatureFlags.isOn("EVENT_V2_TIMER") then
 		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
 		-- keine Woerter.
 		setEventIcon(event, _eventId or _nextEventId)
 		paint(event, clock(_phaseEndsAt - os.clock()), "", "normal")
 	else
-		paint(event, "Event", eventLine(), "normal")
+		paint(event, eventTitle, eventLine(), "normal")
 	end
 
 	-- --------------------------------------------------------------- Fight
 	local hpText = if hpRatio then string.format("HP %d%%  •  %s", math.floor(hpRatio * 100 + 0.5), towerLabel(selectedTower)) else ""
 
+	local fightTitle = Loc.t("ui.petbar.fight")
 	if not hasPet then
-		paint(fight, "Fight", "Kein Baerchi ausgeruestet", "disabled")
+		paint(fight, fightTitle, Loc.t("err.event_no_equipped"), "disabled")
 	elseif _state == "ToPit" then
-		paint(fight, "Zurueckholen", "laeuft in den PIT …", "active")
+		paint(fight, recall, Loc.t("ui.petbar.walking_pit"), "active")
 	elseif _state == "InPit" then
-		paint(fight, "Zurueckholen", if _stage then towerLabel(_tower or selectedTower) .. " · Stage " .. _stage else towerLabel(_tower or selectedTower), "active")
+		local tower = towerLabel(_tower or selectedTower)
+		paint(fight, recall, if _stage then Loc.t("ui.petbar.in_pit_stage", { tower = tower, stage = _stage }) else tower, "active")
 	elseif _pending == "Fight" then
-		paint(fight, "wartet …", "erst heim, dann PIT • Klick bricht ab", "waiting")
+		paint(fight, waiting, Loc.t("ui.petbar.pending_fight"), "waiting")
 	elseif _state == "Returning" and _from == "Fight" then
-		paint(fight, "Fight", "kommt heim …", "normal")
+		paint(fight, fightTitle, Loc.t("ui.petbar.coming_home"), "normal")
 	elseif (hpRatio or 0) <= 0 then
-		paint(fight, "Fight", "Zu erschoepft — erst Honig", "disabled")
+		paint(fight, fightTitle, Loc.t("ui.petbar.exhausted"), "disabled")
 	else
-		paint(fight, "Fight", hpText, "normal")
+		paint(fight, fightTitle, hpText, "normal")
 	end
 end
 
@@ -322,7 +328,8 @@ local function buildButton(parent: Instance, name: string, color: Color3, order:
 	icon.Size        = UDim2.fromOffset(60, 60)
 	icon.ZIndex      = 4
 
-	local title = Theme.label("Title", button, name)
+	-- Beschriftung setzt refresh() (in der Spielersprache); `name` ist nur der Instanz-Name
+	local title = Theme.label("Title", button, "")
 	title.Position       = UDim2.new(0, 64, 0, 6)
 	title.Size           = UDim2.new(1, -72, 0, 30)
 	title.TextXAlignment = Enum.TextXAlignment.Center
@@ -398,6 +405,7 @@ function PetBar.init(screenGui: ScreenGui)
 	end)
 
 	ClientState.onChanged(refresh)
+	Loc.onChanged(function() refresh() end)
 
 	-- Restzeit des Events jede Sekunde nachziehen
 	local accumulator = 0

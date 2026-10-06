@@ -22,6 +22,8 @@ local CombConfig = require(ReplicatedStorage.Config.CombConfig)
 local MapConfig  = require(ReplicatedStorage.Config.MapConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types      = require(ReplicatedStorage.Network.Types)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 
@@ -52,16 +54,18 @@ function RecyclerBuilder.writeState(body: BasePart, recycler: Types.RecyclerData
 
 	local title = sign:FindFirstChild("Title")
 	if title and title:IsA("TextLabel") then
-		title.Text = string.format("%s  Lv.%d", CombConfig.RECYCLER_NAME, recycler.level)
+		WorldText.set(title, Loc.msg("ui.world.sign_level", {
+			name = Loc.msg("ui.recycler.name"), level = recycler.level,
+		}))
 	end
 
 	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
 		if recycler.queued > 0 then
-			stock.Text = string.format("Waben: %d", recycler.queued)
+			WorldText.set(stock, Loc.msg("ui.world.combs_queued", { n = recycler.queued }))
 			stock.TextColor3 = CombConfig.LAMP_ACTIVE_COLOR
 		else
-			stock.Text = string.format("%d Gummies je Wabe", CombConfig.getPayPerUnit(recycler.level))
+			WorldText.set(stock, Loc.msg("ui.world.gummies_per_comb", { n = CombConfig.getPayPerUnit(recycler.level) }))
 			stock.TextColor3 = Color3.fromRGB(235, 235, 235)
 		end
 	end

@@ -329,13 +329,13 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 		st.abducting     = true
 		part.abducting   = true
 		taken[part.player] = true
-		setLabel(part, "ENTFUEHRT!")
+		setLabel(part, Loc.msg("ev.label.abducted"))
 
 		task.spawn(function()
 			local ok, err = pcall(function()
 				local figure = part.figure
 				local player = part.player
-				api.toast(player, "UFO: Dein Baerchi wird entfuehrt!")
+				api.toast(player, Loc.msg("ev.ufo.abducted"))
 
 				local startFoot = api.footOf(figure)
 				local here      = ringCenterAt(Workspace:GetServerTimeNow())
@@ -349,14 +349,14 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				-- 2) Transport zum Plot des Spielers
 				local plotPos = api.plotPosition(player)
 				local overPlot = (plotPos or ufoFoot) + Vector3.new(0, UFO_TRANSPORT_HEIGHT, 0)
-				setLabel(part, "Transport...")
+				setLabel(part, Loc.msg("ev.label.transport"))
 				moveFoot(figure, ufoFoot, overPlot, UFO_TRANSPORT_SECONDS, math.pi * 2 * UFO_TRANSPORT_TURNS)
 
 				-- 3) Wartezeit ueber dem Plot
 				local waitStart = os.clock()
 				while os.clock() - waitStart < cfg.ABDUCT_WAIT_SECONDS do
 					local left = math.ceil(cfg.ABDUCT_WAIT_SECONDS - (os.clock() - waitStart))
-					setLabel(part, string.format("Landung in %ds", left))
+					setLabel(part, Loc.msg("ev.label.landing", { s = left }))
 					local hovered = os.clock() - waitStart
 					FigurePlacement.place(
 						figure,
@@ -387,8 +387,8 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 		sb.fightUntil = now + cfg.FIGHT_SECONDS
 		fightPause    = now + cfg.FIGHT_SECONDS
 		a.cancelWalk, b.cancelWalk = true, true
-		setLabel(a, "KAMPF!")
-		setLabel(b, "KAMPF!")
+		setLabel(a, Loc.msg("ev.label.fight"))
+		setLabel(b, Loc.msg("ev.label.fight"))
 
 		task.spawn(function()
 			local ok, err = pcall(function()
@@ -398,8 +398,8 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				-- Verlierer: aus dem Ring gedraengt, beginnt von vorne.
 				sl.progress  = 0
 				sl.coolUntil = os.clock() + cfg.LOSER_COOLDOWN_SECONDS
-				api.toast(loser.player, "Kampf verloren - Beam-Fortschritt zurueckgesetzt")
-				api.toast(winner.player, "Kampf gewonnen!")
+				api.toast(loser.player, Loc.msg("ev.ufo.fight_lost"))
+				api.toast(winner.player, Loc.msg("ev.ufo.fight_won"))
 				setLabel(winner, nil)
 				setLabel(loser, nil)
 
@@ -422,7 +422,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 			setLabel(part, nil)
 		end
 		for _, part in api.participants() do
-			api.toast(part.player, "UFO: Der Beam wurde zurueckgesetzt - alle Countdowns beginnen von vorne")
+			api.toast(part.player, Loc.msg("ev.ufo.beam_reset"))
 		end
 		setBeam(false)
 		task.delay(cfg.BEAM_REOPEN_SECONDS, function()
@@ -434,9 +434,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	end
 
 	for _, part in api.participants() do
-		api.toast(part.player, string.format(
-			"UFO: Geh in den Strahl! %ds Beam-Fortschritt bis zur Entfuehrung", cfg.BEAM_REQUIRED_SECONDS
-		))
+		api.toast(part.player, Loc.msg("ev.ufo.go_beam", { s = cfg.BEAM_REQUIRED_SECONDS }))
 	end
 	api.announce(Loc.msg("msg.ufo.patrol"), "info")
 
@@ -763,8 +761,8 @@ function EventHandlers.HotEgg(api: Api, def: EventConfig.EventDef): Session
 					Color = HOT_EGG_FIRE_COLOR, SecondaryColor = HOT_EGG_FIRE_COLOR_2,
 				}, root)
 			end
-			setLabel(part, "HEISSES EI!")
-			api.toast(part.player, "Du hast das heisse Ei! Gib es per Beruehrung weiter.")
+			setLabel(part, Loc.msg("ev.label.hot_egg"))
+			api.toast(part.player, Loc.msg("ev.hot_egg.you_have"))
 		end
 	end
 
@@ -956,7 +954,7 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 					if up and t > kingTime then
 						king, kingTime = part, t
 					end
-					setLabel(part, string.format("%ds oben", math.floor(seconds[part.player] or 0)))
+					setLabel(part, Loc.msg("ev.label.on_top", { s = math.floor(seconds[part.player] or 0) }))
 				end
 
 				for _, part in parts do
@@ -1010,8 +1008,8 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 									local ok2, err2 = pcall(function()
 										local winner, loser = duel(api, a, b, cfg.DUEL_SECONDS)
 										coolUntil[loser] = os.clock() + cfg.LOSER_COOLDOWN_SECONDS
-										api.toast(loser.player, "Vom Huegel gestossen!")
-										api.toast(winner.player, "Du haeltst den Huegel!")
+										api.toast(loser.player, Loc.msg("ev.king.pushed"))
+										api.toast(winner.player, Loc.msg("ev.king.holding"))
 										api.walkTo(loser, loser.standFoot)
 									end)
 									if not ok2 then
@@ -1082,7 +1080,7 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 		local player  = part.player
 
 		finds[player] = finds[player] or 0
-		api.toast(player, string.format("Schatzgraeber: %d Fundstellen - Vorsicht, Bomben!", sites))
+		api.toast(player, Loc.msg("ev.treasure.start", { n = sites }))
 
 		for i = 1, sites do
 			if not running or not api.stillHere(part) then return end
@@ -1101,7 +1099,7 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 			end
 
 			-- graben
-			setLabel(part, string.format("Graebt %d/%d", i, sites))
+			setLabel(part, Loc.msg("ev.label.digging", { i = i, n = sites }))
 			pcall(FigureFX.idleBob, part.figure, DIG_BOB)
 			local t0 = os.clock()
 			while os.clock() - t0 < digTime do
@@ -1126,18 +1124,18 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 				finds[player] = 0
 				bombed[player] = true
 				setLabel(part, nil)
-				api.toast(player, "BOMBE! Dein Baerchi ist besiegt - die Beute ist weg")
+				api.toast(player, Loc.msg("ev.treasure.bomb"))
 				api.recall(player)
 				return
 			end
 
 			finds[player] += 1
 			pcall(FigureFX.burstAt, pos + Vector3.new(0, FIND_BURST_LIFT, 0), FIND_COLOR, folder, FIND_BURST_COUNT)
-			api.toast(player, string.format("Fund! (%d)", finds[player]))
+			api.toast(player, Loc.msg("ev.treasure.find", { n = finds[player] }))
 		end
 
 		setLabel(part, nil)
-		api.toast(player, string.format("Alle Fundstellen geleert: %d Funde", finds[player]))
+		api.toast(player, Loc.msg("ev.treasure.done", { n = finds[player] }))
 		if api.walkTo(part, part.standFoot) and running and api.stillHere(part) then
 			pcall(FigureFX.idleBob, part.figure, DIG_BOB)
 		end

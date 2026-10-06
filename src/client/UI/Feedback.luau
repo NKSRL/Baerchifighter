@@ -47,7 +47,7 @@ export type Origin = GuiObject | Vector3 | BasePart
 local LOOK: { [string]: { icon: string?, text: string, color: Color3, float: boolean, me: boolean? } } = {
 	gummies     = { icon = "gummy",     text = "G",  color = Theme.COLORS.gummy,     float = false },
 	goldGummies = { icon = "goldgummy", text = "$",  color = Theme.COLORS.goldGummy, float = false },
-	eggs        = { icon = "egg",       text = "EI", color = Theme.COLORS.text,      float = false },
+	eggs        = { icon = "egg",       text = "🥚", color = Theme.COLORS.text,      float = false },
 	xp          = { icon = nil,         text = "XP", color = Theme.COLORS.growth,    float = true },
 	honey       = { icon = "honey",     text = "",   color = Theme.COLORS.volume,    float = true },
 	level       = { icon = nil,         text = "Lv", color = Theme.COLORS.good,      float = true },

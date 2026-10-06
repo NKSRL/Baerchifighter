@@ -72,6 +72,17 @@ local EggService      = require(ServerScriptService.Services.EggService)
 local CombRecyclerService = require(ServerScriptService.Services.CombRecyclerService)
 local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
 local Loc           = require(ReplicatedStorage.Localization.Loc)
+local Names         = require(ReplicatedStorage.Localization.Names)
+
+-- Meldungsteile verbinden, ohne einen Satz zu bauen: der Client setzt die
+-- Teile in seiner Sprache zusammen ("{a}  •  {b}" bzw. "{a}  {b}").
+local function joinMsg(a: (string | Types.LocMsg)?, b: string | Types.LocMsg): string | Types.LocMsg
+	if a == nil then return b end
+	return Loc.msg("fmt.join", { a = a, b = b })
+end
+local function appendMsg(a: string | Types.LocMsg, b: string | Types.LocMsg): Types.LocMsg
+	return Loc.msg("fmt.append", { a = a, b = b })
+end
 
 local EventParticipationService = {}
 
@@ -491,7 +502,7 @@ end
 -- Zahlt den Zusatz-Ertrag eines Events aus (EventConfig.EventDef.bonus).
 --
 -- Gibt zurueck:
---   1. einen fertigen Anzeigetext ("+1x Goldenes Ei"), oder nil wenn es
+--   1. eine Nachricht (LocMsg, "+1x Goldenes Ei"), oder nil wenn es
 --      nichts zu melden gibt (Event ohne Bonus, oder Mutations-Wurf daneben),
 --   2. die neue Mutation, falls dieses Event dem Baerchi eine verschafft hat.
 --
@@ -502,7 +513,7 @@ local function awardBonus(
 	data: Types.PlayerData,
 	baerchi: Types.Baerchi,
 	bonus: EventConfig.EventBonus?
-): (string?, Types.MutationId?)
+): ((string | Types.LocMsg)?, Types.MutationId?)
 
 	if not bonus then
 		return nil, nil
@@ -527,9 +538,9 @@ local function awardBonus(
 		end
 
 		if added <= 0 then
-			return "Honig-Lager waren schon voll", nil
+			return Loc.msg("ev.bonus.honey_full"), nil
 		end
-		return string.format("+%d Honig", added), nil
+		return Loc.msg("ev.bonus.honey", { n = added }), nil
 	end
 
 	-- EIER ins Lager, nicht in einen Brut-Slot: die Brut startet der Spieler
@@ -556,22 +567,21 @@ local function awardBonus(
 		end
 		data.island.eggStock[eggType] = (data.island.eggStock[eggType] or 0) + amount
 
-		local eggDef = EggConfig.data[eggType]
-		local text = string.format("+%dx %s", amount, if eggDef then eggDef.displayName else eggType)
-		if isJump then
-			text ..= " (Sprung-Ei!)"
-		end
+		local text: string | Types.LocMsg = Loc.msg(
+			if isJump then "ev.bonus.eggs_jump" else "ev.bonus.eggs",
+			{ n = amount, egg = Names.msg.egg(eggType) }
+		)
 
 		-- Blaupause (Koenigshuegel, Schatzgraeber mit 5 Funden)
 		if (bonus.blueprintChance or 0) > 0 and math.random() < (bonus.blueprintChance :: number) then
 			EggTreeService.grantBlueprint(player, data, 1)
-			text ..= "  +1 Blaupause!"
+			text = appendMsg(text, Loc.msg("ev.bonus.blueprint"))
 		end
 
 		-- Notfall-Ei (zusaetzlich, siehe EventConfig.EMERGENCY_BASIC_EGG_CHANCE)
 		if math.random() < EventConfig.EMERGENCY_BASIC_EGG_CHANCE then
 			data.island.eggStock.BasicEgg = (data.island.eggStock.BasicEgg or 0) + 1
-			text ..= "  +1 Basis-Ei"
+			text = appendMsg(text, Loc.msg("ev.bonus.basic_egg"))
 		end
 
 		return text, nil
@@ -585,7 +595,7 @@ local function awardBonus(
 		if final <= 0 then
 			return nil, nil
 		end
-		return string.format("+%d Gummies", final), nil
+		return Loc.msg("ev.bonus.gummies", { n = final }), nil
 	end
 
 	if bonus.kind == "goldGummies" then
@@ -593,7 +603,7 @@ local function awardBonus(
 		if final <= 0 then
 			return nil, nil
 		end
-		return string.format("+%d GoldGummies", final), nil
+		return Loc.msg("ev.bonus.gold", { n = final }), nil
 	end
 
 	-- MUTATION: zwei getrennte Wuerfe. Erst die Event-Chance (kommt ueberhaupt
@@ -614,17 +624,11 @@ local function awardBonus(
 		-- eintauschen. Der Fehlversuch wird trotzdem gemeldet — ein Treffer,
 		-- der nichts veraendert, saehe sonst aus wie ein verschlucktes Ergebnis.
 		if better == baerchi.mutation then
-			return string.format(
-				"Mutations-Wurf: %s — schwaecher als seine, bleibt wie es ist",
-				BaerchiConfig.getMutationDisplayName(rolled)
-			), nil
+			return Loc.msg("ev.bonus.mutation_weaker", { mutation = Names.msg.mutation(rolled) }), nil
 		end
 
 		baerchi.mutation = better
-		return string.format(
-			"MUTATION: %s!",
-			BaerchiConfig.getMutationDisplayName(better :: Types.MutationId)
-		), better
+		return Loc.msg("ev.bonus.mutation", { mutation = Names.msg.mutation(better :: Types.MutationId) }), better
 	end
 
 	return nil, nil
@@ -647,15 +651,15 @@ end
 -- v17: Zusatz-Belohnungen eines Handler-Ergebnisses (Boss): Gummies,
 -- Wabeneinheiten, zweites Ei, Rarity-Up-Wurf. Waehrungen ueber
 -- EconomyService, Waben ueber CombRecyclerService, nie direkt.
--- Gibt (Meldungen als LocMsg, Text des zweiten Eis, neue Rarity) zurueck.
+-- Gibt (Meldungen als LocMsg, Meldung des zweiten Eis, neue Rarity) zurueck.
 local function awardExtras(
 	player: Player,
 	data: Types.PlayerData,
 	baerchi: Types.Baerchi,
 	result: EventHandlers.Reward
-): ({ Types.LocMsg }, string?, string?)
+): ({ Types.LocMsg }, (string | Types.LocMsg)?, string?)
 	local notes: { Types.LocMsg } = {}
-	local eggText: string? = nil
+	local eggText: (string | Types.LocMsg)? = nil
 
 	if result.extraEgg then
 		eggText = awardBonus(player, data, baerchi, result.extraEgg)
@@ -666,7 +670,7 @@ local function awardExtras(
 	if result.tierBonus then
 		local tierText = awardBonus(player, data, baerchi, result.tierBonus)
 		if tierText then
-			eggText = if eggText then eggText .. "  •  " .. tierText else tierText
+			eggText = joinMsg(eggText, tierText)
 		end
 	end
 	if (result.tierEggs or 0) > 0 then
@@ -768,7 +772,7 @@ local function onEventEnded(finished: EventConfig.EventDef)
 		-- des Handlers.
 		local notes, extraEggText, rarityUp = awardExtras(player, data, baerchi, result)
 		if extraEggText then
-			bonusText = if bonusText then bonusText .. "  •  " .. extraEggText else extraEggText
+			bonusText = joinMsg(bonusText, extraEggText)
 		end
 		if player.Parent ~= nil then
 			if result.notice then
@@ -830,16 +834,17 @@ local function onEventEnded(finished: EventConfig.EventDef)
 			)
 		end
 
-		local statText = "keine Stat-Stufe (nur das UFO gibt welche)"
+		-- Nur Server-Log (kein Spieler sieht das)
+		local statText = "no stat level"
 		if key then
-			statText = string.format("%s Stufe %d/%d", key, gain.newLevel, gain.cap)
+			statText = string.format("%s %d/%d", key, gain.newLevel, gain.cap)
 		end
 
 		print(
 			"[EventParticipationService]", player.Name,
 			"|", finished.id,
 			"→", statText,
-			if bonusText then "| " .. bonusText else ""
+			if bonusText then "| " .. Loc.resolve(bonusText) else ""
 		)
 	end
 
@@ -859,7 +864,7 @@ end
 --------------------------------------------------------------------------------
 
 -- Meldung an den Spieler waehrend eines Events (Toast beim Client).
-local function toast(player: Player, text: string)
+local function toast(player: Player, text: string | Types.LocMsg)
 	if player.Parent == nil then
 		return
 	end
@@ -938,14 +943,14 @@ local function applyUfoReward(presence: any)
 		)
 	end
 
-	local parts: { string } = {}
-	if #gained > 0 then
-		table.insert(parts, "+1 " .. table.concat(gained, "/"))
-	else
-		table.insert(parts, "alle Stats am Maximum")
-	end
+	-- "+1 HP/ATK/SPD" ist sprachneutral; alles andere als Nachricht
+	local summary: string | Types.LocMsg = if #gained > 0
+		then "+1 " .. table.concat(gained, "/")
+		else Loc.msg("msg.event_all_max")
 	if rarityUp then
-		table.insert(parts, string.format("RARITY UP: %s -> %s!", oldRarity, rarityUp))
+		summary = joinMsg(summary, Loc.msg("msg.event.rarity_up", {
+			from = Loc.msg("rarity." .. oldRarity), to = Loc.msg("rarity." .. rarityUp),
+		}))
 	end
 
 	local gain: any = {
@@ -954,7 +959,7 @@ local function applyUfoReward(presence: any)
 		statKey    = nil,
 		newLevel   = 0,
 		cap        = PromotionConfig.getStatCap(baerchi.rarity),
-		bonusText  = "UFO: " .. table.concat(parts, "  •  "),
+		bonusText  = Loc.msg("ev.ufo.reward_line", { text = summary }),
 		mutation   = nil,
 		midEvent   = true,
 		rarityUp   = rarityUp,

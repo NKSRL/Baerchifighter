@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local Types            = require(ReplicatedStorage.Network.Types)
+local WorldText        = require(ReplicatedStorage.Localization.WorldText)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
 local EventKit = {}
@@ -47,7 +48,7 @@ export type Api = {
 	plotPosition : (Player) -> Vector3?,
 	level        : (Part) -> number,
 	power        : (Part) -> number,
-	toast        : (Player, string) -> (),
+	toast        : (Player, string | Types.LocMsg) -> (),
 	recall       : (Player) -> (),
 	finishHome   : (Part) -> (),
 	ufoReward    : (Part) -> (),
@@ -130,7 +131,9 @@ function EventKit.rootOf(figure: Model): BasePart?
 end
 
 -- Kleine Textmarke ueber der Figur (Fortschritt, "Ei!", ...). nil entfernt sie.
-function EventKit.setLabel(part: Part, text: string?)
+-- Woerter kommen als Nachricht (Loc.msg): alle Spieler sehen die Marke, jeder
+-- liest sie in seiner Sprache (siehe WorldText). Reine Zahlen gehen als String.
+function EventKit.setLabel(part: Part, text: (string | Types.LocMsg)?)
 	local figure = part.figure
 	if not figure or not figure.Parent then
 		return
@@ -171,7 +174,7 @@ function EventKit.setLabel(part: Part, text: string?)
 
 	local label = (gui :: Instance):FindFirstChild("Text")
 	if label and label:IsA("TextLabel") then
-		label.Text = text
+		WorldText.set(label, text :: string | Types.LocMsg)
 	end
 end
 

@@ -211,6 +211,9 @@ UI_CALL = re.compile(r"Theme\.(label|button|bigButton|bodyText|sectionLabel|dial
 SKIP_LINE = re.compile(r"\b(print|warn|error|assert)\s*\(|require\(|GetService|WaitForChild|FindFirstChild")
 
 
+CONFIG_FALLBACK = re.compile(r"\b(displayName|description|drawback|shortName|rewardText|actionText)\s*=\s*\"")
+
+
 def find_open_texts(src):
     result = {}
     for path in lua_files(src):
@@ -222,6 +225,10 @@ def find_open_texts(src):
         for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             line = strip_comment(raw)
             if not line.strip() or SKIP_LINE.search(line):
+                continue
+            # Deutscher Rueckfall-Text in Configs: angezeigt wird der
+            # Loc-Schluessel (Names), das prueft check_ui.py (Regel T4).
+            if CONFIG_FALLBACK.search(line):
                 continue
             is_ui = bool(UI_CALL.search(line))
             for text in STRING.findall(line):
@@ -276,6 +283,8 @@ def main():
         for rel, hits in sorted(open_texts.items(), key=lambda kv: -len(kv[1]))[:12]:
             print(f"  {len(hits):>4}  {rel}")
         print("  (alle Stellen: python3 tools/check_loc.py --todo)")
+    print("  Verbindlich fuer Spieler-Texte ist tools/check_ui.py (zerlegt den Code statt zu raten;")
+    print("  die Heuristik hier meldet auch mehrzeilige Log-Ausgaben).")
 
     print()
     if errors:

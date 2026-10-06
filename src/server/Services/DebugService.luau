@@ -112,6 +112,7 @@ local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
+local Loc = require(ReplicatedStorage.Localization.Loc)   -- Belohnung ist eine LocMsg
 local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiFactory   = require(ReplicatedStorage.Modules.BaerchiFactory)
@@ -772,7 +773,7 @@ commands.skipevent = function(_player, _data)
 	local active = EventService.getActive()
 	return {
 		laeuftJetzt  = if active then active.displayName else "Pause",
-		belohnung    = if active then EventConfig.describeReward(active) else nil,
+		belohnung    = if active then Loc.resolve(EventConfig.describeReward(active)) else nil,
 		naechstes    = EventService.getNext().displayName,
 		restSekunden = EventService.getRemainingSeconds(),
 	}
@@ -785,7 +786,7 @@ commands.events = function(_player, _data)
 	for index, def in EventConfig.EVENTS do
 		table.insert(katalog, string.format(
 			"%d. %s (%s) — %s",
-			index, def.displayName, def.id, EventConfig.describeReward(def)
+			index, def.displayName, def.id, Loc.resolve(EventConfig.describeReward(def))
 		))
 	end
 
@@ -822,7 +823,7 @@ commands.startevent = function(_player, _data, id: any)
 	local active = EventService.getActive()
 	return {
 		gestartet    = if active then active.displayName else "?",
-		belohnung    = if active then EventConfig.describeReward(active) else nil,
+		belohnung    = if active then Loc.resolve(EventConfig.describeReward(active)) else nil,
 		restSekunden = EventService.getRemainingSeconds(),
 		hinweis      = "jetzt 'event' aufrufen, um den Baerchi hinzuschicken — er muss beim ENDE dort stehen",
 	}

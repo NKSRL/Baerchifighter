@@ -26,6 +26,9 @@ local EggConfig = require(ReplicatedStorage.Config.EggConfig)
 local MapConfig = require(ReplicatedStorage.Config.MapConfig)
 local Remotes   = require(ReplicatedStorage.Network.Remotes)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)  -- HBB Paket 5
+local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Names     = require(ReplicatedStorage.Localization.Names)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local EggService = require(ServerScriptService.Services.EggService)
 
@@ -158,7 +161,7 @@ local function onTriggered(player: Player)
 	if not (root and root:IsA("BasePart")) then return end
 
 	if (root.Position - counter.Position).Magnitude > EggConfig.MERCHANT.maxBuyDistance then
-		Remotes.ActionFailed:FireClient(player, "BuyBasicEgg", "Zu weit vom Haendler entfernt")
+		Remotes.ActionFailed:FireClient(player, "BuyBasicEgg", Loc.msg("err.merchant_too_far"))
 		return
 	end
 
@@ -179,8 +182,9 @@ function EggMerchantService.init()
 	local merchant = EggConfig.MERCHANT
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name                  = "BuyPrompt"
-	prompt.ActionText            = string.format("Basis-Ei kaufen (%d Gummies)", merchant.priceGummies)
-	prompt.ObjectText            = "Eier-Stand"
+	-- Prompt-Texte als Nachricht: jeder Spieler liest sie in seiner Sprache
+	WorldText.set(prompt, Loc.msg("ui.merchant.buy", { egg = Names.msg.egg(merchant.eggType), n = merchant.priceGummies }), "ActionText")
+	WorldText.set(prompt, Loc.msg("ui.merchant.stand"), "ObjectText")
 	prompt.MaxActivationDistance = merchant.promptDistance
 	prompt.RequiresLineOfSight   = false
 	prompt.HoldDuration          = 0

@@ -48,6 +48,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local Names            = require(ReplicatedStorage.Localization.Names)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
@@ -74,6 +75,7 @@ local BUILDINGS: { { id: Types.BuildingId } } = {
 -- Alles, was ein einzelnes Menue zum Aktualisieren braucht.
 type Menu = {
 	root       : Frame,
+	title      : TextLabel,
 	levelBadge : TextLabel,
 	subLabel   : TextLabel,
 	honeyFill  : Frame,
@@ -93,12 +95,7 @@ local _menus: { [string]: Menu } = {}
 --------------------------------------------------------------------------------
 
 local function displayName(buildingId: string): string
-	local key = "building." .. buildingId .. ".name"
-	if Loc.has(key) then
-		return Loc.t(key)
-	end
-	local config = MapConfig.BUILDING_OFFSETS[buildingId]
-	return if config then config.displayName else buildingId
+	return Names.building(buildingId)
 end
 
 -- v15: Meilenstein-Faehigkeiten als eine Zeile ("Lv.10 Auto-Abnahme ✓ ·
@@ -119,13 +116,13 @@ local function priceText(costGummies: number, costGoldGummies: number): string
 	local parts: { string } = {}
 
 	if costGummies > 0 then
-		table.insert(parts, Theme.formatNumber(costGummies) .. " Gummies")
+		table.insert(parts, Loc.t("event.bonus.gummies", { n = costGummies }))
 	end
 	if costGoldGummies > 0 then
-		table.insert(parts, Theme.formatNumber(costGoldGummies) .. " GoldGummies")
+		table.insert(parts, Loc.t("event.bonus.gold", { n = costGoldGummies }))
 	end
 	if #parts == 0 then
-		return "kostenlos"
+		return Loc.t("ui.common.free")
 	end
 
 	return table.concat(parts, " + ")
@@ -193,7 +190,7 @@ local function buildMenu(
 	titleLabel.Size       = UDim2.new(1, -118, 0, 30)
 	titleLabel.TextColor3 = Theme.COLORS.outline
 
-	local subLabel = Theme.sectionLabel("Sub", header, "Stufe 1 von 10", Theme.shade(accent, -0.45))
+	local subLabel = Theme.sectionLabel("Sub", header, "", Theme.shade(accent, -0.45))
 	subLabel.Position = UDim2.new(0, 72, 0, 42)
 	subLabel.Size     = UDim2.new(1, -118, 0, 20)
 
@@ -229,7 +226,9 @@ local function buildMenu(
 
 	-- Honig-Balken: der Wert, den man beim Reinschauen zuerst sucht.
 	local honeyHead = row(18)
-	Theme.sectionLabel("HoneyHead", honeyHead, "Honig im Lager", accent).Size = UDim2.fromScale(1, 1)
+	local honeyHeadLabel = Theme.sectionLabel("HoneyHead", honeyHead, "", accent)
+	honeyHeadLabel.Size = UDim2.fromScale(1, 1)
+	Loc.bind(honeyHeadLabel, "ui.building.honey_stock")
 
 	local honeyRow  = row(26)
 	local honeyBar  = Theme.progress(honeyRow, accent)
@@ -237,7 +236,9 @@ local function buildMenu(
 
 	-- Was das Gebaeude JETZT kann
 	local nowHead = row(18)
-	Theme.sectionLabel("NowHead", nowHead, "Was es kann", accent).Size = UDim2.fromScale(1, 1)
+	local nowHeadLabel = Theme.sectionLabel("NowHead", nowHead, "", accent)
+	nowHeadLabel.Size = UDim2.fromScale(1, 1)
+	Loc.bind(nowHeadLabel, "ui.building.now")
 
 	local nowRow  = row(38)
 	local nowText = Theme.bodyText("Now", nowRow, "")
@@ -246,7 +247,9 @@ local function buildMenu(
 
 	-- Was die naechste Stufe braechte
 	local nextHead = row(18)
-	Theme.sectionLabel("NextHead", nextHead, "Naechste Stufe", accent).Size = UDim2.fromScale(1, 1)
+	local nextHeadLabel = Theme.sectionLabel("NextHead", nextHead, "", accent)
+	nextHeadLabel.Size = UDim2.fromScale(1, 1)
+	Loc.bind(nextHeadLabel, "ui.building.next")
 
 	local nextRow  = row(38)
 	local nextText = Theme.bodyText("Next", nextRow, "")
@@ -266,14 +269,14 @@ local function buildMenu(
 
 	-- Die Knoepfe ganz unten, in der Reihenfolge, in der man sie braucht.
 	local upgradeRow = row(44)
-	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, "AUSBAUEN", accent)
+	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, Loc.t("ui.building.upgrade_btn"), accent)
 	upgrade.Size = UDim2.new(1, 0, 1, 0)
 	upgrade.Activated:Connect(onUpgrade)
 
 	local feedButton: TextButton? = nil
 	if withFeed and onFeed then
 		local feedRow = row(38)
-		local feed    = Theme.bigButton("Feed", feedRow, "Honig fuettern", Theme.shade(accent, -0.10))
+		local feed    = Theme.bigButton("Feed", feedRow, "", Theme.shade(accent, -0.10))
 		feed.Size = UDim2.new(1, 0, 1, 0)
 		feed.Activated:Connect(onFeed)
 		feedButton = feed
@@ -281,6 +284,7 @@ local function buildMenu(
 
 	return {
 		root       = root,
+		title      = titleLabel,
 		levelBadge = levelBadge,
 		subLabel   = subLabel,
 		honeyFill  = honeyBar.fill,
@@ -330,18 +334,18 @@ local function refreshBuilding(buildingId: Types.BuildingId)
 		menu.priceText.Text  = priceText(next_.costGummies, next_.costGoldGummies)
 		menu.priceText.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.bad
 
-		menu.upgrade.Text = "AUSBAUEN"
+		menu.upgrade.Text = Loc.t("ui.building.upgrade_btn")
 		Theme.setEnabled(menu.upgrade, affordable)
 	else
-		menu.nextText.Text        = "Hoechste Stufe erreicht."
+		menu.nextText.Text        = Loc.t("ui.building.maxed_text")
 		menu.priceText.Text       = ""
-		menu.upgrade.Text         = "VOLL AUSGEBAUT"
+		menu.upgrade.Text         = Loc.t("ui.building.maxed_btn")
 		Theme.setEnabled(menu.upgrade, false)
 	end
 
 	local feed = menu.feed
 	if feed then
-		feed.Text = string.format("Fuettern  (%d Honig)", honey)
+		feed.Text = Loc.t("ui.building.feed", { n = honey })
 		Theme.setEnabled(feed, honey > 0 and data.island.equippedUid ~= nil)
 	end
 end
@@ -393,6 +397,14 @@ function BuildingPanel.init(screenGui: ScreenGui)
 	end
 
 	ClientState.onChanged(function()
+		BuildingPanel.refresh()
+	end)
+	-- Sprachwechsel: Titel und alle Zeilen der offenen Menues neu beschriften
+	Loc.onChanged(function()
+		for _, entry in BUILDINGS do
+			local menu = _menus[PanelManager.buildingPanelName(entry.id)]
+			if menu then menu.title.Text = displayName(entry.id) end
+		end
 		BuildingPanel.refresh()
 	end)
 

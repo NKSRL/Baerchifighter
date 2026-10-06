@@ -20,6 +20,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local Loc              = require(ReplicatedStorage.Localization.Loc)
 
 local Theme       = require(script.Parent.Theme)
 local ClientState = require(script.Parent.Parent.Controllers.ClientState)
@@ -66,10 +67,11 @@ local function offer(data: Types.PlayerDataUpdate, choice: Choice): (number, num
 	return stage, TowerConfig.getResumeCost(towerId, stage, data.rebirthMult)
 end
 
+-- Loc-Schluessel der drei Optionen
 local LABELS: { [Choice]: string } = {
-	Fresh   = "Von vorn",
-	Percent = "Ab 65 % des letzten Laufs",
-	Last    = "Ab der letzten Stufe",
+	Fresh   = "ui.pit_resume.fresh",
+	Percent = "ui.pit_resume.percent",
+	Last    = "ui.pit_resume.last",
 }
 
 local function fill()
@@ -80,9 +82,11 @@ local function fill()
 		local stage, cost = offer(data, choice)
 		local affordable = cost <= data.gummies
 
-		button.Text = string.format("%s  —  Stage %d  —  %s",
-			LABELS[choice], stage,
-			if cost > 0 then Theme.formatNumber(cost) .. " Gummies" else "kostenlos")
+		button.Text = Loc.t("ui.pit_resume.option", {
+			label = Loc.t(LABELS[choice]),
+			stage = stage,
+			cost  = if cost > 0 then Loc.t("event.bonus.gummies", { n = cost }) else Loc.t("ui.common.free"),
+		})
 		Theme.setEnabled(button, affordable)
 	end
 
@@ -95,10 +99,11 @@ local function fill()
 		if baerchi and def then
 			local maxHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
 			local hp = math.clamp(baerchi.currentHp or maxHp, 0, maxHp)
-			hpLabel.Text = string.format("Tower %s  •  Letzter Lauf: Stage %d  •  HP %d / %d (%d%%)",
-				(TowerConfig.get(selectedTower(data)) or TowerConfig.TOWERS[1]).numeral,
-				reached or 0,
-				hp, maxHp, math.floor(hp / math.max(1, maxHp) * 100 + 0.5))
+			hpLabel.Text = Loc.t("ui.pit_resume.status", {
+				tower = (TowerConfig.get(selectedTower(data)) or TowerConfig.TOWERS[1]).numeral,
+				stage = reached or 0,
+				hp = hp, max = maxHp, pct = math.floor(hp / math.max(1, maxHp) * 100 + 0.5),
+			})
 		end
 	end
 end
@@ -136,7 +141,8 @@ function PitResumeDialog.init(screenGui: ScreenGui)
 	root.ZIndex = 20
 	_root = root
 
-	Theme.dialogHeader(root, "Wo soll er einsteigen?", PitResumeDialog.close)
+	local title = Theme.dialogHeader(root, "", PitResumeDialog.close)
+	Loc.bind(title, "ui.pit_resume.title")
 
 	local body = Theme.dialogBody(root)
 	local layout = Theme.listLayout(body, 8)
@@ -154,7 +160,7 @@ function PitResumeDialog.init(screenGui: ScreenGui)
 	}
 
 	for order, choice in { "Fresh", "Percent", "Last" } :: { Choice } do
-		local button = Theme.bigButton("Option_" .. choice, body, LABELS[choice], colors[choice])
+		local button = Theme.bigButton("Option_" .. choice, body, Loc.t(LABELS[choice]), colors[choice])
 		button.Size        = UDim2.new(1, 0, 0, 44)
 		button.LayoutOrder = order
 		button.Activated:Connect(function()
@@ -166,13 +172,17 @@ function PitResumeDialog.init(screenGui: ScreenGui)
 		_options[choice] = button
 	end
 
-	local cancel = Theme.button("Cancel", body, "Abbrechen", Theme.COLORS.panelLight)
+	local cancel = Theme.button("Cancel", body, "", Theme.COLORS.panelLight)
+	Loc.bind(cancel, "ui.common.cancel")
 	cancel.Size        = UDim2.new(1, 0, 0, 34)
 	cancel.LayoutOrder = 10
 	cancel.TextColor3  = Theme.COLORS.text
 	cancel.Activated:Connect(PitResumeDialog.close)
 
 	ClientState.onChanged(function()
+		if PitResumeDialog.isOpen() then fill() end
+	end)
+	Loc.onChanged(function()
 		if PitResumeDialog.isOpen() then fill() end
 	end)
 

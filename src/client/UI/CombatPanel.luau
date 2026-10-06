@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Types       = require(ReplicatedStorage.Network.Types)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
 local Loc         = require(ReplicatedStorage.Localization.Loc)
+local Names       = require(ReplicatedStorage.Localization.Names)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local EggConfig   = require(ReplicatedStorage.Config.EggConfig)
@@ -242,8 +243,7 @@ local function showMilestone(reward: Types.TowerMilestoneReward)
 	if reward.gummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.gummies) .. " Gummies") end
 	if reward.goldGummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.goldGummies) .. " GoldGummies") end
 	if reward.eggType and reward.eggs > 0 then
-		local egg = EggConfig.data[reward.eggType]
-		table.insert(parts, string.format("+%d %s", reward.eggs, Loc.name("egg." .. reward.eggType .. ".name", if egg then egg.displayName else reward.eggType)))
+		table.insert(parts, string.format("+%d %s", reward.eggs, Names.egg(reward.eggType)))
 	end
 	if reward.blueprints > 0 then table.insert(parts, Loc.t("msg.tower_blueprint")) end
 	if (reward.endlessLevels or 0) > 0 then

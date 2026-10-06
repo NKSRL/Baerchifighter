@@ -39,6 +39,8 @@ local TweenService      = game:GetService("TweenService")
 local Types         = require(ReplicatedStorage.Network.Types)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
+local Names         = require(ReplicatedStorage.Localization.Names)
 
 local Theme = require(script.Parent.Theme)
 local EggIcon = require(script.Parent.EggIcon)
@@ -206,7 +208,7 @@ local function buildScene(screenGui: ScreenGui, eggType: Types.EggType): Scene
 	cracks.ZIndex                 = 54
 	cracks.Parent                 = egg
 
-	local label = Theme.label("Hint", stage, if eggDef then eggDef.displayName else tostring(eggType))
+	local label = Theme.label("Hint", stage, Names.egg(tostring(eggType)))
 	label.AnchorPoint    = Vector2.new(0.5, 0)
 	label.Position       = UDim2.new(0.5, 0, 0.48, EGG_SIZE.Y * 0.5 + 18)
 	label.Size           = UDim2.fromOffset(320, 30)
@@ -357,28 +359,27 @@ local function buildReveal(scene: Scene, result: Types.HatchResult): Frame
 	end
 
 	if result.isNew then
-		local new = cardLabel("New", "NEU!", 10, 22, Theme.COLORS.goldGummy)
+		local new = cardLabel("New", Loc.t("ui.moment.new"), 10, 22, Theme.COLORS.goldGummy)
 		Theme.outlineText(new)
 	end
 
-	local title = (if mutation then BaerchiConfig.getMutationDisplayName(mutation):upper() .. "  " else "")
-		.. (if def then def.displayName else baerchi.configId)
+	local title = (if mutation then Names.mutation(mutation):upper() .. "  " else "")
+		.. Names.baerchi(baerchi.configId)
 	local titleLabel = cardLabel("Title", title, 38, 34, color)
 	Theme.outlineText(titleLabel)
 
-	cardLabel("Rarity", string.upper(baerchi.rarity), 78, 24, rarityColor)
+	cardLabel("Rarity", string.upper(Names.rarity(baerchi.rarity)), 78, 24, rarityColor)
 
-	local eggDef = EggConfig.data[result.eggType]
-	local sub = cardLabel("Sub", string.format("Lv. %d%s\naus %s",
-		baerchi.level,
-		if mutation then string.format("  •  %s x%.2g", BaerchiConfig.getMutationDisplayName(mutation), BaerchiConfig.getMutationMultiplier(mutation)) else "",
-		if eggDef then eggDef.displayName else tostring(result.eggType)
-	), 108, 40, Theme.COLORS.textDim)
+	local sub = cardLabel("Sub", Loc.t("ui.hatch.result_sub", {
+		level    = baerchi.level,
+		mutation = if mutation then string.format("  •  %s x%.2g", Names.mutation(mutation), BaerchiConfig.getMutationMultiplier(mutation)) else "",
+		egg      = Names.egg(tostring(result.eggType)),
+	}), 108, 40, Theme.COLORS.textDim)
 	sub.Font       = Theme.FONT_BODY
 	sub.TextScaled = false
 	sub.TextSize   = 15
 
-	local tapHint = cardLabel("Tap", "Tippen zum Schliessen", 156, 16, Theme.COLORS.textDim)
+	local tapHint = cardLabel("Tap", Loc.t("ui.hatch.tap_close"), 156, 16, Theme.COLORS.textDim)
 	tapHint.TextScaled = false
 	tapHint.TextSize   = 12
 
@@ -422,7 +423,7 @@ local function play(job: Job)
 
 	while not job.result and not job.failed do
 		if os.clock() - job.started > RESULT_TIMEOUT then
-			job.failed = "Keine Antwort vom Server — das Ei ist noch im Lager"
+			job.failed = Loc.t("ui.hatch.timeout")
 			break
 		end
 		RunService.RenderStepped:Wait()
@@ -433,7 +434,7 @@ local function play(job: Job)
 		connection:Disconnect()
 		if not job.silent then
 			Notify.emit("hatch_failed", function()
-				Toast.show(job.failed or "Oeffnen fehlgeschlagen", Theme.COLORS.bad)
+				Toast.show(job.failed or Loc.t("ui.hatch.failed"), Theme.COLORS.bad)
 			end)
 		end
 		tween(scene.backdrop, FADE_SECONDS, { BackgroundTransparency = 1 })

@@ -133,7 +133,7 @@ local function refresh(data: Types.PlayerDataUpdate)
 		if def then
 			setIcon(questIcon, QuestConfig.METRIC_ICON[def.metric] or "scroll", "?")
 			if def.reward.eggType then
-				setIcon(rewardIcon, "egg", "EI")
+				setIcon(rewardIcon, "egg", "🥚")
 				rewardLabel.Text = "+" .. Loc.formatNumber(def.reward.gummies)
 			else
 				setIcon(rewardIcon, "gummy", "G")

@@ -28,6 +28,7 @@
 local Types           = require(script.Parent.Parent.Network.Types)
 local EggConfig       = require(script.Parent.EggConfig)
 local PromotionConfig = require(script.Parent.PromotionConfig)
+local Loc             = require(script.Parent.Parent.Localization.Loc)
 
 --------------------------------------------------------------------------------
 -- Typen
@@ -92,6 +93,8 @@ export type EventDef = {
 	bonus       : EventBonus?,
 
 	-- Ein Satz fuer Tafel/UI. Hat Vorrang vor der automatisch gebauten Zeile.
+	-- Deutsch zum Lesen der Config; angezeigt wird `event.<id>.reward` aus
+	-- den Sprachdateien (tools/check_ui.py, Regel T4, verlangt den Schluessel).
 	rewardText  : string?,
 
 	-- Laeuft nur in jedem n-ten Durchlauf des Zyklus (nil = jeder). Der Zyklus
@@ -597,7 +600,10 @@ local function getMutationFactor(rarity: string): number
 	return MUTATION_RARITY_FACTOR[rarity] or 1
 end
 
-local function describeBonus(bonus: EventBonus?): string?
+-- Liefert eine Nachricht (LocMsg) statt eines fertigen Satzes: die Tafel
+-- baut der Server, lesen tut sie jeder Spieler in seiner Sprache. Der Client
+-- loest sie mit Loc.resolve auf, Log-Ausgaben ebenso (dann in Serversprache).
+local function describeBonus(bonus: EventBonus?): Types.LocMsg?
 	if not bonus then
 		return nil
 	end
@@ -605,38 +611,34 @@ local function describeBonus(bonus: EventBonus?): string?
 	local amount = bonus.amount or 0
 
 	if bonus.kind == "honey" then
-		return string.format("%d Honig je Gebaeude", amount)
+		return Loc.msg("event.bonus.honey", { n = amount })
 
 	elseif bonus.kind == "eggs" then
 		if bonus.eggPick == "jump" then
-			return string.format("%dx Sprung-Ei", amount)
+			return Loc.msg("event.bonus.jump", { n = amount })
 		elseif bonus.eggPick == "highest" then
-			return string.format("%dx dein hoechstes Ei", amount)
+			return Loc.msg("event.bonus.highest", { n = amount })
 		end
 		local eggType = bonus.eggType or "BasicEgg"
-		local eggDef  = EggConfig.data[eggType]
-		return string.format("%dx %s", amount, if eggDef then eggDef.displayName else eggType)
+		return Loc.msg("event.bonus.eggs", { n = amount, egg = Loc.msg("egg." .. eggType .. ".name") })
 
 	elseif bonus.kind == "gummies" then
-		return string.format("%d Gummies", amount)
+		return Loc.msg("event.bonus.gummies", { n = amount })
 
 	elseif bonus.kind == "goldGummies" then
-		return string.format("%d GoldGummies", amount)
+		return Loc.msg("event.bonus.gold", { n = amount })
 
 	elseif bonus.kind == "mutation" then
-		return string.format(
-			"bis zu %d%% Chance auf eine Mutation (sinkt mit Rarity)",
-			math.floor((bonus.chance or 0) * 100 + 0.5)
-		)
+		return Loc.msg("event.bonus.mutation", { pct = math.floor((bonus.chance or 0) * 100 + 0.5) })
 	end
 
 	return nil
 end
 
 -- Die vollstaendige Belohnung in einer Zeile, fuer Tafel und UI.
-local function describeReward(def: EventDef): string
+local function describeReward(def: EventDef): Types.LocMsg
 	if def.rewardText then
-		return def.rewardText
+		return Loc.msg("event." .. def.id .. ".reward")
 	end
 
 	local bonusPart = describeBonus(def.bonus)
@@ -644,7 +646,7 @@ local function describeReward(def: EventDef): string
 		return bonusPart
 	end
 
-	return "Belohnung unbekannt"
+	return Loc.msg("event.bonus.unknown")
 end
 
 return {

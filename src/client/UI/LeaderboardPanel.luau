@@ -39,7 +39,7 @@ local function formatValue(listId: string, value: number): string
 	if listId == "Tower" then
 		local towerId, stage = TowerConfig.fromLeaderboardValue(value)
 		local def = TowerConfig.get(towerId) or TowerConfig.TOWERS[1]
-		return string.format("Tower %s · %d", def.numeral, stage)
+		return Loc.t("ui.leaderboard.tower_value", { tower = Loc.t("ui.petbar.tower", { numeral = def.numeral }), stage = stage })
 	end
 	return Loc.formatNumber(value)
 end

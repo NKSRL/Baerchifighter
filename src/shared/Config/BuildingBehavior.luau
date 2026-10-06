@@ -41,6 +41,7 @@
 
 local EconomyConfig = require(script.Parent.EconomyConfig)
 local Types         = require(script.Parent.Parent.Network.Types)
+local Loc           = require(script.Parent.Parent.Localization.Loc)
 
 --------------------------------------------------------------------------------
 -- Abweichungen der einzelnen Gebaeude
@@ -178,12 +179,12 @@ local function beehiveCapacity(level: number): number
 	return BEEHIVE_CAPACITY_L10 + math.floor((l - 10) / BEEHIVE_CAPACITY_STEP)
 end
 
+-- Effekt-Texte in der aktiven Sprache (nur der Client zeigt sie an).
 local function beehiveDescribe(level: number): string
-	return string.format(
-		"Lager: %d Honig  —  alle %.1f s ein neuer",
-		beehiveCapacity(level),
-		beehiveInterval(level)
-	)
+	return Loc.t("building.Beehive.effect", {
+		cap = beehiveCapacity(level),
+		sec = Loc.formatDecimal(beehiveInterval(level), 1),
+	})
 end
 
 --------------------------------------------------------------------------------
@@ -215,11 +216,10 @@ local function refinerXpMultiplier(level: number): number
 end
 
 local function refinerDescribe(level: number): string
-	return string.format(
-		"+%s XP auf jeden Honig  —  sein Honig heilt %s",
-		percentText(refinerXpMultiplier(level) - 1),
-		percentText(refinerHeal(level))
-	)
+	return Loc.t("building.HoneyRefiner.effect", {
+		xp   = percentText(refinerXpMultiplier(level) - 1),
+		heal = percentText(refinerHeal(level)),
+	})
 end
 
 --------------------------------------------------------------------------------
@@ -241,13 +241,12 @@ local function pondCapacity(level: number): number
 end
 
 local function pondDescribe(level: number): string
-	return string.format(
-		"Lager: %d Honig  —  alle %.1f s ein neuer  —  +%s XP  —  heilt %s",
-		pondCapacity(level),
-		pondInterval(level),
-		percentText(refinerXpMultiplier(level) - 1),
-		percentText(refinerHeal(level))
-	)
+	return Loc.t("building.HoneyPond.effect", {
+		cap  = pondCapacity(level),
+		sec  = Loc.formatDecimal(pondInterval(level), 1),
+		xp   = percentText(refinerXpMultiplier(level) - 1),
+		heal = percentText(refinerHeal(level)),
+	})
 end
 
 -- Kosten eines Teich-Ausbaus relativ zu EconomyConfig.HONEY_UPGRADE_COSTS,
@@ -299,7 +298,7 @@ local DEFAULT_BEHAVIOR: Behavior = {
 	getCapacity        = baseCapacity,
 	getHealPercent     = baseHeal,
 	getXpMultiplier    = noXpBonus,
-	describe           = function(_level: number): string return "Produziert Honig" end,
+	describe           = function(_level: number): string return Loc.t("building.default.effect") end,
 }
 
 --------------------------------------------------------------------------------

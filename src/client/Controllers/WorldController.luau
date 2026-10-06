@@ -55,6 +55,7 @@ local Workspace = game:GetService("Workspace")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loc          = require(ReplicatedStorage.Localization.Loc)
+local Names        = require(ReplicatedStorage.Localization.Names)
 
 local Theme        = require(script.Parent.Parent.UI.Theme)
 local BaerchiPanel = require(script.Parent.Parent.UI.BaerchiPanel)
@@ -162,14 +163,27 @@ end
 -- Gebaeude und Kampfplattform
 --------------------------------------------------------------------------------
 
+-- Beschriftung eines Prompts: liefert (ActionText, ObjectText) in der
+-- aktiven Sprache. Als Funktion statt fertiger Texte, damit ein Sprachwechsel
+-- alle Prompts neu beschriften kann (siehe Loc.onChanged in init).
+type PromptLabels = () -> (string, string)
+
+-- Weak: ein ersetzter Plot nimmt seine Prompts mit, ohne dass sie hier haengen bleiben.
+local _promptLabels: { [ProximityPrompt]: PromptLabels } = setmetatable({}, { __mode = "k" }) :: any
+
+local function applyPromptLabels(prompt: ProximityPrompt, labels: PromptLabels)
+	local action, object = labels()
+	prompt.ActionText = action
+	prompt.ObjectText = object
+end
+
 -- Ein Prompt an einer Part. `name` dient als Schutz gegen doppeltes Anhaengen:
 -- die Parts werden bei jedem Plot-Neuaufbau ersetzt, und ein zweiter Prompt
 -- waere ein doppeltes Fenster.
 local function addPrompt(
 	part: BasePart,
 	name: string,
-	actionText: string,
-	objectText: string,
+	labels: PromptLabels,
 	keyCode: Enum.KeyCode,
 	onTriggered: () -> ()
 ): ProximityPrompt?
@@ -177,8 +191,8 @@ local function addPrompt(
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name                  = name
-	prompt.ActionText            = actionText
-	prompt.ObjectText            = objectText
+	applyPromptLabels(prompt, labels)
+	_promptLabels[prompt] = labels
 	prompt.KeyboardKeyCode       = keyCode
 	prompt.MaxActivationDistance = PROMPT_DISTANCE
 	prompt.RequiresLineOfSight   = false
@@ -188,8 +202,8 @@ local function addPrompt(
 	return prompt
 end
 
-local function addPanelPrompt(part: BasePart, actionText: string, objectText: string, panelName: string)
-	addPrompt(part, "OpenPanel", actionText, objectText, Enum.KeyCode.E, function()
+local function addPanelPrompt(part: BasePart, labels: PromptLabels, panelName: string)
+	addPrompt(part, "OpenPanel", labels, Enum.KeyCode.E, function()
 		PanelManager.open(panelName)
 	end)
 end
@@ -245,7 +259,7 @@ local function addHomeMarker(board: BasePart)
 	label.BackgroundTransparency = 1
 	label.Font                   = Theme.FONT
 	label.TextScaled             = true
-	label.Text                   = "\u{25BC} Dein Plot"
+	Loc.bind(label, "ui.world.your_plot")
 	label.TextColor3             = Theme.COLORS.goldGummy
 	label.TextStrokeTransparency = 0.2
 	label.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
@@ -298,7 +312,9 @@ local function hookOwnedPart(instance: BasePart)
 	end
 
 	if instance.Name == "FightFloor" then
-		addPanelPrompt(instance, Loc.t("ui.tower.prompt_action"), Loc.t("ui.tower.prompt_object"), PanelManager.ARENA_PANEL)
+		addPanelPrompt(instance, function()
+			return Loc.t("ui.tower.prompt_action"), Loc.t("ui.tower.prompt_object")
+		end, PanelManager.ARENA_PANEL)
 		return
 	end
 
@@ -317,7 +333,9 @@ local function hookOwnedPart(instance: BasePart)
 	local buildingId = instance.Name
 
 	local function attach()
-		addPrompt(instance, "OpenPanel", "Ausbauen", buildingId, Enum.KeyCode.E, function()
+		addPrompt(instance, "OpenPanel", function()
+			return Loc.t("ui.world.upgrade_prompt"), Names.building(buildingId)
+		end, Enum.KeyCode.E, function()
 			PanelManager.open(PanelManager.buildingPanelName(buildingId))
 		end)
 	end
@@ -387,6 +405,13 @@ local function hook(instance: Instance)
 end
 
 function WorldController.init()
+	-- Sprachwechsel: alle noch lebenden Prompts neu beschriften
+	Loc.onChanged(function()
+		for prompt, labels in _promptLabels do
+			if prompt.Parent then applyPromptLabels(prompt, labels) end
+		end
+	end)
+
 	-- Was schon da ist
 	for _, descendant in Workspace:GetDescendants() do
 		hook(descendant)

@@ -757,7 +757,7 @@ export type EventStatGain = {
 	-- Bonus-Art: der Client zeigt ihn nur an, und die Formulierung soll an
 	-- EINER Stelle stehen (EventConfig.describeBonus bzw. der Ausgabe-Text in
 	-- EventParticipationService).
-	bonusText  : string?,
+	bonusText  : (string | LocMsg)?,   -- seit UI-Qualitaet eine Nachricht; Client: Loc.resolve
 
 	-- Gesetzt, wenn der Baerchi durch dieses Event eine (bessere) Mutation
 	-- bekommen hat — der seltenste Ausgang im ganzen Event-System, deshalb als

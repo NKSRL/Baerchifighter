@@ -71,6 +71,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local Types            = require(ReplicatedStorage.Network.Types)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService    = require(ServerScriptService.Services.MapService)
@@ -199,10 +200,14 @@ local function applyTower(player: Player, signature: string, show: boolean)
 	MapService.updateTowerShowcase(player, {
 		look   = def.look,
 		floors = TowerConfig.getShowcaseFloors(def.id, record),
-		title  = string.format("%s  ·  Tower %s  ·  %d", player.DisplayName, def.numeral, record),
+		title  = Loc.msg("ui.world.showcase_title", {
+			name = player.DisplayName, tower = Loc.msg("ui.petbar.tower", { numeral = def.numeral }), record = record,
+		}),
 		color  = def.color,
 	}, show)
-	MapService.setOwnerBadge(player, string.format("◆ Tower %s · %d", def.numeral, record), def.color)
+	MapService.setOwnerBadge(player, Loc.msg("ui.world.owner_badge", {
+		tower = Loc.msg("ui.petbar.tower", { numeral = def.numeral }), record = record,
+	}), def.color)
 end
 
 --------------------------------------------------------------------------------

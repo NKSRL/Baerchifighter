@@ -21,6 +21,8 @@ local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 local EggLook          = require(ReplicatedStorage.Modules.EggLook)
 local EggMesh          = require(ReplicatedStorage.Modules.EggMesh)
 local Types            = require(ReplicatedStorage.Network.Types)
+local Names     = require(ReplicatedStorage.Localization.Names)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local FigureFX         = require(ServerScriptService.Util.FigureFX)
 
@@ -263,7 +265,7 @@ function LaidEggBuilder.buildLaidEgg(parent: Instance, egg: Types.LaidEgg, world
 	billboard.Parent      = part
 
 	local label = MapParts.newTextLabel("Name", billboard, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0))
-	label.Text             = def.shortName
+	WorldText.set(label, Names.msg.eggShort(def.id))
 	label.TextColor3       = Color3.new(1, 1, 1)
 	label.TextStrokeColor3 = look.base:Lerp(Color3.new(0, 0, 0), 0.65)
 	label.TextStrokeTransparency = 0

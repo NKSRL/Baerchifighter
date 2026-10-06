@@ -105,6 +105,10 @@ UiScale.init(screenGui)
 -- gesetzt werden, einen Moment lang die Standardsprache.
 LanguageController.init()
 
+-- Vom Server gebaute Welt-Texte (Tafeln, Schilder, Prompts) in der Sprache
+-- dieses Spielers anzeigen (siehe Localization/WorldText)
+require(game:GetService("ReplicatedStorage"):WaitForChild("Localization"):WaitForChild("WorldText")).startClient()
+
 Toast.init(screenGui)
 ClientState.init()
 

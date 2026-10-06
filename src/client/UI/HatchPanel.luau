@@ -21,6 +21,7 @@ local Types     = require(ReplicatedStorage.Network.Types)
 local Remotes   = require(ReplicatedStorage.Network.Remotes)
 local EggConfig = require(ReplicatedStorage.Config.EggConfig)
 local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Names     = require(ReplicatedStorage.Localization.Names)
 local EggTree   = require(ReplicatedStorage.Modules.EggTree)
 
 local Theme          = require(script.Parent.Theme)
@@ -80,14 +81,14 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	icon.AnchorPoint = Vector2.new(0, 0.5)
 	icon.Position    = UDim2.new(0, 10, 0.5, 0)
 
-	local name = Theme.label("Name", card, Loc.name("egg." .. eggType .. ".name", def.displayName))
+	local name = Theme.label("Name", card, Names.egg(eggType))
 	name.Position = UDim2.new(0, 68, 0, 8)
 	name.Size     = UDim2.new(1, -200, 0, 22)
 
 	-- v14: ein noch gesperrtes Ei im Lager ist ein Sprung-Ei aus einem Event.
 	local data = ClientState.get()
 	local locked = data ~= nil and not EggTree.isUnlocked(data.eggTree, eggType)
-	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else def.description)
+	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else Names.eggDesc(eggType))
 	desc.Position = UDim2.new(0, 68, 0, 32)
 	desc.Size     = UDim2.new(1, -200, 0, 40)
 
@@ -97,7 +98,7 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	count.TextXAlignment = Enum.TextXAlignment.Right
 	count.TextColor3     = Theme.COLORS.good
 
-	local button = Theme.bigButton("Open", card, "Oeffnen", Theme.COLORS.accent)
+	local button = Theme.bigButton("Open", card, Loc.t("ui.common.open"), Theme.COLORS.accent)
 	button.Position = UDim2.new(1, -128, 0, 38)
 	button.Size     = UDim2.new(0, 116, 0, 32)
 
@@ -138,8 +139,7 @@ function HatchPanel.refresh()
 	end
 
 	if shown == 0 then
-		local empty = Theme.bodyText("Empty", scroller,
-			"Keine Eier im Lager.\nDein ausgeruesteter Baerchi legt welche auf deinem Plot — einfach einsammeln.")
+		local empty = Theme.bodyText("Empty", scroller, Loc.t("ui.hatch.empty"))
 		empty.Size        = UDim2.new(1, -8, 0, 60)
 		empty.LayoutOrder = 1
 	end
@@ -177,7 +177,7 @@ function HatchPanel.init(screenGui: ScreenGui)
 	)
 	_root = root
 
-	local header = Theme.dialogHeader(root, "Eier", function()
+	local header = Theme.dialogHeader(root, Loc.t("ui.menu.eggs"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 

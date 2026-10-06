@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local Names            = require(ReplicatedStorage.Localization.Names)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
@@ -159,15 +160,15 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 	local name = Theme.label("Name", row,
 		(if equipped then "\u{2605} " else "")
 		.. (if mutation then BaerchiConfig.getMutationBadge(mutation) .. " " else "")
-		.. (def and def.displayName or baerchi.configId))
+		.. Names.baerchi(baerchi.configId))
 	name.Position = UDim2.new(0, 22, 0, 5)
 	name.Size     = UDim2.new(1, -120, 0, 21)
 
 	local sub = Theme.label("Sub", row, string.format(
 		"Lv. %d  —  %s%s",
 		baerchi.level,
-		baerchi.rarity,
-		if mutation then "  —  " .. BaerchiConfig.getMutationDisplayName(mutation):upper() else ""
+		Names.rarity(baerchi.rarity),
+		if mutation then "  —  " .. Names.mutation(mutation):upper() else ""
 	))
 	sub.Position   = UDim2.new(0, 22, 0, 26)
 	sub.Size       = UDim2.new(1, -120, 0, 16)
@@ -227,11 +228,10 @@ local function updateFooter()
 		local baerchi = if uid then ClientState.getBaerchi(uid) else nil
 
 		if baerchi then
-			local def = BaerchiConfig.getById(baerchi.configId)
-			label.Text       = string.format("%s  Lv.%d", def and def.displayName or baerchi.configId, baerchi.level)
+			label.Text       = string.format("%s  Lv.%d", Names.baerchi(baerchi.configId), baerchi.level)
 			label.TextColor3  = Theme.rarityColor(baerchi.rarity)
 		else
-			label.Text       = "Slot " .. slot .. ": leer"
+			label.Text       = Loc.t("ui.inventory.slot_empty", { slot = slot })
 			label.TextColor3  = Theme.COLORS.textDim
 		end
 	end
@@ -243,14 +243,12 @@ local function updateFooter()
 
 	local modeButton = _modeButton
 	if modeButton then
-		modeButton.Text = if _fusionMode then "Fusion: an" else "Fusion: aus"
+		modeButton.Text = Loc.t(if _fusionMode then "ui.inventory.fusion_on" else "ui.inventory.fusion_off")
 	end
 
 	local hint = _hint
 	if hint then
-		hint.Text = if _fusionMode
-			then "Zwei Baerchis derselben Rarity antippen"
-			else "Zeile antippen oeffnet die Karte"
+		hint.Text = Loc.t(if _fusionMode then "ui.inventory.hint_fusion" else "ui.inventory.hint_list")
 	end
 end
 
@@ -277,7 +275,7 @@ function BaerchiInventory.refresh()
 
 	local title = _title
 	if title then
-		title.Text = "Baerchis (" .. #list .. ")"
+		title.Text = Loc.t("ui.inventory.title_count", { n = #list })
 	end
 
 	local empty = _empty
@@ -366,7 +364,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		Vector2.new(520, 580)
 	)
 	_root  = root
-	_title = Theme.dialogHeader(root, "Baerchis", function()
+	_title = Theme.dialogHeader(root, Loc.t("ui.menu.baerchis"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 
@@ -408,11 +406,11 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	local toolbar = Theme.container("Toolbar", listPage)
 	toolbar.Size = UDim2.new(1, 0, 0, TOOLBAR_H)
 
-	local modeButton = Theme.button("FusionMode", toolbar, "Fusion: aus", Theme.COLORS.gummy)
+	local modeButton = Theme.button("FusionMode", toolbar, Loc.t("ui.inventory.fusion_off"), Theme.COLORS.gummy)
 	modeButton.Size = UDim2.new(0, 130, 1, 0)
 	_modeButton = modeButton
 
-	local hint = Theme.bodyText("Hint", toolbar, "Zeile antippen oeffnet die Karte")
+	local hint = Theme.bodyText("Hint", toolbar, Loc.t("ui.inventory.hint_list"))
 	_hint = hint
 	hint.Position       = UDim2.new(0, 140, 0, 0)
 	hint.Size           = UDim2.new(1, -140, 1, 0)
@@ -435,7 +433,8 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	local layout = Theme.listLayout(scroller, 6)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-	local empty = Theme.bodyText("Empty", listPage, "Noch keine Baerchis. Leg im Eier-Menue ein Ei in die Brueterei.")
+	local empty = Theme.bodyText("Empty", listPage, "")
+	Loc.bind(empty, "ui.inventory.empty")
 	empty.Position = UDim2.new(0, 4, 0, TOOLBAR_H + 16)
 	empty.Size     = UDim2.new(1, -8, 0, 40)
 	empty.Visible  = false
@@ -450,14 +449,15 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	_footer = footer
 
 	for slot = 1, 2 do
-		local label = Theme.label("Slot" .. slot, footer, "Slot " .. slot .. ": leer")
+		local label = Theme.label("Slot" .. slot, footer, Loc.t("ui.inventory.slot_empty", { slot = slot }))
 		label.Position   = UDim2.new(0, 10, 0, 6 + (slot - 1) * 22)
 		label.Size       = UDim2.new(1, -140, 0, 20)
 		label.TextColor3  = Theme.COLORS.textDim
 		_slotLabels[slot] = label
 	end
 
-	local fuseButton = Theme.button("Fuse", footer, "Fusionieren", Theme.COLORS.gummy)
+	local fuseButton = Theme.button("Fuse", footer, "", Theme.COLORS.gummy)
+	Loc.bind(fuseButton, "ui.fusion.fuse")
 	fuseButton.AnchorPoint = Vector2.new(1, 0.5)
 	fuseButton.Position    = UDim2.new(1, -10, 0.5, 0)
 	fuseButton.Size        = UDim2.new(0, 116, 0, 34)
@@ -481,6 +481,12 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		else
 			_dirty = true
 		end
+	end)
+
+	-- Sprachwechsel: Zeilen, Titel und Fusions-Leiste neu beschriften
+	Loc.onChanged(function()
+		_dirty = true
+		BaerchiInventory.refresh()
 	end)
 
 	print("[BaerchiInventory] Initialisiert")

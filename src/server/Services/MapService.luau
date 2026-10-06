@@ -51,6 +51,8 @@ local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local CombConfig = require(ReplicatedStorage.Config.CombConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types     = require(ReplicatedStorage.Network.Types)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
 
 local ActivityLock = require(ServerScriptService.Util.ActivityLock)
 local FigureFX     = require(ServerScriptService.Util.FigureFX)
@@ -103,8 +105,8 @@ type Badge = { text: string, color: Color3 }
 local _badge: { [Player]: Badge } = {}
 local _crown: { [Player]: boolean } = {}   -- Paket 9: Top 10 der Endless-Woche
 
-local function badgeText(player: Player, text: string): string
-	return if _crown[player] then "♛ " .. text else text
+local function badgeText(player: Player, text: string | Types.LocMsg): string | Types.LocMsg
+	return if _crown[player] then Loc.msg("fmt.append", { a = "♛", b = text }) else text
 end
 
 --------------------------------------------------------------------------------
@@ -242,7 +244,7 @@ function MapService.updateTowerShowcase(player: Player, view: ArenaBuilder.Showc
 end
 
 -- v15: Tower-Symbol unter dem Namen auf dem Plot-Schild ("◆ III · 42").
-function MapService.setOwnerBadge(player: Player, text: string, color: Color3)
+function MapService.setOwnerBadge(player: Player, text: string | Types.LocMsg, color: Color3)
 	_badge[player] = { text = text, color = color }
 	local model = _plotModels[player]
 	if model then
@@ -539,19 +541,21 @@ end
 -- Die Anzeigetafel ueber der Arena beschriften und einblenden.
 -- Aufgerufen von PitArenaService waehrend einer Wiedergabe; MapService kennt
 -- den Kampfverlauf nicht und entscheidet deshalb nichts ueber den Inhalt.
-function MapService.setPitBanner(player: Player, title: string, subtitle: string, color: Color3)
+-- Titel und Untertitel duerfen Nachrichten (LocMsg) sein: die Tafel sieht
+-- jeder Spieler, und jeder liest sie in seiner Sprache (siehe WorldText).
+function MapService.setPitBanner(player: Player, title: string | Types.LocMsg, subtitle: string | Types.LocMsg, color: Color3)
 	local banner = findPitBanner(player)
 	if not banner then return end
 
 	local titleLabel = banner:FindFirstChild("Title")
 	if titleLabel and titleLabel:IsA("TextLabel") then
-		titleLabel.Text       = title
+		WorldText.set(titleLabel, title)
 		titleLabel.TextColor3 = color
 	end
 
 	local subLabel = banner:FindFirstChild("Sub")
 	if subLabel and subLabel:IsA("TextLabel") then
-		subLabel.Text = subtitle
+		WorldText.set(subLabel, subtitle)
 	end
 
 	banner.Enabled = true
@@ -626,7 +630,7 @@ end
 -- setPitBanner blendet das hier NICHT ein/aus — die Tafel steht permanent
 -- (siehe buildEventPit): sie zeigt entweder den Countdown bis zum naechsten
 -- Event oder Name + Restzeit des laufenden.
-function MapService.setEventBanner(title: string, subtitle: string, color: Color3, reward: string?)
+function MapService.setEventBanner(title: string | Types.LocMsg, subtitle: string | Types.LocMsg, color: Color3, reward: (string | Types.LocMsg)?)
 	local container = findEventPitContainer()
 	if not container then return end
 
@@ -638,18 +642,18 @@ function MapService.setEventBanner(title: string, subtitle: string, color: Color
 
 	local titleLabel = banner:FindFirstChild("Title")
 	if titleLabel and titleLabel:IsA("TextLabel") then
-		titleLabel.Text       = title
+		WorldText.set(titleLabel, title)
 		titleLabel.TextColor3 = color
 	end
 
 	local subLabel = banner:FindFirstChild("Sub")
 	if subLabel and subLabel:IsA("TextLabel") then
-		subLabel.Text = subtitle
+		WorldText.set(subLabel, subtitle)
 	end
 
 	local rewardLabel = banner:FindFirstChild("Reward")
 	if rewardLabel and rewardLabel:IsA("TextLabel") then
-		rewardLabel.Text = reward or ""
+		WorldText.set(rewardLabel, reward or "")
 	end
 end
 
