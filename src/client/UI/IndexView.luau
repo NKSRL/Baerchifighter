@@ -201,10 +201,13 @@ local function showPopup(configId: string, anchor: GuiObject)
 	popup.Size = UDim2.new(0, POP_W, 0, y + 10)
 
 	-- Neben die Kachel setzen und im Dialog halten.
-	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale)
-	local hostPos  = UiScale.toGui(host.AbsolutePosition)
-	local hostSize = UiScale.toGui(host.AbsoluteSize)
-	local aPos, aSize = UiScale.toGui(anchor.AbsolutePosition), UiScale.toGui(anchor.AbsoluteSize)
+	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale), dann in die
+	-- Einheiten INNERHALB des Dialogs (Theme.dialogScale: auf kleinen
+	-- Bildschirmen ist der ganze Dialog verkleinert).
+	local inner    = math.max(Theme.dialogScale(host), 0.01)
+	local hostPos  = UiScale.toGui(host.AbsolutePosition) / inner
+	local hostSize = UiScale.toGui(host.AbsoluteSize) / inner
+	local aPos, aSize = UiScale.toGui(anchor.AbsolutePosition) / inner, UiScale.toGui(anchor.AbsoluteSize) / inner
 
 	local x = aPos.X - hostPos.X + aSize.X + 6
 	if x + POP_W > hostSize.X then

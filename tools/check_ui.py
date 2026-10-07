@@ -31,6 +31,8 @@ landet. Jede Regel unten ist ein FEHLER (Exit-Code 1), keine Empfehlung.
                       fehlen Groessen-Constraints, Kopfzeile und Schliessen-X.
   P2 SCROLLER         ScrollingFrames nur ueber Theme.scroller (Canvas waechst
                       automatisch mit, gleiche Scrollbar ueberall).
+  P3 SCHLIESSEN-X     Schliessen-Knoepfe nur ueber Theme.closeButton (bzw.
+                      Theme.dialogHeader): grosse Trefferflaeche fuers Handy.
 
 Ausnahmen pro Zeile: ein Kommentar `-- ui-ok: <Grund>` am Ende der Zeile.
 Ohne Grund zaehlt die Ausnahme nicht — sie soll im Review auffallen.
@@ -409,6 +411,10 @@ def analyse(path, rel, src, known=None):
             line = stripped[:stripped.find("PanelManager.register(")].count("\n") + 1
             if not ok_marker(comments, line):
                 findings.append(("P1", line, "Panel ohne Theme.dialog-Huelle"))
+        for m in re.finditer(r'Theme\.(?:big)?[bB]utton\(\s*[^,]+,\s*[^,]+,\s*"[Xx✕×]"', stripped):
+            line = stripped[:m.start()].count("\n") + 1
+            if not ok_marker(comments, line):
+                findings.append(("P3", line, "Schliessen-Knopf ohne Theme.closeButton"))
         for m in re.finditer(r'Instance\.new\(\s*"ScrollingFrame"', stripped):
             line = stripped[:m.start()].count("\n") + 1
             if not ok_marker(comments, line):

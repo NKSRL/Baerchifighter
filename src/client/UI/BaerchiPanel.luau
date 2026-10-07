@@ -543,40 +543,36 @@ end
 --------------------------------------------------------------------------------
 
 function BaerchiPanel.init(screenGui: ScreenGui)
-	local root = Theme.panel("BaerchiPanel", screenGui, Theme.COLORS.panelDeep)
-	root.AnchorPoint = Vector2.new(0.5, 0.5)
-	root.Position    = UDim2.fromScale(0.5, 0.5)
 	-- Playtest 05.10.: die einspaltige Karte war zu schmal und lang. Jetzt
 	-- zwei Spalten: links wer der Baerchi ist und wie er staerker wird,
 	-- rechts Zustand, Werte, Eier und Aktionen.
-	root.Size        = UDim2.fromScale(0.72, 0.74)
-	root.Visible     = false
-	root.ZIndex      = 10
-
+	--
 	-- Seit v8 passt der Inhalt nicht mehr garantiert in den Rahmen (Sterne,
 	-- fuenf Stat-Balken, acht Charm-Slots kamen dazu). Statt die Karte immer
 	-- weiter wachsen zu lassen, scrollt sie: die Mindesthoehe muss deshalb nur
 	-- noch fuer eine bequem lesbare Flaeche reichen, nicht mehr fuer JEDE
 	-- Zeile gleichzeitig.
-	local sizeConstraint = Instance.new("UISizeConstraint")
-	sizeConstraint.MinSize = Vector2.new(560, 400)
-	sizeConstraint.MaxSize = Vector2.new(920, 680)
-	sizeConstraint.Parent  = root
+	--
+	-- UI-Qualitaet Schritt 2: gemeinsame Huelle (Theme.dialog) wie alle
+	-- anderen Menues — passt sich kleinen Bildschirmen an, Name in der
+	-- Kopfzeile, grosses Schliessen-X oben rechts. Der fruehere farbige
+	-- Rarity-Streifen ist jetzt der Titelbalken selbst.
+	local root = Theme.dialog(
+		"BaerchiPanel", screenGui,
+		Vector2.new(0.72, 0.74),
+		Vector2.new(560, 400),
+		Vector2.new(920, 680)
+	)
 
-	-- Farbiger Rarity-Streifen am oberen Rand
-	local accent = Instance.new("Frame")
-	accent.Name             = "Accent"
-	accent.Size             = UDim2.new(1, 0, 0, 10)
-	accent.BackgroundColor3  = Theme.COLORS.accent
-	accent.BorderSizePixel   = 0
-	accent.Parent            = root
-	Theme.corner(accent, 10)
-	_accentBar = accent
+	_titleLabel = Theme.dialogHeader(root, "—", function()
+		BaerchiPanel.close()
+	end)
+	local band = root:FindFirstChild("TitleBand")
+	if band and band:IsA("Frame") then
+		_accentBar = band
+	end
 
-	local shell = Theme.container("Body", root)
-	shell.Position = UDim2.new(0, 0, 0, 16)
-	shell.Size     = UDim2.new(1, 0, 1, -16)
-	Theme.padding(shell, 14)
+	local shell = Theme.dialogBody(root)
 
 	-- Zwei Spalten, jede scrollt fuer sich. `row()` haengt an die Spalte, die
 	-- gerade in `column` steht (umgeschaltet vor dem Abschnitt "Zustand").
@@ -611,10 +607,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		Loc.bind(label, key)
 	end
 
-	-- Name
-	local titleRow = row(34)
-	_titleLabel = Theme.label("Title", titleRow, "—")
-	_titleLabel.Size = UDim2.fromScale(1, 1)
+	-- Name steht seit UI-Qualitaet Schritt 2 in der Kopfzeile (dialogHeader).
 
 	-- HBB Paket 4: Kampfwert (eine Zahl statt fuenf Werte)
 	local ratingRow = row(40)
@@ -937,7 +930,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 	_root = root
 
-	PanelManager.register(PANEL_NAME, { -- ui-ok: eigene Zwei-Spalten-Huelle, Umbau auf Theme.dialog in UI-Schritt 2
+	PanelManager.register(PANEL_NAME, {
 		open  = showInternal,
 		close = closeInternal,
 	})

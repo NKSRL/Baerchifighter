@@ -444,8 +444,27 @@ end
 -- Dialoge
 --------------------------------------------------------------------------------
 
+-- Ein Dialog laesst mindestens so viel vom Bildschirm frei (Anteil, je Achse).
+local DIALOG_SCREEN_FILL = 0.94
+
+-- Name des UIScale, mit dem ein Dialog auf kleine Bildschirme passt (siehe
+-- Theme.dialog und Theme.dialogScale).
+local FIT_SCALE_NAME = "FitScale"
+
+-- Schliessen-Knopf: sichtbar 40x34, die Trefferflaeche darum herum 52x52 —
+-- auf dem Handy trifft ein Daumen sonst leicht daneben (Richtwert 44 pt).
+local CLOSE_SIZE = Vector2.new(40, 34)
+local CLOSE_HIT  = 52
+
 -- Zentriertes Panel, standardmaessig unsichtbar. Groesse in Scale, damit es
 -- auf Handy und Monitor passt; die Constraints halten es lesbar.
+--
+-- UI-Qualitaet Schritt 2: die Mindestgroesse (minSize) war auf kleinen
+-- Bildschirmen groesser als der Bildschirm selbst — ein Handy quer hat ohne
+-- Topbar rund 350 px Hoehe, Charms/Bestenliste/Kampf brauchen 420. Kopfzeile
+-- und Schliessen-X lagen dann ausserhalb. Jetzt verkleinert ein UIScale
+-- (FitScale) den GANZEN Dialog gleichmaessig, bis er passt: das Layout bleibt
+-- wie gebaut, nur kleiner. Auf normalen Bildschirmen ist der Faktor 1.
 function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: Vector2, maxSize: Vector2): Frame
 	local root = Theme.panel(name, parent, Theme.COLORS.panelDeep)
 	root.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -459,7 +478,82 @@ function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: V
 	constraint.MaxSize = maxSize
 	constraint.Parent  = root
 
+	local fit = Instance.new("UIScale")
+	fit.Name   = FIT_SCALE_NAME
+	fit.Parent = root
+
+	if parent:IsA("LayerCollector") then
+		local screen = parent :: LayerCollector
+		local function refit()
+			-- AbsoluteSize sind echte Pixel; die globale UiScale (>= 1) rechnet
+			-- sie in Oberflaechen-Einheiten um, in denen minSize gemeint ist.
+			local global = screen:FindFirstChild("GlobalScale")
+			local globalScale = if global and global:IsA("UIScale") then math.max(global.Scale, 0.01) else 1
+			local room = screen.AbsoluteSize / globalScale * DIALOG_SCREEN_FILL
+			if room.X <= 0 or room.Y <= 0 then return end
+			fit.Scale = math.min(1, room.X / minSize.X, room.Y / minSize.Y)
+		end
+		screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
+		-- Die globale UiScale kann nach dem Dialog angelegt werden (Main) und
+		-- aendert sich mit der Fenstergroesse.
+		screen.ChildAdded:Connect(function(child)
+			if child.Name == "GlobalScale" and child:IsA("UIScale") then
+				child:GetPropertyChangedSignal("Scale"):Connect(refit)
+				refit()
+			end
+		end)
+		local global = screen:FindFirstChild("GlobalScale")
+		if global and global:IsA("UIScale") then
+			global:GetPropertyChangedSignal("Scale"):Connect(refit)
+		end
+		refit()
+	end
+
 	return root
+end
+
+-- Gesamter Verkleinerungsfaktor der Dialoge, in denen `gui` steckt (1 = keiner).
+-- Fuer Code, der AbsolutePosition/AbsoluteSize in eine Position INNERHALB eines
+-- Dialogs zurueckrechnet (IndexView): erst UiScale.toGui, dann durch diesen Wert.
+function Theme.dialogScale(gui: Instance): number
+	local factor = 1
+	local node: Instance? = gui
+	while node do
+		local fit = node:FindFirstChild(FIT_SCALE_NAME)
+		if fit and fit:IsA("UIScale") then
+			factor *= fit.Scale
+		end
+		node = node.Parent
+	end
+	return factor
+end
+
+-- Schliessen-Knopf mit grosser Trefferflaeche. Sitzt rechts mittig in `parent`.
+-- Gibt den sichtbaren Knopf zurueck (Farbe/Position darf der Aufrufer aendern;
+-- die Trefferflaeche haengt als Kind daran und wandert mit).
+function Theme.closeButton(parent: Instance, onClose: () -> (), color: Color3?): TextButton
+	local close = Theme.button("Close", parent, "X", color or Theme.COLORS.bad)
+	close.AnchorPoint = Vector2.new(1, 0.5)
+	close.Position    = UDim2.new(1, 0, 0.5, 0)
+	close.Size        = UDim2.fromOffset(CLOSE_SIZE.X, CLOSE_SIZE.Y)
+	close.TextColor3  = Theme.COLORS.text
+	close.Activated:Connect(onClose)
+
+	-- Unsichtbare Trefferflaeche, zentriert auf dem Knopf und etwas groesser.
+	-- Als Kind liegt sie ueber dem Knopf (ZIndexBehavior.Sibling) und nimmt
+	-- jeden Klick in ihrem Bereich an — auch knapp neben dem sichtbaren X.
+	local hit = Instance.new("TextButton")
+	hit.Name                   = "CloseHit"
+	hit.AnchorPoint            = Vector2.new(0.5, 0.5)
+	hit.Position               = UDim2.fromScale(0.5, 0.5)
+	hit.Size                   = UDim2.fromOffset(CLOSE_HIT, CLOSE_HIT)
+	hit.BackgroundTransparency = 1
+	hit.Text                   = ""
+	hit.AutoButtonColor        = false
+	hit.Parent                 = close
+	hit.Activated:Connect(onClose)
+
+	return close
 end
 
 -- Kopfzeile eines Dialogs: Titel links, Schliessen-Kreuz rechts.
@@ -484,15 +578,10 @@ function Theme.dialogHeader(root: Frame, title: string, onClose: () -> ()): Text
 	header.Size     = UDim2.new(1, -28, 0, 30)
 
 	local label = Theme.label("Title", header, title)
-	label.Size = UDim2.new(1, -44, 1, 0)
+	label.Size = UDim2.new(1, -(CLOSE_SIZE.X + 10), 1, 0)
 	Theme.outlineText(label, 2)
 
-	local close = Theme.button("Close", header, "X", Theme.COLORS.bad)
-	close.AnchorPoint = Vector2.new(1, 0.5)
-	close.Position    = UDim2.new(1, 0, 0.5, 0)
-	close.Size        = UDim2.new(0, 34, 0, 30)
-	close.TextColor3  = Theme.COLORS.text
-	close.Activated:Connect(onClose)
+	Theme.closeButton(header, onClose)
 
 	return label
 end

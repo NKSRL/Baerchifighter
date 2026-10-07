@@ -194,14 +194,12 @@ local function buildMenu(
 	subLabel.Position = UDim2.new(0, 72, 0, 42)
 	subLabel.Size     = UDim2.new(1, -118, 0, 20)
 
-	local close = Theme.button("Close", header, "X", Theme.shade(accent, -0.30))
+	-- Gemeinsamer Schliessen-Knopf (grosse Trefferflaeche), oben rechts im Kopf
+	local close = Theme.closeButton(header, function()
+		PanelManager.close(panelName)
+	end, Theme.shade(accent, -0.30))
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position    = UDim2.new(1, -10, 0, 10)
-	close.Size        = UDim2.new(0, 32, 0, 28)
-	close.TextColor3  = Theme.COLORS.text
-	close.Activated:Connect(function()
-		PanelManager.close(panelName)
-	end)
 
 	--------------------------------------------------------------------------
 	-- Inhalt

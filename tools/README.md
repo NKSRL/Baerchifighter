@@ -93,6 +93,7 @@ Fehler:
 | T5 | `Loc.t/tn/msg/bind`-Aufruf übergibt nicht alle `{platzhalter}` des Textes |
 | P1 | Panel ohne `Theme.dialog`-Hülle |
 | P2 | `ScrollingFrame` ohne `Theme.scroller` |
+| P3 | Schließen-Knopf ohne `Theme.closeButton` (große Trefferfläche) |
 
 Bewusste Ausnahme: Kommentar `-- ui-ok: <Grund>` am Zeilenende (ohne Grund
 zählt sie nicht).
