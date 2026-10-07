@@ -1,0 +1,66 @@
+Fehler aus dem Studio-Ausgabefenster (rote Zeilen samt Stack), Stand 08.10.2026
+Quelle: get_console_output, Studio mit eingespieltem HBBUpdate (48 ersetzt, 3 neu angelegt)
+
+=== Lauf 1 (Play-Test direkt nach dem Einspielen) ===
+ServerScriptService.Services.PitBrawlService:112: attempt to index nil with 'TICK_SECONDS'
+Stack Begin
+Script 'ServerScriptService.Services.PitBrawlService', Line 112
+Stack End
+ServerScriptService.Services.PitBrawlService:123: attempt to index nil with 'REACH'
+Stack Begin
+Script 'ServerScriptService.Services.PitBrawlService', Line 123 - function start
+Script 'ServerScriptService.Core.GameManager', Line 124
+Stack End
+[PlayerService] onPlayerReady-Callback fehlgeschlagen: ServerScriptService.Services.SpecialMilestoneService:45: attempt to index nil with 'tower_III_60'
+
+=== Lauf 2 (weiterer Play-Lauf, spaeter im selben Log) ===
+(gleiche PitBrawlService-Fehler Zeile 112 und 123 wie oben)
+ServerScriptService.Services.IncubatorService:505: attempt to call a nil value
+Stack Begin
+Script 'ServerScriptService.Services.IncubatorService', Line 505
+Stack End
+DataStore request was added to queue. If request queue fills, further requests will be dropped. Try sending fewer requests.Key = player_323256346
+
+=== Weitere Meldungen im Log (HBBUpdate-Ordner wurde offenbar erneut/anders verarbeitet) ===
+The Parent property of <Name> is locked, current parent: NULL, new parent <Ziel>
+  (fuer TouchSafeArea, Theme, ReturnSummary, RebirthDialog, QuestTracker, ProfilePanel, PitResumeDialog, PetBar, MenuBar,
+   LeaderboardPanel, IndexView, HomeButton, HatchPanel, HatchAnimation, FusionPanel, FightStartPrompt, Feedback, EggTreePanel,
+   CombatPanel, CharmPanel, BuildingPanel, BaerchiPanel, BaerchiInventory -> UI; UI, Main -> StarterPlayerScripts;
+   WorldController, EggTimerController -> Controllers; Controllers -> StarterPlayerScripts;
+   StarterPlayerScripts -> HBBUpdate; RecyclerBuilder, PlotBuilder, LaidEggBuilder, FigureBuilder, ArenaBuilder -> MapBuild;
+   MapBuild, EventKit -> Util; Util -> ServerScriptService; PlotDisplayService, PitArenaService, PetModeService, MapService,
+   EventService, EventParticipationService, EventHandlers, EggMerchantService, DebugService -> Services;
+   Services -> ServerScriptService; ServerScriptService -> HBBUpdate; Types -> Network; Network -> ReplicatedStorage;
+   WorldText, Names, Strings(de,en,es,fr) -> Localization; Localization -> ReplicatedStorage;
+   EventConfig, CharmConfig, BuildingBehavior -> Config; Config -> ReplicatedStorage; ReplicatedStorage -> HBBUpdate;
+   HBBUpdate -> Workspace)
+WorldText is not a valid member of Folder "ReplicatedStorage.Localization"
+Stack Begin
+Script 'ServerScriptService.Services.MapService', Line 54
+Stack End
+Requested module experienced an error while loading
+Stack Begin
+Script 'ServerScriptService.Services.PlayerService', Line 34
+Stack End
+Requested module experienced an error while loading
+Stack Begin
+Script 'ServerScriptService.Core.GameManager', Line 111
+Stack End
+TouchSafeArea is not a valid member of Folder "Players.QUENTENDO.PlayerScripts.UI"
+Stack Begin
+Script 'Players.QUENTENDO.PlayerScripts.UI.MenuBar', Line 28
+Stack End
+Requested module experienced an error while loading
+Stack Begin
+Script 'Players.QUENTENDO.PlayerScripts.UI.Feedback', Line 38
+Stack End
+Requested module experienced an error while loading
+Stack Begin
+Script 'Players.QUENTENDO.PlayerScripts.Controllers.ResultFeed', Line 27
+Stack End
+Requested module experienced an error while loading
+Stack Begin
+Script 'Players.QUENTENDO.PlayerScripts.Main', Line 47
+Stack End
+The Parent property of SerializationService is locked, current parent: Grow a Baerchi Fighter [ALPHA], new parent NULL
+(Block "WorldText is not a valid member ... Main, Line 47" erscheint danach noch ein zweites Mal identisch.)
