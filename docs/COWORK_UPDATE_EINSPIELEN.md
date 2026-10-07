@@ -1,5 +1,9 @@
 # Auftrag für Claude Cowork: UI-Update in Roblox Studio einspielen (ohne Rojo)
 
+> **ZURÜCKGEZOGEN (08.10.):** Studio enthält Code, der nicht im Repo ist
+> (Inkubator). Diese Update-Datei überschreibt Studio-Fassungen. Erst
+> `docs/COWORK_STUDIO_EXPORT.md` ausführen; danach gibt es eine neue Datei.
+
 Du steuerst meinen Windows-PC. Ziel: die neuen Skripte aus dem Git-Branch
 `claude/trusting-albattani-or20rj` in meinen Roblox-Studio-Ort „Grow a Baerchi“
 einspielen, **ohne dass irgendetwas in Studio verloren geht**. Arbeite die
