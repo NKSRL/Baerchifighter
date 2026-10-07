@@ -22,6 +22,8 @@ Option A: Rojo installieren (`aftman`/Rojo 7.7.0), `rojo serve`, im Studio-Plugi
 ACHTUNG: `src/shared/Assets/BaerchiTemplate.rbxm` fehlt hier – vorher in Studio
 ReplicatedStorage/Assets/BaerchiTemplate per Rechtsklick → „Als Datei speichern“ dorthin sichern, sonst löscht Rojo das Modell.
 Option B: geänderte Skripte von Hand in Studio einfügen.
+Option C (empfohlen, löscht nichts): `python tools/make_update_rbxmx.py [<seit-commit>]` → `updates/HBBUpdate.rbxmx` in Studio importieren, dann `updates/HBBUpdate_Befehl.lua` in die Befehlsleiste. Ersetzt nur den Quelltext geänderter Skripte, legt neue an; Strg+Z macht es rückgängig.
+ACHTUNG Rojo: macht ReplicatedStorage/ServerScriptService/StarterPlayerScripts exakt zum Repo-Stand und löscht alles, was nur in Studio existiert (07.10.: dabei ging ein Studio-Inhalt verloren).
 
 Nach Änderungen in Studio: Datei → Auf Roblox speichern.
 
