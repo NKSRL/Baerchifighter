@@ -39,7 +39,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Remotes = require(ReplicatedStorage.Network.Remotes)
-local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Loc     = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 2.4
 
 local PlayerService             = require(ServerScriptService.Services.PlayerService)
 local CombatService             = require(ServerScriptService.Services.CombatService)
@@ -116,7 +116,7 @@ local function start(player: Player, mode: Mode, resume: CombatService.ResumeCho
 	local data = PlayerService.getData(player)
 	local uid  = if data then data.island.equippedUid else nil
 	if not uid then
-		Remotes.ActionFailed:FireClient(player, "RequestPetMode", Loc.msg("err.event_no_equipped"))
+		Remotes.ActionFailed:FireClient(player, "RequestPetMode", Loc.msg("ui.petbar.no_pet"))
 		return false
 	end
 	return CombatService.startPitRun(player, uid, resume)

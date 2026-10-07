@@ -451,10 +451,10 @@ local DIALOG_SCREEN_FILL = 0.94
 -- Theme.dialog und Theme.dialogScale).
 local FIT_SCALE_NAME = "FitScale"
 
--- Schliessen-Knopf: sichtbar 40x34, die Trefferflaeche darum herum 52x52 —
--- auf dem Handy trifft ein Daumen sonst leicht daneben (Richtwert 44 pt).
-local CLOSE_SIZE = Vector2.new(40, 34)
-local CLOSE_HIT  = 52
+-- Schliessen-Knopf (Sammel-Update 2.1: 44x40) plus eine unsichtbare
+-- Trefferflaeche 56x56 darum — auf dem Handy trifft ein Daumen sonst leicht
+-- daneben (Richtwert 44 pt).
+local CLOSE_HIT = 56
 
 -- Zentriertes Panel, standardmaessig unsichtbar. Groesse in Scale, damit es
 -- auf Handy und Monitor passt; die Constraints halten es lesbar.
@@ -528,20 +528,21 @@ function Theme.dialogScale(gui: Instance): number
 	return factor
 end
 
--- Schliessen-Knopf mit grosser Trefferflaeche. Sitzt rechts mittig in `parent`.
--- Gibt den sichtbaren Knopf zurueck (Farbe/Position darf der Aufrufer aendern;
--- die Trefferflaeche haengt als Kind daran und wandert mit).
+-- Sammel-Update 2.1: der eine Schliessen-Knopf fuer alle Fenster (oben
+-- rechts, gross genug zum Tippen). Fenster ohne dialogHeader (Baerchi-Karte)
+-- setzen ihn direkt. `color` optional (Gebaeude-Menue: Ton seiner Farbe).
+-- UI-Qualitaet: dazu eine unsichtbare Trefferflaeche (CLOSE_HIT) als Kind —
+-- sie liegt ueber dem Knopf (ZIndexBehavior.Sibling) und nimmt jeden Klick in
+-- ihrem Bereich an, auch knapp neben dem sichtbaren X.
 function Theme.closeButton(parent: Instance, onClose: () -> (), color: Color3?): TextButton
 	local close = Theme.button("Close", parent, "X", color or Theme.COLORS.bad)
 	close.AnchorPoint = Vector2.new(1, 0.5)
-	close.Position    = UDim2.new(1, 0, 0.5, 0)
-	close.Size        = UDim2.fromOffset(CLOSE_SIZE.X, CLOSE_SIZE.Y)
+	close.Position    = UDim2.new(1, 4, 0.5, 0)
+	close.Size        = UDim2.new(0, 44, 0, 40)
 	close.TextColor3  = Theme.COLORS.text
+	close.ZIndex      = math.max(close.ZIndex, 12)
 	close.Activated:Connect(onClose)
 
-	-- Unsichtbare Trefferflaeche, zentriert auf dem Knopf und etwas groesser.
-	-- Als Kind liegt sie ueber dem Knopf (ZIndexBehavior.Sibling) und nimmt
-	-- jeden Klick in ihrem Bereich an — auch knapp neben dem sichtbaren X.
 	local hit = Instance.new("TextButton")
 	hit.Name                   = "CloseHit"
 	hit.AnchorPoint            = Vector2.new(0.5, 0.5)
@@ -550,6 +551,7 @@ function Theme.closeButton(parent: Instance, onClose: () -> (), color: Color3?):
 	hit.BackgroundTransparency = 1
 	hit.Text                   = ""
 	hit.AutoButtonColor        = false
+	hit.ZIndex                 = close.ZIndex
 	hit.Parent                 = close
 	hit.Activated:Connect(onClose)
 
@@ -578,9 +580,11 @@ function Theme.dialogHeader(root: Frame, title: string, onClose: () -> ()): Text
 	header.Size     = UDim2.new(1, -28, 0, 30)
 
 	local label = Theme.label("Title", header, title)
-	label.Size = UDim2.new(1, -(CLOSE_SIZE.X + 10), 1, 0)
+	label.Size = UDim2.new(1, -52, 1, 0)
 	Theme.outlineText(label, 2)
 
+	-- Sammel-Update 2.1: groesserer X-Knopf (Tippflaeche ~44 px, Apple/
+	-- Google-Empfehlung) — er ragt bewusst etwas ueber die Kopfzeile hinaus.
 	Theme.closeButton(header, onClose)
 
 	return label

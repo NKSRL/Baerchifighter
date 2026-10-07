@@ -55,9 +55,12 @@ local Workspace = game:GetService("Workspace")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loc          = require(ReplicatedStorage.Localization.Loc)
-local Names        = require(ReplicatedStorage.Localization.Names)
+local Remotes      = require(ReplicatedStorage.Network.Remotes)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 
 local Theme        = require(script.Parent.Parent.UI.Theme)
+local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local BaerchiPanel = require(script.Parent.Parent.UI.BaerchiPanel)
 local PanelManager = require(script.Parent.Parent.UI.PanelManager)
 
@@ -209,6 +212,133 @@ local function addPanelPrompt(part: BasePart, labels: PromptLabels, panelName: s
 end
 
 --------------------------------------------------------------------------------
+-- HUD_ROW_V2: Honig-Brunnen ohne Fenster
+--------------------------------------------------------------------------------
+-- Wunsch Projektinhaber 05.10.: Am Brunnen ploppt nichts mehr auf. E (kurz
+-- halten) baut direkt aus, und ueber dem Brunnen steht nur ein Schild mit
+-- Level und Preis des naechsten Ausbaus. Verbessern geht nur noch vor Ort
+-- (keine Kachel mehr). Der Server prueft wie immer selbst (IslandService).
+
+local POND_SIGN_NAME   = "PondLevelSign"
+local POND_PROMPT_HOLD = 0.4
+local POND_SIGN_HEIGHT = 9
+local POND_SIGN_DISTANCE = 90
+
+type PondView = { part: BasePart, prompt: ProximityPrompt, level: TextLabel, cost: TextLabel, lastLevel: number }
+local _ponds: { PondView } = {}
+
+local function pondState(buildingId: string): (number, any?)
+	local data = ClientState.get()
+	local building = if data then data.island.buildings[buildingId :: any] else nil
+	local level = if building then building.level else 1
+	return level, BuildingBehavior.getUpgrade(buildingId :: any, level + 1)
+end
+
+local function costText(cost: any): string
+	local gummies = Theme.formatNumber(cost.costGummies or 0)
+	local gold = cost.costGoldGummies or 0
+	return if gold > 0
+		then Loc.t("ui.recycler.cost_gg", { gummies = gummies, gold = gold })
+		else Loc.t("ui.recycler.cost_g", { gummies = gummies })
+end
+
+local function writePond(view: PondView)
+	local buildingId = view.part.Name
+	local level, cost = pondState(buildingId)
+	view.level.Text = "Lv. " .. level
+	local data = ClientState.get()
+	if cost then
+		local affordable = data ~= nil and data.gummies >= (cost.costGummies or 0)
+			and data.goldGummies >= (cost.costGoldGummies or 0)
+		view.cost.Text = "⬆ " .. costText(cost)
+		view.cost.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.text
+		view.prompt.ActionText = Loc.t("ui.building.prompt_upgrade")
+		view.prompt.Enabled = true
+	else
+		view.cost.Text = Loc.t("ui.recycler.maxed")
+		view.cost.TextColor3 = Theme.COLORS.goldGummy
+		view.prompt.Enabled = false
+	end
+	view.prompt.ObjectText = Loc.name("building." .. buildingId .. ".name", buildingId) .. "  Lv." .. level
+
+	-- Kleiner Huepfer am Schild, wenn das Level steigt (statt eines Fensters)
+	if level > view.lastLevel and view.lastLevel > 0 then
+		local gui = view.level.Parent
+		if gui and gui:IsA("BillboardGui") then
+			local base = gui.Size
+			gui.Size = UDim2.new(base.X.Scale * 1.25, 0, base.Y.Scale * 1.25, 0)
+			task.delay(0.25, function()
+				if gui.Parent then gui.Size = base end
+			end)
+		end
+	end
+	view.lastLevel = level
+end
+
+local function attachPond(part: BasePart)
+	if part:FindFirstChild(POND_SIGN_NAME) then return end
+
+	local gui = Instance.new("BillboardGui")
+	gui.Name        = POND_SIGN_NAME
+	gui.Size        = UDim2.fromScale(12, 4)
+	gui.StudsOffset = Vector3.new(0, POND_SIGN_HEIGHT, 0)
+	gui.MaxDistance = POND_SIGN_DISTANCE
+	gui.AlwaysOnTop = false
+	gui.Adornee     = part
+	gui.Parent      = part
+
+	local level = Instance.new("TextLabel")
+	level.Name                   = "Level"
+	level.Size                   = UDim2.fromScale(1, 0.58)
+	level.BackgroundTransparency = 1
+	level.Font                   = Theme.FONT
+	level.TextScaled             = true
+	level.TextColor3             = Theme.COLORS.goldGummy
+	level.TextStrokeTransparency = 0.1
+	level.Parent                 = gui
+
+	local cost = Instance.new("TextLabel")
+	cost.Name                   = "Cost"
+	cost.Position               = UDim2.fromScale(0, 0.6)
+	cost.Size                   = UDim2.fromScale(1, 0.4)
+	cost.BackgroundTransparency = 1
+	cost.Font                   = Theme.FONT
+	cost.TextScaled             = true
+	cost.TextStrokeTransparency = 0.1
+	cost.Parent                 = gui
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name                  = "OpenPanel"   -- gleicher Name: kein zweiter Prompt
+	prompt.KeyboardKeyCode       = Enum.KeyCode.E
+	prompt.HoldDuration          = POND_PROMPT_HOLD
+	prompt.MaxActivationDistance = PROMPT_DISTANCE
+	prompt.RequiresLineOfSight   = false
+	prompt.Parent                = part
+	local buildingId = part.Name
+	prompt.Triggered:Connect(function()
+		Remotes.RequestUpgradeBuilding:FireServer(buildingId)
+	end)
+
+	local view: PondView = { part = part, prompt = prompt, level = level, cost = cost, lastLevel = 0 }
+	table.insert(_ponds, view)
+	part.Destroying:Connect(function()
+		local index = table.find(_ponds, view)
+		if index then table.remove(_ponds, index) end
+	end)
+	writePond(view)
+end
+
+local function refreshPonds()
+	for _, view in _ponds do
+		writePond(view)
+	end
+end
+
+local function usesPondSign(buildingId: string): boolean
+	return FeatureFlags.isOn("HUD_ROW_V2") and buildingId == "HoneyPond"
+end
+
+--------------------------------------------------------------------------------
 -- Wem gehoert der Plot, in dem dieses Teil steckt?
 --
 -- MapService setzt das Attribut am Plot-Model, nicht an jedem Teil — also
@@ -259,7 +389,7 @@ local function addHomeMarker(board: BasePart)
 	label.BackgroundTransparency = 1
 	label.Font                   = Theme.FONT
 	label.TextScaled             = true
-	Loc.bind(label, "ui.world.your_plot")
+	label.Text                   = "\u{25BC} " .. Loc.t("ui.world.your_plot")
 	label.TextColor3             = Theme.COLORS.goldGummy
 	label.TextStrokeTransparency = 0.2
 	label.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
@@ -332,10 +462,16 @@ local function hookOwnedPart(instance: BasePart)
 	-- niemand mehr.
 	local buildingId = instance.Name
 
+	-- Sammel-Update 2.6: am Honig-Teich gibt es kein Schild und kein
+	-- "Honig essen"-Klicken mehr (der Baerchi isst selbst). Der Prompt hier
+	-- ist nur noch "Verbessern" — dazu die Gebaeude-Kachel rechts (MenuBar).
+
 	local function attach()
-		addPrompt(instance, "OpenPanel", function()
-			return Loc.t("ui.world.upgrade_prompt"), Names.building(buildingId)
-		end, Enum.KeyCode.E, function()
+		if usesPondSign(buildingId) then
+			attachPond(instance)
+			return
+		end
+		addPrompt(instance, "OpenPanel", Loc.t("ui.building.prompt_upgrade"), Loc.name("building." .. buildingId .. ".name", buildingId), Enum.KeyCode.E, function()
 			PanelManager.open(PanelManager.buildingPanelName(buildingId))
 		end)
 	end
@@ -426,6 +562,10 @@ function WorldController.init()
 		hookPlayer(other)
 	end
 	Players.PlayerAdded:Connect(hookPlayer)
+
+	-- HUD_ROW_V2: Brunnen-Schild mit Level und Preis aktuell halten
+	ClientState.onChanged(refreshPonds)
+	Loc.onChanged(refreshPonds)
 
 	print("[WorldController] Initialisiert")
 end

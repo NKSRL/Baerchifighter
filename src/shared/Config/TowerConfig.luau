@@ -77,9 +77,17 @@ export type TowerDef = {
 --     Staerke-Bereich haben.
 local TOWERS: { TowerDef } = {
 	{
+		-- Sammel-Update 05.10. (Paket 4.2, "Kaempfe frueher vorbei, nicht
+		-- instant zum Rebirth"): je Stage 1.0 -> 1.15. Stage 30 entspricht
+		-- jetzt Aequivalenz 34 statt 30 — ein frischer Baerchi endet deutlich
+		-- vor Stage 25, Stage 30 (erster Rebirth) braucht Honig-XP und
+		-- Ausbau. Weil die Belohnung an der Aequivalenz haengt (staerkere
+		-- Gegner = mehr Gummies) und der Deckel von R0 auf 30 stieg, zahlt
+		-- Tower I nur noch 0.3: das Einkommen der ersten Stunde bleibt fast
+		-- gleich (Look 2 weiter ab 20 min, progression_pacing.lua).
 		id = "I", index = 1, stages = 30,
-		startEquivalent = 1, equivalentPerStage = 1.0,
-		rewardFactor = 1,
+		startEquivalent = 1, equivalentPerStage = 1.15,
+		rewardFactor = 0.3,
 		goldPerFive = 10,
 		look = "Wood", color = Color3.fromRGB(196, 140, 80), numeral = "I",
 	},
@@ -171,22 +179,55 @@ end
 --------------------------------------------------------------------------------
 
 -- Bis Rebirth 6 eine feste Tabelle: hoechster offener Tower und dessen Deckel.
+-- Sammel-Update 05.10. (Paket 4.1): R0 I/15 -> I/30, damit der erste Rebirth
+-- (Tower I Stage 30, Entscheidung 11.3) auch Belohnung und Rekord bringt; R1
+-- I/30 -> II/5, damit die Rebirth-Bedingung danach weiter steigen kann (sie
+-- muss in einem OFFENEN Tower liegen). Die Gummies der Stages bleiben dabei
+-- fast gleich: Tower I zahlt mit rewardFactor 0.3 (seine Gegner sind seit dem
+-- Sammel-Update staerker, siehe TOWERS), Tower II Stage 1-5 liegt unter I/30.
+-- Der Deckel steuert die BELOHNUNG (das Einkommen, damit die Look-Zeiten);
+-- die Rebirth-Bedingung steht getrennt in REBIRTH_REQUIREMENT.
 local STAGE_CAP_BY_REBIRTH: { [number]: { tower: Types.TowerId, stage: number } } = {
-	[0] = { tower = "I",   stage = 15 },
-	[1] = { tower = "I",   stage = 30 },
+	[0] = { tower = "I",   stage = 30 },
+	[1] = { tower = "II",  stage = 5 },
 	[2] = { tower = "II",  stage = 25 },
 	[3] = { tower = "II",  stage = 45 },
 	[4] = { tower = "III", stage = 40 },
 	[5] = { tower = "III", stage = 60 },
-	[6] = { tower = "III", stage = 60 },
 }
 
--- Ab Rebirth 7 ist der Final-Tower offen: Deckel 20, jeder weitere Rebirth +10,
--- bis 100 (bei Rebirth 15).
+-- Ab Rebirth 6 ist der Final-Tower offen: Deckel 20, jeder weitere Rebirth +10,
+-- bis 100 (bei Rebirth 14). Sammel-Update 05.10.: vorher ab R7 — R6 hatte
+-- denselben Deckel wie R5 (III/60), mit der Stage-Bedingung waere der siebte
+-- Rebirth damit ohne jeden Anstieg sofort moeglich gewesen.
 local FINAL_CAP = {
-	fromRebirth = 7,
+	fromRebirth = 6,
 	startStage  = 20,
 	perRebirth  = 10,
+}
+
+-- Sammel-Update 05.10. (Paket 4.1): REBIRTH-BEDINGUNG je Rebirth (Tower,
+-- Stage), in DIESEM Leben geschafft. Steigt langsam; muss in einem offenen
+-- Tower liegen (rebirth_rules.test.lua prueft das). Ohne Eintrag gilt der
+-- Deckel des Rebirths als Bedingung, hinter Final 100 Endless-Stages
+-- (REBIRTH_AFTER_FINAL). Zeiten: tools/sim/progression_pacing.lua.
+local REBIRTH_REQUIREMENT: { [number]: { tower: Types.TowerId, stage: number } } = {
+	[0] = { tower = "I",   stage = 30 },   -- erster Rebirth: Tower I Stage 30
+	[1] = { tower = "II",  stage = 30 },
+	[2] = { tower = "II",  stage = 40 },
+	[3] = { tower = "II",  stage = 45 },
+	[4] = { tower = "III", stage = 40 },
+	[5] = { tower = "III", stage = 60 },
+	-- ab R6: der Deckel des Rebirths (Final 20, 30, ... 100)
+}
+TowerConfig.REBIRTH_REQUIREMENT = REBIRTH_REQUIREMENT
+
+-- Paket 4.1: ab diesem Rebirth ist Final 100 laengst der Deckel; die
+-- Bedingung zieht in den Endless-Tower weiter (+endlessPerRebirth Stages je
+-- Rebirth), sonst waere jeder weitere Rebirth sofort wieder moeglich.
+TowerConfig.REBIRTH_AFTER_FINAL = {
+	fromRebirth       = 15,
+	endlessPerRebirth = 20,
 }
 
 TowerConfig.STAGE_CAP_BY_REBIRTH = STAGE_CAP_BY_REBIRTH
@@ -250,6 +291,54 @@ function TowerConfig.isCapLimiting(rebirthCount: number, towerId: string): boole
 	local nextTower, nextStage = TowerConfig.getCap(rebirthCount + 1)
 	return TowerConfig.getIndex(nextTower) > def.index
 		or nextStage > TowerConfig.getStageCap(rebirthCount, towerId)
+end
+
+--------------------------------------------------------------------------------
+-- Sammel-Update 05.10. (Paket 4.1): REBIRTH NUR NACH STAGE
+--------------------------------------------------------------------------------
+-- Ein Rebirth kostet keine Gummies mehr. Bedingung: in DIESEM Leben (seit dem
+-- letzten Rebirth, island.stageBest) den Deckel des aktuellen Rebirths
+-- geschafft (getCap): R0 Tower I Stage 30, R1 II/15, R2 II/25, R3 II/45,
+-- R4 III/40, R5 III/60, R6 Final/20, dann +10 je Rebirth bis Final 100.
+--
+-- Gemessen wird in Aequivalenz-Stages: eine gleich starke Stage in einem
+-- anderen Tower zaehlt genauso (wer im hoeheren Tower kaempft, wird nicht
+-- bestraft).
+--
+-- Weil das Baerchi-Level beim Rebirth auf 1 faellt, muss jedes Leben ueber
+-- Honig-XP und Gebaeude wieder bis dorthin wachsen — genau die gewollte
+-- Schleife ("Stages schafft man schneller durch mehr Baerchi-XP"). Die
+-- Abstaende wurden mit tools/sim/progression_pacing.lua gegen die alten
+-- Gummy-Kosten gelegt (Tabelle im Bericht SAMMEL_UPDATE_UMGESETZT).
+function TowerConfig.getRebirthRequirement(rebirthCount: number, _records: { [string]: number }?): (string, number)
+	local n = math.max(0, math.floor(rebirthCount))
+	-- Hinter Final 100 (Deckel ab REBIRTH_AFTER_FINAL.fromRebirth) steigt die
+	-- Bedingung im Endless-Tower weiter, sonst waere jeder weitere Rebirth
+	-- sofort wieder moeglich. Ohne ENDLESS bleibt es bei Final 100.
+	local after = TowerConfig.REBIRTH_AFTER_FINAL
+	if n >= after.fromRebirth and BY_ID.Endless then
+		return "Endless", math.min(BY_ID.Endless.stages, (n - after.fromRebirth + 1) * after.endlessPerRebirth)
+	end
+	local entry = REBIRTH_REQUIREMENT[n]
+	if entry then
+		return entry.tower, entry.stage
+	end
+	local towerId, stage = TowerConfig.getCap(n)
+	return towerId, stage
+end
+
+-- Ist die Bedingung erfuellt? `stageBest` = beste geschaffte Stage je Tower
+-- in diesem Leben (island.stageBest).
+function TowerConfig.isRebirthReady(rebirthCount: number, stageBest: { [string]: number }?, records: { [string]: number }?): boolean
+	if not stageBest then return false end
+	local towerId, stage = TowerConfig.getRebirthRequirement(rebirthCount, records)
+	local needed = TowerConfig.getEquivalent(towerId, stage)
+	for id, best in stageBest do
+		if BY_ID[id] and best > 0 and TowerConfig.getEquivalent(id, best) >= needed - 1e-6 then
+			return true
+		end
+	end
+	return false
 end
 
 --------------------------------------------------------------------------------

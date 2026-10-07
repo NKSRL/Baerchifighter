@@ -319,7 +319,7 @@ function PlotBuilder.writeBuildingState(part: BasePart, buildingData: Types.Buil
 
 	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
-		WorldText.set(stock, Loc.msg("ui.world.honey_stock", { n = honey, max = capacity }))
+		stock.Text = string.format("🍯 %d / %d", honey, capacity)   -- sprachneutral (2.4)
 
 		-- Volles Lager faellt farblich auf: dann steht die Produktion und es
 		-- wird Zeit, zurueckzukommen und zu fuettern.
@@ -411,6 +411,14 @@ function PlotBuilder.buildBuilding(plotModel: Model, slot: number, buildingData:
 	-- Koerpergroesse: sonst haengt das Schild nach jeder Formaenderung falsch.
 	-- StudsOffset zaehlt ab der MITTE der Part, deshalb die Halbierung.
 	local topOfDecor = math.max(MapParts.decorHeight(decor), config.size.Y)
+
+	-- Sammel-Update 2.6 ("UI von Honig-Sumpf weg"): der Honig-Teich bekommt
+	-- kein Schild — der Baerchi isst dort von selbst (Autopilot), Text und
+	-- Zahlen braucht dort niemand. writeBuildingState kommt ohne Schild aus.
+	if buildingData.id == "HoneyPond" then
+		PlotBuilder.writeBuildingState(part, buildingData, pool)
+		return
+	end
 
 	local sign = Instance.new("BillboardGui")
 	sign.Name         = "Sign"

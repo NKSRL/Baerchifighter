@@ -23,6 +23,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local IncubatorRules   = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
+local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig) -- Sammel-Update 7
+local BuildingBehavior  = require(ReplicatedStorage.Config.BuildingBehavior)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
+local Workspace        = game:GetService("Workspace")
 
 local Theme        = require(script.Parent.Theme)
 local TouchSafeArea = require(script.Parent.TouchSafeArea)
@@ -37,16 +42,20 @@ local TILE_ELEMENT: { [string]: string } = {
 	Hatch = "tile_eggs", Inventory = "tile_bears", EggTree = "tile_tree",
 	Leaderboard = "tile_leaderboard", DailyBonus = "tile_daily",
 	Shop = "tile_shop",
+	Incubator = "tile_incubator",   -- Sammel-Update Paket 8
 }
 
 local MenuBar = {}
 
 -- Groessen. TILE ist gleichzeitig die Antippflaeche — darunter wird es auf dem
 -- Handy zur Geduldsprobe.
-local TILE   = 54
-local LABEL  = 16
-local GAP    = 6
-local WIDTH  = 76
+-- HUD_ROW_V2: weniger Kacheln (Verbessern, Inkubator und Shop sind weg),
+-- dafuer groesser. Die UIScale unten schrumpft weiterhin auf kleinen Fenstern.
+local BIG    = FeatureFlags.isOn("HUD_ROW_V2")
+local TILE   = if BIG then 70 else 54
+local LABEL  = if BIG then 18 else 16
+local GAP    = if BIG then 8 else 6
+local WIDTH  = if BIG then 94 else 76
 
 -- Was eine Kachel anzeigt: `value` ist die Beschriftung IN der Kachel,
 -- `alert` laesst das rote Ausrufezeichen erscheinen.
@@ -76,15 +85,66 @@ type Tile = {
 }
 
 local _tiles: { Tile } = {}
+local buildAllEntries: () -> { Entry }
+
+-- Sammel-Update 3.5: welches Gebaeude-Menue die Kachel oeffnet
+local function buildingPanel(): string
+	return PanelManager.buildingPanelName(if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner")
+end
+TILE_ELEMENT[buildingPanel()] = "tile_building"
 
 --------------------------------------------------------------------------------
 -- Die Eintraege
 --------------------------------------------------------------------------------
 
 local function buildEntries(): { Entry }
+	local list = buildAllEntries()
+	-- HUD_ROW_V2: Honig-Brunnen und Inkubator benutzt man vor Ort (Prompt am
+	-- Plot), der Shop sitzt in der Knopf-Zeile oben links (Hud).
+	local hidden: { [string]: boolean } = {}
+	if not FeatureFlags.isOn("INCUBATOR") then hidden.Incubator = true end
+	if BIG then
+		hidden.Incubator = true
+		hidden.Shop = true
+		hidden[buildingPanel()] = true
+	end
+	for i = #list, 1, -1 do
+		if hidden[list[i].panel] then table.remove(list, i) end
+	end
+	return list
+end
+
+function buildAllEntries(): { Entry }
 	return {
 		{ panel = "Hatch",     title = function() return Loc.t("ui.menu.eggs") end,     color = Theme.COLORS.gummy,  symbol = "EI", icon = "egg" },
-		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear" },
+		-- Sammel-Update 05.10. (Paket 7): "!" = eine Index-Belohnung ist abholbar.
+		{ panel = "Inventory", title = function() return Loc.t("ui.menu.baerchis") end, color = Theme.COLORS.accent, symbol = "BA", icon = "bear",
+			live = function(data: Types.PlayerDataUpdate)
+				if not FeatureFlags.isOn("INDEX_REWARDS") then return "BA", false end
+				return "BA", #IndexRewardConfig.claimable(data.discovered, data.indexClaimed) > 0
+			end },
+		-- Sammel-Update 05.10. (Paket 3.5/3.6): das Honig-Gebaeude als Kachel
+		-- (Verbessern ohne hinzulaufen). "!" = Ausbau bezahlbar.
+		{ panel = buildingPanel(), title = function() return Loc.t("ui.menu.building") end, color = Theme.COLORS.goldGummy, symbol = "⬆", icon = "upgrade",
+			live = function(data: Types.PlayerDataUpdate)
+				local id = if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"
+				local building = data.island.buildings[id :: any]
+				if not building then return "⬆", false end
+				local cost = BuildingBehavior.getUpgrade(id :: any, building.level + 1)
+				return "⬆", cost ~= nil and data.gummies >= cost.costGummies and data.goldGummies >= (cost.costGoldGummies or 0)
+			end },
+		-- Sammel-Update 05.10. (Paket 8): Inkubator ("!" = ein Ei ist fertig).
+		{ panel = "Incubator", title = function() return Loc.t("ui.incubator.tile") end, color = Theme.COLORS.growth, symbol = "⏳", icon = "incubator",
+			live = function(data: Types.PlayerDataUpdate)
+				local incubator = data.island.incubator
+				if not incubator then return "⏳", false end
+				local now = Workspace:GetServerTimeNow()
+				local ready = false
+				for _, entry in incubator.slots do
+					if IncubatorRules.isReady(entry, now) then ready = true end
+				end
+				return "⏳", ready
+			end },
 		-- v14: Ei-Baum. Das "!" zeigt eine ungenutzte Blaupause an.
 		{ panel = "EggTree", title = function() return Loc.t("ui.menu.tree") end, color = Theme.COLORS.growth, symbol = "BAUM", icon = "tree",
 			live = function(data: Types.PlayerDataUpdate)
@@ -161,7 +221,7 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	label.Size           = UDim2.new(1, 0, 0, LABEL)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextScaled     = false
-	label.TextSize       = 14
+	label.TextSize       = if BIG then 16 else 14
 	Theme.outlineText(label)
 
 	return { entry = entry, tile = button, alert = alert, label = label, image = hasImage }

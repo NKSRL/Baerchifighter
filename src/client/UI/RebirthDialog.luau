@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
+local TowerConfig   = require(ReplicatedStorage.Config.TowerConfig)   -- Paket 4.1
 local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
@@ -56,10 +57,14 @@ function RebirthDialog.refresh()
 	local data = ClientState.get()
 	if not data then return end
 
-	local cost    = EconomyConfig.getRebirthCost(data.rebirthCount)
+	-- Sammel-Update 05.10. (Paket 4.1): Bedingung ist eine Stage, kein Preis.
+	local records = data.towers and data.towers.records
+	local reqTower, reqStage = TowerConfig.getRebirthRequirement(data.rebirthCount, records)
+	local reqDef  = TowerConfig.get(reqTower)
+	local have    = ((data.island :: any).stageBest or {})[reqTower] or 0
 	local nextMult = EconomyConfig.getRebirthMult(data.rebirthCount + 1)
 	local eggs    = EconomyConfig.getAscensionEggReward(data.rebirthCount + 1)
-	local enough  = data.gummies >= cost
+	local enough  = TowerConfig.isRebirthReady(data.rebirthCount, (data.island :: any).stageBest, records)
 
 	-- Zahlen uebergibt der Code als Zahlen: Loc formatiert sie je nach Sprache
 	-- ("1.500" / "1,500" / "1 500"), der Text legt das Dezimalformat fest ({mult:d2}).
@@ -71,7 +76,11 @@ function RebirthDialog.refresh()
 	end
 
 	if _costLabel then
-		_costLabel.Text = Loc.t("ui.rebirth.cost", { cost = cost, have = data.gummies })
+		_costLabel.Text = Loc.t("ui.rebirth.requirement", {
+			tower = if reqDef then reqDef.numeral else reqTower,
+			have  = math.min(have, reqStage),
+			stage = reqStage,
+		})
 		_costLabel.TextColor3 = if enough then Theme.COLORS.good else Theme.COLORS.bad
 	end
 
@@ -123,7 +132,9 @@ function RebirthDialog.refresh()
 				Loc.formatDecimal(data.rebirthMult, 2), Loc.formatDecimal(nextMult, 2))
 		end
 		if _costLabel then
-			_costLabel.Text = string.format("%s / %s", Loc.formatNumber(data.gummies), Loc.formatNumber(cost))
+			_costLabel.Text = string.format("%s %s · %s / %s", "🗼",
+				if reqDef then reqDef.numeral else reqTower,
+				Loc.formatNumber(math.min(have, reqStage)), Loc.formatNumber(reqStage))
 		end
 		if _lossLabel then
 			_lossLabel.Text = "⚠ " .. Loc.t("ui.rebirth.warn_short")

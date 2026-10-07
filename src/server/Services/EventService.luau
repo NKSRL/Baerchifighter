@@ -92,11 +92,18 @@ end
 -- rechtzeitig losschicken (der Weg in die Mitte dauert selbst ein paar
 -- Sekunden). Auf der Tafel steht dieselbe Information — die sieht aber nur,
 -- wer gerade in die Weltmitte schaut.
-local function phasePayload(): (string?, number, string)
+-- Sammel-Update 05.10. (Paket 5.3): vierte Angabe = Sekunden bis zur
+-- naechsten Wespenkoenigin (0 = laeuft gerade, nil = unbekannt). Die Pet-
+-- Leiste zeigt daraus "Boss in X min" — der 50-Minuten-Zyklus fuehlt sich
+-- kuerzer an, wenn man sieht, worauf man wartet.
+local function phasePayload(): (string?, number, string, number?)
+	local remaining = math.max(0, _phaseEndsAt - os.time())
+	local activeId = if _active then _active.id else nil
 	return
-		(if _active then _active.id else nil),
-		math.max(0, _phaseEndsAt - os.time()),
-		EventConfig.EVENTS[_nextIndex].id
+		activeId,
+		remaining,
+		EventConfig.EVENTS[_nextIndex].id,
+		EventConfig.secondsUntilStart(WASP_QUEEN_ID, activeId, remaining, _nextIndex, _nextCycle)
 end
 
 -- Sagt ALLEN Clients, welches Event gerade laeuft (bzw. dass Pause ist).
@@ -200,8 +207,9 @@ local function tick()
 	if _active then
 		-- Tafel-Texte als Nachrichten: jeder Spieler liest sie in seiner Sprache.
 		MapService.setEventBanner(
+			-- Sammel-Update 2.4: die Tafel sehen alle — Zeichen statt Woerter
 			Loc.msg("ui.eventboard.live", { event = Names.msg.event(_active.id) }),
-			Loc.msg("ui.eventboard.left", { time = formatCountdown(remaining) }),
+			string.format("⏱ %s", formatCountdown(remaining)),
 			_active.bannerColor,
 			EventConfig.describeReward(_active)
 		)
@@ -209,8 +217,8 @@ local function tick()
 		local upcoming = EventConfig.EVENTS[_nextIndex]
 
 		MapService.setEventBanner(
-			Loc.msg("ui.eventboard.next", { event = Names.msg.event(upcoming.id) }),
-			Loc.msg("ui.eventboard.in", { time = formatCountdown(remaining) }),
+			Loc.msg("fmt.append", { a = "⏭", b = Names.msg.event(upcoming.id) }),
+			string.format("⏱ %s", formatCountdown(remaining)),
 			MapConfig.EVENT_PIT_BANNER_IDLE_COLOR,
 			EventConfig.describeReward(upcoming)
 		)

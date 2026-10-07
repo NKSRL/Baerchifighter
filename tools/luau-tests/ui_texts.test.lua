@@ -118,7 +118,7 @@ for _, lang in { "de", "en", "fr", "es" } do
 	}) })
 	local boards = {
 		Loc.msg("ui.eventboard.live", { event = Names.msg.event("WaspQueen") }),
-		Loc.msg("ui.pitboard.stage", { tower = Loc.msg("ui.petbar.tower", { numeral = "III" }), stage = 42 }),
+		Loc.msg("ui.pitboard.stage", { tower = Loc.msg("ui.petbar.tower", { n = "III" }), stage = 42 }),
 		Loc.msg("ui.world.figure_name", { badge = "", name = Names.msg.baerchi("OmegaBaerchi"), level = 50 }),
 		Loc.msg("ui.world.sign_level", { name = Names.msg.building("HoneyPond"), level = 12 }),
 		Loc.msg("ui.merchant.buy", { egg = Names.msg.egg("BasicEgg"), n = 120 }),

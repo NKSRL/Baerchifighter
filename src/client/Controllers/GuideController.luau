@@ -24,6 +24,8 @@ local Workspace         = game:GetService("Workspace")
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local GuideSteps   = require(ReplicatedStorage.Modules.GuideSteps)
 local EggConfig    = require(ReplicatedStorage.Config.EggConfig)
+local Loc          = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 3.5
+local PanelManager = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PanelManager"))
 
 local UI          = script.Parent.Parent:WaitForChild("UI")
 local Theme       = require(UI:WaitForChild("Theme"))
@@ -36,6 +38,17 @@ local GuideController = {}
 
 -- Nach so vielen Sekunden ohne Fortschritt wird die Hervorhebung staerker.
 local HINT_AFTER_SECONDS = 12
+
+-- Sammel-Update 05.10.:
+-- 3.1 groessere Pfeile (vorher 40 px, Wippen 8/18 px)
+local ARROW_SIZE   = 84
+local ARROW_BOUNCE = 16
+local ARROW_BOUNCE_STRONG = 30
+-- 3.2 der Event-Schritt ist am Anfang unwichtig: er zeigt sich nur so lange
+-- und verschwindet dann (bis zum naechsten Join).
+local EVENT_STEP_SECONDS = 8
+-- 3.5 ein Satz, was der Schritt bringt (Schluessel "guide.<step>")
+local HINT_WIDTH = 300
 local HIGHLIGHT_COLOR = Color3.fromRGB(255, 236, 140)
 local BEAM_COLOR      = Color3.fromRGB(255, 220, 90)
 local LAID_EGG_ATTRIBUTE = "LaidEggUid"
@@ -49,6 +62,7 @@ local _worldTarget: BasePart? = nil
 local _frame: Frame? = nil
 local _stroke: UIStroke? = nil
 local _arrow: TextLabel? = nil
+local _hint: TextLabel? = nil
 
 local _beam: Beam? = nil
 local _from: Attachment? = nil
@@ -65,6 +79,12 @@ local function uiTarget(step: string): GuiObject?
 		return PetBar.getButton("Fight")
 	elseif step == "event" then
 		return PetBar.getButton("Event")
+	elseif step == "upgrade" then
+		-- HUD_ROW_V2: keine Kachel mehr, der Strahl zeigt zum Brunnen (worldTarget)
+		if FeatureFlags.isOn("HUD_ROW_V2") then return nil end
+		-- Sammel-Update 3.5: Gebaeude-Kachel rechts
+		return MenuBar.getTileAnchor(PanelManager.buildingPanelName(
+			if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"))
 	end
 	return nil
 end
@@ -107,11 +127,54 @@ local function merchantCounter(): BasePart?
 	return if counter and counter:IsA("BasePart") then counter else nil
 end
 
+-- Recycler auf dem EIGENEN Plot (Attribut PlotOwner am Plot-Model).
+local function ownRecycler(): BasePart?
+	for _, descendant in Workspace:GetDescendants() do
+		if descendant.Name == "Recycler" and descendant:IsA("BasePart") then
+			local model = descendant.Parent
+			if model and model:GetAttribute("PlotOwner") == Players.LocalPlayer.UserId then
+				return descendant
+			end
+		end
+	end
+	return nil
+end
+
+-- HUD_ROW_V2: Honig-Gebaeude auf dem EIGENEN Plot (Prompt "Verbessern").
+local function ownHoneyBuilding(): BasePart?
+	local id = if FeatureFlags.isOn("HONEY_POND_V2") then "HoneyPond" else "HoneyRefiner"
+	for _, descendant in Workspace:GetDescendants() do
+		if descendant.Name == id and descendant:IsA("BasePart") then
+			local current: Instance? = descendant
+			while current do
+				local owner = current:GetAttribute("PlotOwner")
+				if typeof(owner) == "number" then
+					if owner == Players.LocalPlayer.UserId then return descendant end
+					break
+				end
+				current = current.Parent
+			end
+		end
+	end
+	return nil
+end
+
 local function worldTarget(step: string): BasePart?
-	if step == "collect" then
+	if step == "upgrade" and FeatureFlags.isOn("HUD_ROW_V2") then
+		return ownHoneyBuilding()
+	elseif step == "collect" then
 		return nearestOwnEgg()
 	elseif step == "merchant" then
 		return merchantCounter()
+	elseif step == "combs" then
+		-- Sammel-Update 3.5: mit Waben auf dem Kopf zum eigenen Recycler,
+		-- sonst zu den Waben in die Mitte.
+		local carried = Players.LocalPlayer:GetAttribute("CombsCarried")
+		if typeof(carried) == "number" and carried > 0 then
+			return ownRecycler()
+		end
+		local pit = Workspace:FindFirstChild("EventFloor", true)
+		return if pit and pit:IsA("BasePart") then pit else nil
 	end
 	return nil
 end
@@ -165,6 +228,19 @@ local function hideHighlight()
 	if _arrow then _arrow.Visible = false end
 end
 
+-- Sammel-Update 3.5: Satz zum Schritt, unten mittig ueber der Pet-Leiste.
+local function showHint(step: string?)
+	local hint = _hint
+	if not hint then return end
+	local key = if step then "guide." .. step else nil
+	if key and Loc.has(key) then
+		hint.Text = Loc.t(key)
+		hint.Visible = true
+	else
+		hint.Visible = false
+	end
+end
+
 local function showHighlight(target: GuiObject, strong: boolean, t: number)
 	local frame, stroke, arrow = _frame, _stroke, _arrow
 	if not frame or not stroke or not arrow then return end
@@ -186,15 +262,15 @@ local function showHighlight(target: GuiObject, strong: boolean, t: number)
 	-- Pfeil zeigt von oben auf den Knopf (die Kachelleiste rechts: von links)
 	local screen = frame.Parent :: GuiObject
 	local fromLeft = pos.X > UiScale.toGui(screen.AbsoluteSize.X) * 0.8
-	local bounce = wave * (if strong then 18 else 8)
+	local bounce = wave * (if strong then ARROW_BOUNCE_STRONG else ARROW_BOUNCE)
 	arrow.Visible = true
 	if fromLeft then
 		-- "➡" statt "➜": "➜" kann die Spielschrift nicht darstellen.
 		arrow.Text = "➡"
-		arrow.Position = UDim2.fromOffset(pos.X - 48 - bounce, pos.Y + size.Y * 0.5 - 20)
+		arrow.Position = UDim2.fromOffset(pos.X - ARROW_SIZE - 6 - bounce, pos.Y + size.Y * 0.5 - ARROW_SIZE * 0.5)
 	else
 		arrow.Text = "⬇"
-		arrow.Position = UDim2.fromOffset(pos.X + size.X * 0.5 - 20, pos.Y - 46 - bounce)
+		arrow.Position = UDim2.fromOffset(pos.X + size.X * 0.5 - ARROW_SIZE * 0.5, pos.Y - ARROW_SIZE - 6 - bounce)
 	end
 end
 
@@ -221,12 +297,17 @@ end
 
 local function render()
 	local step = _step
+	local now = os.clock()
+	-- Sammel-Update 3.2: Event-Schritt nur kurz
+	if step == "event" and now - _stepSince > EVENT_STEP_SECONDS then
+		step = nil
+	end
+	showHint(step)
 	if not step then
 		hideHighlight()
 		clearBeam()
 		return
 	end
-	local now = os.clock()
 	local strong = now - _stepSince >= HINT_AFTER_SECONDS
 
 	local target = uiTarget(step)
@@ -262,13 +343,29 @@ function GuideController.init(screenGui: ScreenGui)
 	_frame, _stroke = frame, stroke
 
 	local arrow = Theme.label("GuideArrow", screenGui, "⬇")
-	arrow.Size = UDim2.fromOffset(40, 40)
+	arrow.Size = UDim2.fromOffset(ARROW_SIZE, ARROW_SIZE)
+	local arrowLimit = arrow:FindFirstChildOfClass("UITextSizeConstraint")
+	if arrowLimit then arrowLimit.MaxTextSize = ARROW_SIZE end
 	arrow.TextXAlignment = Enum.TextXAlignment.Center
 	arrow.TextColor3 = HIGHLIGHT_COLOR
 	arrow.ZIndex = 41
 	arrow.Visible = false
 	Theme.outlineText(arrow, 3)
 	_arrow = arrow
+
+	-- Sammel-Update 3.5: ein Satz pro Schritt
+	local hint = Theme.label("GuideHint", screenGui, "")
+	hint.AnchorPoint = Vector2.new(0.5, 1)
+	hint.Position = UDim2.new(0.5, 0, 1, -112)
+	hint.Size = UDim2.fromOffset(HINT_WIDTH, 44)
+	hint.TextXAlignment = Enum.TextXAlignment.Center
+	hint.TextWrapped = true
+	hint.TextColor3 = HIGHLIGHT_COLOR
+	hint.ZIndex = 41
+	hint.Visible = false
+	Theme.outlineText(hint, 2)
+	_hint = hint
+	Loc.onChanged(function() showHint(_step) end)
 
 	ClientState.onChanged(function()
 		evaluate()

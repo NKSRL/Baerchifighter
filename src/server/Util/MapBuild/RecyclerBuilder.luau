@@ -62,10 +62,11 @@ function RecyclerBuilder.writeState(body: BasePart, recycler: Types.RecyclerData
 	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
 		if recycler.queued > 0 then
-			WorldText.set(stock, Loc.msg("ui.world.combs_queued", { n = recycler.queued }))
+			stock.Text = string.format("⬡ %d", recycler.queued)   -- sprachneutral (2.4)
 			stock.TextColor3 = CombConfig.LAMP_ACTIVE_COLOR
 		else
-			WorldText.set(stock, Loc.msg("ui.world.gummies_per_comb", { n = CombConfig.getPayPerUnit(recycler.level) }))
+			-- Sammel-Update 3.6: sprachneutral "⬡ = 12 G" (eine Wabe bringt so viel)
+			stock.Text = string.format("⬡ = %d G", CombConfig.getPayPerUnit(recycler.level))
 			stock.TextColor3 = Color3.fromRGB(235, 235, 235)
 		end
 	end

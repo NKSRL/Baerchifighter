@@ -55,6 +55,8 @@ local LaidEggMeshController = require(Controllers:WaitForChild("LaidEggMeshContr
 local UiEventLogger      = require(Controllers:WaitForChild("UiEventLogger"))
 local GuideController    = require(Controllers:WaitForChild("GuideController"))
 local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
+local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
+local AreaSignController    = require(Controllers:WaitForChild("AreaSignController"))    -- Sammel-Update 3.8
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
@@ -73,6 +75,7 @@ local LanguagePanel    = require(UI:WaitForChild("LanguagePanel"))
 local PetBar           = require(UI:WaitForChild("PetBar"))
 local QuestPanel       = require(UI:WaitForChild("QuestPanel"))
 local QuestTracker     = require(UI:WaitForChild("QuestTracker"))
+local HudRow           = require(UI:WaitForChild("HudRow"))
 local EggTreePanel     = require(UI:WaitForChild("EggTreePanel"))
 local LeaderboardPanel = require(UI:WaitForChild("LeaderboardPanel"))
 local ProfilePanel     = require(UI:WaitForChild("ProfilePanel"))
@@ -81,6 +84,9 @@ local Feedback         = require(UI:WaitForChild("Feedback"))
 local Moment           = require(UI:WaitForChild("Moment"))
 local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
 local HomeButton       = require(UI:WaitForChild("HomeButton"))
+local RebirthButton    = require(UI:WaitForChild("RebirthButton"))   -- Sammel-Update 2.7
+local IncubatorPanel   = require(UI:WaitForChild("IncubatorPanel"))  -- Sammel-Update 8
+local CurrencyHint     = require(UI:WaitForChild("CurrencyHint"))    -- Sammel-Update 3.4
 
 --------------------------------------------------------------------------------
 -- Oberflaeche
@@ -134,6 +140,7 @@ LeaderboardPanel.init(screenGui)
 ProfilePanel.init(screenGui)
 DailyBonusPanel.init(screenGui)
 ShopPanel.init(screenGui)          -- HBB Paket 10 (nur mit SHOP_V1)
+IncubatorPanel.init(screenGui)     -- Sammel-Update Paket 8
 
 Hud.init(screenGui)
 MenuBar.init(screenGui)
@@ -146,9 +153,13 @@ Moment.init(screenGui)
 ReturnSummary.init(screenGui)
 -- HBB Paket 5: Heim-Knopf (erscheint nur weit weg vom eigenen Plot)
 HomeButton.init(screenGui)
+RebirthButton.init(screenGui)   -- Sammel-Update 2.7: fester Rebirth-Knopf
+CurrencyHint.init(screenGui)    -- Sammel-Update 3.4: Waehrungs-Hinweise
 
 -- v13: Quest-Karte links (braucht das Quest-Fenster, das oben angemeldet wird)
 QuestTracker.init(screenGui)
+-- HUD_ROW_V2: Zahnrad · Quests · Shop in einer Zeile (versteckt die Quest-Karte)
+HudRow.init(screenGui)
 
 -- v12: untere Pet-Leiste (Event / Fight), legt auch den PitResumeDialog an
 PetBar.init(screenGui)
@@ -156,6 +167,8 @@ PetBar.init(screenGui)
 ResultFeed.init()
 WorldController.init()
 EggTimerController.init()
+IncubatorController.init()   -- Sammel-Update Paket 8
+AreaSignController.init()    -- Sammel-Update Paket 3.8
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
 -- v15: Waben im Event-Pit und Recycler (braucht Toast, ClientState und die Welt)

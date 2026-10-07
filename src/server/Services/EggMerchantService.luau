@@ -27,8 +27,6 @@ local MapConfig = require(ReplicatedStorage.Config.MapConfig)
 local Remotes   = require(ReplicatedStorage.Network.Remotes)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)  -- HBB Paket 5
 local Loc       = require(ReplicatedStorage.Localization.Loc)
-local Names     = require(ReplicatedStorage.Localization.Names)
-local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local EggService = require(ServerScriptService.Services.EggService)
 
@@ -161,11 +159,19 @@ local function onTriggered(player: Player)
 	if not (root and root:IsA("BasePart")) then return end
 
 	if (root.Position - counter.Position).Magnitude > EggConfig.MERCHANT.maxBuyDistance then
-		Remotes.ActionFailed:FireClient(player, "BuyBasicEgg", Loc.msg("err.merchant_too_far"))
+		Remotes.ActionFailed:FireClient(player, "BuyBasicEgg", Loc.msg("err.merchant_far"))
 		return
 	end
 
 	if EggService.buyFromMerchant(player) then
+		-- Sammel-Update 2.3 ("Animation groesser, wenn man Ei kauft"): das
+		-- gekaufte Ei wird sofort geoeffnet — der Client spielt dafuer die
+		-- grosse Schluepf-Animation (HatchResultReceived ohne offene Anfrage
+		-- startet sie direkt, siehe HatchAnimation.deliver). Klappt das
+		-- Oeffnen nicht, liegt das Ei im Lager und es gibt den alten Toast.
+		if EggService.openEgg(player, EggConfig.MERCHANT.eggType) then
+			return
+		end
 		-- Kurze Bestaetigung ueber den bestehenden Ei-Eingang (Toast "+1 Basis-Ei")
 		Remotes.EggCollectedReceived:FireClient(player, {
 			eggUid  = "merchant",
@@ -182,9 +188,10 @@ function EggMerchantService.init()
 	local merchant = EggConfig.MERCHANT
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name                  = "BuyPrompt"
-	-- Prompt-Texte als Nachricht: jeder Spieler liest sie in seiner Sprache
-	WorldText.set(prompt, Loc.msg("ui.merchant.buy", { egg = Names.msg.egg(merchant.eggType), n = merchant.priceGummies }), "ActionText")
-	WorldText.set(prompt, Loc.msg("ui.merchant.stand"), "ObjectText")
+	-- Sammel-Update 2.4: der Prompt ist fuer alle gleich (Server-Objekt) —
+	-- deshalb sprachneutral: Ei + Preis.
+	prompt.ActionText            = string.format("🥚 +1  (%d G)", merchant.priceGummies)
+	prompt.ObjectText            = "🥚"
 	prompt.MaxActivationDistance = merchant.promptDistance
 	prompt.RequiresLineOfSight   = false
 	prompt.HoldDuration          = 0

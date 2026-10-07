@@ -35,6 +35,7 @@ export type Part = {
 	busy       : boolean?,   -- Figur laeuft gerade (walkTo)
 	cancelWalk : boolean?,   -- laufende Bewegung abbrechen
 	abducting  : boolean?,   -- UFO hat die Figur gerade
+	abductedAt : number?,    -- Sammel-Update 1.1: os.clock() beim Start der Entfuehrung (Waechter)
 }
 
 -- Was EventParticipationService den Handlern bereitstellt (buildApi).
@@ -48,10 +49,15 @@ export type Api = {
 	plotPosition : (Player) -> Vector3?,
 	level        : (Part) -> number,
 	power        : (Part) -> number,
+	-- Sammel-Update 2.4: Text als LocMsg (der Client uebersetzt). Ein
+	-- einfacher string bleibt fuer Altstellen erlaubt.
 	toast        : (Player, string | Types.LocMsg) -> (),
 	recall       : (Player) -> (),
 	finishHome   : (Part) -> (),
 	ufoReward    : (Part) -> (),
+	-- UFO_REJOIN: befristet geschwaecht (Level halbiert) nach dem Absetzen
+	weaken       : (Part, number) -> (),
+	isWeakened   : (Part) -> boolean,
 	walkTo       : (Part, Vector3) -> boolean,
 
 	-- v17 (lebendige Events)
@@ -78,6 +84,9 @@ export type Reward = {
 	bossTier       : number?,
 	tierBonus      : EventConfig.EventBonus?,
 	tierEggs       : number?,                   -- Basis-Eier der Stufe
+	-- Sammel-Update 05.10. (Paket 6.2): Boss besiegt und dieser Spieler hat
+	-- Schaden gemacht (besonderer Meilenstein "erster Boss-Sieg").
+	bossVictory    : boolean?,
 }
 
 export type Session = {

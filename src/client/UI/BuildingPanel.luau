@@ -222,11 +222,16 @@ local function buildMenu(
 		return frame
 	end
 
+	-- Sammel-Update 3.6: ein Satz, was Verbessern bringt
+	local whyRow = row(34)
+	local whyText = Theme.bodyText("Why", whyRow, Loc.t("ui.building.why"))
+	whyText.Size = UDim2.fromScale(1, 1)
+	whyText.TextColor3 = Theme.COLORS.goldGummy
+	Loc.onChanged(function() whyText.Text = Loc.t("ui.building.why") end)
+
 	-- Honig-Balken: der Wert, den man beim Reinschauen zuerst sucht.
 	local honeyHead = row(18)
-	local honeyHeadLabel = Theme.sectionLabel("HoneyHead", honeyHead, "", accent)
-	honeyHeadLabel.Size = UDim2.fromScale(1, 1)
-	Loc.bind(honeyHeadLabel, "ui.building.honey_stock")
+	Theme.sectionLabel("HoneyHead", honeyHead, Loc.t("ui.building.honey_head"), accent).Size = UDim2.fromScale(1, 1)
 
 	local honeyRow  = row(26)
 	local honeyBar  = Theme.progress(honeyRow, accent)
@@ -234,9 +239,7 @@ local function buildMenu(
 
 	-- Was das Gebaeude JETZT kann
 	local nowHead = row(18)
-	local nowHeadLabel = Theme.sectionLabel("NowHead", nowHead, "", accent)
-	nowHeadLabel.Size = UDim2.fromScale(1, 1)
-	Loc.bind(nowHeadLabel, "ui.building.now")
+	Theme.sectionLabel("NowHead", nowHead, Loc.t("ui.building.now_head"), accent).Size = UDim2.fromScale(1, 1)
 
 	local nowRow  = row(38)
 	local nowText = Theme.bodyText("Now", nowRow, "")
@@ -245,9 +248,7 @@ local function buildMenu(
 
 	-- Was die naechste Stufe braechte
 	local nextHead = row(18)
-	local nextHeadLabel = Theme.sectionLabel("NextHead", nextHead, "", accent)
-	nextHeadLabel.Size = UDim2.fromScale(1, 1)
-	Loc.bind(nextHeadLabel, "ui.building.next")
+	Theme.sectionLabel("NextHead", nextHead, Loc.t("ui.building.next_head"), accent).Size = UDim2.fromScale(1, 1)
 
 	local nextRow  = row(38)
 	local nextText = Theme.bodyText("Next", nextRow, "")
@@ -267,14 +268,14 @@ local function buildMenu(
 
 	-- Die Knoepfe ganz unten, in der Reihenfolge, in der man sie braucht.
 	local upgradeRow = row(44)
-	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, Loc.t("ui.building.upgrade_btn"), accent)
+	local upgrade    = Theme.bigButton("Upgrade", upgradeRow, Loc.t("ui.building.upgrade_button"), accent)
 	upgrade.Size = UDim2.new(1, 0, 1, 0)
 	upgrade.Activated:Connect(onUpgrade)
 
 	local feedButton: TextButton? = nil
 	if withFeed and onFeed then
 		local feedRow = row(38)
-		local feed    = Theme.bigButton("Feed", feedRow, "", Theme.shade(accent, -0.10))
+		local feed    = Theme.bigButton("Feed", feedRow, Loc.t("ui.building.feed", { n = 0 }), Theme.shade(accent, -0.10))
 		feed.Size = UDim2.new(1, 0, 1, 0)
 		feed.Activated:Connect(onFeed)
 		feedButton = feed
@@ -332,12 +333,12 @@ local function refreshBuilding(buildingId: Types.BuildingId)
 		menu.priceText.Text  = priceText(next_.costGummies, next_.costGoldGummies)
 		menu.priceText.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.bad
 
-		menu.upgrade.Text = Loc.t("ui.building.upgrade_btn")
+		menu.upgrade.Text = Loc.t("ui.building.upgrade_button")
 		Theme.setEnabled(menu.upgrade, affordable)
 	else
-		menu.nextText.Text        = Loc.t("ui.building.maxed_text")
+		menu.nextText.Text        = Loc.t("ui.building.max")
 		menu.priceText.Text       = ""
-		menu.upgrade.Text         = Loc.t("ui.building.maxed_btn")
+		menu.upgrade.Text         = Loc.t("ui.building.maxed_button")
 		Theme.setEnabled(menu.upgrade, false)
 	end
 
@@ -364,8 +365,11 @@ function BuildingPanel.init(screenGui: ScreenGui)
 		local id        = entry.id
 		local panelName = PanelManager.buildingPanelName(id)
 
+		-- Sammel-Update 2.6: kein "Honig fuettern"-Knopf mehr — der Baerchi
+		-- isst selbst (BaerchiAutopilotService). RequestFeedHoney bleibt als
+		-- Remote bestehen, nur die Oberflaeche dazu entfaellt.
 		local menu = buildMenu(
-			screenGui, panelName, displayName(id), Theme.buildingColor(id), true,
+			screenGui, panelName, displayName(id), Theme.buildingColor(id), false,
 			function()
 				Remotes.RequestUpgradeBuilding:FireServer(id)
 			end,

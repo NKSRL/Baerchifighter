@@ -26,8 +26,8 @@ local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
-local Loc              = require(ReplicatedStorage.Localization.Loc)
-local Names            = require(ReplicatedStorage.Localization.Names)
+local Loc              = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 2.4
+local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
 
 local Theme           = require(script.Parent.Theme)
 local UiScale         = require(script.Parent.UiScale)
@@ -62,6 +62,11 @@ local _fight: ButtonView? = nil
 
 -- Letzte Server-Meldung (PetModeChanged)
 local _state   = "Home"
+-- Sammel-Update 05.10. (Paket 4.3): gewaehltes Wiedergabe-Tempo (0 = sofort)
+local SPEED_STEPS = { 1, 2, 4, 0 }
+local _bossAt: number? = nil   -- Sammel-Update 5.3
+local _speedChoice = 1
+local _speedButton: TextButton? = nil
 local _pending: string? = nil
 local _stage: number? = nil
 local _tower: string? = nil   -- v15: Tower des laufenden Kampfs (vom Server)
@@ -96,18 +101,28 @@ end
 local function eventLine(): string
 	local remaining = _phaseEndsAt - os.clock()
 	if _eventId then
+		local def = EventConfig.getById(_eventId)
 		return string.format("%s  %s", Names.event(_eventId), clock(remaining))
 	end
 	if _nextEventId then
-		return Loc.t("ui.petbar.next_event", { time = clock(remaining) })
+		return Loc.t("ui.petbar.next_event", { t = clock(remaining) })
 	end
 	return ""
+end
+
+-- Sammel-Update 5.3: "🐝 Boss in 12 min" (bzw. "🐝 Boss LIVE").
+local function bossLine(): string
+	local at = _bossAt
+	if not at then return "" end
+	local left = at - os.clock()
+	if left <= 0 then return Loc.t("ui.petbar.boss_live") end
+	return Loc.t("ui.petbar.boss_in", { min = math.max(1, math.ceil(left / 60)) })
 end
 
 -- "Tower II" fuer eine Tower-Id.
 local function towerLabel(towerId: string?): string
 	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
-	return Loc.t("ui.petbar.tower", { numeral = def.numeral })
+	return Loc.t("ui.petbar.tower", { n = def.numeral })
 end
 
 -- HP-Anteil des ausgeruesteten Baerchis (nil = keiner da) und der gewaehlte
@@ -191,6 +206,13 @@ local function refresh()
 	local event, fight = _event, _fight
 	if not event or not fight then return end
 
+	-- Paket 4.3: Tempo-Knopf nur im Tower
+	local speedButton = _speedButton
+	if speedButton then
+		speedButton.Visible = _state == "InPit" or _state == "ToPit"
+		speedButton.Text = if _speedChoice == 0 then "⏭ " .. Loc.t("ui.petbar.speed_skip") else "⏩ x" .. _speedChoice
+	end
+
 	-- HBB Paket 3: der Event-Knopf erscheint erst nach dem ersten Kampf
 	Unlock.apply("button_event", event.button)
 
@@ -202,22 +224,22 @@ local function refresh()
 	local recall     = Loc.t("ui.petbar.recall")
 	local waiting    = Loc.t("ui.petbar.waiting")
 	if not hasPet then
-		paint(event, eventTitle, Loc.t("err.event_no_equipped"), "disabled")
+		paint(event, eventTitle, Loc.t("ui.petbar.no_pet"), "disabled")
 	elseif _abducting then
 		paint(event, eventTitle, Loc.t("ui.petbar.abducted"), "disabled")
 	elseif _state == "ToEvent" then
-		paint(event, recall, Loc.t("ui.petbar.walking_to", { line = eventLine() }), "active")
+		paint(event, Loc.t("ui.petbar.recall"), Loc.t("ui.petbar.walking_there") .. " • " .. eventLine(), "active")
 	elseif _state == "AtEvent" then
-		paint(event, recall, eventLine(), "active")
+		paint(event, Loc.t("ui.petbar.recall"), eventLine(), "active")
 	elseif _pending == "Event" then
-		paint(event, waiting, Loc.t("ui.petbar.pending_event"), "waiting")
+		paint(event, Loc.t("ui.petbar.waiting"), Loc.t("ui.petbar.switch_hint"), "waiting")
 	elseif _state == "Returning" and _from == "Event" then
 		paint(event, eventTitle, Loc.t("ui.petbar.coming_home"), "normal")
 	elseif FeatureFlags.isOn("EVENT_V2_TIMER") then
 		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
 		-- keine Woerter.
 		setEventIcon(event, _eventId or _nextEventId)
-		paint(event, clock(_phaseEndsAt - os.clock()), "", "normal")
+		paint(event, clock(_phaseEndsAt - os.clock()), bossLine(), "normal")
 	else
 		paint(event, eventTitle, eventLine(), "normal")
 	end
@@ -227,14 +249,13 @@ local function refresh()
 
 	local fightTitle = Loc.t("ui.petbar.fight")
 	if not hasPet then
-		paint(fight, fightTitle, Loc.t("err.event_no_equipped"), "disabled")
+		paint(fight, fightTitle, Loc.t("ui.petbar.no_pet"), "disabled")
 	elseif _state == "ToPit" then
-		paint(fight, recall, Loc.t("ui.petbar.walking_pit"), "active")
+		paint(fight, Loc.t("ui.petbar.recall"), Loc.t("ui.petbar.walking_pit"), "active")
 	elseif _state == "InPit" then
-		local tower = towerLabel(_tower or selectedTower)
-		paint(fight, recall, if _stage then Loc.t("ui.petbar.in_pit_stage", { tower = tower, stage = _stage }) else tower, "active")
+		paint(fight, Loc.t("ui.petbar.recall"), if _stage then Loc.t("ui.petbar.in_pit_stage", { tower = towerLabel(_tower or selectedTower), stage = _stage }) else towerLabel(_tower or selectedTower), "active")
 	elseif _pending == "Fight" then
-		paint(fight, waiting, Loc.t("ui.petbar.pending_fight"), "waiting")
+		paint(fight, Loc.t("ui.petbar.waiting"), Loc.t("ui.petbar.switch_hint_pit"), "waiting")
 	elseif _state == "Returning" and _from == "Fight" then
 		paint(fight, fightTitle, Loc.t("ui.petbar.coming_home"), "normal")
 	elseif (hpRatio or 0) <= 0 then
@@ -387,6 +408,25 @@ function PetBar.init(screenGui: ScreenGui)
 
 	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO")
 	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X")
+
+	-- Sammel-Update 05.10. (Paket 4.3): Tempo-Knopf ueber dem Fight-Knopf,
+	-- nur waehrend der Baerchi im Tower kaempft. Ein Tipp schaltet
+	-- x1 -> x2 -> x4 -> "sofort" -> x1. Der Server spielt ab der naechsten
+	-- Stage schneller ab; die Abrechnung bleibt gleich.
+	local speedButton = Theme.button("SpeedButton", _fight.button, "⏩ x1", Theme.COLORS.panelLight)
+	speedButton.AnchorPoint = Vector2.new(1, 1)
+	speedButton.Position    = UDim2.new(1, 0, 0, -6)
+	speedButton.Size        = UDim2.fromOffset(96, 34)
+	speedButton.ZIndex      = 6
+	speedButton.TextColor3  = Theme.COLORS.text
+	speedButton.Visible     = false
+	_speedButton = speedButton
+	speedButton.Activated:Connect(function()
+		local index = (table.find(SPEED_STEPS, _speedChoice) or 1) % #SPEED_STEPS + 1
+		_speedChoice = SPEED_STEPS[index]
+		Remotes.RequestPitSpeed:FireServer(_speedChoice)
+		refresh()
+	end)
 	FightStartPrompt.init(screenGui, bar)
 
 	PitResumeDialog.init(screenGui)
@@ -408,7 +448,9 @@ function PetBar.init(screenGui: ScreenGui)
 		refresh()
 	end)
 
-	Remotes.EventPhaseChanged.OnClientEvent:Connect(function(eventId: any, remaining: any, nextEventId: any)
+	Remotes.EventPhaseChanged.OnClientEvent:Connect(function(eventId: any, remaining: any, nextEventId: any, untilBoss: any)
+		-- Sammel-Update 5.3: Countdown bis zum Boss
+		_bossAt      = if typeof(untilBoss) == "number" then os.clock() + untilBoss else nil
 		_eventId     = if typeof(eventId) == "string" then eventId else nil
 		_nextEventId = if typeof(nextEventId) == "string" then nextEventId else nil
 		_phaseEndsAt = os.clock() + (if typeof(remaining) == "number" then remaining else 0)
