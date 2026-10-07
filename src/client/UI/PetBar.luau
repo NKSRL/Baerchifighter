@@ -31,6 +31,7 @@ local Names            = require(ReplicatedStorage.Localization.Names)
 
 local Theme           = require(script.Parent.Theme)
 local UiScale         = require(script.Parent.UiScale)
+local TouchSafeArea   = require(script.Parent.TouchSafeArea)
 local Icons           = require(script.Parent.Icons)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
 local FightStartPrompt = require(script.Parent.FightStartPrompt)
@@ -361,15 +362,25 @@ function PetBar.init(screenGui: ScreenGui)
 	bar.Size        = UDim2.fromOffset(BUTTON_WIDTH * 2 + GAP, BUTTON_HEIGHT)
 	bar.ZIndex      = 5
 
-	-- Auf schmalen Bildschirmen (Handy) mitskalieren statt ueber den Rand
+	-- Auf schmalen Bildschirmen (Handy) mitskalieren statt ueber den Rand.
+	-- Playtest 07.10.: auf Touch-Geraeten ausserdem raus aus der Zone des
+	-- Bewegungs-Sticks und weg vom Sprung-Knopf (TouchSafeArea) — sonst
+	-- loeste, wer laufen wollte, den Event-Knopf aus.
 	local scale = Instance.new("UIScale")
 	scale.Parent = bar
+	local barWidth = BUTTON_WIDTH * 2 + GAP
 	local function rescale()
-		local width = UiScale.toGui(screenGui.AbsoluteSize.X)
-		scale.Scale = math.clamp((width - 32) / (BUTTON_WIDTH * 2 + GAP), 0.6, 1)
+		local zone = TouchSafeArea.zone(screenGui)
+		if zone then
+			bar.Position = UDim2.new(0, zone.center, 1, -14)
+			scale.Scale  = math.clamp(zone.width / barWidth, 0.5, 1)
+		else
+			local width = UiScale.toGui(screenGui.AbsoluteSize.X)
+			bar.Position = UDim2.new(0.5, 0, 1, -14)
+			scale.Scale  = math.clamp((width - 32) / barWidth, 0.6, 1)
+		end
 	end
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
-	rescale()
+	TouchSafeArea.watch(screenGui, rescale)
 
 	local layout = Theme.listLayout(bar, GAP, true)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center

@@ -87,11 +87,28 @@ end
 function FightStartPrompt.init(screenGui: ScreenGui, anchorAbove: GuiObject)
 	local root = Theme.panel("FightStartPrompt", screenGui, Theme.COLORS.panelDeep)
 	root.AnchorPoint = Vector2.new(0.5, 1)
-	root.Position = UDim2.new(0.5, 0, 1, -(anchorAbove.Size.Y.Offset + 26))
 	root.Size = UDim2.fromOffset(300, 96)
 	root.Visible = false
 	root.ZIndex = 6
 	_root = root
+
+	-- Ueber der Pet-Leiste, und mit ihr mitwandern: auf Touch-Geraeten sitzt
+	-- sie nicht mittig, sondern im freien Streifen neben der Steuerung
+	-- (TouchSafeArea), und ihr UIScale macht sie kleiner.
+	local function follow()
+		local barScale = anchorAbove:FindFirstChildOfClass("UIScale")
+		local factor = if barScale then barScale.Scale else 1
+		root.Position = UDim2.new(
+			anchorAbove.Position.X.Scale, anchorAbove.Position.X.Offset,
+			1, -(anchorAbove.Size.Y.Offset * factor + 26)
+		)
+	end
+	anchorAbove:GetPropertyChangedSignal("Position"):Connect(follow)
+	local barScale = anchorAbove:FindFirstChildOfClass("UIScale")
+	if barScale then
+		barScale:GetPropertyChangedSignal("Scale"):Connect(follow)
+	end
+	follow()
 
 	local resume = Theme.bigButton("Resume", root, "", Theme.COLORS.goldGummy)
 	resume.Position = UDim2.new(0, 8, 0, 8)

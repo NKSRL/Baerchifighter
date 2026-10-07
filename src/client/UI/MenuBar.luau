@@ -25,6 +25,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
 
 local Theme        = require(script.Parent.Theme)
+local TouchSafeArea = require(script.Parent.TouchSafeArea)
 local UiScale      = require(script.Parent.UiScale)
 local PanelManager = require(script.Parent.PanelManager)
 local Icons        = require(script.Parent.Icons)
@@ -232,19 +233,43 @@ function MenuBar.init(screenGui: ScreenGui)
 	root.Position = UDim2.new(0.988, 0, 0, 108)
 	root.Size     = UDim2.new(0, WIDTH, 0, height)
 
-	local layout = Theme.listLayout(root, GAP)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	-- Raster statt Liste: eine Spalte wie bisher, auf Touch-Geraeten bei Bedarf
+	-- zwei (siehe rescale). Unsichtbare Kacheln (Unlock) ueberspringt es.
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize              = UDim2.fromOffset(WIDTH, slot)
+	grid.CellPadding           = UDim2.fromOffset(GAP, GAP)
+	grid.FillDirection         = Enum.FillDirection.Horizontal
+	grid.FillDirectionMaxCells = 1
+	grid.HorizontalAlignment   = Enum.HorizontalAlignment.Right
+	grid.SortOrder             = Enum.SortOrder.LayoutOrder
+	grid.Parent                = root
 
 	-- Auf niedrigen Fenstern (Handy quer, kleines Studio-Fenster) schrumpfen,
 	-- damit die Leiste nicht ueber den unteren Rand ragt.
+	--
+	-- Playtest 07.10.: auf Touch-Geraeten endet die Leiste ueber dem
+	-- Sprung-Knopf (unten rechts), sonst oeffnete ein Sprung ein Menue. Wuerden
+	-- die Kacheln dafuer in einer Spalte zu klein zum Antippen (< 70 %), werden
+	-- es zwei Spalten.
+	local MIN_TOUCH_SCALE = 0.7
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
 	local function rescale()
-		local room = UiScale.toGui(screenGui.AbsoluteSize.Y) - 108 - 12
-		scale.Scale = math.clamp(room / height, 0.55, 1)
+		local bottom = TouchSafeArea.rightBottomReserve(screenGui, 12)
+		local room = UiScale.toGui(screenGui.AbsoluteSize.Y) - 108 - bottom
+
+		local columns = 1
+		if TouchSafeArea.isTouch() and room / height < MIN_TOUCH_SCALE then
+			columns = 2
+		end
+		local rows = math.ceil(#entries / columns)
+		local gridHeight = rows * slot + (rows - 1) * GAP
+
+		grid.FillDirectionMaxCells = columns
+		root.Size   = UDim2.fromOffset(columns * WIDTH + (columns - 1) * GAP, gridHeight)
+		scale.Scale = math.clamp(room / gridHeight, 0.4, 1)
 	end
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
-	rescale()
+	TouchSafeArea.watch(screenGui, rescale)
 
 	for order, entry in entries do
 		table.insert(_tiles, buildTile(root, order, entry))
