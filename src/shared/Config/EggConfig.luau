@@ -509,7 +509,28 @@ local LAY_STAT_LEVEL_GAIN = 0.08
 -- Die Produktion laeuft weiter, waehrend der Spieler weg ist (dasselbe
 -- Zeitstempel-Verfahren wie beim Honig, kein Server-Loop noetig) — aber
 -- gebremst. Anwesenheit soll sich lohnen, ohne dass Abwesenheit bestraft wird.
-local OFFLINE_SLOWDOWN = 2.5
+-- Sammel-Update 05.10. (Paket 6.1): 2,5 -> 3,5 (Offline-Rate 40 % -> ca. 29 %).
+-- "Man kommt wieder und hat direkt ganz viele Eier. Wozu spielt man dann noch?"
+local OFFLINE_SLOWDOWN = 3.5
+
+-- Sammel-Update 05.10. (Paket 6.1): eigene Obergrenze fuers Offline-Legen.
+-- Eine reine Prozent-Senkung verlaengert nur die Zeit bis "voll" — ein
+-- starker Baerchi fuellt die 12 Plaetze trotzdem ueber Nacht. Offline legt er
+-- deshalb hoechstens bis 6 liegende Eier, online weiter bis 12. Liegen schon
+-- mehr als 6, kommt offline nichts dazu (es wird nichts weggenommen).
+local OFFLINE_MAX_EGGS = 6
+
+-- Sammel-Update 05.10. (Paket 6.5, Annahme "brueten" = LEGEN): niedrige
+-- Rarities legen schneller, damit der Anfang nicht zaeh ist. Faktor auf das
+-- Grundintervall (BaerchiConfig.layIntervalSeconds), fehlende Rarity = 1.
+-- Common 240-300 s -> 144-180 s, Uncommon 330-360 s -> ca. 230-250 s,
+-- Rare 360-420 s -> ca. 300-350 s. Ab Epic unveraendert, damit die
+-- Freischalt-Zeiten im Ei-Baum (tools/sim/egg_tree_sim.lua) nicht kippen.
+local LAY_RARITY_FACTOR: { [string]: number } = {
+	Common   = 0.60,
+	Uncommon = 0.70,
+	Rare     = 0.82,
+}
 
 -- Wie viele NICHT eingesammelte Eier gleichzeitig herumliegen duerfen.
 --
@@ -639,6 +660,8 @@ return {
 	LAY_LEVEL_GAIN           = LAY_LEVEL_GAIN,
 	LAY_STAT_LEVEL_GAIN      = LAY_STAT_LEVEL_GAIN,
 	OFFLINE_SLOWDOWN         = OFFLINE_SLOWDOWN,
+	OFFLINE_MAX_EGGS         = OFFLINE_MAX_EGGS,
+	LAY_RARITY_FACTOR        = LAY_RARITY_FACTOR,
 	MAX_UNCOLLECTED_EGGS     = MAX_UNCOLLECTED_EGGS,
 	MIN_LAY_INTERVAL_SECONDS = MIN_LAY_INTERVAL_SECONDS,
 	LAY_SCATTER_RADIUS       = LAY_SCATTER_RADIUS,

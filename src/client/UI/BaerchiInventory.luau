@@ -81,13 +81,38 @@ local function toggleSelection(uid: string)
 		return
 	end
 
-	-- Der dritte Klick verdraengt die aelteste Markierung — das ist
-	-- angenehmer als ein stiller "geht nicht".
+	-- Sammel-Update 2.8: B muss dieselbe Rarity wie A haben (der Server
+	-- lehnt sonst ab, err.fuse_rarity_mismatch). Die Liste zeigt ohnehin nur
+	-- passende — das hier ist das Netz fuer einen Klick waehrend eines Umbaus.
+	local first = if _selection[1] then ClientState.getBaerchi(_selection[1]) else nil
+	local picked = ClientState.getBaerchi(uid)
+	if first and picked and first.rarity ~= picked.rarity then
+		return
+	end
+
+	-- Sammel-Update 1.3: ein weiterer Klick ersetzt B, nie A — A ist der
+	-- Baerchi, von dessen Karte der Spieler kam.
 	if #_selection >= 2 then
-		table.remove(_selection, 1)
+		table.remove(_selection, 2)
 	end
 	table.insert(_selection, uid)
 end
+
+-- Sammel-Update 2.8: im Fusions-Modus mit gewaehltem A nur Baerchis
+-- derselben Rarity zeigen (A selbst bleibt sichtbar, zum Abwaehlen).
+local function visibleInFusion(baerchi: Types.Baerchi): boolean
+	if not _fusionMode or not _selection[1] then return true end
+	if isSelected(baerchi.uid) then return true end
+	local first = ClientState.getBaerchi(_selection[1])
+	return first == nil or first.rarity == baerchi.rarity
+end
+
+-- Sammel-Update 1.3 ("kann keinen 2. auswaehlen"): die Zeilen wurden bei JEDEM
+-- Datenstand (Honig, Eier, ... mehrmals pro Sekunde) zerstoert und neu
+-- gebaut. Lag ein Tipp gerade dazwischen (Finger runter, Zeile weg, Finger
+-- hoch), kam Activated nie an — auf dem Handy fast jedes Mal. Jetzt bleibt
+-- die Zeile samt Knopf pro uid stehen, nur der Inhalt wird erneuert.
+local _rows: { [string]: Frame } = {}
 
 -- Markierungen wegwerfen die es nicht mehr gibt (verwertet, fusioniert, Rebirth)
 local function pruneSelection()
@@ -127,15 +152,49 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 	local data     = ClientState.get()
 	local equipped = data ~= nil and data.island.equippedUid == baerchi.uid
 
-	local row = Theme.panel("Row_" .. baerchi.uid, parent, Theme.COLORS.panel)
-	row.Size        = UDim2.new(1, -8, 0, ROW_HEIGHT)
-	row.LayoutOrder = order
+	local uid = baerchi.uid
+	local row = _rows[uid]
+	local fresh = row == nil or row.Parent == nil
+	if fresh then
+		row = Theme.panel("Row_" .. uid, parent, Theme.COLORS.panel)
+		row.Size = UDim2.new(1, -8, 0, ROW_HEIGHT)
+		_rows[uid] = row :: Frame
+
+		-- Die ganze Zeile ist der Knopf: ein durchsichtiger Button darueber.
+		-- Er bleibt ueber alle Aktualisierungen bestehen (siehe _rows).
+		local hit = Instance.new("TextButton")
+		hit.Name                   = "Hit"
+		hit.BackgroundTransparency = 1
+		hit.Text                   = ""
+		hit.Size                   = UDim2.fromScale(1, 1)
+		hit.ZIndex                 = 3
+		hit.Parent                 = row
+
+		hit.Activated:Connect(function()
+			if _fusionMode then
+				toggleSelection(uid)
+				BaerchiInventory.refresh()
+			else
+				PanelManager.open("Baerchi", uid)
+			end
+		end)
+	end
+	local frame = row :: Frame
+	frame.LayoutOrder = order
+	frame.Visible     = visibleInFusion(baerchi)
+	for _, child in frame:GetChildren() do
+		if child.Name == "Accent" or child.Name == "Name" or child.Name == "Sub" or child.Name == "Stats" then
+			child:Destroy()
+		end
+	end
+	row = frame
 
 	-- Markierte Zeilen bekommen einen farbigen Rand statt eines eigenen Symbols
 	local stroke = row:FindFirstChildOfClass("UIStroke")
-	if stroke and _fusionMode and isSelected(baerchi.uid) then
-		stroke.Color     = Theme.COLORS.gummy
-		stroke.Thickness = Theme.OUTLINE_THICKNESS + 2
+	if stroke then
+		local marked = _fusionMode and isSelected(uid)
+		stroke.Color     = if marked then Theme.COLORS.gummy else Theme.COLORS.outline
+		stroke.Thickness = if marked then Theme.OUTLINE_THICKNESS + 2 else Theme.OUTLINE_THICKNESS
 	end
 
 	local accent = Instance.new("Frame")
@@ -159,15 +218,15 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 	local name = Theme.label("Name", row,
 		(if equipped then "\u{2605} " else "")
 		.. (if mutation then BaerchiConfig.getMutationBadge(mutation) .. " " else "")
-		.. (def and def.displayName or baerchi.configId))
+		.. Loc.name("baerchi." .. baerchi.configId .. ".name", def and def.displayName or baerchi.configId))
 	name.Position = UDim2.new(0, 22, 0, 5)
 	name.Size     = UDim2.new(1, -120, 0, 21)
 
 	local sub = Theme.label("Sub", row, string.format(
 		"Lv. %d  —  %s%s",
 		baerchi.level,
-		baerchi.rarity,
-		if mutation then "  —  " .. BaerchiConfig.getMutationDisplayName(mutation):upper() else ""
+		Loc.t("rarity." .. baerchi.rarity),
+		if mutation then "  —  " .. Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)):upper() else ""
 	))
 	sub.Position   = UDim2.new(0, 22, 0, 26)
 	sub.Size       = UDim2.new(1, -120, 0, 16)
@@ -182,25 +241,6 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 	stats.TextSize       = if upgradeUi then 20 else 13
 	stats.Font           = if upgradeUi then Theme.FONT else Theme.FONT_BODY
 	stats.TextColor3     = if upgradeUi then Theme.COLORS.text else Theme.COLORS.textDim
-
-	-- Die ganze Zeile ist der Knopf: ein durchsichtiger Button darueber.
-	-- So bleibt der Aufbau der Zeile frei von Button-Eigenheiten.
-	local hit = Instance.new("TextButton")
-	hit.Name                   = "Hit"
-	hit.BackgroundTransparency = 1
-	hit.Text                   = ""
-	hit.Size                   = UDim2.fromScale(1, 1)
-	hit.ZIndex                 = 3
-	hit.Parent                 = row
-
-	hit.Activated:Connect(function()
-		if _fusionMode then
-			toggleSelection(baerchi.uid)
-			BaerchiInventory.refresh()
-		else
-			PanelManager.open("Baerchi", baerchi.uid)
-		end
-	end)
 end
 
 --------------------------------------------------------------------------------
@@ -228,10 +268,10 @@ local function updateFooter()
 
 		if baerchi then
 			local def = BaerchiConfig.getById(baerchi.configId)
-			label.Text       = string.format("%s  Lv.%d", def and def.displayName or baerchi.configId, baerchi.level)
+			label.Text       = string.format("%s  Lv.%d", Loc.name("baerchi." .. baerchi.configId .. ".name", def and def.displayName or baerchi.configId), baerchi.level)
 			label.TextColor3  = Theme.rarityColor(baerchi.rarity)
 		else
-			label.Text       = "Slot " .. slot .. ": leer"
+			label.Text       = Loc.t("ui.fusion.slot_empty", { n = slot })
 			label.TextColor3  = Theme.COLORS.textDim
 		end
 	end
@@ -243,14 +283,15 @@ local function updateFooter()
 
 	local modeButton = _modeButton
 	if modeButton then
-		modeButton.Text = if _fusionMode then "Fusion: an" else "Fusion: aus"
+		modeButton.Text = Loc.t(if _fusionMode then "ui.fusion.mode_on" else "ui.fusion.mode_off")
 	end
 
 	local hint = _hint
 	if hint then
-		hint.Text = if _fusionMode
-			then "Zwei Baerchis derselben Rarity antippen"
-			else "Zeile antippen oeffnet die Karte"
+		hint.Text = if not _fusionMode
+			then Loc.t("ui.inventory.hint_card")
+			elseif _selection[1] then Loc.t("ui.fusion.hint_pick_b")
+			else Loc.t("ui.fusion.hint_pick_a")
 	end
 end
 
@@ -267,17 +308,21 @@ function BaerchiInventory.refresh()
 
 	pruneSelection()
 
-	for _, child in scroller:GetChildren() do
-		if child:IsA("Frame") then
-			child:Destroy()
+	local list = ClientState.getBaerchiList()
+
+	-- Sammel-Update 1.3: nur Zeilen entfernen, deren Baerchi es nicht mehr gibt.
+	local alive: { [string]: boolean } = {}
+	for _, baerchi in list do alive[baerchi.uid] = true end
+	for uid, row in _rows do
+		if not alive[uid] then
+			row:Destroy()
+			_rows[uid] = nil
 		end
 	end
 
-	local list = ClientState.getBaerchiList()
-
 	local title = _title
 	if title then
-		title.Text = "Baerchis (" .. #list .. ")"
+		title.Text = Loc.t("ui.inventory.title_count", { n = #list })
 	end
 
 	local empty = _empty
@@ -314,6 +359,16 @@ local function applyTab()
 		local active = tab == _tab
 		button.BackgroundColor3 = if active then Theme.COLORS.accent else Theme.COLORS.panelLight
 		button.TextColor3       = if active then Theme.COLORS.outline else Theme.COLORS.text
+	end
+
+	-- Sammel-Update 05.10. (Paket 7): "!" am Index-Reiter, solange eine
+	-- Belohnung abholbar ist.
+	local indexButton = _tabButtons.Index
+	if indexButton then
+		local badge = indexButton:FindFirstChild("RewardBadge")
+		if badge and badge:IsA("GuiObject") then
+			badge.Visible = IndexView.claimableCount() > 0
+		end
 	end
 
 	if _tab == "Pets" then
@@ -392,6 +447,20 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	end
 	addTab("Pets",  "ui.inventory.tab_pets",  1)
 	addTab("Index", "ui.inventory.tab_index", 2)
+	do
+		local indexButton = _tabButtons.Index
+		local badge = Theme.panel("RewardBadge", indexButton, Theme.COLORS.bad)
+		badge.AnchorPoint = Vector2.new(1, 0)
+		badge.Position = UDim2.new(1, 4, 0, -6)
+		badge.Size = UDim2.fromOffset(20, 20)
+		badge.ZIndex = 4
+		badge.Visible = false
+		Theme.corner(badge, 10)
+		local bang = Theme.label("Bang", badge, "!")
+		bang.Size = UDim2.fromScale(1, 1)
+		bang.TextXAlignment = Enum.TextXAlignment.Center
+		bang.ZIndex = 5
+	end
 
 	-- Beide Seiten teilen sich die Flaeche unter den Reitern.
 	local pages = Theme.container("Pages", body)
@@ -408,11 +477,11 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	local toolbar = Theme.container("Toolbar", listPage)
 	toolbar.Size = UDim2.new(1, 0, 0, TOOLBAR_H)
 
-	local modeButton = Theme.button("FusionMode", toolbar, "Fusion: aus", Theme.COLORS.gummy)
+	local modeButton = Theme.button("FusionMode", toolbar, Loc.t("ui.fusion.mode_off"), Theme.COLORS.gummy)
 	modeButton.Size = UDim2.new(0, 130, 1, 0)
 	_modeButton = modeButton
 
-	local hint = Theme.bodyText("Hint", toolbar, "Zeile antippen oeffnet die Karte")
+	local hint = Theme.bodyText("Hint", toolbar, Loc.t("ui.inventory.hint_card"))
 	_hint = hint
 	hint.Position       = UDim2.new(0, 140, 0, 0)
 	hint.Size           = UDim2.new(1, -140, 1, 0)
@@ -435,7 +504,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	local layout = Theme.listLayout(scroller, 6)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-	local empty = Theme.bodyText("Empty", listPage, "Noch keine Baerchis. Leg im Eier-Menue ein Ei in die Brueterei.")
+	local empty = Theme.bodyText("Empty", listPage, Loc.t("ui.inventory.empty"))
 	empty.Position = UDim2.new(0, 4, 0, TOOLBAR_H + 16)
 	empty.Size     = UDim2.new(1, -8, 0, 40)
 	empty.Visible  = false
@@ -450,14 +519,14 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	_footer = footer
 
 	for slot = 1, 2 do
-		local label = Theme.label("Slot" .. slot, footer, "Slot " .. slot .. ": leer")
+		local label = Theme.label("Slot" .. slot, footer, Loc.t("ui.fusion.slot_empty", { n = slot }))
 		label.Position   = UDim2.new(0, 10, 0, 6 + (slot - 1) * 22)
 		label.Size       = UDim2.new(1, -140, 0, 20)
 		label.TextColor3  = Theme.COLORS.textDim
 		_slotLabels[slot] = label
 	end
 
-	local fuseButton = Theme.button("Fuse", footer, "Fusionieren", Theme.COLORS.gummy)
+	local fuseButton = Theme.button("Fuse", footer, Loc.t("ui.fusion.fuse"), Theme.COLORS.gummy)
 	fuseButton.AnchorPoint = Vector2.new(1, 0.5)
 	fuseButton.Position    = UDim2.new(1, -10, 0.5, 0)
 	fuseButton.Size        = UDim2.new(0, 116, 0, 34)
@@ -476,6 +545,11 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	-- Bestandsaenderungen: sichtbar sofort nachziehen, sonst nur merken
 	ClientState.onChanged(function()
 		local current = _root
+		local indexButton = _tabButtons.Index
+		local badge = if indexButton then indexButton:FindFirstChild("RewardBadge") else nil
+		if badge and badge:IsA("GuiObject") then
+			badge.Visible = IndexView.claimableCount() > 0
+		end
 		if current and current.Visible then
 			BaerchiInventory.refresh()
 		else

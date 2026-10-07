@@ -461,6 +461,9 @@ function WaspQueenEvent.run(api: EventKit.Api, def: EventConfig.EventDef): Event
 					}),
 				}
 
+				-- Sammel-Update 05.10. (Paket 6.2): Boss-Sieg merken (besonderer
+				-- Meilenstein, Zaehler stats.bossVictories).
+				reward.bossVictory = victory
 				if pay.victoryEgg then
 					if math.random() < cfg.JACKPOT_CHANCE then
 						reward.egg = { kind = "eggs", eggType = EventConfig.UFO.JACKPOT_EGG, amount = 1 }

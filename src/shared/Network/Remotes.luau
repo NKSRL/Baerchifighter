@@ -324,6 +324,29 @@ local RequestGoHome = getOrCreateEvent("RequestGoHome")
 local RequestClaimFreeGrab = getOrCreateEvent("RequestClaimFreeGrab")
 
 -- ============================================================
+-- Sammel-Update 05.10.
+-- ============================================================
+-- Paket 4.3: Tower-Wiedergabe beschleunigen. Args: speed (1 | 2 | 4 | 0 = sofort)
+local RequestPitSpeed = getOrCreateEvent("RequestPitSpeed")
+-- Paket 7: Index-Belohnung abholen. Args: rewardId (IndexRewardConfig)
+local RequestClaimIndexReward = getOrCreateEvent("RequestClaimIndexReward")
+-- Paket 7: Belohnung ausgezahlt (S->C, Toast). Args: Types.IndexRewardResult
+local IndexRewardReceived = getOrCreateEvent("IndexRewardReceived")
+-- Paket 6.2: besonderer Meilenstein ausgezahlt (S->C). Args: Types.SpecialMilestoneResult
+local SpecialMilestoneReceived = getOrCreateEvent("SpecialMilestoneReceived")
+-- Paket 8: Inkubator. Start (eggType), Abholen (slot), Beschleunigen (slot),
+-- Ausbauen (keine Args). Das Schluepfen meldet HatchResultReceived.
+local RequestIncubatorStart   = getOrCreateEvent("RequestIncubatorStart")
+local RequestIncubatorCollect = getOrCreateEvent("RequestIncubatorCollect")
+local RequestIncubatorSpeedUp = getOrCreateEvent("RequestIncubatorSpeedUp")
+local RequestUpgradeIncubator = getOrCreateEvent("RequestUpgradeIncubator")
+-- INCUBATOR_BREED: ("put", baerchiUid) / ("take", platz)
+local RequestIncubatorBaerchi = getOrCreateEvent("RequestIncubatorBaerchi")
+-- Paket 8: S->C Hinweis "Platz belegt / fertig / abgeholt" (Feedback, Ton).
+-- Args: { slot: number, kind: "start" | "ready" | "collect" | "speedup" | "upgrade" }
+local IncubatorChanged = getOrCreateEvent("IncubatorChanged")
+
+-- ============================================================
 -- Client → Server Functions (brauchen eine Antwort)
 -- ============================================================
 
@@ -399,6 +422,18 @@ return {
 	RequestMarkUiSeen      = RequestMarkUiSeen,
 	RequestGoHome          = RequestGoHome,
 	RequestClaimFreeGrab   = RequestClaimFreeGrab,
+
+	-- Sammel-Update 05.10.
+	RequestPitSpeed          = RequestPitSpeed,
+	RequestClaimIndexReward  = RequestClaimIndexReward,
+	IndexRewardReceived      = IndexRewardReceived,
+	SpecialMilestoneReceived = SpecialMilestoneReceived,
+	RequestIncubatorStart    = RequestIncubatorStart,
+	RequestIncubatorCollect  = RequestIncubatorCollect,
+	RequestIncubatorSpeedUp  = RequestIncubatorSpeedUp,
+	RequestUpgradeIncubator  = RequestUpgradeIncubator,
+	RequestIncubatorBaerchi  = RequestIncubatorBaerchi,
+	IncubatorChanged         = IncubatorChanged,
 
 	-- Functions
 	GetPlayerData          = GetPlayerData,

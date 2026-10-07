@@ -24,6 +24,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Loc             = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 2.4
 local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
@@ -119,10 +120,7 @@ local function fill(baerchi: Types.Baerchi)
 			widget.letter.Text             = "-"
 			widget.letter.TextColor3       = Theme.COLORS.textDim
 			widget.lockDot.Visible         = false
-			widget.detail.Text = string.format(
-				"ab Promotion %d",
-				CharmConfig.getUnlockPromotion(widget.slot)
-			)
+			widget.detail.Text = Loc.t("ui.charm.unlock_at", { n = CharmConfig.getUnlockPromotion(widget.slot) })
 			widget.detail.TextColor3 = Theme.COLORS.textDim
 
 		elseif not charm then
@@ -130,7 +128,7 @@ local function fill(baerchi: Types.Baerchi)
 			widget.letter.Text             = "?"
 			widget.letter.TextColor3       = Theme.COLORS.text
 			widget.lockDot.Visible         = false
-			widget.detail.Text             = "leer — beim naechsten Wurf dabei"
+			widget.detail.Text             = Loc.t("ui.charm.empty_slot")
 			widget.detail.TextColor3       = Theme.COLORS.textDim
 
 		else
@@ -150,21 +148,15 @@ local function fill(baerchi: Types.Baerchi)
 	local cost     = CharmConfig.ROLL_COST_GOLD_GUMMIES
 
 	if _costLabel then
-		_costLabel.Text = string.format(
-			"%s GoldGummies  —  ein Wurf kostet %d",
-			Theme.formatNumber(gold), cost
-		)
+		_costLabel.Text = Loc.t("ui.charm.cost", { gold = gold, cost = cost })
 		_costLabel.TextColor3 = if gold >= cost then Theme.COLORS.goldGummy else Theme.COLORS.bad
 	end
 
 	if _hintLabel then
 		if rollable == 0 then
-			_hintLabel.Text = "Alle offenen Slots sind gesperrt — tippe einen an, um ihn wieder freizugeben."
+			_hintLabel.Text = Loc.t("ui.charm.all_locked")
 		else
-			_hintLabel.Text = string.format(
-				"Ein Wurf wuerfelt alle %d offenen Slots neu. Tippe einen Slot an, um ihn zu sperren.",
-				rollable
-			)
+			_hintLabel.Text = Loc.t("ui.charm.roll_hint", { n = rollable })
 		end
 	end
 
@@ -312,21 +304,27 @@ function CharmPanel.init(screenGui: ScreenGui)
 
 	for _, widget in _slots do
 		local row = Theme.container("Row_" .. widget.slot, list)
-		row.Size        = UDim2.new(1, -8, 0, 20)
+		-- Sammel-Update 2.5 ("Charm Text der Effekte groesser"): 13 -> 18 px,
+		-- Zeile 20 -> 28 px, mit duenner dunkler Kontur fuer den Kontrast auf
+		-- dem farbigen Text (Rarity-Farben sind teils hell).
+		row.Size        = UDim2.new(1, -8, 0, 28)
 		row.LayoutOrder = widget.slot
 
 		local numeral = Theme.label("Num", row, CharmConfig.SLOT_NUMERALS[widget.slot])
-		numeral.Size       = UDim2.new(0, 40, 1, 0)
+		numeral.Size       = UDim2.new(0, 44, 1, 0)
 		numeral.TextScaled = false
-		numeral.TextSize   = 13
+		numeral.TextSize   = 17
 		numeral.TextColor3 = Theme.COLORS.textDim
 
 		widget.detail.Parent         = row
-		widget.detail.Position       = UDim2.new(0, 44, 0, 0)
-		widget.detail.Size           = UDim2.new(1, -44, 1, 0)
+		widget.detail.Position       = UDim2.new(0, 48, 0, 0)
+		widget.detail.Size           = UDim2.new(1, -48, 1, 0)
 		widget.detail.TextScaled     = false
-		widget.detail.TextSize       = 13
+		widget.detail.TextSize       = 18
+		widget.detail.TextWrapped    = true
 		widget.detail.TextXAlignment = Enum.TextXAlignment.Left
+		widget.detail.TextStrokeTransparency = 0.55
+		widget.detail.TextStrokeColor3       = Theme.COLORS.outline
 	end
 
 	-- Fusszeile: Bestand, Hinweis, zwei Knoepfe.
@@ -344,7 +342,7 @@ function CharmPanel.init(screenGui: ScreenGui)
 	_hintLabel.Position = UDim2.new(0, 0, 0, 22)
 	_hintLabel.Size     = UDim2.new(1, 0, 0, 26)
 
-	local roll = Theme.button("Roll", footer, "Charms wuerfeln", Theme.COLORS.gummy)
+	local roll = Theme.button("Roll", footer, Loc.t("ui.charm.roll"), Theme.COLORS.gummy)
 	roll.Position = UDim2.new(0, 0, 0, 52)
 	roll.Size     = UDim2.new(0.5, -4, 0, 34)
 	_rollButton = roll

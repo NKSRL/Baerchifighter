@@ -89,8 +89,7 @@ local EPSILON = 1e-3
 -- Fusspunkt eines Models: Mitte der Unterkante seiner Bounding-Box. Dieselbe
 -- Groesse, mit der FigurePlacement und FigureWalker rechnen.
 local function footOf(model: Model): Vector3
-	local box, size = model:GetBoundingBox()
-	return Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
 
 local function heightOf(model: Model): number

@@ -58,10 +58,11 @@ function RecyclerBuilder.writeState(body: BasePart, recycler: Types.RecyclerData
 	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
 		if recycler.queued > 0 then
-			stock.Text = string.format("Waben: %d", recycler.queued)
+			stock.Text = string.format("⬡ %d", recycler.queued)   -- sprachneutral (2.4)
 			stock.TextColor3 = CombConfig.LAMP_ACTIVE_COLOR
 		else
-			stock.Text = string.format("%d Gummies je Wabe", CombConfig.getPayPerUnit(recycler.level))
+			-- Sammel-Update 3.6: sprachneutral "⬡ = 12 G" (eine Wabe bringt so viel)
+			stock.Text = string.format("⬡ = %d G", CombConfig.getPayPerUnit(recycler.level))
 			stock.TextColor3 = Color3.fromRGB(235, 235, 235)
 		end
 	end

@@ -159,17 +159,14 @@ local function fillPromotion(baerchi: Types.Baerchi)
 
 	if _promoteHint then
 		if maxed then
-			_promoteHint.Text       = string.format("Promotion %d/%d — voll befoerdert",
-				promotion, PromotionConfig.MAX_PROMOTION)
+			_promoteHint.Text       = Loc.t("ui.baerchi.promo_maxed", { n = promotion, max = PromotionConfig.MAX_PROMOTION })
 			_promoteHint.TextColor3 = Theme.COLORS.goldGummy
 		else
 			local cost = PromotionConfig.getDuplicateCost(baerchi.rarity, promotion + 1)
 			local have = countMaterials(baerchi)
 
-			_promoteHint.Text = string.format(
-				"Promotion %d/%d  —  naechste Stufe: %d Duplikate (du hast %d)",
-				promotion, PromotionConfig.MAX_PROMOTION, cost, have
-			)
+			_promoteHint.Text = Loc.t("ui.baerchi.promo_next", {
+				n = promotion, max = PromotionConfig.MAX_PROMOTION, cost = cost, have = have })
 			_promoteHint.TextColor3 = if have >= cost then Theme.COLORS.good else Theme.COLORS.textDim
 		end
 	end
@@ -181,7 +178,7 @@ local function fillPromotion(baerchi: Types.Baerchi)
 			ready = countMaterials(baerchi) >= cost
 		end
 
-		_promoteButton.Text = if maxed then "Voll befoerdert" else "Befoerdern"
+		_promoteButton.Text = Loc.t(if maxed then "ui.baerchi.promo_full" else "ui.baerchi.promote")
 		Theme.setEnabled(_promoteButton, ready)
 	end
 end
@@ -244,7 +241,7 @@ local function fillCharms(baerchi: Types.Baerchi)
 	end
 
 	if _charmButton then
-		_charmButton.Text = string.format("Charms (%d/%d offen)", unlocked, CharmConfig.SLOT_COUNT)
+		_charmButton.Text = Loc.t("ui.baerchi.charms_button", { open = unlocked, total = CharmConfig.SLOT_COUNT })
 		Theme.setEnabled(_charmButton, true)
 	end
 end
@@ -261,14 +258,11 @@ local function fillEgg(baerchi: Types.Baerchi)
 		local interval = EggCalculator.getLayIntervalSeconds(baerchi, false)
 
 		if not interval then
-			_eggRateLabel.Text       = "Dieser Baerchi legt keine Eier."
+			_eggRateLabel.Text       = Loc.t("ui.baerchi.no_eggs")
 			_eggRateLabel.TextColor3 = Theme.COLORS.textDim
 		else
-			_eggRateLabel.Text = string.format(
-				"Legt alle %s%s",
-				Theme.formatDuration(interval),
-				if equipped then "" else "  (nur der ausgeruestete legt wirklich)"
-			)
+			_eggRateLabel.Text = Loc.t(if equipped then "ui.baerchi.lays_every" else "ui.baerchi.lays_every_unequipped",
+				{ time = Theme.formatDuration(interval) })
 			_eggRateLabel.TextColor3 = if equipped then Theme.COLORS.goldGummy else Theme.COLORS.textDim
 		end
 	end
@@ -284,7 +278,7 @@ local function fillEgg(baerchi: Types.Baerchi)
 				local def = EggConfig.data[chance.eggType]
 				table.insert(parts, string.format(
 					"%s %d%%",
-					if def then def.shortName else chance.eggType,
+					Loc.name("egg." .. chance.eggType .. ".name", if def then def.shortName else chance.eggType),
 					math.floor(chance.percent + 0.5)
 				))
 			end
@@ -293,12 +287,10 @@ local function fillEgg(baerchi: Types.Baerchi)
 	end
 
 	if _eggCountLabel then
-		local laid = if data then #(data.island.laidEggs or {}) else 0
+		-- INCUBATOR_BREED: nur die Eier des ausgeruesteten zaehlen gegen seine Grenze
+		local laid = if data then EggCalculator.countOwnLaid(data.island.laidEggs) else 0
 
-		_eggCountLabel.Text = string.format(
-			"%d / %d Eier liegen auf deinem Plot",
-			laid, EggConfig.MAX_UNCOLLECTED_EGGS
-		)
+		_eggCountLabel.Text = Loc.t("ui.baerchi.eggs_on_plot", { n = laid, max = EggConfig.MAX_UNCOLLECTED_EGGS })
 		_eggCountLabel.TextColor3 = if laid >= EggConfig.MAX_UNCOLLECTED_EGGS
 			then Theme.COLORS.bad
 			else Theme.COLORS.textDim
@@ -307,8 +299,8 @@ local function fillEgg(baerchi: Types.Baerchi)
 	if _collectButton then
 		local laid = if data then #(data.island.laidEggs or {}) else 0
 		_collectButton.Text = if laid > 0
-			then string.format("Alle %d Eier einsammeln", laid)
-			else "Keine Eier da"
+			then Loc.t("ui.baerchi.collect_n", { n = laid })
+			else Loc.t("ui.baerchi.collect_none")
 		Theme.setEnabled(_collectButton, laid > 0)
 	end
 end
@@ -346,7 +338,7 @@ local function fill(baerchi: Types.Baerchi)
 		_rarityLabel.TextColor3 = color
 	end
 	if _levelLabel then
-		_levelLabel.Text = string.format("Level %d / %d", baerchi.level, BaerchiConfig.MAX_LEVEL)
+		_levelLabel.Text = Loc.t("ui.baerchi.level", { level = baerchi.level, max = BaerchiConfig.MAX_LEVEL })
 		if baerchi.level >= BaerchiConfig.MAX_LEVEL and (baerchi.endlessLevel or 0) > 0 then
 			-- Paket 9: Endless-Level dahinter
 			_levelLabel.Text ..= "  " .. Loc.t("ui.baerchi.endless_level", { n = baerchi.endlessLevel or 0 })
@@ -375,7 +367,8 @@ local function fill(baerchi: Types.Baerchi)
 		-- Eine Verteidigung gibt es nicht mehr (siehe BaerchiConfig): die drei
 		-- Zahlen, die einen Kampf entscheiden, sind Schaden pro Treffer,
 		-- Angriffstempo und Ability-Staerke.
-		_statsLabel.Text = string.format("ATK %d    SPD %.2f    PWR %d%%",
+		-- Sammel-Update 3.7: Symbole vor den Kuerzeln
+		_statsLabel.Text = string.format("⚔ ATK %d   ⚡ SPD %.2f   ✨ PWR %d%%",
 			stats.atk, stats.spd, math.floor(stats.pwr * 100 + 0.5))
 	end
 
@@ -437,7 +430,7 @@ local function fill(baerchi: Types.Baerchi)
 			EconomyConfig.getBaerchiBaseValue(baerchi.rarity, baerchi.level)
 			* EconomyConfig.RECYCLE_RETURN
 		)
-		_valueLabel.Text = "Verwerten bringt: " .. Theme.formatNumber(value) .. " Gummies"
+		_valueLabel.Text = Loc.t("ui.baerchi.recycle_value", { n = value })
 	end
 
 	-- Pet-Regel (v12): der ausgeruestete Baerchi ist der, der Eier legt — er
@@ -448,7 +441,7 @@ local function fill(baerchi: Types.Baerchi)
 		local data     = ClientState.get()
 		local equipped = data ~= nil and data.island.equippedUid == baerchi.uid
 
-		_recycleButton.Text = if equipped then "Ausgeruestet — nicht verwertbar" else "Verwerten"
+		_recycleButton.Text = Loc.t(if equipped then "ui.baerchi.recycle_equipped" else "ui.baerchi.recycle")
 		Theme.setEnabled(_recycleButton, not equipped)
 	end
 
@@ -579,6 +572,17 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	Theme.corner(accent, 10)
 	_accentBar = accent
 
+	-- Sammel-Update 2.1: X oben rechts wie bei allen anderen Fenstern
+	-- (vorher nur "Schliessen" ganz unten in der rechten Spalte).
+	local closeHolder = Theme.container("CloseHolder", root)
+	closeHolder.AnchorPoint = Vector2.new(1, 0)
+	closeHolder.Position    = UDim2.new(1, -10, 0, 18)
+	closeHolder.Size        = UDim2.new(0, 44, 0, 40)
+	closeHolder.ZIndex      = 12
+	Theme.closeButton(closeHolder, function()
+		PanelManager.close(PANEL_NAME)
+	end).Position = UDim2.new(1, 0, 0.5, 0)
+
 	local shell = Theme.container("Body", root)
 	shell.Position = UDim2.new(0, 0, 0, 16)
 	shell.Size     = UDim2.new(1, 0, 1, -16)
@@ -617,7 +621,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	-- Name
 	local titleRow = row(34)
 	_titleLabel = Theme.label("Title", titleRow, "—")
-	_titleLabel.Size = UDim2.fromScale(1, 1)
+	_titleLabel.Size = UDim2.new(1, -40, 1, 0)   -- Platz fuer das X (2.1)
 
 	-- HBB Paket 4: Kampfwert (eine Zahl statt fuenf Werte)
 	local ratingRow = row(40)
@@ -768,7 +772,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 	-- ------------------------------------------------------------------- Werte
 	column = rightColumn
-	section("Zustand")
+	section(Loc.t("ui.baerchi.section_state"))
 
 	-- HP-Balken (steht bewusst ueber dem XP-Balken: ob der Baerchi kaempfen
 	-- kann, ist die haeufigere Frage als wie weit er zum naechsten Level ist)
@@ -811,13 +815,30 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	local statsRow = row(22)
 	table.insert(detailRows, statsRow)
 	_statsLabel = Theme.label("Stats", statsRow, "—")
-	_statsLabel.Size      = UDim2.fromScale(1, 1)
+	_statsLabel.Size      = UDim2.new(1, -34, 1, 0)
 	_statsLabel.TextColor3 = Theme.COLORS.textDim
+
+	-- Sammel-Update 05.10. (Paket 3.7, "Stats sind unintuitiv"): "?" zeigt
+	-- je Stat einen kurzen Satz. Kein Dauertext, nur auf Antippen.
+	local statHelpButton = Theme.button("StatHelp", statsRow, "?", Theme.COLORS.panelLight)
+	statHelpButton.AnchorPoint = Vector2.new(1, 0.5)
+	statHelpButton.Position = UDim2.new(1, 0, 0.5, 0)
+	statHelpButton.Size = UDim2.fromOffset(30, 22)
+	statHelpButton.TextColor3 = Theme.COLORS.text
+	local helpRow = row(96)
+	helpRow.Visible = false
+	local helpText = Theme.bodyText("StatHelpText", helpRow, Loc.t("ui.stats.help"))
+	helpText.Size = UDim2.fromScale(1, 1)
+	helpText.TextColor3 = Theme.COLORS.text
+	statHelpButton.Activated:Connect(function()
+		helpText.Text = Loc.t("ui.stats.help")
+		helpRow.Visible = not helpRow.Visible
+	end)
 
 	-- ------------------------------------------------------------- Stat-Level
 	local statHeader = row(16)
 	table.insert(detailRows, statHeader)
-	local statHeaderLabel = Theme.sectionLabel("Section", statHeader, "Stat-Stufen (Event-Teilnahme)")
+	local statHeaderLabel = Theme.sectionLabel("Section", statHeader, Loc.t("ui.stats.levels_head"))
 	statHeaderLabel.Size = UDim2.fromScale(1, 1)
 
 	for _, key in PromotionConfig.ALL_STATS do
@@ -839,7 +860,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	_skillLabel.Size = UDim2.fromScale(1, 1)
 
 	-- -------------------------------------------------------------------- Eier
-	section("Eier legen")
+	section(Loc.t("ui.baerchi.section_eggs"))
 
 	local eggRateRow = row(20)
 	_eggRateLabel = Theme.label("EggRate", eggRateRow, "")
@@ -861,7 +882,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	_eggCountLabel.TextSize   = 13
 
 	local collectRow = row(30)
-	local collect = Theme.button("CollectEggs", collectRow, "Alle Eier einsammeln", Theme.COLORS.goldGummy)
+	local collect = Theme.button("CollectEggs", collectRow, Loc.t("ui.baerchi.collect_none"), Theme.COLORS.goldGummy)
 	collect.Size = UDim2.new(1, 0, 1, 0)
 	_collectButton = collect
 	collect.Activated:Connect(function()
@@ -871,7 +892,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	end)
 
 	-- ----------------------------------------------------------------- Aktionen
-	section("Aktionen")
+	section(Loc.t("ui.baerchi.section_actions"))
 
 	-- Verwertungs-Wert
 	local valueRow = row(20)
@@ -884,12 +905,17 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	-- echte Entscheidung. Reihenfolge und Namen kommen aus MapConfig, die
 	-- Farben aus Theme — dieselben wie auf den Karten im Gebaeude-Panel, damit
 	-- man Knopf und Gebaeude sofort zusammenbringt.
+	-- Sammel-Update 2.6: kein "Honig essen"-Klicken mehr (der Baerchi isst am
+	-- Teich von selbst). Zeile und Knoepfe bleiben gebaut, aber unsichtbar —
+	-- fill() greift weiter auf _feedButtons zu.
 	local feedHint = row(18)
-	local hint = Theme.label("FeedHint", feedHint, "Fuettern — Honig aus dem Topf heilt am meisten")
+	feedHint.Visible = false
+	local hint = Theme.label("FeedHint", feedHint, "")
 	hint.Size       = UDim2.fromScale(1, 1)
 	hint.TextColor3 = Theme.COLORS.textDim
 
 	local feedRow = row(38)
+	feedRow.Visible = false   -- Sammel-Update 2.6
 	Theme.listLayout(feedRow, 6, true)
 
 	for _, id in MapConfig.BUILDING_ORDER do
@@ -910,7 +936,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	-- Verwerten und Schliessen: beides beendet die Karte
 	local exitRow = row(36)
 
-	local recycle = Theme.button("Recycle", exitRow, "Verwerten", Theme.COLORS.panelLight)
+	local recycle = Theme.button("Recycle", exitRow, Loc.t("ui.baerchi.recycle"), Theme.COLORS.panelLight)
 	recycle.Size       = UDim2.new(1, 0, 1, 0)
 	recycle.TextColor3 = Theme.COLORS.text
 	_recycleButton = recycle
@@ -929,7 +955,7 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 	-- Schliessen
 	local closeRow = row(34)
-	local close = Theme.button("Close", closeRow, "Schliessen", Theme.COLORS.panelLight)
+	local close = Theme.button("Close", closeRow, Loc.t("ui.common.close"), Theme.COLORS.panelLight)
 	close.Size       = UDim2.new(1, 0, 1, 0)
 	close.TextColor3 = Theme.COLORS.text
 	close.Activated:Connect(BaerchiPanel.close)
@@ -998,20 +1024,19 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		if typed.eggUid == "merchant" then
 			-- Kauf beim versteckten Haendler (EggMerchantService)
 			Notify.emit("egg_bought", function()
-				Toast.success(string.format("%s gekauft — liegt im Lager",
-					if def then def.displayName else typed.eggType))
+				Toast.success(Loc.t("msg.egg_bought", {
+					egg = Loc.name("egg." .. typed.eggType .. ".name", if def then def.displayName else typed.eggType) }))
 			end)
 		elseif typed.eggUid == "" then
 			Notify.emit("egg_collected_all", function()
-				Toast.success(string.format("%d Eier eingesammelt", typed.inStock))
+				Toast.success(Loc.t("msg.eggs_collected_all", { n = typed.inStock }))
 			end)
 		else
 			Notify.emit("egg_collected", function()
-				Toast.success(string.format(
-					"%s eingesammelt  (%d im Lager)",
-					if def then def.displayName else typed.eggType,
-					typed.inStock
-				))
+				Toast.success(Loc.t("msg.egg_collected", {
+					egg = Loc.name("egg." .. typed.eggType .. ".name", if def then def.displayName else typed.eggType),
+					n   = typed.inStock,
+				}))
 			end)
 		end
 	end)
@@ -1021,11 +1046,14 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		local typed = report :: Types.OfflineEggReport
 
 		Notify.emit("offline_eggs", function()
-			Toast.success(string.format(
-				"%d Eier waehrend deiner Abwesenheit gelegt%s",
-				typed.laid,
-				if typed.skipped then " (Platz war voll)" else ""
-			))
+			-- Paket 6.1: "Lager voll", wenn die Offline-Grenze gegriffen hat
+			if typed.laid <= 0 then
+				Toast.info(Loc.t("msg.offline_eggs_full"))
+			elseif typed.skipped then
+				Toast.success(Loc.t("msg.offline_eggs", { n = typed.laid }) .. "  " .. Loc.t("msg.offline_eggs_full"))
+			else
+				Toast.success(Loc.t("msg.offline_eggs", { n = typed.laid }))
+			end
 		end, function()
 			if typed.laid > 0 then
 				ReturnSummary.addEggs(typed.secondsAway, typed.laid)
@@ -1042,14 +1070,14 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 			if typed.rarityUp then
 				local rarity = typed.rarityUp :: string
 				Notify.emit("event_mid_rarity", function()
-					Toast.success(typed.bonusText or "")
+					Toast.success(Loc.resolve(typed.bonusText or ""))
 				end, function()
 					Moment.show("rarity", Theme.rarityColor(rarity :: any), "ui.moment.rarity")
 				end)
 			elseif typed.bonusText then
-				local text = typed.bonusText :: string
+				local text = typed.bonusText :: any
 				Notify.emit("event_mid", function()
-					Toast.info(text)
+					Toast.info(Loc.resolve(text))
 				end)
 			end
 			return
@@ -1061,36 +1089,31 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 		-- `bonusText` fehlt bei den reinen Trainings-Events. Deshalb hier
 		-- zusammensetzen statt eines festen Satzes.
 		local eventDef  = EventConfig.getById(typed.eventId)
-		local eventName = if eventDef then eventDef.displayName else typed.eventId
+		local eventName = Loc.name("event." .. typed.eventId .. ".name", if eventDef then eventDef.displayName else typed.eventId)
 
 		local parts: { string } = {}
 
 		local statKey = typed.statKey
 		if statKey then
-			table.insert(parts, string.format(
-				"%s Stufe %d / %d",
-				PromotionConfig.STAT_LABELS[statKey] or statKey,
-				typed.newLevel, typed.cap
-			))
+			table.insert(parts, Loc.t("msg.event.stat_level", {
+				stat = PromotionConfig.STAT_LABELS[statKey] or statKey,
+				level = typed.newLevel, cap = typed.cap,
+			}))
 		end
 
 		if typed.bonusText then
-			table.insert(parts, typed.bonusText)
+			table.insert(parts, Loc.resolve(typed.bonusText))
 		end
 
 		if #parts == 0 then
-			table.insert(parts, "alle Stats stehen schon am Maximum")
+			table.insert(parts, Loc.t("msg.event.all_maxed"))
 		end
 
 		-- HBB Paket 1: neuer Weg = Mutation als grosser Moment, Stat-Stufe
 		-- als Zahl ueber dem Baerchi. Eier/Gummies des Bonus fliegen ueber
 		-- den Datenstand (UI/Feedback).
 		Notify.emit("event_end", function()
-			Toast.success(string.format(
-				"%s vorbei: %s",
-				eventName,
-				table.concat(parts, "  •  ")
-			))
+			Toast.success(Loc.t("msg.event.ended", { event = eventName, text = table.concat(parts, "  •  ") }))
 		end, function()
 			local mutation = typed.mutation
 			if mutation then

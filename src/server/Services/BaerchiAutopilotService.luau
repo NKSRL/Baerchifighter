@@ -30,6 +30,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local FigurePlacement  = require(ServerScriptService.Util.FigurePlacement)   -- Sammel-Update 1.2
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
@@ -58,8 +59,7 @@ local CHECK_INTERVAL = 3
 local EAT_PAUSE_SECONDS = 1.2
 
 local function footPosOf(model: Model): Vector3
-	local box, size = model:GetBoundingBox()
-	return Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
 
 -- Braucht der ausgeruestete Baerchi gerade Honig, und ist welcher da?
