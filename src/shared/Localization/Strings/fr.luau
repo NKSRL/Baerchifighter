@@ -1053,7 +1053,7 @@ return {
 	----------------------------------------------------------------------------
 	["ui.upgrade.prompt_buy"] = "Améliorer · {cost} Gummies",
 	["ui.upgrade.prompt_need"] = "Il manque {missing} Gummies",
-	["ui.upgrade.fx_level"] = "Niveau {from} ➜ {to}",
+	["ui.upgrade.fx_level"] = "Niveau {from} ➡ {to}",
 	["ui.upgrade.fx_look"] = "NOUVEAU LOOK !",
 
 	----------------------------------------------------------------------------

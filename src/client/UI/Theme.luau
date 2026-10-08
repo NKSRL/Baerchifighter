@@ -644,9 +644,9 @@ Theme.v2 = {
 		goEdge      = Color3.fromRGB( 30, 128,  44),   -- 3D-Kante unten
 		quiet       = Color3.fromRGB(255, 248, 232),   -- Sekundaer (Skip): Creme
 		quietEdge   = Color3.fromRGB(214, 190, 150),
-		gold        = Color3.fromRGB(255, 212,  70),   -- Premium (Pass)
-		goldTop     = Color3.fromRGB(255, 236, 140),
-		goldEdge    = Color3.fromRGB(196, 132,   0),
+		gold        = Color3.fromRGB(255, 222, 128),   -- Premium (Pass): ruhiges Gold
+		goldTop     = Color3.fromRGB(255, 243, 200),
+		goldEdge    = Color3.fromRGB(206, 150,  30),
 		choose      = Color3.fromRGB( 76, 195, 255),   -- "Waehlen" auf der Karte
 		chooseEdge  = Color3.fromRGB( 22, 120, 190),
 

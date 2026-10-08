@@ -52,17 +52,33 @@ local PASS_KEY   = "SKIP_PASS"
 
 -- Masse (Oberflaechen-Einheiten, 8er-Raster)
 local DESIGN     = Vector2.new(640, 688)
-local MIN_HEIGHT = 440
+local MIN_HEIGHT = 316   -- Kopf + eine Karte + Leiste (kompakt)
 local HEADER_H   = 84
 local STATUS_H   = 40
-local FOOTER_H   = 132
+local FOOTER_H   = 140
+-- Kompakt (niedrige Bildschirme, Handy quer): kleinerer Kopf, ohne
+-- Statuszeile und ohne die erste Leisten-Zeile (Gummies stehen ohnehin im
+-- HUD); die Liste scrollt. Ab dieser Fensterhoehe:
+local COMPACT_BELOW = 520
+local HEADER_H_COMPACT = 60
+local FOOTER_H_COMPACT = 104
 local CARD_H     = 116
 local PAD        = T.space.m
 local BADGE      = 80
 local RIGHT_W    = 140
 -- Freie Raender: oben HUD-Luft, unten Pet-Leiste (68 + Abstand), rechts
--- Menueleiste (Kacheln bis 94 + Rand), links etwas Luft.
-local RESERVE = { top = 12, bottom = 96, left = 12, right = 112 }
+-- Menueleiste (Kacheln bis 94 + Rand), links etwas Luft. Auf kurzen
+-- Bildschirmen (Handy quer) stehen HUD-Pillen und Menueleiste neben dem
+-- Fenster: dort links/rechts mehr Platz lassen, oben weniger.
+local function reserve(screen: Vector2): Kit.Reserve
+	if screen.Y < COMPACT_BELOW then
+		return { top = 6, bottom = 90, left = 196, right = 84 }
+	end
+	-- Schmalere Bildschirme (Tablet, 1366): links an den HUD-Pillen vorbei
+	local left = if screen.X < 1400 then 196 else 12
+	return { top = 12, bottom = 96, left = left, right = 112 }
+end
+local _compact = false
 
 type CardView = {
 	def      : TowerConfig.TowerDef,
@@ -186,7 +202,7 @@ local function buildCard(parent: Instance, def: TowerConfig.TowerDef, order: num
 	local choose = Kit.button("Choose", face, "choose", Loc.t("ui.tower2.choose"), 24)
 	choose.button.AnchorPoint = Vector2.new(1, 0.5)
 	choose.button.Position = UDim2.new(1, -14, 0.5, 0)
-	choose.button.Size = UDim2.fromOffset(RIGHT_W - 8, 60)
+	choose.button.Size = UDim2.fromOffset(RIGHT_W - 8, 64)
 	choose.button.Activated:Connect(function()
 		if not choose.button.Active then return end
 		Kit.playSound("select")
@@ -215,7 +231,7 @@ local function buildCard(parent: Instance, def: TowerConfig.TowerDef, order: num
 
 	-- NEU-Aufkleber oben links (schraeg) und Glanz fuer frisch freie Karten
 	local newBadge = Kit.badge("New", card.holder, Loc.t("ui.tower2.new"), T.color.new, -10)
-	newBadge.Position = UDim2.fromOffset(18, 6)
+	newBadge.Position = UDim2.fromOffset(46, 4)
 	newBadge.ZIndex = 45
 	local newLabel = newBadge:FindFirstChild("Text") :: TextLabel
 	newLabel.ZIndex = 46
@@ -281,8 +297,10 @@ local function refreshCard(view: CardView, data: Types.PlayerDataUpdate)
 		view.reward.Visible = true
 	else
 		view.reward.Visible = locked
-		view.reward.Text = if locked then Loc.t("ui.tower2.locked_hint") else ""
+		view.reward.Text = if locked then "🔒 " .. Loc.t("ui.tower2.locked_hint") else ""
 	end
+	-- Gesperrt: Hinweis in die Mitte der Karte (dort stuende sonst der Balken)
+	view.reward.Position = UDim2.fromOffset(14 + BADGE + 14 + (if locked then 0 else 30), if locked then 48 else 80)
 
 	-- Gesperrt: gedaempft, aber lesbar
 	if locked then
@@ -407,7 +425,7 @@ local function refreshFooter(data: Types.PlayerDataUpdate)
 
 	-- Sekundaer: bezahlter Einstieg ab der letzten Stage
 	skip.label.Text = Loc.t("ui.tower2.skip", { stage = stage })
-	skip.sub.Text = Loc.t("ui.tower2.price", { price = Theme.formatNumber(price) })
+	skip.sub.Text = Loc.t("ui.tower2.price", { price = Kit.formatCompact(price) })
 	skip.sub.Visible = true
 	skip.setEnabled(price <= data.gummies)
 
@@ -577,7 +595,7 @@ function TowerPanel.init(screenGui: ScreenGui)
 	if not FeatureFlags.isOn("TOWER_PANEL_V2") then return end
 
 	local window = Kit.window("TowerPanel", screenGui, {
-		design = DESIGN, minHeight = MIN_HEIGHT, reserve = RESERVE,
+		design = DESIGN, minHeight = MIN_HEIGHT, reserve = reserve,
 	})
 	_window = window
 	Kit.mascot(window, 74)
@@ -644,7 +662,7 @@ function TowerPanel.init(screenGui: ScreenGui)
 
 	-- Zeile 1: Gummy-Stand und ein ehrlicher Satz zum Gratis-Start
 	local gummyChip = Kit.chip("Gummies", footer, "0", T.color.white)
-	gummyChip.Position = UDim2.fromOffset(PAD, 12)
+	gummyChip.Position = UDim2.fromOffset(PAD, 10)
 	-- Icon links in der Pille (die Polsterung macht ihm Platz)
 	local gummyPad = gummyChip:FindFirstChildOfClass("UIPadding")
 	if gummyPad then gummyPad.PaddingLeft = UDim.new(0, 36) end
@@ -657,7 +675,7 @@ function TowerPanel.init(screenGui: ScreenGui)
 
 	local hint = Kit.text("Hint", footer, "", T.text.small, { color = T.color.inkSoft, align = Enum.TextXAlignment.Right })
 	hint.AnchorPoint = Vector2.new(1, 0)
-	hint.Position = UDim2.new(1, -PAD, 0, 12)
+	hint.Position = UDim2.new(1, -PAD, 0, 10)
 	hint.Size = UDim2.new(0.6, 0, 0, 30)
 	hint.ZIndex = 33
 	_hint = hint
@@ -673,8 +691,11 @@ function TowerPanel.init(screenGui: ScreenGui)
 		PanelManager.close(PANEL_NAME)
 	end)
 	_primary = primary
-	local freeBadge = Kit.badge("Free", primary.button, Loc.t("ui.tower2.free"), T.color.gummy, -8)
-	freeBadge.Position = UDim2.fromOffset(40, 2)
+	local freeBadge = Kit.badge("Free", primary.button, Loc.t("ui.tower2.free"), T.color.gummy, 8)
+	-- Oben rechts INNERHALB des Knopfs: links steht die Gummy-Pille, rechts
+	-- daneben der naechste Knopf, in der Mitte die Beschriftung.
+	freeBadge.AnchorPoint = Vector2.new(1, 0.5)
+	freeBadge.Position = UDim2.new(1, -10, 0, 2)
 	freeBadge.ZIndex = 44
 	local freeLabel = freeBadge:FindFirstChild("Text") :: TextLabel
 	freeLabel.ZIndex = 45
@@ -716,10 +737,21 @@ function TowerPanel.init(screenGui: ScreenGui)
 	end)
 	_premium = premium
 
-	-- Groesse: Liste fuellt den Platz zwischen Status und Leiste
+	-- Groesse: Liste fuellt den Platz zwischen Status und Leiste; auf
+	-- niedrigen Fenstern die kompakte Anordnung.
 	window.setSize = function(size: Vector2)
-		list.Position = UDim2.fromOffset(PAD, HEADER_H + STATUS_H + 4)
-		list.Size = UDim2.new(1, -PAD * 2 + 10, 0, math.max(CARD_H, size.Y - HEADER_H - STATUS_H - FOOTER_H - 8))
+		_compact = size.Y < COMPACT_BELOW
+		local headerH = if _compact then HEADER_H_COMPACT else HEADER_H
+		local statusH = if _compact then 0 else STATUS_H
+		local footerH = if _compact then FOOTER_H_COMPACT else FOOTER_H
+		local band = window.header
+		if band then band.Size = UDim2.new(1, 0, 0, headerH) end
+		statusRow.Visible = not _compact
+		footer.Size = UDim2.new(1, 0, 0, footerH)
+		gummyChip.Visible = not _compact
+		hint.Visible = not _compact
+		list.Position = UDim2.fromOffset(PAD, headerH + statusH + 4)
+		list.Size = UDim2.new(1, -PAD * 2 + 10, 0, math.max(CARD_H * 0.6, size.Y - headerH - statusH - footerH - 8))
 		if _isOpen then TowerPanel.refresh() end
 	end
 

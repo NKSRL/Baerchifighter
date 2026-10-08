@@ -62,6 +62,27 @@ function Kit.playSound(name: string)
 end
 
 --------------------------------------------------------------------------------
+-- Zahlen kurz (fuer enge Knoepfe): bis 99.999 ausgeschrieben, darueber
+-- 120K / 3,1M / 2,4B / 1,2T. Die Buchstaben sind in Roblox-Spielen in jeder
+-- Sprache ueblich (sprachneutral); das Komma kommt aus der Sprache (Loc).
+--------------------------------------------------------------------------------
+
+local Loc = require(ReplicatedStorage.Localization.Loc)
+
+function Kit.formatCompact(value: number): string
+	local v = math.floor(value)
+	if math.abs(v) < 100000 then return Loc.formatNumber(v) end
+	for _, step in { { 1e12, "T" }, { 1e9, "B" }, { 1e6, "M" }, { 1e3, "K" } } do
+		if math.abs(v) >= step[1] then
+			local n = v / step[1]
+			local digits = if math.abs(n) >= 100 then 0 else 1
+			return Loc.formatDecimal(n, digits) .. step[2]
+		end
+	end
+	return Loc.formatNumber(v)
+end
+
+--------------------------------------------------------------------------------
 -- Die eine Animations-Schleife
 --------------------------------------------------------------------------------
 -- Kit.animate(step) haengt `step(now)` an; gibt step false zurueck, faellt er
@@ -250,11 +271,14 @@ export type Window = {
 -- Ein zentriertes Fenster mit Schlagschatten. `design` ist die gebaute Groesse
 -- in Oberflaechen-Einheiten; passt sie nicht, wird erst die Hoehe bis
 -- `minHeight` gekuerzt (die Liste darin scrollt), danach alles gleichmaessig
--- verkleinert. `reserve` haelt Raender frei (HUD, Pet-Leiste, Menueleiste).
+-- verkleinert. `reserve(screen)` haelt Raender frei (HUD, Pet-Leiste,
+-- Menueleiste) — als Funktion der Bildschirmgroesse (Oberflaechen-Einheiten),
+-- weil ein Handy quer andere Raender braucht als ein Monitor.
+export type Reserve = { top: number, bottom: number, left: number, right: number }
 export type WindowOptions = {
 	design    : Vector2,
 	minHeight : number,
-	reserve   : { top: number, bottom: number, left: number, right: number },
+	reserve   : (Vector2) -> Reserve,
 }
 
 function Kit.window(name: string, screenGui: ScreenGui, options: WindowOptions): Window
@@ -303,7 +327,7 @@ function Kit.window(name: string, screenGui: ScreenGui, options: WindowOptions):
 		local g = if global and global:IsA("UIScale") then math.max(global.Scale, 0.01) else 1
 		local screen = screenGui.AbsoluteSize / g
 		if screen.X <= 0 or screen.Y <= 0 then return end
-		local r = options.reserve
+		local r = options.reserve(screen)
 		local roomX = screen.X - r.left - r.right
 		local roomY = screen.Y - r.top - r.bottom
 		local width = options.design.X
@@ -501,10 +525,12 @@ function Kit.card(name: string, parent: Instance, height: number): Card
 	local stroke = Kit.stroke(face, T.stroke.card)
 	local gradient = Kit.gradient(face, T.color.card, T.color.surface)
 
-	-- 3D-Kante: gleiche Form, dunkler, 6 px tiefer, hinter der Flaeche
-	local edge = Kit.frame("Edge", face, T.color.quietEdge)
-	edge.Position = UDim2.fromOffset(0, 6)
-	edge.Size = UDim2.fromScale(1, 1)
+	-- 3D-Kante: gleiche Form, dunkler, 6 px tiefer, HINTER der Flaeche.
+	-- Geschwister (nicht Kind) der Flaeche: Kinder liegen in Roblox immer
+	-- ueber ihrem Eltern-Element, egal welcher ZIndex.
+	local edge = Kit.frame("Edge", holder, T.color.quietEdge)
+	edge.Position = UDim2.fromOffset(4, 6)
+	edge.Size = UDim2.new(1, -8, 1, -6)
 	edge.ZIndex = 29
 	Kit.corner(edge, T.radius.card)
 	Kit.stroke(edge, T.stroke.card)
@@ -813,13 +839,18 @@ function Kit.towerBadge(name: string, parent: Instance, look: string, color: Col
 		mark("Joint2", UDim2.fromScale(0.5, 0.66), UDim2.new(0.9, 0, 0, 3))
 		mark("Joint3", UDim2.fromScale(0.3, 0.51), UDim2.new(0, 3, 0.3, 0))
 	elseif look == "Gold" then
-		local f = Kit.frame("Gleam", badge, T.color.white)
-		f.AnchorPoint = Vector2.new(0.5, 0.5)
-		f.Position = UDim2.fromScale(0.32, 0.4)
-		f.Size = UDim2.new(0.14, 0, 0.9, 0)
-		f.Rotation = 30
-		f.BackgroundTransparency = 0.45
-		f.ZIndex = 33
+		-- zwei kleine Funkel-Rauten statt eines Streifens (der las sich wie
+		-- "durchgestrichen")
+		for i, spot in { { 0.22, 0.24, 0.16 }, { 0.8, 0.76, 0.11 } } do
+			local f = Kit.frame("Sparkle" .. i, badge, T.color.white)
+			f.AnchorPoint = Vector2.new(0.5, 0.5)
+			f.Position = UDim2.fromScale(spot[1], spot[2])
+			f.Size = UDim2.fromScale(spot[3], spot[3])
+			f.Rotation = 45
+			f.BackgroundTransparency = 0.25
+			f.ZIndex = 33
+			Kit.corner(f, 2)
+		end
 	elseif look == "Crystal" then
 		mark("Gem", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(0.62, 0.62), 45, 6)
 	elseif look == "Endless" then
