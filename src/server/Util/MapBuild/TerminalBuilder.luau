@@ -17,6 +17,7 @@
 --   Tower     gewaehlter Tower (Id)
 --   Record    Rekord im gewaehlten Tower
 --   NextTower Tower, der als naechstes aufgeht ("" = keiner)
+--   NewTower  frisch freier Tower ("NEU", "" = keiner)
 --   Progress  Rekord im Vorgaenger dieses Towers (Fortschritt "12/30")
 --   Needed    noetige Stage im Vorgaenger
 --
@@ -38,6 +39,7 @@ export type TerminalView = {
 	tower     : string,
 	record    : number,
 	nextTower : string,
+	newTower  : string,
 	progress  : number,
 	needed    : number,
 }
@@ -55,6 +57,7 @@ function TerminalBuilder.writeState(model: Model, view: TerminalView)
 	model:SetAttribute("Tower", view.tower)
 	model:SetAttribute("Record", view.record)
 	model:SetAttribute("NextTower", view.nextTower)
+	model:SetAttribute("NewTower", view.newTower)
 	model:SetAttribute("Progress", view.progress)
 	model:SetAttribute("Needed", view.needed)
 end
@@ -77,7 +80,7 @@ function TerminalBuilder.build(plotModel: Model, slot: number, view: TerminalVie
 	if view then
 		TerminalBuilder.writeState(model, view)
 	else
-		TerminalBuilder.writeState(model, { state = "locked", tower = "I", record = 0, nextTower = "II", progress = 0, needed = 0 })
+		TerminalBuilder.writeState(model, { state = "locked", tower = "I", record = 0, nextTower = "II", newTower = "", progress = 0, needed = 0 })
 	end
 	model.Parent = plotModel
 	return model

@@ -205,13 +205,15 @@ local function incubatorSignature(data: Types.PlayerData): string
 end
 
 -- 08.10.: Tower-Terminal — Zustand, gewaehlter Tower, Rekord, Fortschritt.
-local function terminalView(data: Types.PlayerData): { state: string, tower: string, record: number, nextTower: string, progress: number, needed: number }
+local function terminalView(data: Types.PlayerData): { state: string, tower: string, record: number, nextTower: string, newTower: string, progress: number, needed: number }
 	local towers = data.towers
-	local nextTower = ""
+	local nextTower, newTower = "", ""
 	for _, def in TowerConfig.TOWERS do
-		if not TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
+		if newTower == "" and TowerConfig.isNew(def.id, towers) then
+			newTower = def.id
+		end
+		if nextTower == "" and not TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
 			nextTower = def.id
-			break
 		end
 	end
 	local _, progress, needed = TowerConfig.getUnlockProgress(nextTower, towers.records)
@@ -220,6 +222,7 @@ local function terminalView(data: Types.PlayerData): { state: string, tower: str
 		tower     = towers.selected,
 		record    = towers.records[towers.selected] or 0,
 		nextTower = nextTower,
+		newTower  = newTower,
 		progress  = progress,
 		needed    = needed,
 	}
@@ -227,7 +230,7 @@ end
 
 local function terminalSignature(data: Types.PlayerData): string
 	local v = terminalView(data)
-	return string.format("%s|%s|%d|%s|%d|%d", v.state, v.tower, v.record, v.nextTower, v.progress, v.needed)
+	return string.format("%s|%s|%d|%s|%s|%d|%d", v.state, v.tower, v.record, v.nextTower, v.newTower, v.progress, v.needed)
 end
 
 local function allSignatures(data: Types.PlayerData): Signatures

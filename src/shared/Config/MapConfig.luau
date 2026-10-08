@@ -1559,7 +1559,7 @@ return {
 		screenPart     = "Bildschirm",
 		lampPart       = "Lampe",
 		screenPixels   = Vector2.new(420, 240),   -- SurfaceGui-Aufloesung
-		markerHeight   = 11.5,   -- "!" ueber dem Terminal (Studs)
+		markerHeight   = 6.4,    -- "!" ueber der Lampe (Studs ueber der Bildschirm-Mitte)
 		promptDistance = 12,
 		blinkSeconds   = 0.55,
 		lampColors = {

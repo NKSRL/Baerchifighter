@@ -405,9 +405,11 @@ def analyse(path, rel, src, known=None):
         prev = t
 
     # P1 / P2 nur fuer client/UI
-    if rel.startswith("client/UI/") and path.name not in ("Theme.luau", "PanelManager.luau"):
+    # 08.10.: UI/Kit ist die Huelle des neuen Looks (Kit.window passt sich
+    # wie Theme.dialog an den Bildschirm an, Kit.scroller wie Theme.scroller).
+    if rel.startswith("client/UI/") and path.name not in ("Theme.luau", "PanelManager.luau", "Kit.luau"):
         stripped = re.sub(r"--[^\n]*", "", src)
-        if "PanelManager.register(" in stripped and "Theme.dialog(" not in stripped:
+        if "PanelManager.register(" in stripped and "Theme.dialog(" not in stripped and "Kit.window(" not in stripped:
             line = stripped[:stripped.find("PanelManager.register(")].count("\n") + 1
             if not ok_marker(comments, line):
                 findings.append(("P1", line, "Panel ohne Theme.dialog-Huelle"))
