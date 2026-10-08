@@ -451,6 +451,30 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		end
 	end
 	towers.highestTower = highest
+
+	-- v17 (08.10.): Freischaltung durch Schaffen. Bestandsschutz: was nach der
+	-- ALTEN Regel (Deckel pro Rebirth) offen war oder einen Rekord hat, bleibt
+	-- offen — niemand verliert Zugang. Nur einmal (Version), danach fuehrt
+	-- TowerService die Tabelle. Unbekannte Eintraege fliegen raus.
+	if typeof(towers.unlocked) ~= "table" then
+		towers.unlocked = {}
+	end
+	local unlocked = towers.unlocked :: { [string]: boolean }
+	for towerId, flag in unlocked do
+		if flag ~= true or not TowerConfig.isValidId(towerId) then
+			unlocked[towerId] = nil
+		end
+	end
+	unlocked[TowerConfig.FIRST_TOWER] = true
+	local rebirths = tonumber((data :: any).rebirthCount) or 0
+	for _, def in TowerConfig.TOWERS do
+		local wasOpen = (data.version or 0) < 17
+			and TowerConfig.getLegacyStageCap(rebirths, def.id, towers.records) > 0
+		if wasOpen or TowerConfig.isUnlockedByClear(def.id, towers.records, nil) then
+			unlocked[def.id] = true
+		end
+	end
+
 	if not TowerConfig.isValidId(towers.selected) then
 		towers.selected = TowerConfig.FIRST_TOWER
 	end

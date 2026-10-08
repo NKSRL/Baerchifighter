@@ -1054,4 +1054,14 @@ return {
 	["ui.upgrade.prompt_need"] = "Need {missing} more Gummies",
 	["ui.upgrade.fx_level"] = "Level {from} ➜ {to}",
 	["ui.upgrade.fx_look"] = "NEW LOOK!",
+
+	----------------------------------------------------------------------------
+	-- 08.10. Tower-Terminal: Freischaltung, Einstieg, Gamepass
+	----------------------------------------------------------------------------
+	["err.tower_locked_clear"] = "Clear {tower} first (stage {stages})",
+	["ui.fight.fresh_free"] = "▶ Stage 1 · FREE",
+	["ui.fight.resume_pass"] = "⏩ Stage {stage} · Free (Pass)",
+	["ui.pass.skip.name"] = "Free Skip",
+	["ui.pass.skip.desc"] = "Continue from your last stage — always free",
+	["ui.pass.soon"] = "Soon",
 }

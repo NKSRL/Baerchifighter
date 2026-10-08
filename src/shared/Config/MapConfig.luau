@@ -1543,6 +1543,50 @@ return {
 	ARENA_WALK_SPEED = ARENA_WALK_SPEED,
 	TOWER_LOOKS    = TOWER_LOOKS,
 
+	-- 08.10. (Paket B2): das Tower-Terminal auf der Plot-Insel, am Stegbeginn
+	-- zur Arena. Plot-lokal (+Z = zur Arena), ausserhalb des Beets, neben dem
+	-- Laufweg (Steg-Achse x = 0). Terminal-lokal: Ursprung = Boden, -Z = die
+	-- Seite mit dem Bildschirm (zum Beet hin, `yaw` dreht ihn schraeg zum
+	-- Weg). Ein kleiner Kiosk als Baerchi-Kopf (Ohren), Bildschirm (Client
+	-- haengt dort ein SurfaceGui an), Antenne mit Lampe (Zustandsfarbe).
+	-- Gebaut einmal mit dem Plot (TerminalBuilder); was er zeigt, kommt als
+	-- Attribut, nie durch Neubau. Direkt hier: 200-Locals-Limit.
+	-- tools/luau-tests/tower_unlock.test.lua prueft Platz, Boden und Budget.
+	TOWER_TERMINAL = {
+		offset         = Vector3.new(11, 0, 45),
+		yaw            = 36,     -- Grad um Y: Bildschirm schaut schraeg zum Beet/Steg
+		footprint      = 3.6,    -- Radius um den Grundriss (Abstands-Test)
+		screenPart     = "Bildschirm",
+		lampPart       = "Lampe",
+		screenPixels   = Vector2.new(420, 240),   -- SurfaceGui-Aufloesung
+		markerHeight   = 11.5,   -- "!" ueber dem Terminal (Studs)
+		promptDistance = 12,
+		blinkSeconds   = 0.55,
+		lampColors = {
+			locked = Color3.fromRGB(255,  70,  70),
+			ready  = Color3.fromRGB( 90, 255, 120),
+			normal = Color3.fromRGB(255, 200,  70),
+		},
+		pieces = {
+			{ name = "Sockel",     shape = Enum.PartType.Block,    size = Vector3.new(5.0, 0.6, 3.6), offset = Vector3.new(0, 0.30, 0),     color = WOOD_DARK, material = Enum.Material.Wood, solid = true },
+			{ name = "Matte",      shape = Enum.PartType.Block,    size = Vector3.new(4.4, 0.1, 2.0), offset = Vector3.new(0, 0.05, -2.9),  color = HONEY_DEEP },
+			{ name = "Saeule",     shape = Enum.PartType.Block,    size = Vector3.new(2.0, 3.0, 1.6), offset = Vector3.new(0, 2.10, 0.2),   color = HONEY, solid = true },
+			{ name = "Knopf",      shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 0.9, 0.9), offset = Vector3.new(0, 2.80, -0.72), color = Color3.fromRGB(255, 90, 110), material = Enum.Material.Neon, rotation = Vector3.new(0, 90, 0) },
+			{ name = "Licht1",     shape = Enum.PartType.Block,    size = Vector3.new(0.4, 0.4, 0.2), offset = Vector3.new(-0.6, 1.70, -0.66), color = Color3.fromRGB(120, 220, 255), material = Enum.Material.Neon },
+			{ name = "Licht2",     shape = Enum.PartType.Block,    size = Vector3.new(0.4, 0.4, 0.2), offset = Vector3.new( 0.6, 1.70, -0.66), color = Color3.fromRGB(120, 255, 150), material = Enum.Material.Neon },
+			{ name = "Kopf",       shape = Enum.PartType.Block,    size = Vector3.new(5.2, 3.4, 1.8), offset = Vector3.new(0, 5.30, 0),     color = Color3.fromRGB(150, 98, 56), solid = true },
+			{ name = "Rahmen",     shape = Enum.PartType.Block,    size = Vector3.new(4.6, 2.8, 0.3), offset = Vector3.new(0, 5.30, -0.95), color = Color3.fromRGB(70, 44, 26) },
+			{ name = "Bildschirm", shape = Enum.PartType.Block,    size = Vector3.new(4.1, 2.35, 0.1), offset = Vector3.new(0, 5.30, -1.12), color = Color3.fromRGB(36, 28, 46) },
+			{ name = "Dach",       shape = Enum.PartType.Block,    size = Vector3.new(5.6, 0.4, 2.2), offset = Vector3.new(0, 7.20, 0),     color = HONEY_DEEP },
+			{ name = "Ohr1",       shape = Enum.PartType.Ball,     size = Vector3.new(1.6, 1.6, 1.0), offset = Vector3.new(-2.1, 7.60, 0),  color = Color3.fromRGB(150, 98, 56) },
+			{ name = "Ohr2",       shape = Enum.PartType.Ball,     size = Vector3.new(1.6, 1.6, 1.0), offset = Vector3.new( 2.1, 7.60, 0),  color = Color3.fromRGB(150, 98, 56) },
+			{ name = "OhrInnen1",  shape = Enum.PartType.Ball,     size = Vector3.new(0.9, 0.9, 0.4), offset = Vector3.new(-2.1, 7.60, -0.35), color = Color3.fromRGB(255, 160, 190) },
+			{ name = "OhrInnen2",  shape = Enum.PartType.Ball,     size = Vector3.new(0.9, 0.9, 0.4), offset = Vector3.new( 2.1, 7.60, -0.35), color = Color3.fromRGB(255, 160, 190) },
+			{ name = "Antenne",    shape = Enum.PartType.Cylinder, size = Vector3.new(1.6, 0.25, 0.25), offset = Vector3.new(0, 8.20, 0),  color = METAL, material = Enum.Material.Metal, rotation = UPRIGHT },
+			{ name = "Lampe",      shape = Enum.PartType.Ball,     size = Vector3.new(0.9, 0.9, 0.9), offset = Vector3.new(0, 9.25, 0),     color = Color3.fromRGB(255, 70, 70), material = Enum.Material.Neon },
+		},
+	},
+
 	PIT_TOWER_STEP_HEIGHT = PIT_TOWER_STEP_HEIGHT,
 	PIT_TOWER_RADIUS      = PIT_TOWER_RADIUS,
 	PIT_TOWER_COLORS      = PIT_TOWER_COLORS,
