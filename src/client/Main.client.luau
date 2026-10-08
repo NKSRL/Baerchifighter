@@ -81,6 +81,7 @@ local LeaderboardPanel = require(UI:WaitForChild("LeaderboardPanel"))
 local ProfilePanel     = require(UI:WaitForChild("ProfilePanel"))
 local DailyBonusPanel  = require(UI:WaitForChild("DailyBonusPanel"))
 local Feedback         = require(UI:WaitForChild("Feedback"))
+local UpgradeFX        = require(UI:WaitForChild("UpgradeFX"))   -- 08.10. Paket G
 local Moment           = require(UI:WaitForChild("Moment"))
 local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
 local HomeButton       = require(UI:WaitForChild("HomeButton"))
@@ -149,6 +150,7 @@ MenuBar.init(screenGui)
 -- und MenuBar (Ziele der Icons), vor ResultFeed (der Offline-Bericht des
 -- Joins kommt sonst an, bevor die Karte bereit ist).
 Feedback.init(screenGui)
+UpgradeFX.init()                -- 08.10. Paket G: Erfolgs-Moment beim Ausbau
 Moment.init(screenGui)
 ReturnSummary.init(screenGui)
 -- HBB Paket 5: Heim-Knopf (erscheint nur weit weg vom eigenen Plot)

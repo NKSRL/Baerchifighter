@@ -1047,4 +1047,12 @@ return {
 	["ev.bonus.gold"]             = "+{n} GoldGummies",
 	["ev.bonus.mutation"]         = "¡MUTACIÓN: {mutation}!",
 	["ev.bonus.mutation_weaker"]  = "Tirada de mutación: {mutation} — más débil que la suya, no cambia nada",
+
+	----------------------------------------------------------------------------
+	-- 08.10. Paket G: Ausbau mit einem Druck, Erfolgs-Moment
+	----------------------------------------------------------------------------
+	["ui.upgrade.prompt_buy"] = "Mejorar · {cost} Gummies",
+	["ui.upgrade.prompt_need"] = "Faltan {missing} Gummies",
+	["ui.upgrade.fx_level"] = "Nivel {from} ➜ {to}",
+	["ui.upgrade.fx_look"] = "¡NUEVO LOOK!",
 }

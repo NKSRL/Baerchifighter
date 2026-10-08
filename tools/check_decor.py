@@ -17,6 +17,13 @@ Geprueft wird pro Deko-Liste:
     5. v15: jeder LOOK (Grund-Deko + Zusaetze aus BUILDING_LOOK_DECOR bzw.
        CombConfig.RECYCLER_LOOK_DECOR) besteht 1.-4. und bleibt im Teile-Budget
        (MapConfig.LOOK_PART_BUDGET).
+    6. 08.10.: Holz und Stein am Honig-Teich stehen AUF ihrer Flaeche, nicht
+       darin. Brunnen-Deko (HoneyPond, jeder Look) im Becken: Unterkante
+       >= Beckenboden (POND_FLOOR_TOP) - EPS. Ausgenommen sind Neon-Teile
+       (Honigstrahlen und -faelle duerfen in den Honig tauchen). Bohlen und
+       Pfloecke vor dem Becken (PondBuilder, Masse aus MapConfig):
+       Unterkante >= Beet - EPS. Die Steine des Kranzes sind bewusst
+       eingegraben und nicht Teil der Regel.
 
 Aufruf:  python3 tools/check_decor.py      (Exit-Code 1 wenn etwas nicht stimmt)
 """
@@ -158,7 +165,7 @@ def extents(piece):
     return sx, sy, sz
 
 
-def check_list(label, pieces, body_size=None, floating_ok=False):
+def check_list(label, pieces, body_size=None, floating_ok=False, extra_ground=()):
     """`floating_ok` schaltet den Schwebe-Test ab.
 
     Gebraucht wird das nur vom Teich: seine Deko steht auf Becken, Sandkante
@@ -192,7 +199,7 @@ def check_list(label, pieces, body_size=None, floating_ok=False):
 
     # Schwebe-Test: jedes Teil ueber dem Boden braucht einen senkrechten Nachbarn
     for name, low, high in spans if not floating_ok else ():
-        if low <= EPS:
+        if low <= EPS or any(abs(low - g) <= EPS for g in extra_ground):
             continue
         supported = any(
             other_name != name and other_low - EPS <= low <= other_high + EPS
@@ -204,6 +211,67 @@ def check_list(label, pieces, body_size=None, floating_ok=False):
     top = max((high for _, _, high in spans), default=0.0)
     status = "OK " if not problems else "!! "
     print(f"{status}{label:<14} {len(pieces):>2} Teile, Hoehe {top:.2f}")
+    for problem in problems:
+        print(f"     - {problem}")
+    return problems
+
+
+def _number(source, name):
+    """`NAME = 1.23` (als local oder in der Rueckgabe-Tabelle)."""
+    m = re.search(r"\b" + re.escape(name) + r"\s*=\s*(-?[\d.]+)", source)
+    return float(m.group(1)) if m else None
+
+
+def _local_vec(source, name):
+    m = re.search(r"local " + re.escape(name) + r"\s*=\s*" + VEC.pattern, source)
+    return (float(m.group(1)), float(m.group(2)), float(m.group(3))) if m else None
+
+
+def check_pond_surfaces(source, base_lists, look_block):
+    """Regel 6: Holz/Stein am Teich steht auf seiner Flaeche (siehe Kopf)."""
+    problems = []
+    floor = _number(source, "POND_FLOOR_TOP")
+    radius = _number(source, "POND_RADIUS")
+    plank = _local_vec(source, "POND_PLANK_SIZE")
+    plank_top = _number(source, "POND_PLANK_TOP")
+    peg = _local_vec(source, "POND_PEG_SIZE")
+    peg_lift = _number(source, "POND_PEG_LIFT")
+    if None in (floor, radius, plank, plank_top, peg, peg_lift):
+        return ["Teich-Masse (POND_FLOOR_TOP/RADIUS/PLANK/PEG_LIFT) nicht gefunden"]
+
+    # Bohlen: Oberkante POND_PLANK_TOP, Dicke = Size.Y
+    if plank_top - plank[1] < -EPS:
+        problems.append(f"Bohle: steckt {plank[1] - plank_top:.2f} Studs im Beet")
+    # Pflock: STEHENDER Zylinder (CFrame.Angles(0, 0, 90) richtet die
+    # X-Achse senkrecht), Laenge = Size.X, Mittelpunkt = POND_PEG_LIFT x Laenge
+    peg_bottom = peg[0] * peg_lift - peg[0] * 0.5
+    if peg_bottom < -EPS:
+        problems.append(f"Pflock: steckt {-peg_bottom:.2f} Studs im Beet")
+
+    # Brunnen-Deko im Becken, jeder Look
+    pieces = parse_pieces(base_lists.get("HoneyPond", ""))
+    extras = split_look_lists(split_named_lists(look_block or "").get("HoneyPond", ""), 2)
+    lines = {}
+    for line in (base_lists.get("HoneyPond", "") + "\n" + split_named_lists(look_block or "").get("HoneyPond", "")).splitlines():
+        m = re.search(r'name\s*=\s*"([^"]+)"', line)
+        if m:
+            lines[m.group(1)] = line
+    for look in range(1, 7):
+        if look > 1:
+            pieces = pieces + parse_pieces(extras.get(look, ""))
+        for piece in pieces:
+            if "Material.Neon" in lines.get(piece["name"], ""):
+                continue
+            ex, ey, ez = extents(piece)
+            ox, oy, oz = piece["offset"]
+            if math.hypot(ox, oz) > radius:
+                continue
+            if oy - ey < floor - EPS:
+                msg = f"HoneyPond {piece['name']}: steckt {floor - (oy - ey):.2f} Studs im Beckenboden (ab Look {look})"
+                if msg.split(" (ab")[0] not in [p.split(" (ab")[0] for p in problems]:
+                    problems.append(msg)
+    status = "OK " if not problems else "!! "
+    print(f"{status}{'Teich-Flaechen':<14} Bohlen, Pfloecke, Brunnen L1-6")
     for problem in problems:
         print(f"     - {problem}")
     return problems
@@ -230,9 +298,12 @@ def main():
     print("Deko-Geometrie")
     print("=" * 62)
 
+    floor = _number(source, "POND_FLOOR_TOP") or 0.0
+    grounds = {"HoneyPond": (floor,)}
+
     failures = []
     for key, block in split_named_lists(decor_block).items():
-        failures += check_list(key, parse_pieces(block), body_sizes.get(key))
+        failures += check_list(key, parse_pieces(block), body_sizes.get(key), extra_ground=grounds.get(key, ()))
 
     # v15: Looks der Gebaeude (Grund-Deko + alle Zusaetze bis zum Look)
     budget = parse_budget(source) or [999] * 6
@@ -247,7 +318,7 @@ def main():
             pieces = parse_pieces(base_lists.get(key, ""))
             for look in range(2, 7):
                 pieces = pieces + parse_pieces(extras.get(look, ""))
-                failures += check_list(f"{key} Look {look}", pieces, body_sizes.get(key))
+                failures += check_list(f"{key} Look {look}", pieces, body_sizes.get(key), extra_ground=grounds.get(key, ()))
                 if len(pieces) > budget[look - 1]:
                     failures.append(f"{key} Look {look}: {len(pieces)} Teile > Budget {budget[look - 1]}")
                     print(f"     - {len(pieces)} Teile > Budget {budget[look - 1]}")
@@ -271,6 +342,7 @@ def main():
 
     failures += check_list("Honigmast", parse_pieces(center_block))
     failures += check_list("Honig-Teich", parse_pieces(pond_block), floating_ok=True)
+    failures += check_pond_surfaces(source, base_lists, look_block)
 
     print("=" * 62)
     if failures:

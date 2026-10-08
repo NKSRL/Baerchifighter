@@ -412,11 +412,12 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 		{ name = "Topfdeckel",  shape = Enum.PartType.Cylinder, size = Vector3.new( 0.4, 1.8,  1.8), offset = Vector3.new( 2.8, 10.70, 2.8), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT },
 	},
 
-	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe. Alles
-	-- steht auf Beet-Hoehe in der Beckenmitte; der Boden (0,45) und der Honig
-	-- verdecken die Fuesse. Die Looks 2-6 bauen darum den Brunnen auf.
+	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe. Was
+	-- im Becken steht, steht AUF dem Beckenboden (POND_FLOOR_TOP 0.45), nicht
+	-- im Beet darunter (check_decor.py Regel 6). Die Looks 2-6 bauen darum den
+	-- Brunnen auf.
 	HoneyPond = {
-		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(2.4, 0.9, 0.9),   offset = Vector3.new(0, 1.20, 0), color = WOOD,  material = Enum.Material.Wood, rotation = UPRIGHT },
+		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(1.95, 0.9, 0.9),  offset = Vector3.new(0, 1.425, 0), color = WOOD,  material = Enum.Material.Wood, rotation = UPRIGHT },
 		{ name = "Wabe",       shape = Enum.PartType.Block,    size = Vector3.new(1.6, 1.2, 0.5),   offset = Vector3.new(0, 2.90, 0), color = HONEY, material = Enum.Material.Neon },
 	},
 }
@@ -471,10 +472,10 @@ local BUILDING_LOOK_DECOR: { [string]: { [number]: { DecorPiece } } } = {
 		[2] = {
 			{ name = "L2Rinne",    shape = Enum.PartType.Block,    size = Vector3.new(0.6, 0.5, 3.2),   offset = Vector3.new(0, 2.55, -1.6), color = WOOD_DARK, material = Enum.Material.Wood },
 			{ name = "L2Strahl",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.3, 0.5, 0.5), offset = Vector3.new(0, 1.15, -3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
-			{ name = "L2Topf",     shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.6, 1.8),   offset = Vector3.new(5.5, 0.80, 3.0), color = HONEY_DEEP },
+			{ name = "L2Topf",     shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.6, 1.8),   offset = Vector3.new(5.5, 1.25, 3.0), color = HONEY_DEEP },
 		},
 		[3] = {
-			{ name = "L3Saeule",   shape = Enum.PartType.Cylinder, size = Vector3.new(4.0, 4.0, 4.0),   offset = Vector3.new(0, 2.00, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+			{ name = "L3Saeule",   shape = Enum.PartType.Cylinder, size = Vector3.new(3.55, 4.0, 4.0),  offset = Vector3.new(0, 2.225, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
 			{ name = "L3Schale",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.8, 9.0, 9.0),   offset = Vector3.new(0, 4.40, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT },
 			{ name = "L3Honig",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.2, 8.2, 8.2),   offset = Vector3.new(0, 4.90, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
 		},
@@ -741,17 +742,22 @@ local POND_STAND_GAP = 3.2
 
 -- Die Bohlen, auf denen er dabei steht.
 --
--- Sie liegen fast buendig im Gras (Oberkante 0.06 statt einer richtigen
--- Steghoehe): FigureWalker setzt den Baerchi beim Laufen auf BEET-Hoehe, ein
--- aufgestaender Steg waere also eine Bohle, in der er bis zum Knie steckt.
-local POND_PLANK_SIZE   = Vector3.new(8.4, 0.9, 2.4)
+-- Sie LIEGEN auf dem Gras (Unterkante = Beet) und sind dafuer duenn:
+-- FigureWalker setzt den Baerchi beim Laufen auf BEET-Hoehe, ein hoher Steg
+-- waere also eine Bohle, in der er bis zum Knie steckt. 08.10. (Playtest):
+-- vorher 0.9 dick mit Oberkante 0.06 — 0.84 steckten im Boden, von der
+-- Seite sah man nur eine Kante im Gras. Jetzt 0.2: der Fuss sinkt 0.2 ein,
+-- das liest das Auge als "steht auf dem Brett".
+local POND_PLANK_SIZE   = Vector3.new(8.4, 0.2, 2.4)
 local POND_PLANK_GAP    = 0.2    -- Fuge zwischen den beiden Bohlen
-local POND_PLANK_TOP    = 0.06   -- Oberkante ueber dem Beet
+local POND_PLANK_TOP    = 0.2    -- Oberkante ueber dem Beet (= Dicke: liegt auf)
 local POND_PLANK_COLORS: { Color3 } = {
 	Color3.fromRGB(168, 118, 70),
 	Color3.fromRGB(138,  94,  55),
 }
-local POND_PEG_SIZE   = Vector3.new(1.7, 0.9, 0.9)   -- Pflock, liegender Zylinder
+-- Pflock: STEHENDER Zylinder (Laenge = Size.X), ein kleiner Pfosten an jedem
+-- Bohlen-Ende. Hoehe ueber dem Beet: POND_PEG_LIFT (Rueckgabe-Tabelle).
+local POND_PEG_SIZE   = Vector3.new(1.7, 0.9, 0.9)
 local POND_PEG_SPREAD = 4.8                          -- Abstand der beiden Pfloecke zur Mitte
 
 -- Reine Zierde am Becken. Die Offsets sind TEICH-lokal, mit derselben Regel
@@ -1481,6 +1487,9 @@ return {
 
 	POND_STAND_GAP    = POND_STAND_GAP,
 	POND_PLANK_SIZE   = POND_PLANK_SIZE,
+	-- Pflock-Mittelpunkt ueber dem Beet als Anteil seines Durchmessers
+	-- (liegender Zylinder): 0.5 = liegt auf (direkt hier: 200-Locals-Limit)
+	POND_PEG_LIFT     = 0.5,
 	POND_PLANK_GAP    = POND_PLANK_GAP,
 	POND_PLANK_TOP    = POND_PLANK_TOP,
 	POND_PLANK_COLORS = POND_PLANK_COLORS,
