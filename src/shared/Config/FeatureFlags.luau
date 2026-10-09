@@ -71,6 +71,11 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
 	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
 	ENDLESS           = true,
+
+	-- Welt aufwerten (08.10.2026), je Paket ein Schalter. Reine Client-Optik.
+	-- Paket A (Tageslauf) haengt am Schalter AmbienceConfig.DAY_CYCLE.
+	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
+	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
 }
 
 local FeatureFlags = {}

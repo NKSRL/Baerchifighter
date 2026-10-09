@@ -286,8 +286,16 @@ function AmbienceController.init()
 			foamClock = 0
 			local twoPi = math.pi * 2
 			for _, foam in _foamParts do
-				foam.part.Transparency = AmbienceConfig.FOAM_TRANSPARENCY
+				local value = AmbienceConfig.FOAM_TRANSPARENCY
 					+ math.sin(clock / AmbienceConfig.FOAM_PULSE_PERIOD * twoPi + foam.phase) * AmbienceConfig.FOAM_PULSE
+				-- Welt aufwerten, Paket B: mit Schaum-Textur (WaterController)
+				-- ist die Scheibe selbst unsichtbar und die Textur atmet.
+				local lace = foam.part:FindFirstChild("FoamLace")
+				if lace and lace:IsA("Texture") then
+					lace.Transparency = value
+				else
+					foam.part.Transparency = value
+				end
 			end
 		end
 	end)
