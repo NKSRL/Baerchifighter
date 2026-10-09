@@ -1,6 +1,6 @@
-# Welt aufwerten – Stand Zwischenabnahme 1 (Pakete 0, A, B, C)
+# Welt aufwerten – Stand Zwischenabnahme 2 (Pakete 0, A–F)
 
-Auftrag: `OPUS_PROMPT_WELT_AUFWERTEN_2026-10-08.md`. Umgesetzt in einer Cloud-Sitzung **ohne Studio**: Der Code ist geschrieben und geprüft (Syntax, Tests, Prüfskripte). Was nur Studio zeigen kann (Bilder, Teile-Zählung im laufenden Spiel, MicroProfiler, Upload), steht unten als **„In Studio prüfen“**. Ich halte hier an, wie im Prompt verlangt, und warte auf dein Okay für D–F.
+Auftrag: `OPUS_PROMPT_WELT_AUFWERTEN_2026-10-08.md`. Umgesetzt in einer Cloud-Sitzung **ohne Studio**: Der Code ist geschrieben und geprüft (Syntax, Tests, Prüfskripte). Was nur Studio zeigen kann (Bilder, Teile-Zählung im laufenden Spiel, MicroProfiler, Upload), steht unten als **„In Studio prüfen“**. Zwischenabnahme 1 (0, A–C) ist erledigt. Jetzt sind auch D–F fertig. Ich halte an **Zwischenabnahme 2** an, wie im Prompt verlangt, und warte auf dein Okay für G–J.
 
 Leitbild umgesetzt als: alles Neue läuft **nur auf dem Client**, der Server baut **kein einziges neues Teil** (das Teile-Budget der Plot-Inseln bleibt unverändert). Jedes Paket hat einen eigenen Schalter.
 
@@ -9,6 +9,9 @@ Leitbild umgesetzt als: alles Neue läuft **nur auf dem Client**, der Server bau
 | A Tageslauf | `AmbienceConfig.DAY_CYCLE` | fester Himmel 16,9 Uhr wie bisher |
 | B Wasser und Küste | `FeatureFlags.WORLD_B_WATER` | Wasser wie bisher |
 | C Hauptinsel | `FeatureFlags.WORLD_C_HUB` | Hauptinsel wie bisher |
+| D Plot-Inseln | `FeatureFlags.WORLD_D_PLOTS` | Plot-Inseln wie bisher (das Attribut `IslandStage` setzt der Server trotzdem, es ist harmlos) |
+| E Stege und Arena | `FeatureFlags.WORLD_E_ARENA` | Steg und Arena wie bisher |
+| F Leben | `FeatureFlags.WORLD_F_LIFE` | keine Bienen, Schmetterlinge, Pfoten; Blumen und Pollen wie bisher |
 | 0 Kamerapunkte | nur Studio (DebugService) | – |
 
 ---
@@ -27,6 +30,13 @@ Leitbild umgesetzt als: alles Neue läuft **nur auf dem Client**, der Server bau
 | Schaumsaum mit „Schaumrand (kachelbar entlang einer Linie)“ | Der sichtbare Saum ist je Insel 3–9 % des Scheibenradius breit; ein Ring-Bild passt nicht auf alle drei | Kachelbare **Schaum-Spitze** (Blasen mit Lücken) auf der ganzen Scheibe. Auf dem schmalen Saum wirkt der Kreisrand dadurch ausgefranst. |
 | Arena-Inseln/äußere Stege: Schaum und Pfosten „im Teile-Budget mitzählen“ | – | **Auf dem Client gebaut**, je besetztem Slot (9 Teile), zählt deshalb nicht ins Server-Budget. Aus ab 420 Studs. |
 | Steg zur Arena „Blick auf Terminal“ | Ein Tower-Terminal gibt es im Code nicht (Bericht dazu fehlt) | Kamerapunkt 4 schaut vom äußeren Steg auf die Arena. |
+| D: Insel-Deko „zählt ins Teile-Budget, also sparsam“ | – | Die Stufen-Deko baut **nur der Client**. Der Server schreibt bloß das Attribut `IslandStage` an den **Player** (nicht an das Plot-Model: das wird bei jedem Rebirth neu gebaut). Server-Teile pro Insel: weiterhin +0. |
+| D: „Honig läuft sichtbar“ am Brunnen | Der Brunnen ist ein Gebäude-Look (Server), der Füllstand eine Neon-Scheibe | Ein Glanzfleck kreist auf der Honig-Oberfläche. Ist der Teich voll (Füllhöhe ≥ 97 %), laufen Tropfen über den Rand. Der Brunnen-Look selbst bleibt unverändert. |
+| E: Laternen „an jedem zweiten Pfosten“ | Der äußere Steg hat keine Pfosten (nur Geländer) | 5 kleine Laternenpfosten je Seite auf dem Geländer, zusätzlich zu den 4 Endpfosten aus Paket B. |
+| E: Rekord erkennen | Es gibt kein Rekord-Remote an andere Spieler | Der Schau-Turm wird bei einem neuen Rekord neu gebaut, und die Zahl am Ende seines Schilds steigt. Das liest der Client. Fähigkeiten über `SkillFXPlay` (geht an alle) mit `owner`. |
+| E: Schau-Turm „steht an der Arena“ | Mit `MAP_V2_SHOWCASE` steht er am Brückenkopf auf der Hauptinsel | Die Flagge sitzt auf dem Turm, wo er steht. Zuschauer und Laternen bleiben an der Arena. |
+| F: Pollenfarbe | Pollen gehört zu `AmbienceController` | Die Farbe führt `DayCycleController` nach (eine Kurve `pollenColor`; 16,9 Uhr = bisherige Farbe, Test). |
+| F: MicroProfiler mit 8 Spielern | Keine Studio-Sitzung | Aufwand im Code begrenzt (ein Takt, `BulkMoveTo`, Sichtweite). Die Messung bleibt offen. |
 | Fähigkeiten-Show überschreibt Himmel? | `SkillFXController` legt einen **eigenen** Farbfilter `SkillFX_Sky` an, der Boss-Himmel `BossSky_Local` | Der Tageslauf schreibt nur in die Basis-Effekte; die Filter stapeln sich, keiner überschreibt den anderen. Zusätzlich hält der Tageslauf an, solange `SkillFX_Sky` färbt, und kehrt in 2 s weich zurück. |
 
 ---
@@ -139,6 +149,49 @@ D:Invoke("arrival")            -- Ankunft nochmal
 
 ---
 
+## Paket D: Plot-Inseln mit Persönlichkeit
+
+**Gebaut:**
+- `Modules/IslandStage` (neu, rein): Stufe 1–4 aus geschafften Towern (I/II/III) **oder** Rebirths (1/3/5, passend zu den Rebirth-Deckeln). Es zählt, was weiter ist. Test `island_stage.test.lua` (neu, 12 Prüfungen).
+- `PlotDisplayService`: neue Signatur **STUFE**. Bei einem Wechsel `player:SetAttribute("IslandStage", n)` (überlebt jeden Insel-Neuaufbau). Kein Server-Teil.
+- `Controllers/PlotLifeController` (neu, 15 Hz):
+  - **Stufen-Deko** am Inselrand (Radius 53,5, Steg-Achsen ±25° frei). Stufe 2: 6 Blumengruppen. Stufe 3: + 2 Blumengruppen, 3 Pilzgruppen. Stufe 4: + Bienenhaus und **Bernstein-Stein** (das einzige leuchtende Insel-Teil, glüht mit dem Tageslauf). Deklarativ in `WorldFXConfig.ISLAND_KINDS`/`ISLAND_STAGE_ITEMS`, Neubau nur bei einem Stufenwechsel, aus ab 260 Studs.
+  - **Honig-Teich:** Glanzfleck kreist auf der Honig-Oberfläche. Ist er voll, laufen 4 Tropfen über den Rand aufs Beet. Aus ab 120 Studs.
+  - **Eigene Insel** (nur der Besitzer sieht es): warmer, halbtransparenter Neon-Ring auf dem Sandsaum (von weitem erkennbar) und warme Lichtpunkte über der Insel (ein Emitter). Auf der eigenen Insel fliegen zusätzlich 2 Bienenschwärme (Paket F).
+  - **Leere Insel:** Schild „Freie Insel“ (in 4 Sprachen) mit Bärchi-Bild, 3 Blumengruppen, ein Schmetterling. Keine Gebäude. Verschwindet, sobald ein Spieler kommt.
+- `check_decor.py` prüft jetzt auch jede Deko-Art (nichts im Boden, nichts schwebt) und jede Stufe gegen das Budget (Stufe 4: **57 von 60** Client-Teilen).
+- `map_layout.test.lua`: jede Stufen-Deko frei von den Steg-Achsen, außerhalb von Beet und Zaun, auf der Insel. Winkel-Konvention geprüft.
+
+**Debug:** `D:Invoke("islandstage", 4)` (1..4, `"auto"` = aus dem Spielstand), `D:Invoke("pondfull")`.
+
+**Teile pro Insel:** Server unverändert (+0), also auch mit Stufe 4 und Look 6 unter 250. Bitte `D:Invoke("parts")` vor und nach `islandstage 4` vergleichen: muss gleich bleiben.
+
+## Paket E: Stege und Arena
+
+**Gebaut** (`Controllers/ArenaLifeController`, neu, 20 Hz nur in Sichtweite, pro besetztem Slot gepoolt):
+- **Steg-Laternen:** 5 je Seite auf dem Geländer des äußeren Stegs, gedimmt (Glas, dunkles Bernstein). Startet ein Lauf (Arena-Tafel wird eingeblendet), gehen sie nacheinander vom Plot zur Arena an (0,16 s je Laterne). Nach dem Lauf sind sie wieder aus.
+- **Torbogen:** zwei Holzpfosten auf dem Zaunring in der Zaunlücke (7,6 Studs neben der Mitte, also außerhalb des 12er-Stegs und der Geländer), Querbalken auf 9 Studs, leuchtende Wabe oben. Der Laufweg bleibt frei.
+- **Zuschauer-Bärchis:** 6 je Arena auf dem Zaun (fern der Steg-Lücke), aus Teilen (Körper, Kopf, Ohren, Arme) in Rot/Grün/Gelb/Blau. Sie hüpfen kurz bei jeder Fähigkeit in dieser Arena (`SkillFXPlay`, `owner`) und jubeln mit Armen hoch, wenn der Lauf einen neuen Rekord bringt. Aus ab 160 Studs.
+- **Flagge auf dem Schau-Turm:** Stange und wehende Flagge in der Farbe des Towers (Schildfarbe des Turms), beim Rekord glänzt sie 1,2 s auf (Neon).
+
+**Debug:** `D:Invoke("spectators", "hop")`, `D:Invoke("spectators", "cheer")`, `D:Invoke("record")`. Laternen-Welle: einfach einen Lauf starten (`D:Invoke("fight", uid)`).
+
+**In Studio prüfen:** Läuft der Bärchi ohne Hängenbleiben durch den Bogen? (Alles ist ohne Kollision, es kann also nur optisch eng werden.)
+
+## Paket F: Leben in der Luft und im Gras
+
+**Gebaut** (`Controllers/LifeController`, neu, 15 Hz, alles mit **einem** `BulkMoveTo`):
+- **Bienen:** bis zu 6 Schwärme (3–5 Bienen) in Sichtweite, an festen Orten: Wiesen der Hauptinsel (16 Orte), Teich und Inselrand jeder besetzten Plot-Insel. Die nächsten Orte bekommen alle 2 s einen Schwarm, die eigene Insel zuerst und mit 2 Schwärmen extra. Flug als Acht, keine Physik.
+- **Schmetterlinge:** 6 auf der Hauptinsel, langsam flatternd (rosa und lavendel), dazu je einer auf jeder freien Insel (Paket D).
+- **Blumen im Wind:** Die 46 Server-Blumen der Hauptinsel nicken mit **einer** Windwelle, die über die Insel läuft (7°, 0,35 Hz). Läuft der eigene Charakter hindurch, kippen sie zur Seite weg und richten sich langsam wieder auf. Nur lokal gedreht, nichts wird repliziert.
+- **Pollen:** Farbe folgt dem Tageslauf (gold → rosa im Abendrot → kühl-hell in der blauen Stunde).
+- **Pfotenabdrücke:** Steht der eigene Charakter auf Sand (`Humanoid.FloorMaterial`), bleibt alle 2,2 Studs abwechselnd links/rechts ein Abdruck, der in 4 s verblasst. Pool von 20.
+- **Niedrigste Grafikstufe:** alles aus Paket F aus (nur die Pollenfarbe läuft, der Pollen selbst ist auf niedriger Stufe ohnehin aus).
+
+**In Studio prüfen:** MicroProfiler mit 8 Test-Clients (`WorldFX`-Takte unter `Heartbeat`), Zahl in den Bericht.
+
+---
+
 ## Dateien je Paket (für `make_update_rbxmx.py`)
 
 | Paket | neu | geändert |
@@ -147,8 +200,11 @@ D:Invoke("arrival")            -- Ankunft nochmal
 | A | `Modules/DayCycle`, `Controllers/DayCycleController`, `day_cycle.test.lua`, `assets/world/paket_a/*` | `Config/AmbienceConfig`, `Main.client` |
 | B | `Controllers/WaterController`, `assets/world/paket_b/*` | `Controllers/AmbienceController`, `Config/FeatureFlags`, `Main.client` |
 | C | `Controllers/HubLandmarkController`, `HubEventController`, `ArrivalController`, `assets/world/paket_c/*` | `Strings/{de,en,fr,es}`, `Config/FeatureFlags`, `Main.client` |
+| D | `Modules/IslandStage`, `Controllers/PlotLifeController`, `island_stage.test.lua` | `Services/PlotDisplayService`, `Services/DebugService`, `Config/WorldFXConfig`, `Config/FeatureFlags`, `Modules/MapLayout`, `Main.client`, `check_decor.py`, `map_layout.test.lua` |
+| E | `Controllers/ArenaLifeController`, `assets/world/paket_e/*` | `Main.client`, `make_world_textures.py` |
+| F | `Controllers/LifeController`, `assets/world/paket_f/*` | `Controllers/DayCycleController`, `Main.client`, `day_cycle.test.lua` |
 
-Server-Dateien: nur `DebugService` (Befehle setzen workspace-Attribute, nur in Studio aktiv). **Kein MapBuild-Builder geändert.**
+Server-Dateien: `DebugService` (Befehle setzen Attribute, nur in Studio aktiv) und `PlotDisplayService` (Attribut `IslandStage` am Player). **Kein MapBuild-Builder geändert.**
 
 ---
 
@@ -175,8 +231,12 @@ Gezeichnet mit `python3 tools/textures/make_world_textures.py` (fester Seed, rep
 | `paket_c/stall_stripes.png` | 256 | (Reserve: Stand hat schon Streifen) | – |
 | `paket_c/bear_sign.png` | 512 | Wegweiser in Bärchi-Form | Brett mit zwei Ohren |
 | `paket_c/shine_strip.png` | 256 | (Reserve: Glanz läuft über UIGradient) | – |
+| `paket_e/flag_fabric.png` | 256 | Muster auf der Schau-Turm-Flagge (Farbe vom Teil) | einfarbiger Stoff |
+| `paket_f/paw_print.png` | 256 | Pfotenabdruck im Sand | flache dunkle Ellipse |
 
-**Hochladen (wenn du willst, erst nach der Studio-Vorschau):** Studio → Asset Manager → Bulk Import → Ordner `assets/world/paket_a` bis `paket_c` (Typ Image). Die IDs als `"rbxassetid://…"` in `src/shared/Config/WorldFXConfig.luau` → `TEXTURE_IDS` beim gleichnamigen Schlüssel eintragen. Vorschau ohne Upload: das PNG in Studio als Decal auf ein Testteil ziehen (Studio lädt es dabei als temporäres Asset).
+Für D gibt es bewusst keine Texturen: Blumen, Pilze, Bienenhaus und Stein sind Formen und sehen ohne Upload fertig aus. Weggelassen gegenüber dem Prompt: Laternenglas (Neon + Glas reicht), Zuschauer als Bild (aus Teilen gebaut, Annahme 9), Schmetterling/Blütenblatt als Flipbook (Teile-Flügel).
+
+**Hochladen (wenn du willst, erst nach der Studio-Vorschau):** Studio → Asset Manager → Bulk Import → Ordner `assets/world/paket_a` bis `paket_f` (Typ Image). Die IDs als `"rbxassetid://…"` in `src/shared/Config/WorldFXConfig.luau` → `TEXTURE_IDS` beim gleichnamigen Schlüssel eintragen. Vorschau ohne Upload: das PNG in Studio als Decal auf ein Testteil ziehen (Studio lädt es dabei als temporäres Asset).
 
 ## Sounds
 
@@ -191,9 +251,14 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 | Client-Teile Wasser (B) | 0 | Bojen 24, Fisch 7, je besetzter Arena 9 (max. 72) | ebenso |
 | Emitter (neu) | 0 | 5 (Glühwürmchen, Sterne, Schleier, Spritzer, Blasen); niedrige Qualität: 2 | |
 | Takte (Heartbeat) | – | DayCycle 5 Hz, Water 30 Hz, Hub 20 Hz, HubEvents 20 Hz, Culling 2 Hz | kein Thread pro Objekt |
+| Client-Teile Plot-Inseln (D) | 0 | je Insel nach Stufe 0/24/50/57; eigene Insel +1 Ring; leere Insel 17 | `check_decor` |
+| Client-Teile Arena (E) | 0 | je besetzter Arena 20 Laternen + 4 Bogen + 36 Zuschauer, Flagge 2 | im Code gezählt, Sichtweite |
+| Client-Teile Leben (F) | 0 | Bienen bis 80 (8 Schwärme × 5 × 2), Schmetterlinge 12, Pfoten 20 | Pool |
+| Emitter D–F | 0 | 1 (Lichtpunkte über der eigenen Insel) | |
+| Takte D–F | – | PlotLife 15 Hz, ArenaLife 20 Hz (+ 4 Hz Zustand), Life 15 Hz | je ein Takt |
 | MicroProfiler | – | **offen (Studio)** | |
 
-## Qualitätsregler (Stand A–C)
+## Qualitätsregler (Stand A–F)
 
 `WorldFXConfig.MIN_QUALITY`: 0 = läuft immer, 1 = nur ab `AmbienceConfig.HIGH_QUALITY_FROM` (Grafikstufe 4, Automatisch zählt als hoch).
 
@@ -210,6 +275,12 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 | Arena-Küste | 0 | | Wespen kreisen | 1 |
 | Honig-Fisch | 1 | | Nest-Puls | 0 |
 | | | | Tafelrahmen / Glanz | 0 / 1 |
+| Insel-Stufen | 0 | | Zuschauer | 1 |
+| Teich-Glanz, Überlauf | 1 | | Schau-Turm-Flagge | 0 |
+| Eigene Insel | 0 | | Bienen, Schmetterlinge | 1 |
+| Leere Insel | 0 | | Blumen im Wind | 1 |
+| Steg-Laternen | 0 | | Pollenfarbe | 0 |
+| Torbogen | 0 | | Pfotenabdrücke | 1 |
 
 ## Annahmen (von mir, änderbar)
 
@@ -223,15 +294,20 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 | 6 | Glitzern nur mit hochgeladener Textur, kein Ersatzbild | `WaterController.setupWater` |
 | 7 | Bojen bei Radius 560 (Wasser endet bei 650) | `WorldFXConfig.BUOYS.RADIUS` |
 | 8 | Musik: keine | – |
+| 9 | Zuschauer-Bärchis aus Teilen (6 Teile je Bärchi), nicht als Bild: sehen aus jedem Winkel gleich aus und brauchen keinen Upload | `ArenaLifeController.buildSpectators` |
+| 10 | Insel-Stufe: Tower I/II/III geschafft **oder** 1/3/5 Rebirths | `WorldFXConfig.ISLAND_STAGE` |
+| 11 | Teich gilt als voll ab 97 % Füllhöhe | `POND_LIFE.FULL_RATIO` |
+| 12 | Bienen: 6 Schwärme in Sicht + 2 auf der eigenen Insel | `WorldFXConfig.BEES` |
 
 ## Offen und bekannt
 
-- **Alles Sichtbare ist ungetestet in Studio.** Bitte als Erstes: Welt baut, Plot spawnt, Tower-Lauf, Event, Ei legen und einsammeln, Output ohne Fehler (`[DayCycle] an`, `[Water] aktiv`, `[Hub] Wahrzeichen aktiv`, `[HubEvents] aktiv`).
+- **Alles Sichtbare ist ungetestet in Studio.** Bitte als Erstes: Welt baut, Plot spawnt, Tower-Lauf, Event, Ei legen und einsammeln, Output ohne Fehler (`[DayCycle] an`, `[Water] aktiv`, `[Hub] Wahrzeichen aktiv`, `[HubEvents] aktiv`, `[PlotLife] aktiv`, `[ArenaLife] aktiv`, `[Life] aktiv`).
 - Die Typprüfung (`--!strict`) macht nur Studio. Lokal: Syntax aller Dateien, alle Lua-Tests und Prüfskripte grün.
-- Screenshots `welt_vorher/` und `welt_nach_C/` fehlen (keine Studio-Sitzung).
+- Screenshots `welt_vorher/`, `welt_nach_C/` und `welt_nach_F/` fehlen (keine Studio-Sitzung).
+- Die Blumen der Hauptinsel sind Server-Teile, die der Client nur lokal dreht. Würde der Server sie je neu setzen, springen sie für einen Takt zurück. Heute setzt er sie nie.
 - `make_update_rbxmx.py` fehlt im Repo: Update-Datei am Heim-PC bauen.
-- `claude/CONTEXT_BRIEFING.md` fehlt im Repo: Abschnitt „Die Welt“ dort nachziehen, sobald die Datei da ist. Kurzfassung: siehe oben, Pakete A–C.
+- `claude/CONTEXT_BRIEFING.md` fehlt im Repo: Abschnitt „Die Welt“ dort nachziehen, sobald die Datei da ist. Kurzfassung: siehe oben, Pakete A–F.
 
 ## Prüfungen (alle grün)
 
-`luau-compile --null` für alle `.luau` · `check_locals` (Höchstwert MapConfig 191, unverändert) · `guide_steps`, `unlock_rules`, `boss_tiers` · `run_local.py` für `combat_rating`, `gold_rules`, `map_layout` (erweitert), `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, **`day_cycle` (neu)** · alle Sims unter `tools/sim` · `check_feedback`, `check_members`, `check_consistency`, `check_loc`, `check_decor`.
+`luau-compile --null` für alle `.luau` · `check_locals` (Höchstwert MapConfig 191, unverändert) · `guide_steps`, `unlock_rules`, `boss_tiers` · `run_local.py` für `combat_rating`, `gold_rules`, `map_layout` (erweitert), `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, **`day_cycle` (neu)**, **`island_stage` (neu)** · alle Sims unter `tools/sim` · `check_feedback`, `check_members`, `check_consistency`, `check_loc`, `check_decor` (erweitert um die Insel-Stufen).

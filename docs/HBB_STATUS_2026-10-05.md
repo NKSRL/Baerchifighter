@@ -25,7 +25,7 @@ Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredle
 - Studio-Einspielung offen: geänderte Skripte seit dem Laptop-Export siehe `git diff a85f360 --stat -- src`.
 
 ## Welt aufwerten (09.10.2026, Cloud-Sitzung)
-Pakete 0, A (Tageslauf), B (Wasser), C (Hauptinsel) als reine Client-Optik umgesetzt, Schalter `AmbienceConfig.DAY_CYCLE`, `WORLD_B_WATER`, `WORLD_C_HUB`. Kein Server-Teil neu. Nicht in Studio getestet. Bericht und Zwischenabnahme 1: `claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md`.
+Pakete 0, A (Tageslauf), B (Wasser), C (Hauptinsel), D (Plot-Inseln), E (Stege/Arena), F (Leben) als reine Client-Optik umgesetzt, Schalter `AmbienceConfig.DAY_CYCLE`, `WORLD_B_WATER` … `WORLD_F_LIFE`. Kein Server-Teil neu (Server setzt nur das Attribut `IslandStage`). Nicht in Studio getestet. Bericht und Zwischenabnahme 2: `claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md`.
 
 ## Wo der Code liegt
 - Laptop: `Dokumente\Neuer Ordner\RBL` (Git-Repo, Tag `pre-ui-v2` = Stand vor HBB).
