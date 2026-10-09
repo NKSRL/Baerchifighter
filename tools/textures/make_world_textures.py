@@ -388,6 +388,36 @@ def shine_strip():
             px[x, y] = (255, 255, 255, int(220 * a))
     save(img, "paket_c", "shine_strip")
 
+# ---------------------------------------------------------------------------
+# Paket E / F
+# ---------------------------------------------------------------------------
+
+def flag_fabric():
+    """Flaggen-Stoff: halbtransparentes weisses Muster (Saum, Wabe, Falten).
+    Die Farbe kommt vom Teil darunter (Look-Farbe des Turms), das Bild legt
+    nur das Muster darueber."""
+    size = 256
+    img = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+    d = ImageDraw.Draw(img)
+    d.rectangle((0, 0, size - 1, 22), fill=(255, 255, 255, 90))
+    d.rectangle((0, size - 23, size - 1, size - 1), fill=(255, 255, 255, 90))
+    d.polygon(hexagon(size / 2, size / 2, 54), outline=(255, 255, 255, 200), fill=(255, 255, 255, 60))
+    d.polygon(hexagon(size / 2, size / 2, 54), outline=(255, 255, 255, 220))
+    for i in range(0, size, 32):
+        d.line((i, 22, i + 16, size - 23), fill=(255, 255, 255, 25), width=6)
+    save(img.filter(ImageFilter.GaussianBlur(0.6)), "paket_e", "flag_fabric")
+
+
+def paw_print():
+    """Baerenpfote von oben: Ballen + vier Zehen, weiss (Farbe per Decal.Color3)."""
+    size = 256
+    img = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse((70, 120, 186, 222), fill=(255, 255, 255, 230))
+    for cx, cy, r in ((62, 92, 22), (102, 58, 24), (154, 58, 24), (194, 92, 22)):
+        d.ellipse((cx - r, cy - r * 1.15, cx + r, cy + r * 1.15), fill=(255, 255, 255, 230))
+    save(img.filter(ImageFilter.GaussianBlur(2.0)), "paket_f", "paw_print")
+
 
 def main():
     print("Paket A")
@@ -399,6 +429,8 @@ def main():
     insect_flipbook("bee_flipbook", (250, 200, 40), (50, 36, 20), 170)
     insect_flipbook("wasp_flipbook", (214, 128, 26), (22, 16, 12), 150)
     pennant_fabric(); stall_stripes(); bear_sign(); shine_strip()
+    print("Paket E / F")
+    flag_fabric(); paw_print()
 
 
 if __name__ == "__main__":
