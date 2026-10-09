@@ -45,6 +45,33 @@
 --   cinematic kurze Kamerafahrt (nur Besitzer, Stufe 4)  dur
 --   sound     ein Sound-Slot                              slot = "charge"|"strike"|"impact"
 --
+-- v16 (Gletscher-Show) — neue Bausteine, alle relativ zu den Figuren (Fuesse
+-- aus der Bounding-Box), stimmen also auf dem Tower in jeder Hoehe:
+--   breath     Atemwolke vor dem Maul, 2 Stoesse (1 Emitter)  count, dur, tex
+--   groundmark Boden friert im Kreis, Adern kriechen raus     radius, dur, veins, tex
+--   crack      Zickzack-Riss am Boden von self zu target      dur, linger, segments, amp, width, tex
+--   spikes     schraege Dornen brechen nacheinander entlang   count, dur, rise, minHeight, maxHeight, linger, tex
+--              des letzten `crack` aus, jeder hoeher (Welle)
+--   snowfall   Nachgluehen: Reifschimmer + sinkende Flocken  count, dur, tex
+--              (1 Emitter)
+-- Erweiterte Parameter bestehender Bausteine (v16):
+--   frost  legs = true   Kristalle wachsen von den Fuessen bis zur Huefte
+--          perch = true  kleine Kristalle auf Ohren und Schultern, glint = true
+--                        laesst jede Kante EINMAL weiss aufleuchten
+--   ring   ground = true flacher Ring auf dem Boden unter der Figur; tex
+-- Fuer jeden Schritt:
+--   extra = true  Beiwerk — faellt auf niedriger Grafikstufe weg
+--                 (PARTICLE_BUDGET.EXTRAS_MIN), der Kernmoment bleibt.
+--   tex = "<key>" Bild aus TEXTURES[<Faehigkeit>][key]. Ist keine ID
+--                 eingetragen (0), laeuft der Rueckfall (Neon-Teile,
+--                 Standard-Partikel).
+-- Fuer einen Eintrag:
+--   echo     eigene Schritt-Liste fuer das Echo (ab dem 2. Einsatz im Lauf,
+--            Laenge TIERS[tier].echo). Ohne `echo`: die ersten zwei
+--            Welt-Effekte der Show, verkuerzt.
+--   impactAt Sekunde, in der die Show den Gegner trifft (sonst geschaetzt,
+--            siehe getImpactTime).
+--
 -- Jede Faehigkeit ist eine EIGENE Komposition (andere Bausteine, Reihenfolge,
 -- Formen und Farben). Geprueft: tools/sim/egg_tree_check.lua meldet doppelte
 -- Kompositionen.
@@ -78,6 +105,24 @@ local PARTICLE_BUDGET = {
 	medium = 0.65,  -- 4..6
 	high   = 1.0,   -- 7..10
 	MIN_COUNT = 2,
+	-- v16: unter diesem Faktor fallen Schritte mit `extra = true` und das
+	-- Beiwerk der Bausteine (Adern, Glitzer) weg. Niedrig = 0,35 (Besitzer);
+	-- Zuschauer bekommen x0,6, sehen also nur auf hoher Stufe Beiwerk.
+	EXTRAS_MIN = 0.5,
+}
+
+-- v16: Bilder je Faehigkeit (Asset-IDs). 0 = noch nicht hochgeladen -> der
+-- Baustein nimmt seinen Rueckfall. Die PNGs liegen unter assets/vfx/<faehigkeit>/
+-- (gezeichnet von tools/render_vfx_glacier.py).
+local TEXTURES: { [string]: { [string]: number } } = {
+	GlacierFrost = {
+		breath    = 0,  -- assets/vfx/glacier_frost/breath.png     (breath)
+		veins     = 0,  -- assets/vfx/glacier_frost/veins.png      (groundmark)
+		crack     = 0,  -- assets/vfx/glacier_frost/crack.png      (crack)
+		spike     = 0,  -- assets/vfx/glacier_frost/spike.png      (spikes)
+		frostring = 0,  -- assets/vfx/glacier_frost/frostring.png  (ring)
+		flake     = 0,  -- assets/vfx/glacier_frost/flake.png      (snowfall)
+	},
 }
 
 -- ============================================================
@@ -135,6 +180,8 @@ export type SkillFX = {
 	-- Tonhoehe je Slot, damit dieselbe Datei je Faehigkeit anders klingt.
 	pitch    : number?,
 	steps    : { Step },
+	echo     : { Step }?,   -- v16: eigenes Echo (siehe oben)
+	impactAt : number?,     -- v16: Treffer-Sekunde der vollen Show
 }
 
 local C = Color3.fromRGB
@@ -333,16 +380,44 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	GlacierFrost = {
-		tier = 3, duration = 3.2, color = C(170, 230, 255), color2 = C(255, 255, 255),
-		sounds = { charge = "whoosh", strike = "glass" }, pitch = 0.8,
+		-- v16 (Show-Paket, Prompt 1): klar, kalt, unaufhaltsam.
+		-- Aufladen: Atem, Boden friert, Reif-Adern, Kristalle auf Ohren und
+		--   Schultern, Himmel kuehlt zu blassem Blaugrau (nur Besitzer).
+		-- Schlag: Aufstampfen, Zickzack-Riss zum Gegner, Dornen-Welle.
+		-- Einschlag (2,25 s): letzter Dorn trifft, Kristalle bis zur Huefte,
+		--   Zeitlupe, Frostring, danach Reifschimmer und Schneeflocken.
+		-- Farben: Gletscherblau, Eisweiss, tiefes Tuerkis (Dorn-Mix im
+		--   Baustein), reines Weiss auf Kanten und Spitzen.
+		tier = 3, duration = 3.6, color = C(150, 215, 245), color2 = C(235, 250, 255),
+		sounds = { charge = "whoosh", strike = "boom", impact = "glass" }, pitch = 0.8,
+		impactAt = 2.25,
 		steps = {
-			{ t = 0.00, fx = "sky",    tint = C(190, 225, 255), brightness = 0.1, saturation = -0.4, dur = 2.8 },
-			{ t = 0.00, fx = "sound",  slot = "charge" },
-			{ t = 0.00, fx = "ring",   at = "self", radius = 14, dur = 1.2, ice = true },
-			{ t = 0.60, fx = "spiral", at = "target", radius = 8, count = 20, dur = 1.0, snow = true },
-			{ t = 1.50, fx = "frost",  at = "target", count = 18, dur = 1.4 },
-			{ t = 1.50, fx = "hitstop", dur = 0.4 },
-			{ t = 1.50, fx = "sound",  slot = "strike" },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",        tint = C(205, 220, 235), brightness = 0.02, saturation = -0.45, dur = 3.3 },
+			{ t = 0.00, fx = "sound",      slot = "charge" },
+			{ t = 0.00, fx = "breath",     at = "self", count = 10, dur = 1.0, tex = "breath", extra = true },
+			{ t = 0.10, fx = "groundmark", at = "self", radius = 6, dur = 3.2, veins = 7, tex = "veins" },
+			{ t = 0.45, fx = "frost",      at = "self", perch = true, count = 8, dur = 1.6, glint = true, extra = true },
+			-- 2. Schlag (Aufstampfen bei 1,30)
+			{ t = 1.30, fx = "ring",       at = "self", ground = true, radius = 3.5, dur = 0.35, tex = "frostring" },
+			{ t = 1.30, fx = "shake",      power = 0.35, dur = 0.2 },
+			{ t = 1.30, fx = "sound",      slot = "strike" },
+			{ t = 1.35, fx = "crack",      dur = 0.45, linger = 1.9, segments = 7, amp = 0.9, tex = "crack" },
+			{ t = 1.40, fx = "spikes",     count = 7, dur = 0.7, rise = 0.16, minHeight = 1.0, maxHeight = 3.4, linger = 1.6, tex = "spike" },
+			-- 3. Einschlag (letzter Dorn: 1,40 + 0,7 x 6/7 + 0,16 = 2,16 .. 2,25)
+			{ t = 2.25, fx = "frost",      at = "target", legs = true, count = 14, dur = 1.3 },
+			{ t = 2.25, fx = "hitstop",    dur = 0.35 },
+			{ t = 2.25, fx = "sound",      slot = "impact" },
+			{ t = 2.28, fx = "ring",       at = "target", ground = true, radius = 11, dur = 0.9, tex = "frostring" },
+			{ t = 2.45, fx = "snowfall",   at = "target", count = 16, dur = 1.15, tex = "flake", extra = true },
+		},
+		-- Echo (0,55 s): Aufstampfen, Zickzack-Riss, Kristalle am Gegner.
+		echo = {
+			{ t = 0.00, fx = "ring",  at = "self", ground = true, radius = 3, dur = 0.25 },
+			{ t = 0.00, fx = "sound", slot = "strike" },
+			{ t = 0.03, fx = "crack", dur = 0.2, linger = 0.4, segments = 5, amp = 0.7 },
+			{ t = 0.23, fx = "frost", at = "target", legs = true, count = 8, dur = 0.6 },
+			{ t = 0.23, fx = "sound", slot = "impact" },
 		},
 	},
 
@@ -661,6 +736,7 @@ return {
 	CINEMATIC_CAMERA = CINEMATIC_CAMERA,
 	TIERS            = TIERS,
 	PARTICLE_BUDGET  = PARTICLE_BUDGET,
+	TEXTURES         = TEXTURES,
 	SOUND_LIBRARY    = SOUND_LIBRARY,
 	SOUND            = SOUND,
 	data             = FX,

@@ -120,6 +120,43 @@ local function centerOf(model: Model?): Vector3?
 	return (cf :: CFrame).Position
 end
 
+-- Groesse der Figur (Bounding-Box). Fallback: ein normaler Baerchi.
+local function sizeOf(model: Model?): Vector3
+	if model and model.Parent then
+		local ok, _, size = pcall(function()
+			return (model :: Model):GetBoundingBox()
+		end)
+		if ok and typeof(size) == "Vector3" and (size :: Vector3).Y > 0.5 then
+			return size :: Vector3
+		end
+	end
+	return Vector3.new(3, 3.5, 3)
+end
+
+-- Gleiche Regeln wie newPart, fuer andere Teil-Klassen (CornerWedgePart ...).
+local function prepPart(p: BasePart, color: Color3, cf: CFrame, transparency: number?)
+	p.Color        = color
+	p.Material     = Enum.Material.Neon
+	p.Anchored     = true
+	p.CanCollide   = false
+	p.CanQuery     = false
+	p.CanTouch     = false
+	p.CastShadow   = false
+	p.CFrame       = cf
+	p.Transparency = transparency or 0
+	p.Parent       = folder()
+end
+
+-- Tween mit Startverzoegerung: so braucht eine Reihe von Teilen (Dornen,
+-- Riss-Stuecke) keinen eigenen Thread pro Teil.
+local function tweenLater(inst: Instance, delaySeconds: number, seconds: number, props: { [string]: any }, style: Enum.EasingStyle?, dir: Enum.EasingDirection?)
+	local info = TweenInfo.new(math.max(0.01, seconds), style or Enum.EasingStyle.Quad,
+		dir or Enum.EasingDirection.Out, 0, false, math.max(0, delaySeconds))
+	local t = TweenService:Create(inst, info, props)
+	t:Play()
+	return t
+end
+
 local RAINBOW = {
 	Color3.fromRGB(255, 60, 60), Color3.fromRGB(255, 160, 40), Color3.fromRGB(255, 240, 60),
 	Color3.fromRGB(80, 230, 90), Color3.fromRGB(60, 180, 255), Color3.fromRGB(150, 90, 255),
@@ -144,6 +181,7 @@ end
 
 type Ctx = {
 	fx       : SkillFXConfig.SkillFX,
+	id       : string,
 	selfPos  : Vector3,
 	targetPos: Vector3,
 	arena    : Vector3,
@@ -151,12 +189,61 @@ type Ctx = {
 	factor   : number,
 	cc       : ColorCorrectionEffect?,
 	sounds   : { [string]: boolean },
+	-- v16 (Gletscher-Show): Fuesse, Groesse und Blickrichtung der Kaempfer.
+	-- Alles relativ zu den Figuren, nie zur Arena-Bodenhoehe (Tower!).
+	selfModel  : Model?,
+	targetModel: Model?,
+	selfSize   : Vector3,
+	targetSize : Vector3,
+	selfFeet   : Vector3,
+	targetFeet : Vector3,
+	fwd        : Vector3,       -- waagerecht von self zu target, Laenge 1
+	path       : { Vector3 }?,  -- Zickzack-Linie des letzten `crack`
 }
 
 local function at(ctx: Ctx, where: string?): Vector3
 	if where == "target" then return ctx.targetPos end
 	if where == "arena" then return ctx.arena end
 	return ctx.selfPos
+end
+
+-- Bodenpunkt unter einer Figur (Fuesse).
+local function groundAt(ctx: Ctx, where: string?): Vector3
+	if where == "target" then return ctx.targetFeet end
+	if where == "arena" then return (ctx.selfFeet + ctx.targetFeet) / 2 end
+	return ctx.selfFeet
+end
+
+local function sizeAt(ctx: Ctx, where: string?): Vector3
+	if where == "target" then return ctx.targetSize end
+	return ctx.selfSize
+end
+
+-- Textur-ID aus SkillFXConfig.TEXTURES[<Faehigkeit>][key] oder nil (dann
+-- laeuft der Rueckfall mit Neon-Teilen bzw. Standard-Partikeln).
+local function texOf(ctx: Ctx, key: string?): string?
+	if not key then return nil end
+	local set = SkillFXConfig.TEXTURES[ctx.id]
+	local id = set and set[key]
+	if typeof(id) == "number" and id > 0 then
+		return "rbxassetid://" .. tostring(id)
+	end
+	return nil
+end
+
+local function addDecal(p: BasePart, texture: string, face: Enum.NormalId, color: Color3?): Decal
+	local d = Instance.new("Decal")
+	d.Texture = texture
+	d.Face = face
+	if color then d.Color3 = color end
+	d.Parent = p
+	return d
+end
+
+-- Beiwerk (Schritte mit `extra = true`, Adern, Glitzer) faellt auf
+-- niedriger Grafikstufe weg; der Kernmoment bleibt.
+local function extrasOn(ctx: Ctx): boolean
+	return ctx.factor >= SkillFXConfig.PARTICLE_BUDGET.EXTRAS_MIN
 end
 
 --------------------------------------------------------------------------------
@@ -192,13 +279,33 @@ BLOCKS.aura = function(ctx, s)
 end
 
 BLOCKS.ring = function(ctx, s)
-	local pos = at(ctx, s.at) - Vector3.new(0, 1.2, 0)
+	-- `ground = true`: flach auf dem Boden unter der Figur (v16).
+	local pos = if s.ground then groundAt(ctx, s.at) + Vector3.new(0, 0.1, 0) else at(ctx, s.at) - Vector3.new(0, 1.2, 0)
 	local r = s.radius or 6
 	local dur = s.dur or 0.6
 	local startD = if s.shrink then r * 2 else 0.5
 	local endD   = if s.shrink then 0.5 else r * 2
-	local ring = newPart(Enum.PartType.Cylinder, Vector3.new(0.25, startD, startD), pickColor(s, ctx.fx),
+	-- `ground` + `tex`: das Bild liegt als Decal auf einer flachen, unsichtbaren
+	-- Platte (quadratisches PNG mit rundem Motiv).
+	local texture = if s.ground then texOf(ctx, s.tex) else nil
+	if texture then
+		local plate = newPart(Enum.PartType.Block, Vector3.new(startD, 0.05, startD), pickColor(s, ctx.fx), CFrame.new(pos), 1)
+		local d = addDecal(plate, texture, Enum.NormalId.Top, plate.Color)
+		tween(plate, dur, { Size = Vector3.new(endD, 0.05, endD) })
+		tweenLater(d, dur * 0.6, dur * 0.4, { Transparency = 1 })
+		Debris:AddItem(plate, dur + 0.1)
+		return
+	end
+	local ring = newPart(Enum.PartType.Cylinder, Vector3.new(if s.ground then 0.08 else 0.25, startD, startD), pickColor(s, ctx.fx),
 		CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)), 0.2)
+	if s.ground then
+		-- flacher Ring: Dicke bleibt, nur der Durchmesser waechst
+		tween(ring, dur, { Size = Vector3.new(0.08, endD, endD) })
+		task.delay(dur * 0.6, function()
+			if ring.Parent then fadeAndDestroy(ring, dur * 0.4) end
+		end)
+		return
+	end
 	if s.rainbow or s.glyphs or s.infinity or s.clock then
 		task.spawn(function()
 			local t0 = os.clock()
@@ -467,7 +574,82 @@ BLOCKS.spiral = function(ctx, s)
 	end
 end
 
+-- v16: Kristalle von den Fuessen bis zur Huefte (`legs`). Waechst von unten
+-- nach oben: jeder Kristall startet per Tween-Verzoegerung, kein Thread.
+local function frostLegs(ctx: Ctx, s: { [string]: any })
+	local feet = groundAt(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local hip = size.Y * 0.55
+	local radius = math.max(size.X, size.Z) * 0.42
+	local n = math.max(6, scaled(s.count, ctx.factor))
+	local dur = s.dur or 1.2
+	local grow = dur * 0.45
+	for i = 1, n do
+		local k = (i - 1) / math.max(1, n - 1)          -- 0 = Fuesse, 1 = Huefte
+		local a = i * 2.39996                            -- goldener Winkel: gleichmaessig rundum
+		local r = radius * (1.05 - 0.25 * k)
+		local base = feet + Vector3.new(math.cos(a) * r, 0.1 + k * hip, math.sin(a) * r)
+		local outward = Vector3.new(math.cos(a), 0, math.sin(a))
+		local h = 0.9 + 0.6 * (1 - k) + math.random() * 0.4
+		local rot = CFrame.lookAt(Vector3.zero, outward).Rotation * CFrame.Angles(math.rad(25 + math.random() * 20), 0, 0)
+		local p = newPart(Enum.PartType.Block, Vector3.new(0.05, 0.05, 0.05), if i % 3 == 0 then ctx.fx.color2 else ctx.fx.color,
+			CFrame.new(base) * rot, 0.1)
+		p.Material = Enum.Material.Ice
+		local w = 0.28 + 0.12 * (1 - k)
+		tweenLater(p, k * grow, grow * 0.6, {
+			Size = Vector3.new(w, h, w),
+			CFrame = CFrame.new(base) * rot * CFrame.new(0, h * 0.35, 0),
+		}, Enum.EasingStyle.Back)
+		tweenLater(p, dur * 0.75, dur * 0.25, { Transparency = 1 })
+		Debris:AddItem(p, dur + 0.1)
+	end
+end
+
+-- v16: kleine Kristalle auf Ohren und Schultern (`perch`), ein Glitzern.
+local function frostPerch(ctx: Ctx, s: { [string]: any })
+	local model = if s.at == "target" then ctx.targetModel else ctx.selfModel
+	local center = at(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local spots: { Vector3 } = {}
+	for _, name in { "ear_left", "ear_right" } do
+		local ear = model and model:FindFirstChild(name, true)
+		if ear and ear:IsA("BasePart") then
+			table.insert(spots, ear.Position + Vector3.new(0, ear.Size.Y * 0.4, 0))
+		end
+	end
+	if #spots == 0 then
+		-- Rueckfall: Ohren oben links/rechts am Kopf schaetzen.
+		local side = ctx.fwd:Cross(Vector3.yAxis)
+		table.insert(spots, center + side * size.X * 0.28 + Vector3.new(0, size.Y * 0.48, 0))
+		table.insert(spots, center - side * size.X * 0.28 + Vector3.new(0, size.Y * 0.48, 0))
+	end
+	local side = ctx.fwd:Cross(Vector3.yAxis)
+	table.insert(spots, center + side * size.X * 0.42 + Vector3.new(0, size.Y * 0.05, 0))  -- Schultern
+	table.insert(spots, center - side * size.X * 0.42 + Vector3.new(0, size.Y * 0.05, 0))
+	local dur = s.dur or 1.4
+	local per = math.max(1, math.floor(scaled(s.count, ctx.factor) / #spots + 0.5))
+	for si, spot in spots do
+		for j = 1, per do
+			local rot = CFrame.Angles(math.random() - 0.5, math.random() * 6, math.random() - 0.5)
+			local p = newPart(Enum.PartType.Block, Vector3.new(0.05, 0.05, 0.05), ctx.fx.color,
+				CFrame.new(spot) * rot, 0.05)
+			p.Material = Enum.Material.Ice
+			local h = 0.35 + math.random() * 0.35
+			tweenLater(p, (si + j) * 0.06, dur * 0.3, { Size = Vector3.new(0.14, h, 0.14) }, Enum.EasingStyle.Back)
+			if s.glint and extrasOn(ctx) then
+				-- EIN kurzes Aufleuchten der Kante (weiss, hin und zurueck), kein Flackern.
+				TweenService:Create(p, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true,
+					dur * 0.35 + si * 0.08), { Color = Color3.new(1, 1, 1) }):Play()
+			end
+			tweenLater(p, dur * 0.8, dur * 0.2, { Transparency = 1 })
+			Debris:AddItem(p, dur + 0.1)
+		end
+	end
+end
+
 BLOCKS.frost = function(ctx, s)
+	if s.legs then frostLegs(ctx, s) return end
+	if s.perch then frostPerch(ctx, s) return end
 	local pos = at(ctx, s.at)
 	local n = scaled(s.count, ctx.factor)
 	local dur = s.dur or 0.8
@@ -494,6 +676,230 @@ BLOCKS.starfield = function(ctx, s)
 		tween(p, 0.4 + math.random() * 0.6, { Transparency = 0.1 })
 		task.delay(dur * 0.75, function() if p.Parent then fadeAndDestroy(p, dur * 0.25) end end)
 	end
+end
+
+--------------------------------------------------------------------------------
+-- v16 (Gletscher-Show): Boden, Riss, Dornen, Atem, Schneefall. Wiederverwendbar
+-- fuer jede Faehigkeit; Doku in SkillFXConfig ("BAUSTEINE").
+--------------------------------------------------------------------------------
+
+-- Ein flaches Teil auf dem Boden, das von `from` nach `to` waechst (Riss,
+-- Adern). Kein Thread: Wachsen und Ausblenden sind verzoegerte Tweens.
+local function groundStroke(ctx: Ctx, from: Vector3, to: Vector3, width: number, color: Color3,
+	delaySeconds: number, growSeconds: number, fadeAt: number, texture: string?): BasePart?
+	local len = (to - from).Magnitude
+	if len < 0.05 then return nil end
+	local rot = CFrame.lookAt(from, to).Rotation
+	local p = newPart(Enum.PartType.Block, Vector3.new(width, 0.04, 0.01), color, CFrame.new(from) * rot, 0)
+	tweenLater(p, delaySeconds, growSeconds, {
+		Size = Vector3.new(width, 0.04, len),
+		CFrame = CFrame.new((from + to) / 2) * rot,
+	}, Enum.EasingStyle.Linear)
+	if texture then
+		p.Transparency = 1
+		local d = addDecal(p, texture, Enum.NormalId.Top, color)
+		tweenLater(d, fadeAt, 0.4, { Transparency = 1 })
+	else
+		tweenLater(p, fadeAt, 0.4, { Transparency = 1 })
+	end
+	Debris:AddItem(p, fadeAt + 0.5)
+	return p
+end
+
+-- breath: Atemwolke vor dem Maul. EIN Emitter, zwei Atemstoesse.
+--   at, dur, count (Teilchen je Stoss)
+BLOCKS.breath = function(ctx, s)
+	local center = at(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local dir = if s.at == "target" then -ctx.fwd else ctx.fwd
+	local mouth = center + dir * size.Z * 0.45 + Vector3.new(0, size.Y * 0.2, 0)
+	local dur = s.dur or 1.0
+	local anchor = newPart(Enum.PartType.Block, Vector3.one * 0.2, Color3.new(1, 1, 1), CFrame.lookAt(mouth, mouth + dir), 1)
+	local em = Instance.new("ParticleEmitter")
+	em.Texture = texOf(ctx, s.tex) or "rbxasset://textures/particles/smoke_main.dds"
+	em.EmissionDirection = Enum.NormalId.Front
+	em.Rate = 0
+	em.Speed = NumberRange.new(1.5, 2.5)
+	em.SpreadAngle = Vector2.new(18, 12)
+	em.Drag = 2.5
+	em.Lifetime = NumberRange.new(0.8, 1.1)
+	em.Acceleration = Vector3.new(0, 0.6, 0)
+	em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1.6) })
+	em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) })
+	em.Color = ColorSequence.new(Color3.new(1, 1, 1), ctx.fx.color)
+	em.LightEmission = 0.2
+	em.Rotation = NumberRange.new(0, 360)
+	em.RotSpeed = NumberRange.new(-30, 30)
+	em.Parent = anchor
+	local n = scaled(s.count, ctx.factor)
+	em:Emit(n)
+	task.delay(dur * 0.5, function()
+		if em.Parent then em:Emit(n) end
+	end)
+	Debris:AddItem(anchor, dur * 0.5 + 1.3)
+end
+
+-- groundmark: Boden friert in einem Kreis, Adern kriechen nach aussen.
+--   at, radius, dur, veins (Zahl der Adern; Beiwerk), tex (Bodenbild)
+BLOCKS.groundmark = function(ctx, s)
+	local feet = groundAt(ctx, s.at) + Vector3.new(0, 0.06, 0)
+	local r = s.radius or 6
+	local dur = s.dur or 2
+	local grow = dur * 0.3
+	local disc = newPart(Enum.PartType.Cylinder, Vector3.new(0.05, 0.5, 0.5), ctx.fx.color,
+		CFrame.new(feet) * CFrame.Angles(0, 0, math.rad(90)), 0.45)
+	disc.Material = Enum.Material.Ice
+	tween(disc, grow, { Size = Vector3.new(0.05, r * 1.2, r * 1.2) }, Enum.EasingStyle.Sine)
+	local texture = texOf(ctx, s.tex)
+	if texture then
+		-- Mit Bodenbild: das Bild (auf einer flachen Platte) traegt Kreis UND
+		-- Adern; die Eisscheibe bleibt als blasser Grund darunter.
+		local plate = newPart(Enum.PartType.Block, Vector3.new(0.5, 0.05, 0.5), ctx.fx.color, CFrame.new(feet + Vector3.new(0, 0.03, 0)), 1)
+		local d = addDecal(plate, texture, Enum.NormalId.Top)
+		tween(plate, grow * 1.6, { Size = Vector3.new(r * 2, 0.05, r * 2) }, Enum.EasingStyle.Sine)
+		tweenLater(d, dur * 0.8, dur * 0.2, { Transparency = 1 })
+		tweenLater(disc, dur * 0.8, dur * 0.2, { Transparency = 1 })
+		Debris:AddItem(plate, dur + 0.1)
+	else
+		tweenLater(disc, dur * 0.8, dur * 0.2, { Transparency = 1 })
+		if extrasOn(ctx) then
+			-- Rueckfall: Reif-Adern als duenne Neon-Striche, je Ader ein Ast.
+			local n = scaled(s.veins or 6, ctx.factor)
+			for i = 1, n do
+				local a = (i / n) * math.pi * 2 + math.random() * 0.4
+				local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+				local mainEnd = feet + dir * r * (0.75 + math.random() * 0.25)
+				groundStroke(ctx, feet, mainEnd, 0.09, ctx.fx.color2, i * 0.03, grow * 1.4, dur * 0.8, nil)
+				local fork = feet + dir * r * 0.45
+				local turn = (if i % 2 == 0 then 1 else -1) * math.rad(35)
+				local bdir = Vector3.new(math.cos(a + turn), 0, math.sin(a + turn))
+				groundStroke(ctx, fork, fork + bdir * r * 0.35, 0.06, ctx.fx.color2, grow * 0.8, grow * 0.8, dur * 0.8, nil)
+			end
+		end
+	end
+	Debris:AddItem(disc, dur + 0.1)
+end
+
+-- crack: Zickzack-Riss am Boden von self zu target. Merkt sich die Linie in
+-- ctx.path (fuer `spikes`).
+--   dur (Wachsen), linger (sichtbar bis), segments, amp (Zickzack-Breite), width, tex
+BLOCKS.crack = function(ctx, s)
+	local from = ctx.selfFeet + ctx.fwd * ctx.selfSize.Z * 0.3 + Vector3.new(0, 0.07, 0)
+	local to = ctx.targetFeet - ctx.fwd * ctx.targetSize.Z * 0.15 + Vector3.new(0, 0.07, 0)
+	local k = s.segments or 7
+	local amp = s.amp or 0.9
+	local side = ctx.fwd:Cross(Vector3.yAxis)
+	local pts: { Vector3 } = { from }
+	for j = 1, k - 1 do
+		local sign = if j % 2 == 0 then 1 else -1
+		table.insert(pts, from:Lerp(to, j / k) + side * sign * amp * (0.6 + math.random() * 0.4))
+	end
+	table.insert(pts, to)
+	ctx.path = pts
+	local dur = s.dur or 0.5
+	local linger = s.linger or (dur + 1)
+	local step = dur / k
+	local texture = texOf(ctx, s.tex)
+	for j = 1, k do
+		groundStroke(ctx, pts[j], pts[j + 1], s.width or 0.28, ctx.fx.color2, (j - 1) * step, step, linger, texture)
+	end
+end
+
+-- spikes: schraege Eisdornen brechen nacheinander entlang ctx.path (oder der
+-- Linie self -> target) aus dem Boden, jeder hoeher als der vorige.
+--   count, dur (vom ersten bis zum letzten Dorn), minHeight, maxHeight, linger, tex
+BLOCKS.spikes = function(ctx, s)
+	local pts = ctx.path or { ctx.selfFeet, ctx.targetFeet }
+	-- Gesamtlaenge und Punkt bei Anteil k entlang der Linie
+	local lens: { number } = {}
+	local total = 0
+	for j = 1, #pts - 1 do
+		local l = (pts[j + 1] - pts[j]).Magnitude
+		lens[j] = l
+		total += l
+	end
+	local function pointAt(k: number): Vector3
+		local want = total * k
+		for j = 1, #pts - 1 do
+			if want <= lens[j] or j == #pts - 1 then
+				return pts[j]:Lerp(pts[j + 1], math.clamp(want / math.max(lens[j], 0.001), 0, 1))
+			end
+			want -= lens[j]
+		end
+		return pts[#pts]
+	end
+	local n = math.max(4, scaled(s.count, ctx.factor))   -- Kernmoment: nie unter 4
+	local dur = s.dur or 0.8
+	local rise = s.rise or 0.18
+	local linger = s.linger or (dur + 1)
+	local lo, hi = s.minHeight or 1.0, s.maxHeight or 3.2
+	local tilt = CFrame.lookAt(Vector3.zero, ctx.fwd).Rotation * CFrame.Angles(math.rad(-28), 0, 0)
+	local texture = texOf(ctx, s.tex)
+	local tips = extrasOn(ctx)
+	for i = 1, n do
+		local k = i / n
+		local base = pointAt(0.2 + 0.8 * k)
+		local h = lo + (hi - lo) * k
+		local w = 0.55 + 0.35 * k
+		local delaySeconds = (i - 1) * (dur / n)
+		local rot = tilt * CFrame.Angles(0, math.random() * 0.6 - 0.3, 0)
+		local spike = Instance.new("CornerWedgePart")
+		spike.Size = Vector3.new(w, 0.05, w)
+		prepPart(spike, if i % 2 == 0 then ctx.fx.color else ctx.fx.color:Lerp(Color3.fromRGB(40, 170, 180), 0.35), CFrame.new(base) * rot, 0.05)
+		spike.Material = Enum.Material.Ice
+		if texture then
+			local d = addDecal(spike, texture, Enum.NormalId.Front)
+			tweenLater(d, linger, 0.35, { Transparency = 1 })
+		end
+		tweenLater(spike, delaySeconds, rise, {
+			Size = Vector3.new(w, h, w),
+			CFrame = CFrame.new(base) * rot * CFrame.new(0, h / 2, 0),
+		}, Enum.EasingStyle.Back)
+		tweenLater(spike, linger, 0.35, { Transparency = 1 })
+		Debris:AddItem(spike, linger + 0.45)
+		if tips then
+			-- Reines Weiss als scharfes Licht: jeder Dorn leuchtet nach dem
+			-- Ausbrechen EINMAL kurz auf (laeuft als Welle mit, kein Flackern).
+			TweenService:Create(spike, TweenInfo.new(0.16, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true,
+				delaySeconds + rise * 0.8), { Color = Color3.new(1, 1, 1) }):Play()
+		end
+	end
+end
+
+-- snowfall: Nachgluehen. Leichter Reifschimmer um die Figur und einzelne
+-- Schneeflocken, die langsam herabsinken. EIN Emitter.
+--   at, count, dur, tex (Flocke)
+BLOCKS.snowfall = function(ctx, s)
+	local center = at(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local dur = s.dur or 1.2
+	local top = center + Vector3.new(0, size.Y * 0.5 + 1.5, 0)
+	local w = math.max(size.X, size.Z) * 1.6
+	local anchor = newPart(Enum.PartType.Block, Vector3.new(w, 0.2, w), Color3.new(1, 1, 1), CFrame.new(top), 1)
+	local em = Instance.new("ParticleEmitter")
+	em.Texture = texOf(ctx, s.tex) or "rbxasset://textures/particles/sparkles_main.dds"
+	em.Shape = Enum.ParticleEmitterShape.Box
+	em.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	em.EmissionDirection = Enum.NormalId.Bottom
+	em.Rate = 0
+	em.Speed = NumberRange.new(0.6, 1.2)
+	em.Acceleration = Vector3.new(0, -0.4, 0)
+	em.Drag = 0.5
+	em.Lifetime = NumberRange.new(dur * 0.8, dur * 1.2)
+	em.Size = NumberSequence.new(0.22)
+	em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.7, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	em.Color = ColorSequence.new(Color3.new(1, 1, 1), ctx.fx.color)
+	em.LightEmission = 0.5
+	em.Rotation = NumberRange.new(0, 360)
+	em.RotSpeed = NumberRange.new(-40, 40)
+	em.Parent = anchor
+	em:Emit(scaled(s.count, ctx.factor))
+	Debris:AddItem(anchor, dur * 1.2 + 0.2)
+	-- Reifschimmer: eine fast durchsichtige Huelle, blendet langsam aus.
+	local shell = newPart(Enum.PartType.Ball, size * 1.15, ctx.fx.color, CFrame.new(center), 0.82)
+	shell.Material = Enum.Material.ForceField
+	tweenLater(shell, dur * 0.4, dur * 0.6, { Transparency = 1 }, Enum.EasingStyle.Sine)
+	Debris:AddItem(shell, dur + 0.1)
 end
 
 -- Ab hier: nur fuer den Besitzer (Bildschirm und Kamera gehoeren ihm).
@@ -707,8 +1113,12 @@ function SkillFXController.play(req: PlayRequest)
 		end
 	end
 
+	local selfSize = sizeOf(req.attacker)
+	local targetSize = sizeOf(req.target)
+	local flat = Vector3.new(targetPos.X - selfPos.X, 0, targetPos.Z - selfPos.Z)
 	local ctx: Ctx = {
 		fx = fx,
+		id = req.skillId,
 		selfPos = selfPos,
 		targetPos = targetPos,
 		arena = req.center or (selfPos + targetPos) / 2,
@@ -716,7 +1126,43 @@ function SkillFXController.play(req: PlayRequest)
 		factor = budgetFactor() * (if isOwner then 1 else 0.6),
 		cc = nil,
 		sounds = {},
+		selfModel = req.attacker,
+		targetModel = req.target,
+		selfSize = selfSize,
+		targetSize = targetSize,
+		selfFeet = selfPos - Vector3.new(0, selfSize.Y / 2, 0),
+		targetFeet = targetPos - Vector3.new(0, targetSize.Y / 2, 0),
+		fwd = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1),
+		path = nil,
 	}
+
+	-- Schritte abspielen (volle Show oder eigenes Echo), je Schritt EIN
+	-- verzoegerter Aufruf; Fehler eines Bausteins stoppen die Show nicht.
+	local function run(steps: { SkillFXConfig.Step }, limit: number, echo: boolean)
+		for _, step in steps do
+			local block = BLOCKS[step.fx]
+			if block and not (step.extra and not extrasOn(ctx)) then
+				local st = step
+				if echo and step.fx == "sound" then
+					st = table.clone(step)
+					st.echo = true
+				end
+				task.delay(math.min(step.t or 0, limit), function()
+					local ok, err = pcall(block, ctx, st)
+					if not ok then
+						warn("[SkillFX]", req.skillId, step.fx, err)
+					end
+				end)
+			end
+		end
+	end
+
+	local echoSteps = fx.echo
+	if not req.full and echoSteps then
+		-- v16: eigenes Echo der Show (SkillFXConfig: `echo`).
+		run(echoSteps, SkillFXConfig.TIERS[fx.tier].echo, true)
+		return
+	end
 
 	if not req.full then
 		-- Echo: die ersten zwei Welt-Effekte der Show, stark verkuerzt.
@@ -739,18 +1185,7 @@ function SkillFXController.play(req: PlayRequest)
 	end
 
 	local maxDur = SkillFXConfig.getDuration(req.skillId, true)
-	for _, step in fx.steps do
-		local block = BLOCKS[step.fx]
-		if block then
-			local t = math.min(step.t or 0, maxDur)
-			task.delay(t, function()
-				local ok, err = pcall(block, ctx, step)
-				if not ok then
-					warn("[SkillFX]", req.skillId, step.fx, err)
-				end
-			end)
-		end
-	end
+	run(fx.steps, maxDur, false)
 
 	-- Farbfilter am Ende sicher entfernen.
 	task.delay(maxDur + 1, function()
