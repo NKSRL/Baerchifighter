@@ -44,6 +44,7 @@ local ArenaLifeController   = require(script.Parent.ArenaLifeController)
 local PlotLifeController    = require(script.Parent.PlotLifeController)
 local LifeController        = require(script.Parent.LifeController)
 local HubLandmarkController = require(script.Parent.HubLandmarkController)
+local SoundscapeController  = require(script.Parent.SoundscapeController)
 
 local WorldMomentController = {}
 
@@ -328,6 +329,7 @@ end
 function WorldMomentController.eventStarted()
 	if not (FeatureFlags.isOn("WORLD_G_MOMENTS") and WorldFXKit.enabled("eventBell")) then return end
 	HubLandmarkController.flashCrown()
+	SoundscapeController.bell()   -- leise, einmal (still ohne gepruefte ID)
 	LifeController.rally(MapConfig.CENTER + Vector3.new(0, MapConfig.PLATFORM_TOP_Y, 0), 10)
 end
 

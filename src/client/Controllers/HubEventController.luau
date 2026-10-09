@@ -34,6 +34,8 @@ local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 local WorldFXKit = require(script.Parent.WorldFXKit)
 -- Paket G: Event-Start als Welt-Moment (Krone blinkt, Bienen ziehen los)
 local WorldMomentController = require(script.Parent.WorldMomentController)
+-- Paket H: Stimmengewirr am Pit nur waehrend eines Events
+local SoundscapeController = require(script.Parent.SoundscapeController)
 
 local HubEventController = {}
 
@@ -355,6 +357,7 @@ function HubEventController.init()
 				end
 				_pitState = state
 				applyPitState(state)
+				SoundscapeController.setEventLive(state == "live")
 			end
 			_pitStateKnown = _ring ~= nil or _pitOverride ~= nil
 		end
