@@ -499,4 +499,11 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "Drop off your combs first!",
 	["err.home_unavailable"] = "Your plot is not reachable right now",
+	-- Welt aufwerten, Paket C: Wegweiser auf der Hauptinsel
+	["world.sign.event"]    = "Event",
+	["world.sign.merchant"] = "Merchant",
+	["world.sign.board"]    = "Leaderboard",
+	["world.sign.home"]     = "Your island",
+	["world.sign.free"]     = "Free island",
+	["world.sign.island"]   = "{name}'s island",
 }

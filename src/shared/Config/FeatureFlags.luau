@@ -76,6 +76,7 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket A (Tageslauf) haengt am Schalter AmbienceConfig.DAY_CYCLE.
 	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
 	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
+	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
 }
 
 local FeatureFlags = {}

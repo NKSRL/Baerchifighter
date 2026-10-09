@@ -500,4 +500,11 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "Dépose d'abord tes rayons !",
 	["err.home_unavailable"] = "Ton île est inaccessible pour le moment",
+	-- Welt aufwerten, Paket C: Wegweiser auf der Hauptinsel
+	["world.sign.event"]    = "Événement",
+	["world.sign.merchant"] = "Marchand",
+	["world.sign.board"]    = "Classement",
+	["world.sign.home"]     = "Ton île",
+	["world.sign.free"]     = "Île libre",
+	["world.sign.island"]   = "Île de {name}",
 }

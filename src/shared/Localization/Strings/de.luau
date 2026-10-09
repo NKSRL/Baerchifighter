@@ -507,4 +507,11 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "Erst die Waben abgeben!",
 	["err.home_unavailable"] = "Dein Plot ist gerade nicht erreichbar",
+	-- Welt aufwerten, Paket C: Wegweiser auf der Hauptinsel
+	["world.sign.event"]    = "Event",
+	["world.sign.merchant"] = "Händler",
+	["world.sign.board"]    = "Bestenliste",
+	["world.sign.home"]     = "Deine Insel",
+	["world.sign.free"]     = "Freie Insel",
+	["world.sign.island"]   = "Insel von {name}",
 }
