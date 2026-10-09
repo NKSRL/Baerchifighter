@@ -89,6 +89,15 @@
 --   D:Invoke("snapshot")             -- Spielstand merken (fuer Tests)
 --   D:Invoke("restore")              -- gemerkten Spielstand zurueckschreiben
 --
+-- Welt aufwerten (08.10.2026, nur Optik, setzt workspace-Attribute fuer die
+-- Client-Controller; alle Test-Clients sehen dasselbe):
+--   D:Invoke("worldshots", 1)        -- Kamera auf festen Punkt 1..6 (UI aus), 0 = zurueck
+--   D:Invoke("daytime", 19)          -- Tageslauf auf feste Uhrzeit, "auto" = Zyklus
+--   D:Invoke("pitstate", "soon")     -- Pit-Rahmen: idle | soon | live | auto
+--   D:Invoke("neststate", "boss")    -- Wespen-Nest: calm | boss | auto
+--   D:Invoke("arrival")              -- Ankunft (Blasen + Bienen) erneut abspielen
+--   D:Invoke("fish")                 -- sofort einen Honig-Fisch springen lassen
+--
 -- HBB Paket 0 (Test-Zustaende, erst "snapshot"):
 --   D:Invoke("state", "fresh")       -- neues Konto, Trichter F01–F10 misst
 --   D:Invoke("state", "hatch10")     -- dazu zehn geoeffnete Basis-Eier
@@ -443,6 +452,56 @@ end
 -- v15: Teile auf der eigenen Insel zaehlen (Budget: 250 ohne Baerchi-Figuren)
 commands.parts = function(player, _data)
 	return MapService.countParts(player) or { error = "kein Plot" }
+end
+
+-- Welt aufwerten: Debug-Signale an die Client-Controller (workspace-Attribute,
+-- siehe WorldFXKit.onDebug). Ein Zaehler im Wert sorgt dafuer, dass derselbe
+-- Befehl zweimal hintereinander auch zweimal ausloest.
+local _worldSignal = 0
+local function worldSignal(attribute: string, value: any)
+	_worldSignal += 1
+	workspace:SetAttribute(attribute, if value == nil then tostring(_worldSignal) else value)
+end
+
+commands.worldshots = function(_player, _data, index: any)
+	local n = tonumber(index)
+	if n == nil then
+		local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
+		local names = {}
+		for _, shot in WorldFXConfig.WORLD_SHOTS do table.insert(names, shot.name) end
+		return { hinweis = "worldshots <1..6> (0 = zurueck)", punkte = names }
+	end
+	_worldSignal += 1
+	workspace:SetAttribute("DebugWorldShot", string.format("%d|%d", n, _worldSignal))
+	return { punkt = n }
+end
+
+commands.daytime = function(_player, _data, hour: any)
+	local h = tonumber(hour)
+	workspace:SetAttribute("DebugDayTime", if h then h else -1)
+	return { tageszeit = if h then h else "auto" }
+end
+
+commands.pitstate = function(_player, _data, state: any)
+	local value = tostring(state or "auto")
+	workspace:SetAttribute("DebugPitState", value)
+	return { pit = value }
+end
+
+commands.neststate = function(_player, _data, state: any)
+	local value = tostring(state or "auto")
+	workspace:SetAttribute("DebugNestState", value)
+	return { nest = value }
+end
+
+commands.arrival = function(_player, _data)
+	worldSignal("DebugArrival", nil)
+	return { ankunft = true }
+end
+
+commands.fish = function(_player, _data)
+	worldSignal("DebugFish", nil)
+	return { fisch = true }
 end
 
 -- v15: den aktuellen Spielstand in ein v14-Format zuruckverwandeln (Topf L7,
@@ -1047,6 +1106,10 @@ commands.help = function()
 
 		-- v17
 		"jackpot", "combtheme <themeId|off>", "launch [anzahl]",
+
+		-- Welt aufwerten
+		"worldshots [1..6|0]", "daytime <uhrzeit|auto>", "pitstate <idle|soon|live|auto>",
+		"neststate <calm|boss|auto>", "arrival", "fish",
 	}
 end
 

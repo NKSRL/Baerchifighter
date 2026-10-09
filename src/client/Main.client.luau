@@ -50,6 +50,8 @@ local EggTimerController = require(Controllers:WaitForChild("EggTimerController"
 local SkillFXController  = require(Controllers:WaitForChild("SkillFXController"))
 local CombController     = require(Controllers:WaitForChild("CombController"))
 local AmbienceController = require(Controllers:WaitForChild("AmbienceController"))
+-- Welt aufwerten (08.10.2026)
+local WorldShotController   = require(Controllers:WaitForChild("WorldShotController"))
 local EventFXController  = require(Controllers:WaitForChild("EventFXController"))
 local LaidEggMeshController = require(Controllers:WaitForChild("LaidEggMeshController"))
 local UiEventLogger      = require(Controllers:WaitForChild("UiEventLogger"))
@@ -158,6 +160,10 @@ SkillFXController.init()
 CombController.init(screenGui)
 -- v16: Himmels-Kulisse (Wolken, Schwebeinseln, Pollen, Schaum) nur auf dem Client
 AmbienceController.init()
+-- Welt aufwerten: Tageslauf (Paket A) zuerst — Wasser und Hauptinsel melden
+-- ihre leuchtenden Teile bei ihm an. Danach Wasser (B), Hauptinsel (C),
+-- Ankunft (C) und die festen Kamerapunkte (Paket 0, nur Studio).
+WorldShotController.init()
 -- v17: lebendige Events (UFO-Patrouille, Abwuerfe, Boss, Telegraphen); braucht Toast
 EventFXController.init()
 -- v18: Ei-Mesh der gelegten Eier (EditableMesh gibt es nur auf dem Client)
