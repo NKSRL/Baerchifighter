@@ -76,6 +76,25 @@
 --                        halbdurchsichtig; tex = Bild als Beam (weicher Verlauf)
 --   snowfall noShell = true nur Emitter (z. B. rieselnde Federn); lift, size
 --   alle     second = true Zweitfarbe (color2) statt Hauptfarbe
+--
+-- v16 (Kometen-Show) — neue Bausteine:
+--   shadow  dunkler Kreis am Boden, waechst beschleunigt       from, radius, dur, fadeOut, toArena
+--   comet   Punkt funkelt oben und waechst (`charge`), dann    height, size, charge, fall, cloudY,
+--           faellt der Komet (Kopf, Kern, Schweif, Funken =     tex, tailTex, sparkTex
+--           1 Emitter) auf den Gegner, letzte 30 % langsam;
+--           Wolkenfetzen bei cloudY (Beiwerk)
+--   crater  Glut-Risse im Boden, kuehlen Orange -> Violett ab  radius, count, dur, tex
+--   dust    Sternstaub im Bogen (1 Emitter, Schwerkraft)       count, speed, dur, tex
+-- Erweiterte Parameter (v16):
+--   radius = "tower" | "fence"  Turmspitze bzw. bis zum Arena-Zaun (MapConfig),
+--            gemessen ab der Arena-Mitte (ring, shadow, crater)
+--   ring     toArena = true  Bodenring startet an der Figur, waechst um die
+--            Arena-Mitte (Schockwelle bis zum Zaun)
+--   shards   arc = true      Truemmer fliegen im Bogen und landen am Boden; tex
+--   sky      fade = s        so lange dauert das Einfaerben (Standard 0,35)
+--   cinematic style "chase"  Kamera schraeg hinter dem laufenden `comet`
+--   alle     ownerOnly = true Schritt nur fuer den Besitzer (z. B. Sterne
+--            als Teil seines Nachthimmels)
 -- Fuer jeden Schritt:
 --   extra = true  Beiwerk — faellt auf niedriger Grafikstufe weg
 --                 (PARTICLE_BUDGET.EXTRAS_MIN), der Kernmoment bleibt.
@@ -147,6 +166,14 @@ local TEXTURES: { [string]: { [string]: number } } = {
 		column    = 0,  -- assets/vfx/seraph_grace/column.png      (pillar, Beam)
 		cloudrim  = 0,  -- assets/vfx/seraph_grace/cloudrim.png    (ring lift)
 		spark     = 0,  -- assets/vfx/seraph_grace/spark.png       (wings: Funken)
+	},
+	CometImpact = {
+		glow      = 0,  -- assets/vfx/comet_impact/glow.png        (comet: Glut des Kopfs)
+		tail      = 0,  -- assets/vfx/comet_impact/tail.png        (comet: Schweif-Streifen)
+		crater    = 0,  -- assets/vfx/comet_impact/crater.png      (crater: Bodenbild)
+		stardust  = 0,  -- assets/vfx/comet_impact/stardust.png    (dust, comet-Funken)
+		shockring = 0,  -- assets/vfx/comet_impact/shockring.png   (ring)
+		debris    = 0,  -- assets/vfx/comet_impact/debris.png      (shards)
 	},
 }
 
@@ -536,20 +563,49 @@ local FX: { [string]: SkillFX } = {
 	----------------------------------------------------------------------------
 
 	CometImpact = {
-		tier = 4, duration = 4.4, color = C(120, 180, 255), color2 = C(255, 255, 255),
+		-- v16 (Show-Paket, Prompt 3): gewaltig, schnell, triumphal, nicht
+		-- chaotisch — der Komet ist die ganze Zeit klar zu sehen.
+		-- Aufladen: Himmel wird in 1 s zur Nacht, Sterne an (nur Besitzer);
+		--   hoch oben funkelt ein Punkt und waechst; um den Gegner waechst ein
+		--   dunkler Schattenkreis mit.
+		-- Schlag (1,5 s): der Komet faellt, bricht durch die Wolkendecke,
+		--   Funken vom Schweif, Kamera schraeg hinterher; kurz vor dem
+		--   Aufprall Zeitlupe, der Schatten ist so gross wie der Turm.
+		-- Einschlag (2,4 s): weisser Blitz (Besitzer), Krater aus Glut-Rissen,
+		--   Truemmer und Sternstaub im Bogen, Schockwelle bis zum Arena-Zaun,
+		--   Wackeln; der Krater glueht in Orange und Violett aus.
+		-- Turm: alles relativ zu den Kaempfern bzw. zur Arena-Mitte. Alle
+		--   Effekte sind spaetestens bei 4,8 s weg (Show 5,0 s), bevor der
+		--   Turm zur naechsten Stage waechst.
+		tier = 4, duration = 5.0, color = C(255, 150, 60), color2 = C(140, 90, 255),
 		sounds = { charge = "rumble", strike = "rocket", impact = "boom" }, pitch = 0.9,
+		impactAt = 2.4,
 		steps = {
-			{ t = 0.00, fx = "sky",       tint = C(140, 160, 255), brightness = -0.25, saturation = -0.2, dur = 4.0 },
-			{ t = 0.00, fx = "starfield", count = 60, dur = 4.0 },
-			{ t = 0.00, fx = "cinematic", dur = 2.2, style = "up" },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",       tint = C(70, 80, 150), brightness = -0.35, saturation = -0.3, dur = 4.4, fade = 1.0 },
+			{ t = 0.00, fx = "starfield", count = 60, dur = 4.4, ownerOnly = true },
 			{ t = 0.00, fx = "sound",     slot = "charge" },
-			{ t = 0.60, fx = "meteor",    at = "target", size = 5, height = 80, dur = 1.6, tail = true },
-			{ t = 2.20, fx = "flash",     dur = 0.3 },
-			{ t = 2.20, fx = "hitstop",   dur = 0.3 },
-			{ t = 2.25, fx = "wave",      at = "target", radius = 26, dur = 0.8 },
-			{ t = 2.25, fx = "sound",     slot = "impact" },
-			{ t = 2.25, fx = "shake",     power = 1.2, dur = 0.8 },
-			{ t = 2.30, fx = "shards",    at = "target", count = 30, size = 1.0, dur = 1.2, stone = true },
+			{ t = 0.25, fx = "shadow",    at = "target", from = 1.5, radius = "tower", dur = 2.15, fadeOut = 0.3, toArena = true },
+			{ t = 0.30, fx = "comet",     height = 90, size = 3, charge = 1.2, fall = 0.9, cloudY = 45, tex = "glow", tailTex = "tail", sparkTex = "stardust" },
+			-- 2. Schlag (Fall ab 1,5; Zeitlupe die letzten 0,27 s + Bild)
+			{ t = 1.50, fx = "sound",     slot = "strike" },
+			{ t = 1.50, fx = "cinematic", dur = 1.6, style = "chase" },
+			{ t = 2.10, fx = "hitstop",   dur = 0.3 },
+			-- 3. Einschlag
+			{ t = 2.40, fx = "flash",     dur = 0.35 },
+			{ t = 2.40, fx = "sound",     slot = "impact" },
+			{ t = 2.40, fx = "shake",     power = 1.1, dur = 0.6 },
+			{ t = 2.40, fx = "crater",    at = "target", radius = 7, count = 10, dur = 2.4, tex = "crater" },
+			{ t = 2.42, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, tex = "shockring" },
+			{ t = 2.42, fx = "shards",    at = "target", arc = true, count = 16, size = 1.0, dur = 1.1, stone = true, tex = "debris" },
+			{ t = 2.45, fx = "dust",      at = "target", count = 40, speed = 14, dur = 1.2, tex = "stardust", extra = true },
+		},
+		-- Echo (0,65 s): Komet von oben (ohne Nacht und Kamera) und gluehender Krater.
+		echo = {
+			{ t = 0.00, fx = "comet",  height = 40, size = 2.2, charge = 0, fall = 0.3, tex = "glow", tailTex = "tail" },
+			{ t = 0.00, fx = "sound",  slot = "strike" },
+			{ t = 0.30, fx = "crater", at = "target", radius = 5, count = 8, dur = 0.55, tex = "crater" },
+			{ t = 0.30, fx = "sound",  slot = "impact" },
 		},
 	},
 

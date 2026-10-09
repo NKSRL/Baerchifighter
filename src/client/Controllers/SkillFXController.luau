@@ -31,6 +31,7 @@ local Debris            = game:GetService("Debris")
 
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
+local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
 
 local SkillFXController = {}
 
@@ -199,6 +200,7 @@ type Ctx = {
 	targetFeet : Vector3,
 	fwd        : Vector3,       -- waagerecht von self zu target, Laenge 1
 	path       : { Vector3 }?,  -- Zickzack-Linie des letzten `crack`
+	cometHead  : BasePart?,     -- Kopf des laufenden `comet` (Kamera "chase")
 }
 
 local function at(ctx: Ctx, where: string?): Vector3
@@ -246,6 +248,15 @@ local function extrasOn(ctx: Ctx): boolean
 	return ctx.factor >= SkillFXConfig.PARTICLE_BUDGET.EXTRAS_MIN
 end
 
+-- v16: Radius als Zahl oder als Name: "tower" = Turmspitze/Kampfflaeche
+-- (MapConfig.PIT_TOWER_RADIUS), "fence" = bis zum Arena-Zaun. Beide gemessen
+-- ab der Arena-Mitte (req.center = Mitte zwischen den Kaempfern = Turmmitte).
+local function radiusOf(v: any, default: number): number
+	if v == "tower" then return MapConfig.PIT_TOWER_RADIUS end
+	if v == "fence" then return MapConfig.PIT_RADIUS - MapConfig.PIT_FENCE_INSET end
+	return if typeof(v) == "number" then v else default
+end
+
 --------------------------------------------------------------------------------
 -- Bausteine
 --------------------------------------------------------------------------------
@@ -285,8 +296,11 @@ BLOCKS.ring = function(ctx, s)
 		-- v16: `lift` = so viele Studs ueber der Figur (z. B. Wolkenloch)
 		pos = at(ctx, s.at) + Vector3.new(0, s.lift, 0)
 	end
-	local r = s.radius or 6
+	local r = radiusOf(s.radius, 6)
 	local dur = s.dur or 0.6
+	-- `toArena` (v16): der Bodenring startet an der Figur und waechst um die
+	-- Arena-Mitte herum (z. B. Schockwelle bis zum Zaun).
+	local endPos = if s.toArena and s.ground then groundAt(ctx, "arena") + Vector3.new(0, 0.1, 0) else pos
 	local startD = if s.shrink then r * 2 else 0.5
 	local endD   = if s.shrink then 0.5 else r * 2
 	-- `ground` + `tex`: das Bild liegt als Decal auf einer flachen, unsichtbaren
@@ -295,7 +309,7 @@ BLOCKS.ring = function(ctx, s)
 	if texture then
 		local plate = newPart(Enum.PartType.Block, Vector3.new(startD, 0.05, startD), pickColor(s, ctx.fx), CFrame.new(pos), 1)
 		local d = addDecal(plate, texture, Enum.NormalId.Top, plate.Color)
-		tween(plate, dur, { Size = Vector3.new(endD, 0.05, endD) })
+		tween(plate, dur, { Size = Vector3.new(endD, 0.05, endD), CFrame = CFrame.new(endPos) })
 		tweenLater(d, dur * 0.6, dur * 0.4, { Transparency = 1 })
 		if s.lift then
 			-- von unten sichtbar
@@ -309,7 +323,8 @@ BLOCKS.ring = function(ctx, s)
 		CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)), 0.2)
 	if s.ground or s.lift then
 		-- flacher Ring: Dicke bleibt, nur der Durchmesser waechst
-		tween(ring, dur, { Size = Vector3.new(0.08, endD, endD) })
+		tween(ring, dur, { Size = Vector3.new(0.08, endD, endD),
+			CFrame = CFrame.new(endPos) * CFrame.Angles(0, 0, math.rad(90)) })
 		task.delay(dur * 0.6, function()
 			if ring.Parent then fadeAndDestroy(ring, dur * 0.4) end
 		end)
@@ -508,7 +523,50 @@ BLOCKS.wave = function(ctx, s)
 	Debris:AddItem(ball, dur + 0.1)
 end
 
+-- v16: Truemmer fliegen im Bogen nach aussen und fallen auf den Boden
+-- (`arc`). Hoch und runter sind zwei Tweens; der zweite startet fuer ALLE
+-- Brocken aus EINEM verzoegerten Aufruf (kein Thread pro Brocken).
+local function shardsArc(ctx: Ctx, s: { [string]: any })
+	local pos = at(ctx, s.at)
+	local floorY = groundAt(ctx, s.at).Y
+	local n = scaled(s.count, ctx.factor)
+	local size = s.size or 0.8
+	local dur = s.dur or 1.0
+	local texture = texOf(ctx, s.tex)
+	local half = dur * 0.45
+	local down: { { part: BasePart, goal: CFrame } } = {}
+	for i = 1, n do
+		local a = math.random() * math.pi * 2
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		local reach = 5 + math.random() * 8
+		local apex = pos + out * reach * 0.5 + Vector3.new(0, 2.5 + math.random() * 3.5, 0)
+		local land = Vector3.new(pos.X, floorY + size * 0.3, pos.Z) + out * reach
+		local p = newPart(Enum.PartType.Block, Vector3.new(size, size * 0.8, size * 0.7), pickColor(s, ctx.fx, i),
+			CFrame.new(pos) * CFrame.Angles(math.random() * 6, math.random() * 6, 0), 0)
+		if s.stone then
+			p.Material = Enum.Material.Slate
+			p.Color = Color3.fromRGB(80, 70, 90):Lerp(ctx.fx.color, 0.2)
+		end
+		if texture then
+			addDecal(p, texture, Enum.NormalId.Top)
+			addDecal(p, texture, Enum.NormalId.Front)
+		end
+		tween(p, half, { CFrame = CFrame.new(apex) * CFrame.Angles(math.random() * 6, math.random() * 6, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		table.insert(down, { part = p, goal = CFrame.new(land) * CFrame.Angles(math.random() * 6, math.random() * 6, 0) })
+		Debris:AddItem(p, dur + 0.1)
+	end
+	task.delay(half, function()
+		for _, d in down do
+			if d.part.Parent then
+				tween(d.part, half, { CFrame = d.goal }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				tweenLater(d.part, half, dur - 2 * half, { Transparency = 1 })
+			end
+		end
+	end)
+end
+
 BLOCKS.shards = function(ctx, s)
+	if s.arc then shardsArc(ctx, s) return end
 	local pos = at(ctx, s.at)
 	local n = scaled(s.count, ctx.factor)
 	local size = s.size or 0.6
@@ -1149,6 +1207,248 @@ BLOCKS.honeycomb = function(ctx, s)
 	end)
 end
 
+--------------------------------------------------------------------------------
+-- v16 (Kometen-Show): Schattenkreis, Komet, Krater, Sternstaub.
+-- Doku in SkillFXConfig ("BAUSTEINE").
+--------------------------------------------------------------------------------
+
+-- shadow: dunkler Kreis am Boden, waechst beschleunigt (wie etwas, das von
+-- oben naeherkommt). Mit `toArena` wandert seine Mitte zur Arena-Mitte, damit
+-- er bei radius = "tower" genau die Turmspitze bedeckt.
+--   at, from (Startradius), radius (Zahl | "tower" | "fence"), dur, fadeOut, toArena
+BLOCKS.shadow = function(ctx, s)
+	local start = groundAt(ctx, s.at) + Vector3.new(0, 0.05, 0)
+	local finish = if s.toArena then groundAt(ctx, "arena") + Vector3.new(0, 0.05, 0) else start
+	local r0 = s.from or 1.5
+	local r1 = radiusOf(s.radius, 8)
+	local dur = s.dur or 2
+	local fadeOut = s.fadeOut or 0.3
+	local disc = newPart(Enum.PartType.Cylinder, Vector3.new(0.05, r0 * 2, r0 * 2), Color3.fromRGB(12, 10, 30),
+		CFrame.new(start) * CFrame.Angles(0, 0, math.rad(90)), 0.7)
+	disc.Material = Enum.Material.SmoothPlastic
+	tween(disc, dur, {
+		Size = Vector3.new(0.05, r1 * 2, r1 * 2),
+		CFrame = CFrame.new(finish) * CFrame.Angles(0, 0, math.rad(90)),
+		Transparency = 0.35,
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	-- verschwindet im Einschlag (Transparenz-Tween ersetzt den obigen erst
+	-- nach dessen Ende: gleiche Eigenschaft, spaeter gestartet)
+	task.delay(dur, function()
+		if disc.Parent then tween(disc, fadeOut, { Transparency = 1 }) end
+	end)
+	Debris:AddItem(disc, dur + fadeOut + 0.1)
+end
+
+-- comet: ein Punkt funkelt hoch ueber dem Gegner und wird groesser
+-- (`charge` s), dann faellt der Komet mit gluehendem Kopf, weissem Kern und
+-- langem Schweif auf den Gegner (`fall` s; die letzten 30 % langsamer =
+-- Zeitlupe). Funken loesen sich vom Schweif (EIN Emitter). Bricht er durch
+-- die Wolkendecke (`cloudY` Studs ueber dem Gegner), stieben Wolkenfetzen.
+-- Der Kopf steht in ctx.cometHead (Kamera "chase").
+-- EINE RenderStepped-Verbindung fuer den ganzen Kometen.
+--   height, size, charge, fall, cloudY, tex (Glut), tailTex (Schweif)
+BLOCKS.comet = function(ctx, s)
+	local to = ctx.targetPos
+	local h = s.height or 80
+	local size = s.size or 3
+	local charge = s.charge or 0
+	local fall = s.fall or 0.8
+	local side = ctx.fwd:Cross(Vector3.yAxis)
+	local from = to - ctx.fwd * h * 0.4 + side * h * 0.2 + Vector3.new(0, h, 0)
+	local slowAt = to + (from - to) * 0.18     -- ab hier Zeitlupe
+	local dir = (to - from).Unit
+
+	local head = newPart(Enum.PartType.Ball, Vector3.one * 0.3, ctx.fx.color, CFrame.lookAt(from, from + dir), 0)
+	local core = newPart(Enum.PartType.Ball, Vector3.one * 0.15, Color3.new(1, 1, 1), CFrame.new(from), 0)
+	local glowTex = texOf(ctx, s.tex)
+	local halo: BasePart? = nil
+	if glowTex then
+		local bb = Instance.new("BillboardGui")
+		bb.Size = UDim2.fromScale(size * 3.2, size * 3.2)
+		bb.LightInfluence = 0
+		bb.AlwaysOnTop = false
+		local img = Instance.new("ImageLabel")
+		img.BackgroundTransparency = 1
+		img.Size = UDim2.fromScale(1, 1)
+		img.Image = glowTex
+		img.ImageColor3 = ctx.fx.color
+		img.Parent = bb
+		bb.Parent = head
+	else
+		halo = newPart(Enum.PartType.Ball, Vector3.one * 0.6, ctx.fx.color, CFrame.new(from), 0.65)
+	end
+	ctx.cometHead = head
+
+	-- Schweif
+	local a0 = Instance.new("Attachment"); a0.Position = Vector3.new(0, size * 0.45, 0); a0.Parent = head
+	local a1 = Instance.new("Attachment"); a1.Position = Vector3.new(0, -size * 0.45, 0); a1.Parent = head
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.5
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	trail.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(0.25, ctx.fx.color),
+		ColorSequenceKeypoint.new(1, ctx.fx.color2),
+	})
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(1, 1) })
+	trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.15) })
+	local tailTex = texOf(ctx, s.tailTex)
+	if tailTex then
+		trail.Texture = tailTex
+		trail.TextureMode = Enum.TextureMode.Stretch
+	end
+	trail.Enabled = false
+	trail.Parent = head
+
+	-- Funken vom Schweif (ein Emitter, Rate erst im Fall)
+	local em = Instance.new("ParticleEmitter")
+	em.Texture = texOf(ctx, s.sparkTex) or "rbxasset://textures/particles/sparkles_main.dds"
+	em.EmissionDirection = Enum.NormalId.Back
+	em.Rate = 0
+	em.Speed = NumberRange.new(2, 6)
+	em.SpreadAngle = Vector2.new(25, 25)
+	em.Lifetime = NumberRange.new(0.3, 0.6)
+	em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, size * 0.18), NumberSequenceKeypoint.new(1, 0) })
+	em.Color = ColorSequence.new(ctx.fx.color, ctx.fx.color2)
+	em.LightEmission = 1
+	em.Parent = head
+
+	local parts: { BasePart } = { head, core }
+	if halo then table.insert(parts, halo) end
+	local cfs = table.create(#parts) :: { CFrame }
+	local cloudY = s.cloudY
+	local cloudDone = cloudY == nil or not extrasOn(ctx)
+	local t0 = os.clock()
+	local total = charge + fall
+	local conn: RBXScriptConnection? = nil
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - t0
+		local pos: Vector3
+		local sz: number
+		if t < charge then
+			-- Funkeln: waechst, Helligkeit pulsiert 2x pro Sekunde (unter 3/s)
+			local k = t / charge
+			pos = from
+			sz = 0.3 + (size * 0.55 - 0.3) * k * k
+			head.Transparency = 0.1 + 0.3 * (0.5 + 0.5 * math.sin(t * math.pi * 4))
+		else
+			local k = math.clamp((t - charge) / fall, 0, 1)
+			if not trail.Enabled then
+				trail.Enabled = true
+				head.Transparency = 0
+				em.Rate = 45 * ctx.factor
+			end
+			if k < 0.7 then
+				local q = k / 0.7
+				pos = from:Lerp(slowAt, q * q)
+			else
+				pos = slowAt:Lerp(to, (k - 0.7) / 0.3)
+			end
+			sz = size * (0.55 + 0.45 * math.min(1, k * 1.5))
+			if not cloudDone and pos.Y <= to.Y + cloudY then
+				cloudDone = true
+				-- Wolkenfetzen stieben auseinander (Beiwerk)
+				for i = 1, 6 do
+					local a = i / 6 * math.pi * 2
+					local out = Vector3.new(math.cos(a), 0.15, math.sin(a))
+					local puff = newPart(Enum.PartType.Ball, Vector3.one * 3, Color3.fromRGB(200, 205, 230), CFrame.new(pos), 0.45)
+					puff.Material = Enum.Material.SmoothPlastic
+					tween(puff, 0.7, { CFrame = CFrame.new(pos + out * 7), Size = Vector3.one * 5, Transparency = 1 })
+					Debris:AddItem(puff, 0.8)
+				end
+			end
+		end
+		cfs[1] = CFrame.lookAt(pos, pos + dir)
+		cfs[2] = CFrame.new(pos)
+		if halo then cfs[3] = CFrame.new(pos) end
+		workspace:BulkMoveTo(parts, cfs, Enum.BulkMoveMode.FireCFrameChanged)
+		head.Size = Vector3.one * sz
+		core.Size = Vector3.one * sz * 0.5
+		if halo then halo.Size = Vector3.one * sz * 2 end
+		if t >= total or not head.Parent then
+			if conn then conn:Disconnect() end
+			em.Rate = 0
+			trail.Enabled = false
+			if ctx.cometHead == head then ctx.cometHead = nil end
+			for _, p in parts do
+				if p.Parent then fadeAndDestroy(p, 0.08) end
+			end
+		end
+	end)
+	Debris:AddItem(head, total + 1)
+	Debris:AddItem(core, total + 1)
+	if halo then Debris:AddItem(halo, total + 1) end
+end
+
+-- crater: im Boden gluehen strahlenfoermige Risse auf (Orange), kuehlen
+-- langsam nach Violett ab und verblassen; dunkle Brandflaeche darunter.
+--   at, radius, count (Risse), dur, tex (Krater-Bild)
+BLOCKS.crater = function(ctx, s)
+	local feet = groundAt(ctx, s.at) + Vector3.new(0, 0.07, 0)
+	local r = radiusOf(s.radius, 6)
+	local dur = s.dur or 2
+	local fadeAt = math.max(0.2, dur - 0.45)
+	local scorch = newPart(Enum.PartType.Cylinder, Vector3.new(0.05, 0.5, 0.5), Color3.fromRGB(28, 18, 36),
+		CFrame.new(feet - Vector3.new(0, 0.02, 0)) * CFrame.Angles(0, 0, math.rad(90)), 0.25)
+	scorch.Material = Enum.Material.SmoothPlastic
+	tween(scorch, 0.15, { Size = Vector3.new(0.05, r * 1.1, r * 1.1) })
+	tweenLater(scorch, fadeAt, 0.45, { Transparency = 1 })
+	Debris:AddItem(scorch, dur + 0.1)
+	local texture = texOf(ctx, s.tex)
+	if texture then
+		local plate = newPart(Enum.PartType.Block, Vector3.new(r * 2, 0.05, r * 2), ctx.fx.color, CFrame.new(feet), 1)
+		local d = addDecal(plate, texture, Enum.NormalId.Top, ctx.fx.color)
+		tweenLater(d, 0.2, dur * 0.6, { Color3 = ctx.fx.color2 }, Enum.EasingStyle.Sine)
+		tweenLater(d, fadeAt, 0.45, { Transparency = 1 })
+		Debris:AddItem(plate, dur + 0.1)
+		return
+	end
+	-- Rueckfall: Risse als Neon-Striche mit einem Knick.
+	local n = math.max(6, scaled(s.count or 10, ctx.factor))
+	for i = 1, n do
+		local a = (i / n) * math.pi * 2 + (math.random() - 0.5) * 0.3
+		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+		local bend = Vector3.new(math.cos(a + 0.35), 0, math.sin(a + 0.35))
+		local len = r * (0.6 + math.random() * 0.4)
+		local knee = feet + dir * len * 0.55
+		local tip = knee + bend * len * 0.45
+		local inner = groundStroke(ctx, feet + dir * 0.4, knee, 0.3, ctx.fx.color, 0, 0.12, fadeAt, nil)
+		local outer = groundStroke(ctx, knee, tip, 0.18, ctx.fx.color, 0.1, 0.12, fadeAt, nil)
+		for _, p in { inner, outer } do
+			-- Glut kuehlt ab: Orange -> Violett
+			if p then tweenLater(p, 0.25, dur * 0.6, { Color = ctx.fx.color2 }, Enum.EasingStyle.Sine) end
+		end
+	end
+end
+
+-- dust: Sternstaub fliegt im Bogen nach aussen (Schwerkraft am Emitter).
+-- EIN Emitter, ein Stoss.
+--   at, count, speed, dur, tex
+BLOCKS.dust = function(ctx, s)
+	local pos = at(ctx, s.at)
+	local dur = s.dur or 1.0
+	local anchor = newPart(Enum.PartType.Block, Vector3.one * 0.5, Color3.new(1, 1, 1), CFrame.new(pos), 1)
+	local em = Instance.new("ParticleEmitter")
+	em.Texture = texOf(ctx, s.tex) or "rbxasset://textures/particles/sparkles_main.dds"
+	em.EmissionDirection = Enum.NormalId.Top
+	em.Rate = 0
+	em.SpreadAngle = Vector2.new(65, 65)
+	local sp = s.speed or 14
+	em.Speed = NumberRange.new(sp * 0.6, sp)
+	em.Acceleration = Vector3.new(0, -sp * 1.8, 0)
+	em.Lifetime = NumberRange.new(dur * 0.7, dur)
+	em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	em.Color = ColorSequence.new(Color3.new(1, 1, 1), ctx.fx.color2)
+	em.LightEmission = 1
+	em.Rotation = NumberRange.new(0, 360)
+	em.Parent = anchor
+	em:Emit(scaled(s.count, ctx.factor))
+	Debris:AddItem(anchor, dur + 0.2)
+end
+
 -- Ab hier: nur fuer den Besitzer (Bildschirm und Kamera gehoeren ihm).
 
 local function ensureCC(ctx: Ctx): ColorCorrectionEffect
@@ -1164,7 +1464,7 @@ BLOCKS.sky = function(ctx, s)
 	if not ctx.isOwner then return end
 	local cc = ensureCC(ctx)
 	local dur = s.dur or 2
-	tween(cc, 0.35, {
+	tween(cc, s.fade or 0.35, {
 		TintColor = s.tint or Color3.new(1, 1, 1),
 		Brightness = s.brightness or 0,
 		Saturation = s.saturation or 0,
@@ -1274,6 +1574,7 @@ BLOCKS.cinematic = function(ctx, s)
 	local oldCf = cam.CFrame
 	cam.CameraType = Enum.CameraType.Scriptable
 	local style = s.style or "orbit"
+	local chaseEye: Vector3? = nil
 	local t0 = os.clock()
 	local conn: RBXScriptConnection? = nil
 	conn = RunService.RenderStepped:Connect(function()
@@ -1288,6 +1589,23 @@ BLOCKS.cinematic = function(ctx, s)
 		elseif style == "side" then
 			eye = center + Vector3.new(0, 4, 18 - 6 * k)
 			cam.CFrame = CFrame.lookAt(eye, center)
+		elseif style == "chase" then
+			-- v16: schraeg hinter dem laufenden `comet` her; nach dem Aufprall
+			-- bleibt das Auge stehen und schaut auf den Gegner.
+			local head = ctx.cometHead
+			if head and head.Parent then
+				local cp = head.Position
+				local toTarget = ctx.targetPos - cp
+				local d = if toTarget.Magnitude > 0.1 then toTarget.Unit else Vector3.new(0, -1, 0)
+				local sideV = d:Cross(Vector3.yAxis)
+				if sideV.Magnitude < 0.1 then sideV = Vector3.xAxis else sideV = sideV.Unit end
+				eye = cp - d * 16 + Vector3.new(0, 4, 0) + sideV * 7
+				chaseEye = eye
+				cam.CFrame = CFrame.lookAt(eye, cp + d * 6)
+			else
+				eye = chaseEye or (ctx.targetPos + Vector3.new(10, 8, 10))
+				cam.CFrame = CFrame.lookAt(eye, ctx.targetPos)
+			end
 		else
 			local a = k * math.pi * 0.9
 			eye = center + Vector3.new(math.cos(a) * 16, 6, math.sin(a) * 16)
@@ -1381,6 +1699,7 @@ function SkillFXController.play(req: PlayRequest)
 		targetFeet = targetPos - Vector3.new(0, targetSize.Y / 2, 0),
 		fwd = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1),
 		path = nil,
+		cometHead = nil,
 	}
 
 	-- Schritte abspielen (volle Show oder eigenes Echo), je Schritt EIN
@@ -1388,7 +1707,7 @@ function SkillFXController.play(req: PlayRequest)
 	local function run(steps: { SkillFXConfig.Step }, limit: number, echo: boolean)
 		for _, step in steps do
 			local block = BLOCKS[step.fx]
-			if block and not (step.extra and not extrasOn(ctx)) then
+			if block and not (step.extra and not extrasOn(ctx)) and not (step.ownerOnly and not ctx.isOwner) then
 				local st = step
 				if echo and step.fx == "sound" then
 					st = table.clone(step)
