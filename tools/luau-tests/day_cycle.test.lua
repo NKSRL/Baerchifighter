@@ -99,6 +99,7 @@ near("Saettigung", base.ccSaturation, MapConfig.LIGHTING_SATURATION)
 near("Kontrast", base.ccContrast, MapConfig.LIGHTING_CONTRAST)
 near("Wolkenfarbe", base.cloudColor, AmbienceConfig.CLOUD_COLOR)
 near("Terrain-Wolken", base.terrainCloudColor, AmbienceConfig.CLOUDS_COLOR)
+near("Pollenfarbe", base.pollenColor, AmbienceConfig.POLLEN_COLOR)
 
 -- 5. Kurven wohlgeformt
 for name, curve in WorldFXConfig.DAY_CURVES do

@@ -34,6 +34,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 
 local AmbienceConfig = require(ReplicatedStorage.Config.AmbienceConfig)
+local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
 local MapConfig      = require(ReplicatedStorage.Config.MapConfig)
 local WorldFXConfig  = require(ReplicatedStorage.Config.WorldFXConfig)
 local DayCycle       = require(ReplicatedStorage.Modules.DayCycle)
@@ -53,6 +54,8 @@ local _dusk = WorldFXConfig.DAY_BASE_D
 local _glows: { Glow } = {}
 local _lastGlow = -1
 local _cloudParts: { BasePart } = {}
+local _pollen: ParticleEmitter? = nil      -- Paket F: Pollenfarbe folgt dem Tageslauf
+local _lastPollen: Color3? = nil
 local _lastCloud: Color3? = nil
 local _override: number? = nil      -- Debug: feste Uhrzeit
 local _held: { [string]: any }? = nil
@@ -162,6 +165,16 @@ local function apply(v: { [string]: any }, clock: number)
 				g.part.Color = g.day:Lerp(g.night, glow)
 			end
 		end
+	end
+
+	-- Pollen (Paket F): nur bei spuerbarer Aenderung
+	local pollen = _pollen
+	local pollenColor: Color3 = v.pollenColor
+	local lastPollen = _lastPollen
+	if pollen and (not lastPollen or math.abs(lastPollen.R - pollenColor.R) + math.abs(lastPollen.G - pollenColor.G)
+		+ math.abs(lastPollen.B - pollenColor.B) > 0.01) then
+		_lastPollen = pollenColor
+		pollen.Color = ColorSequence.new(pollenColor)
 	end
 
 	-- Emitter: Rate folgt der Kurve
@@ -315,6 +328,11 @@ end
 
 local function collectClouds()
 	local ambience = workspace:WaitForChild("BaerchiAmbience", 30)
+	if ambience and FeatureFlags.isOn("WORLD_F_LIFE") and WorldFXKit.enabled("pollenTint") then
+		local anchor = ambience:FindFirstChild("PollenAnchor")
+		local emitter = anchor and anchor:FindFirstChildOfClass("ParticleEmitter")
+		if emitter then _pollen = emitter end
+	end
 	local clouds = ambience and ambience:WaitForChild("Clouds", 30)
 	if not clouds then return end
 	for _, part in clouds:GetDescendants() do
