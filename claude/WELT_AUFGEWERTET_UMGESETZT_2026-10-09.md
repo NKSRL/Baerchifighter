@@ -1,6 +1,6 @@
-# Welt aufwerten – Stand Zwischenabnahme 2 (Pakete 0, A–F)
+# Welt aufwerten – Abschluss (Pakete 0, A–J, Abnahme 3)
 
-Auftrag: `OPUS_PROMPT_WELT_AUFWERTEN_2026-10-08.md`. Umgesetzt in einer Cloud-Sitzung **ohne Studio**: Der Code ist geschrieben und geprüft (Syntax, Tests, Prüfskripte). Was nur Studio zeigen kann (Bilder, Teile-Zählung im laufenden Spiel, MicroProfiler, Upload), steht unten als **„In Studio prüfen“**. Zwischenabnahme 1 (0, A–C) ist erledigt. Jetzt sind auch D–F fertig. Ich halte an **Zwischenabnahme 2** an, wie im Prompt verlangt, und warte auf dein Okay für G–J.
+Auftrag: `OPUS_PROMPT_WELT_AUFWERTEN_2026-10-08.md`. Umgesetzt in einer Cloud-Sitzung **ohne Studio**: Der Code ist geschrieben und geprüft (Syntax, Tests, Prüfskripte). Was nur Studio zeigen kann (Bilder, Teile-Zählung im laufenden Spiel, MicroProfiler, Upload), steht unten als **„In Studio prüfen“**. Zwischenabnahmen 1 (0, A–C) und 2 (D–F) sind erledigt, jetzt sind auch G–J fertig. Das ist der Stand für **Abnahme 3**. Was nur Studio messen kann (Paket J: Handy-Rundgang, 8 Spieler, MicroProfiler, Nachher-Bilder), steht als Prüfliste am Ende.
 
 Leitbild umgesetzt als: alles Neue läuft **nur auf dem Client**, der Server baut **kein einziges neues Teil** (das Teile-Budget der Plot-Inseln bleibt unverändert). Jedes Paket hat einen eigenen Schalter.
 
@@ -12,6 +12,9 @@ Leitbild umgesetzt als: alles Neue läuft **nur auf dem Client**, der Server bau
 | D Plot-Inseln | `FeatureFlags.WORLD_D_PLOTS` | Plot-Inseln wie bisher (das Attribut `IslandStage` setzt der Server trotzdem, es ist harmlos) |
 | E Stege und Arena | `FeatureFlags.WORLD_E_ARENA` | Steg und Arena wie bisher |
 | F Leben | `FeatureFlags.WORLD_F_LIFE` | keine Bienen, Schmetterlinge, Pfoten; Blumen und Pollen wie bisher |
+| G Welt-Momente | `FeatureFlags.WORLD_G_MOMENTS` | Server meldet nichts, Client zeigt nichts |
+| H Klang-Kulisse | `FeatureFlags.WORLD_H_SOUND` | still (ohne geprüfte Sound-IDs ist es das ohnehin) |
+| I Licht nach Zonen | `FeatureFlags.WORLD_I_ZONES` | überall dasselbe Licht wie bisher |
 | 0 Kamerapunkte | nur Studio (DebugService) | – |
 
 ---
@@ -37,6 +40,13 @@ Leitbild umgesetzt als: alles Neue läuft **nur auf dem Client**, der Server bau
 | E: Schau-Turm „steht an der Arena“ | Mit `MAP_V2_SHOWCASE` steht er am Brückenkopf auf der Hauptinsel | Die Flagge sitzt auf dem Turm, wo er steht. Zuschauer und Laternen bleiben an der Arena. |
 | F: Pollenfarbe | Pollen gehört zu `AmbienceController` | Die Farbe führt `DayCycleController` nach (eine Kurve `pollenColor`; 16,9 Uhr = bisherige Farbe, Test). |
 | F: MicroProfiler mit 8 Spielern | Keine Studio-Sitzung | Aufwand im Code begrenzt (ein Takt, `BulkMoveTo`, Sichtweite). Die Messung bleibt offen. |
+| G: vorhandene Meldungen nutzen (`HatchResult`, `TowerUnlocked` …) | `HatchResultReceived`, `RebirthResultReceived` usw. gehen nur an den **Besitzer**, ein `TowerUnlocked` gibt es nicht | Neue gemeinsame Meldung **`WorldMoment`** (an alle). `WorldMomentService` erkennt die Momente aus dem **Spielstand** (Vergleich vorher/nachher bei jeder Datenänderung). So musste kein bestehender Service angefasst werden. Der Text für die Zeile läuft über `Loc` (Schlüssel + Rarity als `LocMsg`). |
+| G: Schlüpfen ab Mythic | Fusion erzeugt auch neue Bärchis | Jeder **neue** Bärchi ab Mythic zählt (Schlüpfen und Fusion), Annahme 13. |
+| G: „Inverted- oder seltene Mutation“ | Inverted gibt es seit v11 nicht mehr (8 Mutations-Stufen) | Selten = Celestial, Candy, Lava, Galaxy, Rainbow (Gewicht ≤ 400). Auch ein Mutations-Sturm auf eine dieser Stufen zählt. |
+| G: Event-Start und Boss | Der Client sieht beides schon (Pit-Ring, Nest; Boss-Himmel macht `EventFXController.setBossSky` für alle) | Event-Start: ohne Server, `HubEventController` meldet den Wechsel auf „läuft“. Boss: unverändert vorhanden (Himmel, Nest-Puls aus C). Kein doppelter Himmel. |
+| G: Schalter „Momente anderer Spieler“ | Es gibt **kein Einstellungs-Fenster** (nur Sprache) | Nicht gebaut, wie verlangt. Der Wert steht in `WorldFXConfig.MOMENTS.OTHERS_DEFAULT` (`on`/`small`/`off`), der Controller kann ihn schon. |
+| H: Sounds in Studio geprüft | Keine Studio-Sitzung | Alle IDs leer, der Controller ist fertig und bleibt still. **Liste unten zum Eintragen.** |
+| I: Atmosphäre je Zone | Die Atmosphäre führt der Tageslauf jeden Takt nach | Zonen setzen nur **Faktoren** (Dichte, Dunst), die der Tageslauf einrechnet. Farbe über einen eigenen Filter `ZoneGrade`. |
 | Fähigkeiten-Show überschreibt Himmel? | `SkillFXController` legt einen **eigenen** Farbfilter `SkillFX_Sky` an, der Boss-Himmel `BossSky_Local` | Der Tageslauf schreibt nur in die Basis-Effekte; die Filter stapeln sich, keiner überschreibt den anderen. Zusätzlich hält der Tageslauf an, solange `SkillFX_Sky` färbt, und kehrt in 2 s weich zurück. |
 
 ---
@@ -192,6 +202,81 @@ D:Invoke("arrival")            -- Ankunft nochmal
 
 ---
 
+## Paket G: Die Welt reagiert auf die Spieler
+
+**Gebaut:**
+- `Modules/WorldMoments` (neu, rein): `snapshot`/`diff` erkennt aus zwei Spielständen: neuen Bärchi ab Mythic (der seltenste zählt), seltene Mutation, neuen Tower, neuen Rekord (nicht beim allerersten Lauf), Rebirth. `throttle`: je Spieler höchstens **ein großer Moment pro 30 s**, sonst klein. `Queue`: höchstens **ein großer Moment gleichzeitig**, bis zu 4 warten. Wer länger als 12 s wartet, kommt klein. Test `world_moments.test.lua` (neu, 17 Prüfungen, u. a. fünf gleichzeitige Momente laufen nacheinander, nie zwei große zugleich).
+- `Services/WorldMomentService` (neu, Server): hängt an `PlayerService.onDataChanged`, Ausgangsstand beim Laden (was schon da war, ist kein Moment). Sendet `Remotes.WorldMoment` an alle: `{ userId, kind, value, number, big }`. Steht in der `GameManager`-Startliste.
+- `Controllers/WorldMomentController` (neu, Client, 30 Hz nur solange ein Effekt läuft, alles aus Pools):
+
+| Moment | wer sieht was |
+|---|---|
+| Bärchi ab **Mythic** | Lichtsäule in der Rarity-Farbe über der Insel (2,4 s). Alle anderen bekommen unten eine Zeile „<Name> hat einen <Rarity>-Bärchi!“ (4 Sprachen). Ab **Cosmic** zusätzlich ein Funkenring am Himmel. |
+| **Neuer Tower** | Feuerwerk (3 Raketen, Funken in der Tower-Farbe) vom Schau-Turm. |
+| **Neuer Rekord** | Flagge am Schau-Turm glänzt auf, die Zuschauer an der Arena jubeln (Paket E, nur in der Nähe). |
+| **Rebirth** | Weiche Lichtwelle über die Insel, die Blumengruppen am Inselrand wiegen sich einmal stark (Paket D). |
+| **Event startet** | Die Wabenkrone blinkt zweimal (2 Hz), die Bienen in Sicht fliegen 10 s zum Event-Pit, die Glocke läutet (still ohne geprüfte ID). |
+| **Boss kommt** | wie bisher: Himmel leicht dunkler und ockerfarben (`EventFXController`), Nest pulsiert und mehr Wespen (Paket C). |
+| **Seltene Mutation** | Funkenspirale um den Bärchi des Spielers, nur in der Nähe (180 Studs). |
+
+- **Regeln eingehalten:** Momente anderer Spieler liegen in der Welt über deren Insel, kein Vollbild-Blitz, kein Farbfilter. Läuft die **eigene Fähigkeiten-Show** (Filter `SkillFX_Sky`), warten große Momente, bis sie vorbei ist (höchstens 12 s, dann klein).
+
+**Debug:**
+```lua
+D:Invoke("moment", "hatch", "Cosmic")   -- auch: tower II | record | rebirth | mutation Galaxy
+D:Invoke("moments5")                    -- fünf große Momente auf einmal → laufen nacheinander
+D:Invoke("pitstate", "live")            -- Event-Start-Moment (vorher "idle", damit es ein Wechsel ist)
+D:Invoke("neststate", "boss")
+```
+
+**In Studio prüfen:** zwei Test-Clients, `moment` beim einen auslösen: Der andere sieht Säule und Zeile, der Auslöser nur die Säule.
+
+## Paket H: Klang-Kulisse
+
+**Gebaut:**
+- `Modules/SoundZones` (neu, rein): Gewicht 0..1 je Klang aus der Kamera-Position. **Ufer** (an der Küste und auf dem Wasser), **Wiese** tagsüber / **Grillen** in der blauen Stunde (Inselinneres), **Honigmast** (Tropfen, bis 45 Studs), **Event-Pit** (Stimmengewirr, nur während eines Events), **Wind** an der Arena und stärker in der Höhe. Alle Gewichte sind stetig. `audible` lässt höchstens **3** hörbar. Test `sound_zones.test.lua` (neu): richtige Zone an typischen Orten, Rundgang Mitte → Plot → Arena → Wasser ohne harte Übergänge (≤ 0,1 je Stud), Grillen statt Vögel, nie mehr als 3.
+- `Controllers/SoundscapeController` (neu, 5 Hz): eine Schleife je Zone in der Sound-Gruppe `WorldAmbience`, Lautstärke folgt dem Ziel weich (~1,5 s). Ab und zu eine Möwe, wenn das Ufer zu hören ist. Glocke beim Event-Start. **Keine Musik.**
+- Lautstärken (`WorldFXConfig.SOUND_VOLUME`): alle zwischen 0,06 und 0,1, also unter Zuschauer-Kampf (0,12) und Besitzer-Kampf (0,35).
+
+**Sound-Liste (bitte in Studio prüfen und eintragen):** `WorldFXConfig.SOUNDS`
+
+| Schlüssel | wofür | Art | ID |
+|---|---|---|---|
+| `waves` | Ufer | Schleife | **leer, bitte eintragen** |
+| `gull` | Möwe am Ufer | Einzelklang | leer |
+| `meadow` | Wiese tagsüber (Summen, Vögel) | Schleife | leer |
+| `crickets` | Wiese in der blauen Stunde | Schleife | leer |
+| `drip` | Honigmast | Schleife | leer |
+| `crowd` | Event-Pit während eines Events | Schleife | leer |
+| `wind` | Arena, Turm | Schleife | leer |
+| `bell` | Event-Start (G) | Einzelklang | leer |
+| `waspHum` | Wespen-Nest (C, positional am Nest) | Schleife | leer |
+
+Vorgehen: Toolbox → Audio → kostenlos, in Studio anhören, ID als `"rbxassetid://…"` eintragen. Ein leerer Eintrag bleibt still, es entsteht dann keine Sound-Instanz.
+
+## Paket I: Licht-Feinschliff nach Zonen
+
+**Gebaut** (`Controllers/ZoneLightController`, neu, 10 Hz):
+- **Insel:** wie bisher (Filter neutral).
+- **Steg zur Arena und Arena:** Sättigung +0,08, Kontrast +0,07, Helligkeit +0,01 über den eigenen Filter `ZoneGrade`, weiche Kante (15 Studs), Übergang ~1,5 s.
+- **Hoch oben auf dem Turm** (Kamera ab Etage 30 = 72 Studs, voll ab Etage 60): Dichte der Atmosphäre ×0,55, Dunst ×0,45, also klarer und mit weiterem Horizont. Der Tageslauf rechnet die Faktoren ein. Ist er aus, setzt der Controller die festen Werte mal Faktor.
+- **Boss:** wie G (vorhandener Boss-Himmel).
+- **Reihenfolge:** Roblox stapelt alle Farbfilter. `SkillFX_Sky` (Show) und `BossSky_Local` färben unverändert, `ZoneGrade` hebt nur Kontrast/Sättigung. Kein Filter überschreibt einen anderen, die Show verliert ihren Farbfilter also nie.
+- **Nicht eingebaut:** Tiefenunschärfe und andere teure Effekte, auch nicht für PC.
+
+## Paket J: Qualität, Messung, Abschluss
+
+Was in der Cloud ging, ist erledigt: Qualitätsregler-Tabelle (unten, vollständig), alle Prüfungen grün, keine Zyklen zwischen den Client-Controllern (geprüft), jede Funktion mit Schalter und Qualitätsstufe. **Was Studio braucht, als Prüfliste:**
+
+1. **Einspielen** (Heim-PC: `make_update_rbxmx.py 52f75c1`, oder pro Paket ab dem jeweiligen Commit). Output ohne Fehler, diese Zeilen müssen kommen: `[DayCycle] an`, `[Water] aktiv`, `[Hub] Wahrzeichen aktiv`, `[HubEvents] aktiv`, `[PlotLife] aktiv`, `[ArenaLife] aktiv`, `[Life] aktiv`, `[WorldMoments] aktiv`, `[Soundscape] still …`, `[ZoneLight] aktiv`, Server: `[WorldMomentService] Initialisiert`.
+2. **Grundablauf:** Welt baut, Plot spawnt, Tower-Lauf, Event, Ei legen/einsammeln, keine doppelten Skripte.
+3. **Teile:** `D:Invoke("parts")` vor und nach `islandstage 4`: gleich (Server +0).
+4. **Handy:** Studio → Geräte-Emulation (kleines Handy), Grafikstufe 1: Rundgang und Tower-Lauf. Erwartet: Tageslauf, Licht, Glitzern, Krone, Wegweiser, Pit-Rahmen, Insel-Stufen; **aus** sind Glühwürmchen, Sterne, Fisch, Wespen, Bienen, Schmetterlinge, Blumen-Wind, Pfoten, Zuschauer, Funkenring. Ruckelt etwas, in `WorldFXConfig.MIN_QUALITY` auf 1 setzen.
+5. **8 Spieler:** Test → Server + 8 Clients, MicroProfiler (Strg+F6) auf einem Client, Bildzeit und die Heartbeat-Anteile der Controller notieren, `#workspace.WorldFX_Local:GetDescendants()` im Client-Kontext. Vorher/Nachher: einmal alle Schalter A–I aus, einmal an.
+6. **Nachher-Bilder:** `worldshots 1..6` → `claude/screens/welt_nachher/`, neben die Vorher-Bilder.
+
+---
+
 ## Dateien je Paket (für `make_update_rbxmx.py`)
 
 | Paket | neu | geändert |
@@ -203,8 +288,11 @@ D:Invoke("arrival")            -- Ankunft nochmal
 | D | `Modules/IslandStage`, `Controllers/PlotLifeController`, `island_stage.test.lua` | `Services/PlotDisplayService`, `Services/DebugService`, `Config/WorldFXConfig`, `Config/FeatureFlags`, `Modules/MapLayout`, `Main.client`, `check_decor.py`, `map_layout.test.lua` |
 | E | `Controllers/ArenaLifeController`, `assets/world/paket_e/*` | `Main.client`, `make_world_textures.py` |
 | F | `Controllers/LifeController`, `assets/world/paket_f/*` | `Controllers/DayCycleController`, `Main.client`, `day_cycle.test.lua` |
+| G | `Modules/WorldMoments`, `Services/WorldMomentService`, `Controllers/WorldMomentController`, `world_moments.test.lua` | `Network/Remotes` (`WorldMoment`), `Core/GameManager` (Startliste), `Services/DebugService`, `Strings/*`, `Config/WorldFXConfig`, `Config/FeatureFlags`, `ArenaLife`/`PlotLife`/`Life`/`HubLandmark`/`HubEvent`/`DayCycle`-Controller (kleine Einstiege), `Main.client` |
+| H | `Modules/SoundZones`, `Controllers/SoundscapeController`, `sound_zones.test.lua` | `HubEventController`, `WorldMomentController`, `Config/WorldFXConfig`, `Main.client` |
+| I | `Controllers/ZoneLightController` | `DayCycleController`, `Config/WorldFXConfig`, `Main.client` |
 
-Server-Dateien: `DebugService` (Befehle setzen Attribute, nur in Studio aktiv) und `PlotDisplayService` (Attribut `IslandStage` am Player). **Kein MapBuild-Builder geändert.**
+Server-Dateien: `DebugService` (Befehle, nur in Studio aktiv), `PlotDisplayService` (Attribut `IslandStage` am Player), `WorldMomentService` (neu, nur Meldungen), `GameManager` (Startliste), `Remotes` (ein neues S→C-Event). **Kein MapBuild-Builder geändert, keine Datenstruktur geändert, keine Balance-Zahl geändert.**
 
 ---
 
@@ -240,7 +328,7 @@ Für D gibt es bewusst keine Texturen: Blumen, Pilze, Bienenhaus und Stein sind 
 
 ## Sounds
 
-Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.waspHum`, Lautstärke 0,08, im Boss-Fall 0,12, also nie über Zuschauer-Kampf 0,12), aber leer, bis eine ID in Studio geprüft ist. Die Klang-Kulisse kommt mit Paket H.
+Siehe Paket H: neun Plätze, alle **leer**, bis eine ID in Studio geprüft ist. Ohne ID ist alles still und es entsteht keine Sound-Instanz.
 
 ## Messwerte
 
@@ -256,9 +344,12 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 | Client-Teile Leben (F) | 0 | Bienen bis 80 (8 Schwärme × 5 × 2), Schmetterlinge 12, Pfoten 20 | Pool |
 | Emitter D–F | 0 | 1 (Lichtpunkte über der eigenen Insel) | |
 | Takte D–F | – | PlotLife 15 Hz, ArenaLife 20 Hz (+ 4 Hz Zustand), Life 15 Hz | je ein Takt |
-| MicroProfiler | – | **offen (Studio)** | |
+| Client-Teile Momente (G) | 0 | Pool: 1 Säule, 1 Welle, 48 Funken | nur während eines Moments in der Welt |
+| Takte G–I | – | Momente 30 Hz (nur aktiv), Klang 5 Hz, Zonen-Licht 10 Hz | je ein Takt |
+| Netzwerk (G) | – | ein `WorldMoment` je Moment an alle, je Spieler gedrosselt (30 s groß) | kein Takt |
+| MicroProfiler | – | **offen (Studio, Paket J Schritt 5)** | |
 
-## Qualitätsregler (Stand A–F)
+## Qualitätsregler (vollständig, A–I)
 
 `WorldFXConfig.MIN_QUALITY`: 0 = läuft immer, 1 = nur ab `AmbienceConfig.HIGH_QUALITY_FROM` (Grafikstufe 4, Automatisch zählt als hoch).
 
@@ -281,6 +372,9 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 | Leere Insel | 0 | | Blumen im Wind | 1 |
 | Steg-Laternen | 0 | | Pollenfarbe | 0 |
 | Torbogen | 0 | | Pfotenabdrücke | 1 |
+| Welt-Momente | 0 | | Funkenring (ab Cosmic) | 1 |
+| Event-Start (Krone, Bienen) | 0 | | Klang-Kulisse | 0 |
+| Licht nach Zonen | 0 | | | |
 
 ## Annahmen (von mir, änderbar)
 
@@ -298,6 +392,11 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 | 10 | Insel-Stufe: Tower I/II/III geschafft **oder** 1/3/5 Rebirths | `WorldFXConfig.ISLAND_STAGE` |
 | 11 | Teich gilt als voll ab 97 % Füllhöhe | `POND_LIFE.FULL_RATIO` |
 | 12 | Bienen: 6 Schwärme in Sicht + 2 auf der eigenen Insel | `WorldFXConfig.BEES` |
+| 13 | Welt-Moment „Bärchi“: jeder neue ab **Mythic** (auch aus Fusion), Funkenring ab **Cosmic** | `MOMENTS.HATCH_MIN_RARITY`, `RING_MIN_RARITY` |
+| 14 | Seltene Mutation = Celestial, Candy, Lava, Galaxy, Rainbow | `MOMENTS.RARE_MUTATIONS` |
+| 15 | Rekord-Moment erst ab dem zweiten Lauf in einem Tower (der erste ist kein „Rekord“) | `WorldMoments.diff` |
+| 16 | Schlange: 4 warten, 0,6 s Pause, nach 12 s klein | `MOMENTS.QUEUE_*`, `MAX_WAIT` |
+| 17 | Arena-Licht: Sättigung +0,08, Kontrast +0,07; Turm ab Etage 30 klarer | `WorldFXConfig.ZONE_LIGHT` |
 
 ## Offen und bekannt
 
@@ -306,8 +405,20 @@ Keine neuen Sounds. Der Wespen-Summton ist vorbereitet (`WorldFXConfig.SOUNDS.wa
 - Screenshots `welt_vorher/`, `welt_nach_C/` und `welt_nach_F/` fehlen (keine Studio-Sitzung).
 - Die Blumen der Hauptinsel sind Server-Teile, die der Client nur lokal dreht. Würde der Server sie je neu setzen, springen sie für einen Takt zurück. Heute setzt er sie nie.
 - `make_update_rbxmx.py` fehlt im Repo: Update-Datei am Heim-PC bauen.
-- `claude/CONTEXT_BRIEFING.md` fehlt im Repo: Abschnitt „Die Welt“ dort nachziehen, sobald die Datei da ist. Kurzfassung: siehe oben, Pakete A–F.
+- Sound-IDs fehlen (H läuft still), Textur-IDs fehlen (alles mit Rückfall).
+- Kein Einstellungs-Fenster: „Momente anderer Spieler“ nur über die Config.
+- `claude/CONTEXT_BRIEFING.md` fehlt im Repo. Der neue Abschnitt 2 steht unten fertig zum Einfügen.
+
+## Für `claude/CONTEXT_BRIEFING.md`, Abschnitt 2 „Die Welt“ (zum Einfügen)
+
+> **Die Welt (Stand 09.10.2026, „Welt aufwerten“).** Hauptinsel mit Event-Pit und Honigmast in der Mitte, 8 Plot-Inseln auf Radius 212, je eine Arena-Insel dahinter, Wasser bis Radius 650. Der Server baut die feste Welt (`WorldBuilder`, `ScenicBuilder`, `SkyBuilder`) und pro Spieler Plot, Gebäude, Arena (≤ 250 Teile je Insel). **Alles Lebendige ist reine Client-Optik** in `StarterPlayerScripts/Controllers`, gebaut in `workspace.WorldFX_Local`, Zahlen in `Config/WorldFXConfig`, Bausteine in `WorldFXKit` (Qualität, Pools, Distanz-Abschaltung):
+> - `DayCycleController`: Tageslauf 14,5–19 Uhr in 20 min aus der Serverzeit (`Modules/DayCycle`), Licht/Atmosphäre/Bloom/Pollen als Kurven, Leuchten von Laternen und Krone; hält bei Fähigkeiten-Shows an. Schalter `AmbienceConfig.DAY_CYCLE`.
+> - `WaterController` (Glitzern, Schaum, Arena-Küste, Fisch, Bojen), `HubLandmarkController` (Wabenkrone, Honigfaden, Wegweiser, Händler-Deko, Tafelrahmen), `HubEventController` (Pit-Rahmen Ruhe/bald/läuft, Wespen-Nest), `ArrivalController` (Ankunft).
+> - `PlotLifeController`: Insel-Stufen 1–4 (Server-Attribut `IslandStage` am Player, `Modules/IslandStage`), Teich-Glanz, eigene Insel, leere Inseln. `ArenaLifeController`: Steg-Laternen, Torbogen, Zuschauer, Flagge. `LifeController`: Bienen, Schmetterlinge, Blumen im Wind, Pfoten.
+> - `WorldMomentController` + Server `WorldMomentService` (`Remotes.WorldMoment`, `Modules/WorldMoments`): große Momente für alle, gedrosselt.
+> - `SoundscapeController` (`Modules/SoundZones`, still ohne geprüfte IDs), `ZoneLightController` (Arena-Kontrast, klare Luft oben).
+> - Schalter `FeatureFlags.WORLD_B_WATER` … `WORLD_I_ZONES`; Qualitätsstufen `WorldFXConfig.MIN_QUALITY`; Studio-Debug `worldshots`, `daytime`, `pitstate`, `neststate`, `islandstage`, `moment`, `moments5` u. a. (siehe `DebugService`-Kopf).
 
 ## Prüfungen (alle grün)
 
-`luau-compile --null` für alle `.luau` · `check_locals` (Höchstwert MapConfig 191, unverändert) · `guide_steps`, `unlock_rules`, `boss_tiers` · `run_local.py` für `combat_rating`, `gold_rules`, `map_layout` (erweitert), `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, **`day_cycle` (neu)**, **`island_stage` (neu)** · alle Sims unter `tools/sim` · `check_feedback`, `check_members`, `check_consistency`, `check_loc`, `check_decor` (erweitert um die Insel-Stufen).
+`luau-compile --null` für alle `.luau` · `check_locals` (Höchstwert MapConfig 191, unverändert) · `guide_steps`, `unlock_rules`, `boss_tiers` · `run_local.py` für `combat_rating`, `gold_rules`, `map_layout` (erweitert), `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, **`day_cycle` (neu)**, **`island_stage` (neu)**, **`world_moments` (neu)**, **`sound_zones` (neu)** · alle Sims unter `tools/sim` · `check_feedback`, `check_members`, `check_consistency`, `check_loc`, `check_decor` (erweitert um die Insel-Stufen).
