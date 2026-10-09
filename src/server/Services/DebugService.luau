@@ -97,6 +97,10 @@
 --   D:Invoke("neststate", "boss")    -- Wespen-Nest: calm | boss | auto
 --   D:Invoke("arrival")              -- Ankunft (Blasen + Bienen) erneut abspielen
 --   D:Invoke("fish")                 -- sofort einen Honig-Fisch springen lassen
+--   D:Invoke("islandstage", 4)       -- Insel-Deko Stufe 1..4 zeigen ("auto" = aus dem Fortschritt)
+--   D:Invoke("pondfull")             -- Teich bis zum Rand fuellen (Ueberlauf-Tropfen)
+--   D:Invoke("spectators", "hop")    -- Zuschauer an der eigenen Arena: hop | cheer
+--   D:Invoke("record")               -- Rekord-Moment am eigenen Schau-Turm (Flagge glaenzt, Jubel)
 --
 -- HBB Paket 0 (Test-Zustaende, erst "snapshot"):
 --   D:Invoke("state", "fresh")       -- neues Konto, Trichter F01–F10 misst
@@ -502,6 +506,37 @@ end
 commands.fish = function(_player, _data)
 	worldSignal("DebugFish", nil)
 	return { fisch = true }
+end
+
+-- Paket D: Insel-Stufe am Player-Attribut (wie PlotDisplayService), "auto"
+-- rechnet sie aus dem Spielstand neu.
+commands.islandstage = function(player, data, stage: any)
+	local IslandStage = require(ReplicatedStorage.Modules.IslandStage)
+	local n = tonumber(stage)
+	local value = if n then math.clamp(math.floor(n), 1, IslandStage.MAX)
+		else IslandStage.compute(data.towers and data.towers.records, data.rebirthCount or 0)
+	player:SetAttribute("IslandStage", value)
+	return { stufe = value }
+end
+
+-- Paket D: Teich voll (alle Honig-Lager voll, wie "honey"), damit der Ueberlauf laeuft
+commands.pondfull = function(player, data)
+	local result = commands.honey(player, data)
+	return { teich = "voll", honig = result }
+end
+
+-- Paket E: Zuschauer-Baerchis an der eigenen Arena testen
+commands.spectators = function(player, _data, mode: any)
+	_worldSignal += 1
+	workspace:SetAttribute("DebugSpectators", string.format("%d|%s|%d", player.UserId, tostring(mode or "hop"), _worldSignal))
+	return { zuschauer = tostring(mode or "hop") }
+end
+
+-- Paket E: Rekord-Moment am eigenen Schau-Turm
+commands.record = function(player, _data)
+	_worldSignal += 1
+	workspace:SetAttribute("DebugRecord", string.format("%d|%d", player.UserId, _worldSignal))
+	return { rekord = true }
 end
 
 -- v15: den aktuellen Spielstand in ein v14-Format zuruckverwandeln (Topf L7,
@@ -1110,6 +1145,7 @@ commands.help = function()
 		-- Welt aufwerten
 		"worldshots [1..6|0]", "daytime <uhrzeit|auto>", "pitstate <idle|soon|live|auto>",
 		"neststate <calm|boss|auto>", "arrival", "fish",
+		"islandstage <1..4|auto>", "pondfull", "spectators <hop|cheer>", "record",
 	}
 end
 

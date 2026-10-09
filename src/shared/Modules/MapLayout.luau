@@ -251,4 +251,14 @@ function MapLayout.buoys(radius: number): { Vector3 }
 	return list
 end
 
+-- Paket D: Punkt am Rand der Plot-Insel `slot`. `angleDegrees` plot-lokal:
+-- 0 = nach aussen (Arena-Steg), 90 = zur Seite (side), 180 = zur Hauptinsel.
+-- Zweiter Wert: Richtung von dort zur Inselmitte (fuer die Ausrichtung der Deko).
+function MapLayout.islandRimPoint(slot: number, angleDegrees: number, radius: number): (Vector3, Vector3)
+	local a = math.rad(angleDegrees)
+	local dir = MapLayout.outward(slot) * math.cos(a) + MapLayout.side(slot) * math.sin(a)
+	local center = MapLayout.plotCenter(slot)
+	return center + dir * radius, -dir
+end
+
 return MapLayout

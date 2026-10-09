@@ -185,5 +185,31 @@ check("Honigfaden auf der anderen Seite als das Nest",
 check("Wabenkrone ueber dem oberen Querholz",
 	mast.CROWN_HEIGHT - mast.CROWN_ROW_GAP * 0.5 - mast.CELL_SIZE * 0.5 > quer.offset.Y + 1)
 
+-- 6. Paket D: Insel-Stufen am Rand der Plot-Insel
+local stageCfg = WorldFXConfig.ISLAND_STAGE
+local beetHalf = MapConfig.PLOT_SIZE.X * 0.5 + 1   -- Beet + Zaun
+for i, item in WorldFXConfig.ISLAND_STAGE_ITEMS do
+	local name = string.format("Insel-Deko %d (%s)", i, item.kind)
+	local a = math.rad(item.angle)
+	local along, across = math.cos(a) * stageCfg.RIM_RADIUS, math.sin(a) * stageCfg.RIM_RADIUS
+	local r = 2   -- grosszuegiger Radius jeder Art
+	check(name .. " frei von den Steg-Achsen", math.abs(across) - r > MapConfig.BRIDGE_WIDTH * 0.5 + 2,
+		string.format("quer %.1f", across))
+	check(name .. " ausserhalb von Beet und Zaun", math.abs(along) - r > beetHalf or math.abs(across) - r > beetHalf,
+		string.format("%.1f/%.1f", along, across))
+	check(name .. " auf der Insel", stageCfg.RIM_RADIUS + r < MapConfig.PLOT_ISLAND_RADIUS)
+	check(name .. " Art bekannt", WorldFXConfig.ISLAND_KINDS[item.kind] ~= nil)
+	-- islandRimPoint liefert denselben Punkt fuer jeden Slot (Abstand zur Mitte)
+	for slot = 1, MapConfig.PLOT_COUNT, 3 do
+		local p = MapLayout.islandRimPoint(slot, item.angle, stageCfg.RIM_RADIUS)
+		local c = MapLayout.plotCenter(slot)
+		local d = math.sqrt((p.X - c.X) ^ 2 + (p.Z - c.Z) ^ 2)
+		if math.abs(d - stageCfg.RIM_RADIUS) > 1e-6 then check(name .. " Abstand Slot " .. slot, false, d) end
+	end
+end
+-- Winkel 0 zeigt zur Arena
+local p0 = MapLayout.islandRimPoint(1, 0, 10)
+check("Insel-Winkel 0 zeigt nach aussen", p0.X > MapLayout.plotCenter(1).X + 9.9)
+
 if failures > 0 then error(failures .. " Fehler", 0) end
 print("map_layout: alle Tests gruen (" .. #landmarks .. " Wahrzeichen)")

@@ -50,6 +50,9 @@ WorldFXConfig.TEXTURE_IDS = {
 	stall_stripes       = "",
 	bear_sign           = "",
 	shine_strip         = "",
+	-- Paket E–F (D braucht keine: Blumen, Pilze, Bienenhaus sind Formen)
+	flag_fabric         = "",
+	paw_print           = "",
 } :: { [string]: string }
 
 -- Eingebaute Roblox-Texturen als Rueckfall fuer Partikel. Was hier fehlt, hat
@@ -101,6 +104,19 @@ WorldFXConfig.MIN_QUALITY = {
 	waspPulse     = 0,   -- C: Nest pulsiert vor/waehrend des Boss
 	boardFrames   = 0,   -- C: Holzrahmen + Krone an den Tafeln
 	boardShine    = 1,   -- C: Glanzstreifen auf Platz 1
+	islandDecor   = 0,   -- D: Insel-Stufen (Blumen, Pilze, Bienenhaus, Bernstein)
+	pondShine     = 1,   -- D: Glanz auf dem Honig, Tropfen ueber den Rand
+	homeGlow      = 0,   -- D: warmer Schimmer ueber der eigenen Insel
+	freeIsland    = 0,   -- D: Schild "Frei", Blumen, Schmetterling auf leeren Inseln
+	bridgeLamps   = 0,   -- E: Laternen am Steg zur Arena (Welle beim Lauf)
+	arenaArch     = 0,   -- E: Torbogen an der Arena
+	spectators    = 1,   -- E: Zuschauer-Baerchis auf dem Zaun
+	showcaseFlag  = 0,   -- E: Flagge auf dem Schau-Turm (weht nur ab Stufe 1)
+	bees          = 1,   -- F: Bienenschwaerme
+	butterflies   = 1,   -- F: Schmetterlinge
+	flowerSway    = 1,   -- F: Blumen nicken im Wind, weichen dem Spieler aus
+	pollenTint    = 0,   -- F: Pollenfarbe folgt dem Tageslauf
+	footprints    = 1,   -- F: Pfotenabdruecke im Sand
 }
 
 --------------------------------------------------------------------------------
@@ -186,6 +202,12 @@ WorldFXConfig.DAY_CURVES = {
 	-- 0..1: Gluehwuermchen und Sterne
 	fireflies = { { 0, 0 }, { 0.7, 0 }, { 0.88, 0.6 }, { 1, 1 } },
 	stars     = { { 0, 0 }, { 0.75, 0 }, { 1, 1 } },
+
+	-- Pollen (Paket F): goldgelb am Tag, warm-rosa im Abendrot, kuehl-hell in der blauen Stunde
+	pollenColor = {
+		{ 0, Color3.fromRGB(255, 230, 140) }, { BASE, Color3.fromRGB(255, 226, 140) },
+		{ 0.8, Color3.fromRGB(255, 200, 170) }, { 1, Color3.fromRGB(220, 230, 255) },
+	},
 
 	-- Wasser (Paket B): Glitzern wird in der blauen Stunde schwaecher, blaeulicher
 	glitter = { { 0, 1 }, { BASE, 1 }, { 0.8, 0.8 }, { 1, 0.45 } },
@@ -381,6 +403,185 @@ WorldFXConfig.BOARD_FRAME = {
 	CROWN_COLOR   = Color3.fromRGB(255, 205, 70),
 	SHINE_PERIOD  = 3.2,    -- Sekunden fuer einmal Durchwandern
 	SHOW_DISTANCE = 200,
+}
+
+--------------------------------------------------------------------------------
+-- PAKET D: PLOT-INSELN MIT PERSOENLICHKEIT
+--------------------------------------------------------------------------------
+-- Stufe der Insel-Deko (Modules/IslandStage): es zaehlt, was weiter ist —
+-- geschaffte Tower ODER Rebirths. Index = Stufe (2..4).
+WorldFXConfig.ISLAND_STAGE = {
+	TOWERS_FOR   = { [2] = 1, [3] = 2, [4] = 3 },   -- I / II / III geschafft
+	REBIRTHS_FOR = { [2] = 1, [3] = 3, [4] = 5 },   -- passend zu den Rebirth-Deckeln
+	RIM_RADIUS   = 53.5,     -- Abstand zur Inselmitte (Beet-Ecke 50,9, Inselrand 58)
+	SHOW_DISTANCE = 260,
+}
+
+-- Was ab welcher Stufe am Inselrand steht. `angle` in Grad, plot-lokal:
+-- 0 = Richtung Arena-Steg, 90 = zum naechsten Slot, 180 = zur Hauptinsel.
+-- Die Steg-Achsen (0 und 180, je +-25 Grad) bleiben frei (Test: map_layout).
+WorldFXConfig.ISLAND_STAGE_ITEMS = {
+	{ stage = 2, kind = "Flowers",   angle =  40 },
+	{ stage = 2, kind = "Flowers",   angle = 145 },
+	{ stage = 2, kind = "Flowers",   angle = 215 },
+	{ stage = 2, kind = "Flowers",   angle = 320 },
+	{ stage = 2, kind = "Flowers",   angle =  75 },
+	{ stage = 2, kind = "Flowers",   angle = 285 },
+	{ stage = 3, kind = "Flowers",   angle = 110 },
+	{ stage = 3, kind = "Flowers",   angle = 250 },
+	{ stage = 3, kind = "Mushrooms", angle =  58 },
+	{ stage = 3, kind = "Mushrooms", angle = 302 },
+	{ stage = 3, kind = "Mushrooms", angle = 128 },
+	{ stage = 4, kind = "Beehive",   angle =  92 },
+	{ stage = 4, kind = "AmberStone", angle = 268 },
+}
+
+-- Deklarative Deko je Art, Ursprung = Boden am Platz, -Z zeigt zur Inselmitte.
+-- Eine Zeile je Teil (tools/check_decor.py liest genau diese Form: nichts im
+-- Boden, nichts schwebt). Blumen als GRUPPE (Blattkranz + drei Koepfe).
+local UPRIGHT = Vector3.new(0, 0, 90)
+local PINK     = Color3.fromRGB(246, 150, 176)
+local BUTTER   = Color3.fromRGB(255, 222, 110)
+local LAVENDER = Color3.fromRGB(190, 160, 236)
+WorldFXConfig.FLOWER_COLORS = { PINK, BUTTER, LAVENDER }
+
+WorldFXConfig.ISLAND_KINDS = {
+	Flowers = {
+		{ name = "Leaves", shape = Enum.PartType.Cylinder, size = Vector3.new(0.30, 2.8, 2.8), offset = Vector3.new( 0.0, 0.15,  0.0), color = Color3.fromRGB(86, 168, 74), rotation = UPRIGHT },
+		{ name = "HeadA",  shape = Enum.PartType.Ball,     size = Vector3.new(0.90, 0.9, 0.9), offset = Vector3.new( 0.6, 0.75,  0.2), color = PINK },
+		{ name = "HeadB",  shape = Enum.PartType.Ball,     size = Vector3.new(0.85, 0.85, 0.85), offset = Vector3.new(-0.5, 0.70,  0.4), color = BUTTER },
+		{ name = "HeadC",  shape = Enum.PartType.Ball,     size = Vector3.new(0.80, 0.8, 0.8), offset = Vector3.new( 0.0, 0.70, -0.6), color = LAVENDER },
+	},
+	Mushrooms = {
+		{ name = "Stem",   shape = Enum.PartType.Cylinder, size = Vector3.new(1.40, 0.7, 0.7), offset = Vector3.new( 0.0, 0.70,  0.0), color = Color3.fromRGB(250, 240, 220), rotation = UPRIGHT },
+		{ name = "Cap",    shape = Enum.PartType.Ball,     size = Vector3.new(1.80, 1.8, 1.8), offset = Vector3.new( 0.0, 1.50,  0.0), color = Color3.fromRGB(226, 76, 76) },
+		{ name = "DotA",   shape = Enum.PartType.Ball,     size = Vector3.new(0.35, 0.35, 0.35), offset = Vector3.new( 0.45, 2.20,  0.2), color = Color3.fromRGB(255, 250, 240) },
+		{ name = "DotB",   shape = Enum.PartType.Ball,     size = Vector3.new(0.30, 0.30, 0.30), offset = Vector3.new(-0.35, 2.25, -0.3), color = Color3.fromRGB(255, 250, 240) },
+		{ name = "Stem2",  shape = Enum.PartType.Cylinder, size = Vector3.new(0.90, 0.5, 0.5), offset = Vector3.new( 1.1, 0.45,  0.5), color = Color3.fromRGB(250, 240, 220), rotation = UPRIGHT },
+		{ name = "Cap2",   shape = Enum.PartType.Ball,     size = Vector3.new(1.10, 1.1, 1.1), offset = Vector3.new( 1.1, 0.95,  0.5), color = Color3.fromRGB(226, 76, 76) },
+	},
+	Beehive = {
+		{ name = "Stand",  shape = Enum.PartType.Block,    size = Vector3.new(2.6, 0.6, 2.6), offset = Vector3.new( 0.0, 0.30,  0.0), color = Color3.fromRGB(120, 80, 44) },
+		{ name = "Box",    shape = Enum.PartType.Block,    size = Vector3.new(2.2, 2.4, 2.2), offset = Vector3.new( 0.0, 1.80,  0.0), color = Color3.fromRGB(196, 146, 86) },
+		{ name = "Band",   shape = Enum.PartType.Block,    size = Vector3.new(2.3, 0.3, 2.3), offset = Vector3.new( 0.0, 2.10,  0.0), color = Color3.fromRGB(245, 175, 45) },
+		{ name = "Roof",   shape = Enum.PartType.Block,    size = Vector3.new(2.9, 0.4, 2.9), offset = Vector3.new( 0.0, 3.20,  0.0), color = Color3.fromRGB(150, 98, 58) },
+		{ name = "Hole",   shape = Enum.PartType.Ball,     size = Vector3.new(0.6, 0.6, 0.6), offset = Vector3.new( 0.0, 1.40, -1.05), color = Color3.fromRGB(46, 30, 20) },
+	},
+	AmberStone = {
+		{ name = "Rock",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.8, 2.6, 2.6), offset = Vector3.new( 0.0, 0.40,  0.0), color = Color3.fromRGB(140, 132, 120), rotation = UPRIGHT },
+		{ name = "Stone",  shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.8, 1.8), offset = Vector3.new( 0.0, 1.60,  0.0), color = Color3.fromRGB(255, 176, 50) },
+	},
+}
+-- Einzige leuchtende Insel-Deko (Leitbild): der Bernstein-Stein.
+WorldFXConfig.ISLAND_GLOW_PIECE = "Stone"
+-- Obergrenze je Insel fuer Stufe 4 (Client-Teile, check_decor prueft sie)
+WorldFXConfig.ISLAND_DECOR_BUDGET = 60
+
+-- Honig-Brunnen: Glanz auf der Oberflaeche, bei vollem Teich Tropfen ueber den Rand
+WorldFXConfig.POND_LIFE = {
+	SHINE_PERIOD   = 7,       -- Sekunden fuer eine Runde des Glanzflecks
+	SHINE_SIZE     = Vector3.new(0.05, 1.6, 0.8),
+	FULL_RATIO     = 0.97,    -- ab hier gilt der Teich als voll
+	OVERFLOW_DROPS = 4,
+	DROP_INTERVAL  = 1.6,
+	DROP_SIZE      = 0.45,
+	SHOW_DISTANCE  = 120,
+}
+
+-- Eigene Insel (nur der Besitzer sieht es)
+WorldFXConfig.HOME_GLOW = {
+	COLOR        = Color3.fromRGB(255, 214, 120),
+	RING_TRANSPARENCY = 0.82,  -- duenner warmer Ring auf dem Sandsaum
+	MOTE_RATE    = 5,          -- warme Lichtpunkte ueber der Insel
+	MOTE_HEIGHT  = 14,
+}
+
+-- Leere Insel: Schild "Frei", ein paar Blumen, ein Schmetterling
+WorldFXConfig.FREE_ISLAND = {
+	SIGN_HEIGHT  = 4,
+	FLOWER_ANGLES = { 150, 205, 240 },
+	SHOW_DISTANCE = 220,
+}
+
+--------------------------------------------------------------------------------
+-- PAKET E: STEGE UND ARENA
+--------------------------------------------------------------------------------
+WorldFXConfig.BRIDGE_LAMPS = {
+	PER_SIDE     = 5,
+	POST_HEIGHT  = 3.4,
+	GLASS_SIZE   = 0.9,
+	OFF_COLOR    = Color3.fromRGB(150, 116, 70),
+	ON_COLOR     = Color3.fromRGB(255, 210, 110),
+	WAVE_STEP    = 0.16,     -- Sekunden zwischen zwei Laternen der Welle
+	SHOW_DISTANCE = 300,
+}
+
+WorldFXConfig.ARENA_ARCH = {
+	HALF_WIDTH   = 7.6,      -- Steg 12 breit + Gelaender: Pfosten ausserhalb
+	HEIGHT       = 9,
+	POST_DIAMETER = 1.1,
+	COMB_SIZE    = 3.2,
+	WOOD         = Color3.fromRGB(150, 105, 60),
+}
+
+WorldFXConfig.SPECTATORS = {
+	COUNT        = 6,
+	COLORS       = { Color3.fromRGB(226, 70, 70), Color3.fromRGB(80, 190, 90), Color3.fromRGB(255, 210, 60), Color3.fromRGB(80, 140, 230) },
+	SCALE        = 1.0,
+	HOP_HEIGHT   = 1.2,
+	HOP_TIME     = 0.45,
+	CHEER_TIME   = 2.4,
+	SHOW_DISTANCE = 160,
+}
+
+WorldFXConfig.SHOWCASE_FLAG = {
+	POLE_HEIGHT  = 4,
+	FLAG_SIZE    = Vector3.new(2.6, 1.6, 0.1),
+	WAVE_DEGREES = 14,
+	WAVE_RATE    = 0.9,
+	SHINE_TIME   = 1.2,
+	SHOW_DISTANCE = 260,
+}
+
+--------------------------------------------------------------------------------
+-- PAKET F: LEBEN IN DER LUFT UND IM GRAS
+--------------------------------------------------------------------------------
+WorldFXConfig.BEES = {
+	MAX_SWARMS   = 6,        -- gleichzeitig in Sichtweite
+	PER_SWARM    = { 3, 5 },
+	SITE_RADIUS  = 6,
+	SPEED        = 0.22,     -- Umlaeufe pro Sekunde
+	HOME_EXTRA   = 2,        -- zusaetzliche Schwaerme auf der eigenen Insel
+	VIEW_DISTANCE = 180,
+	COLOR        = Color3.fromRGB(255, 206, 40),
+	STRIPE_COLOR = Color3.fromRGB(46, 34, 20),
+}
+
+WorldFXConfig.BUTTERFLIES = {
+	COUNT        = 6,
+	COLORS       = { Color3.fromRGB(246, 150, 186), Color3.fromRGB(190, 160, 236) },
+	FLAP_RATE    = 3.2,      -- Fluegelschlaege pro Sekunde (Bewegung, kein Flackern)
+	WANDER       = 7,
+	HEIGHT       = 2.5,
+	VIEW_DISTANCE = 140,
+}
+
+WorldFXConfig.FLOWER_SWAY = {
+	DEGREES      = 7,
+	RATE         = 0.35,     -- Hz der Windwelle
+	WAVELENGTH   = 60,       -- Studs: die Welle laeuft ueber die Insel
+	DODGE_RADIUS = 3.5,
+	DODGE_DEGREES = 28,
+	VIEW_DISTANCE = 140,
+	TICK         = 1 / 15,
+}
+
+WorldFXConfig.FOOTPRINTS = {
+	MAX          = 20,
+	STEP         = 2.2,      -- Studs zwischen zwei Abdruecken
+	FADE         = 4,        -- Sekunden bis unsichtbar
+	SIZE         = 0.9,
+	COLOR        = Color3.fromRGB(196, 168, 112),   -- etwas dunkler als der Sand
 }
 
 -- Klaenge: nur IDs, die in Studio geprueft sind. Leer = kein Klang (die

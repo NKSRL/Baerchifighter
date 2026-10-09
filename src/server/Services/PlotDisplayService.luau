@@ -41,6 +41,12 @@
 --         LOOK, nicht am Level — ein Ausbau innerhalb eines Looks schreibt nur
 --         das Schild (GEBAEUDE oben).
 --
+--   STUFE      (Welt aufwerten, Paket D: Insel-Stufe 1..4 aus Towern und
+--               Rebirths, Modules/IslandStage)
+--       → Attribut "IslandStage" am Player (ueberlebt jeden Insel-Neuaufbau).
+--         Die Deko baut nur der Client (PlotLifeController), der Server baut
+--         dafuer kein einziges Teil.
+--
 --   TOWER      (v15: Look + Etagen + Schildtext des Tower-Turms)
 --       → MapService.updateTowerShowcase (Neuaufbau des Turms, Show nur beim
 --         Look-Wechsel) und MapService.setOwnerBadge (Symbol am Plot-Schild).
@@ -71,6 +77,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local Types            = require(ReplicatedStorage.Network.Types)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local IslandStage      = require(ReplicatedStorage.Modules.IslandStage)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService    = require(ServerScriptService.Services.MapService)
@@ -85,6 +92,7 @@ type Signatures = {
 	recycler  : string,
 	looks     : string,
 	tower     : string,
+	stage     : string,
 }
 
 local _signatures: { [Player]: Signatures } = {}
@@ -178,6 +186,11 @@ local function towerSignature(data: Types.PlayerData): string
 	return string.format("%s:%d", towerId, record)
 end
 
+-- Paket D: Stufe der Insel-Deko
+local function stageSignature(data: Types.PlayerData): string
+	return tostring(IslandStage.compute(data.towers and data.towers.records, data.rebirthCount or 0))
+end
+
 local function allSignatures(data: Types.PlayerData): Signatures
 	return {
 		structure = structureSignature(data),
@@ -187,6 +200,7 @@ local function allSignatures(data: Types.PlayerData): Signatures
 		recycler  = recyclerSignature(data),
 		looks     = lookSignature(data),
 		tower     = towerSignature(data),
+		stage     = stageSignature(data),
 	}
 end
 
@@ -256,6 +270,10 @@ local function refresh(player: Player, data: Types.PlayerData)
 		MapService.updateBuildingLooks(player, data.island, true)
 	end
 
+	if previous.stage ~= current.stage then
+		player:SetAttribute("IslandStage", tonumber(current.stage))
+	end
+
 	if previous.tower ~= current.tower then
 		local oldTower = string.match(previous.tower, "^([^:]+):")
 		local newTower = string.match(current.tower, "^([^:]+):")
@@ -292,6 +310,7 @@ function PlotDisplayService.init()
 
 		local signatures = allSignatures(data)
 		applyTower(player, signatures.tower, false)
+		player:SetAttribute("IslandStage", tonumber(signatures.stage))
 
 		_signatures[player] = signatures
 	end)

@@ -57,6 +57,7 @@ local HubLandmarkController = require(Controllers:WaitForChild("HubLandmarkContr
 local HubEventController    = require(Controllers:WaitForChild("HubEventController"))
 local ArrivalController     = require(Controllers:WaitForChild("ArrivalController"))
 local WorldShotController   = require(Controllers:WaitForChild("WorldShotController"))
+local PlotLifeController    = require(Controllers:WaitForChild("PlotLifeController"))
 local EventFXController  = require(Controllers:WaitForChild("EventFXController"))
 local LaidEggMeshController = require(Controllers:WaitForChild("LaidEggMeshController"))
 local UiEventLogger      = require(Controllers:WaitForChild("UiEventLogger"))
@@ -173,7 +174,8 @@ WaterController.init()
 HubLandmarkController.init()
 HubEventController.init()
 ArrivalController.init()
-WorldShotController.init()
+-- Paket D (Plot-Inseln) vor F: die Bienen fragen nach der eigenen Insel.
+PlotWorldShotController.init()
 -- v17: lebendige Events (UFO-Patrouille, Abwuerfe, Boss, Telegraphen); braucht Toast
 EventFXController.init()
 -- v18: Ei-Mesh der gelegten Eier (EditableMesh gibt es nur auf dem Client)

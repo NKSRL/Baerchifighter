@@ -77,6 +77,9 @@ local FLAGS: { [string]: boolean } = {
 	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
 	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
 	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
+	WORLD_D_PLOTS     = true,   -- Insel-Stufen, Teich-Glanz/Ueberlauf, eigene Insel, leere Inseln
+	WORLD_E_ARENA     = true,   -- Steg-Laternen, Torbogen, Zuschauer, Flagge am Schau-Turm
+	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
 }
 
 local FeatureFlags = {}
