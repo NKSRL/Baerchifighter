@@ -51,6 +51,7 @@ local SkillFXController  = require(Controllers:WaitForChild("SkillFXController")
 local CombController     = require(Controllers:WaitForChild("CombController"))
 local AmbienceController = require(Controllers:WaitForChild("AmbienceController"))
 -- Welt aufwerten (08.10.2026)
+local DayCycleController    = require(Controllers:WaitForChild("DayCycleController"))
 local WorldShotController   = require(Controllers:WaitForChild("WorldShotController"))
 local EventFXController  = require(Controllers:WaitForChild("EventFXController"))
 local LaidEggMeshController = require(Controllers:WaitForChild("LaidEggMeshController"))
@@ -163,6 +164,7 @@ AmbienceController.init()
 -- Welt aufwerten: Tageslauf (Paket A) zuerst — Wasser und Hauptinsel melden
 -- ihre leuchtenden Teile bei ihm an. Danach Wasser (B), Hauptinsel (C),
 -- Ankunft (C) und die festen Kamerapunkte (Paket 0, nur Studio).
+DayCycleController.init()
 WorldShotController.init()
 -- v17: lebendige Events (UFO-Patrouille, Abwuerfe, Boss, Telegraphen); braucht Toast
 EventFXController.init()
