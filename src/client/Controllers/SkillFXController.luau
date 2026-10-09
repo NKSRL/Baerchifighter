@@ -164,6 +164,9 @@ local RAINBOW = {
 }
 
 local function pickColor(step: { [string]: any }, fx: SkillFXConfig.SkillFX, i: number?): Color3
+	if typeof(step.color) == "Color3" then
+		return step.color                          -- v16: feste Farbe je Schritt
+	end
 	if step.rainbow then
 		return RAINBOW[((i or 1) - 1) % #RAINBOW + 1]
 	end
@@ -201,6 +204,7 @@ type Ctx = {
 	fwd        : Vector3,       -- waagerecht von self zu target, Laenge 1
 	path       : { Vector3 }?,  -- Zickzack-Linie des letzten `crack`
 	cometHead  : BasePart?,     -- Kopf des laufenden `comet` (Kamera "chase")
+	far        : boolean,       -- Zuschauer ausserhalb SPECTATOR_DISTANCE: nur `global`-Schritte
 }
 
 local function at(ctx: Ctx, where: string?): Vector3
@@ -1792,6 +1796,173 @@ BLOCKS.cut = function(ctx, s)
 	end)
 end
 
+--------------------------------------------------------------------------------
+-- v16 (Omega-Show): Omega-Zeichen, Lichtpunkte aus vier Richtungen.
+-- Doku in SkillFXConfig ("BAUSTEINE").
+--------------------------------------------------------------------------------
+
+-- Punkte eines Omega (Kreisbogen mit Luecke unten + zwei Fuesse) in der
+-- Ebene (u, v) um c. Rueckgabe: Liste von Strecken {a, b}.
+local function omegaStrokes(c: Vector3, u: Vector3, v: Vector3, r: number, n: number): { { Vector3 } }
+	local out: { { Vector3 } } = {}
+	local t0, t1 = math.rad(-48), math.rad(228)
+	local prev = c + u * math.cos(t0) * r + v * math.sin(t0) * r
+	local first = prev
+	for i = 1, n do
+		local t = t0 + (t1 - t0) * i / n
+		local p = c + u * math.cos(t) * r + v * math.sin(t) * r
+		table.insert(out, { prev, p })
+		prev = p
+	end
+	-- Fuesse: von den Bogen-Enden waagerecht nach aussen
+	table.insert(out, { first, first + u * r * 0.55 })
+	table.insert(out, { prev, prev - u * r * 0.55 })
+	return out
+end
+
+-- omega: ein leuchtendes Omega (Ω), Strich fuer Strich gezeichnet.
+--   sky   : hoch ueber der Arena (`lift`), zur Kamera DIESES Clients gedreht;
+--           bei `pullAt` zieht es sich mit einem Ruck auf die Pfote des
+--           Baerchis zusammen (`jerk` s) und endet in einem weissen Punkt.
+--   brand : flach auf dem Boden unter `at` eingebrannt, gluehend weiss ->
+--           Zweitfarbe, verblasst langsam (`fade` s ab `burnFor`).
+--   mode ("sky"|"brand"), at, radius, lift, segments, draw, pullAt, jerk, burnFor, fade, width, tex
+BLOCKS.omega = function(ctx, s)
+	local mode = s.mode or "sky"
+	local r = s.radius or 6
+	local n = math.max(10, scaled(s.segments or 18, ctx.factor))
+	local draw = s.draw or 0.8
+	local w = s.width or r * 0.12
+	local th = if mode == "brand" then 0.04 else w          -- Brandzeichen: flach
+	local center: Vector3
+	local u: Vector3
+	local v: Vector3
+	if mode == "brand" then
+		center = groundAt(ctx, s.at or "target") + Vector3.new(0, 0.08, 0)
+		u = ctx.fwd:Cross(Vector3.yAxis)
+		v = ctx.fwd
+	else
+		center = at(ctx, s.at or "arena") + Vector3.new(0, s.lift or 34, 0)
+		local cam = workspace.CurrentCamera
+		local look = if cam then cam.CFrame.LookVector else ctx.fwd
+		local flatLook = Vector3.new(look.X, 0, look.Z)
+		local f = if flatLook.Magnitude > 0.05 then flatLook.Unit else ctx.fwd
+		u = f:Cross(Vector3.yAxis)            -- waagerecht, quer zum Blick
+		v = Vector3.yAxis
+	end
+	local normal = u:Cross(v)
+	local col = pickColor(s, ctx.fx)
+	local parts: { BasePart } = {}
+	local texture = texOf(ctx, s.tex)
+	if texture then
+		-- Mit Bild: EINE Platte mit dem Omega (beidseitig). Beim Brandzeichen
+		-- liegt sie flach (u, v waagerecht), sonst steht sie senkrecht.
+		local plate = newPart(Enum.PartType.Block, Vector3.new(0.05, 0.05, 0.05), col,
+			CFrame.fromMatrix(center, u, v), 1)
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local d = addDecal(plate, texture, face, col)
+			if mode == "brand" then
+				tweenLater(d, s.burnFor or 0.4, s.fade or 1.5, { Transparency = 1 }, Enum.EasingStyle.Sine)
+			end
+		end
+		tween(plate, draw, { Size = Vector3.new(r * 2.7, r * 2.7, 0.05) }, Enum.EasingStyle.Sine)
+		table.insert(parts, plate)
+	else
+		for i, seg in omegaStrokes(center, u, v, r, n) do
+			local a, b = seg[1], seg[2]
+			local len = (b - a).Magnitude
+			local rot = CFrame.lookAt(a, b, normal).Rotation
+			local p = newPart(Enum.PartType.Block, Vector3.new(w, th, 0.05), col, CFrame.new(a) * rot, 0)
+			tweenLater(p, (i - 1) / (n + 2) * draw, draw / (n + 2) + 0.05, {
+				Size = Vector3.new(w, th, len + w * 0.6),
+				CFrame = CFrame.new((a + b) / 2) * rot,
+			}, Enum.EasingStyle.Linear)
+			if mode == "brand" then
+				tweenLater(p, s.burnFor or 0.4, s.fade or 1.5, { Color = ctx.fx.color2 }, Enum.EasingStyle.Sine)
+				tweenLater(p, s.burnFor or 0.4, s.fade or 1.5, { Transparency = 1 }, Enum.EasingStyle.Sine)
+			end
+			table.insert(parts, p)
+		end
+	end
+	if mode == "brand" then
+		for _, p in parts do Debris:AddItem(p, (s.burnFor or 0.4) + (s.fade or 1.5) + 0.1) end
+		return
+	end
+	-- Ruck auf die Pfote
+	local pullAt = s.pullAt or (draw + 1)
+	local jerk = s.jerk or 0.22
+	local size = ctx.selfSize
+	local paw = ctx.selfPos + ctx.fwd * size.Z * 0.45 + Vector3.new(0, size.Y * 0.05, 0)
+	for _, p in parts do Debris:AddItem(p, pullAt + jerk + 0.1) end
+	task.delay(pullAt, function()
+		for _, p in parts do
+			if p.Parent then
+				tween(p, jerk, { CFrame = CFrame.new(paw) * (p.CFrame - p.CFrame.Position), Size = Vector3.one * 0.08 },
+					Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+				for _, d in p:GetChildren() do
+					if d:IsA("Decal") then tween(d, jerk, { Transparency = 0.3 }) end
+				end
+			end
+		end
+		-- reines Weiss als hellster Punkt an der Pfote
+		local core = newPart(Enum.PartType.Ball, Vector3.one * 0.2, Color3.new(1, 1, 1), CFrame.new(paw), 0)
+		tweenLater(core, jerk * 0.8, 0.12, { Size = Vector3.one * 2.4 }, Enum.EasingStyle.Quad)
+		tweenLater(core, jerk * 0.8 + 0.12, 0.25, { Transparency = 1 })
+		Debris:AddItem(core, jerk + 0.5)
+	end)
+end
+
+-- converge: Lichtpunkte fliegen aus vier Himmelsrichtungen in einen Punkt
+-- hoch ueber der Arena (`lift`, wie `omega`). Eine Farbe je Richtung
+-- (`colors`), Schweif per Trail; Starts per Tween-Verzoegerung.
+--   colors, perSide, from (Abstand), lift, flight, stagger, tex
+BLOCKS.converge = function(ctx, s)
+	local goal = at(ctx, s.at or "arena") + Vector3.new(0, s.lift or 34, 0)
+	local colors: { Color3 } = s.colors or { ctx.fx.color, ctx.fx.color2 }
+	local per = math.max(2, scaled(s.perSide or 4, ctx.factor))
+	local dist = s.from or 45
+	local flight = s.flight or 0.9
+	local stagger = s.stagger or 0.18
+	local texture = texOf(ctx, s.tex)
+	local base = at(ctx, "arena")
+	for side = 1, 4 do
+		local col = colors[(side - 1) % #colors + 1]
+		local a = (side - 1) * math.pi / 2
+		for j = 1, per do
+			local aj = a + (math.random() - 0.5) * 0.35
+			local from = base + Vector3.new(math.cos(aj) * dist, 10 + math.random() * 14, math.sin(aj) * dist)
+			local orb = newPart(Enum.PartType.Ball, Vector3.one * 0.7, col, CFrame.new(from), 0)
+			local a0 = Instance.new("Attachment"); a0.Position = Vector3.new(0, 0.3, 0); a0.Parent = orb
+			local a1 = Instance.new("Attachment"); a1.Position = Vector3.new(0, -0.3, 0); a1.Parent = orb
+			local trail = Instance.new("Trail")
+			trail.Attachment0 = a0
+			trail.Attachment1 = a1
+			trail.Lifetime = 0.35
+			trail.LightEmission = 1
+			trail.FaceCamera = true
+			trail.Color = ColorSequence.new(col)
+			trail.Transparency = NumberSequence.new(0.1, 1)
+			trail.Parent = orb
+			if texture then
+				local bb = Instance.new("BillboardGui")
+				bb.Size = UDim2.fromScale(2.2, 2.2)
+				bb.LightInfluence = 0
+				local img = Instance.new("ImageLabel")
+				img.BackgroundTransparency = 1
+				img.Size = UDim2.fromScale(1, 1)
+				img.Image = texture
+				img.ImageColor3 = col
+				img.Parent = bb
+				bb.Parent = orb
+			end
+			local delaySeconds = (j - 1) * stagger + (side - 1) * 0.05
+			tweenLater(orb, delaySeconds, flight, { CFrame = CFrame.new(goal) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			tweenLater(orb, delaySeconds + flight, 0.12, { Transparency = 1 })
+			Debris:AddItem(orb, delaySeconds + flight + 0.25)
+		end
+	end
+end
+
 -- Ab hier: nur fuer den Besitzer (Bildschirm und Kamera gehoeren ihm).
 
 local function ensureCC(ctx: Ctx): ColorCorrectionEffect
@@ -1863,6 +2034,7 @@ end
 BLOCKS.silence = function(ctx, s)
 	if not ctx.isOwner then return end
 	local dur = s.dur or 0.3
+	local level = math.clamp(s.level or 0, 0, 1)          -- v16: 0 = stumm, 0.15 = ganz leise
 	local muted: { { snd: Sound, vol: number } } = {}
 	local roots: { Instance } = { workspace, game:GetService("SoundService") }
 	local gui = player:FindFirstChildOfClass("PlayerGui")
@@ -1871,17 +2043,92 @@ BLOCKS.silence = function(ctx, s)
 		for _, d in root:GetDescendants() do
 			if d:IsA("Sound") and d.IsPlaying and d.Volume > 0 then
 				table.insert(muted, { snd = d, vol = d.Volume })
-				d.Volume = 0
+				d.Volume = d.Volume * level
 			end
 		end
 	end
 	task.delay(dur, function()
 		for _, m in muted do
-			if m.snd.Parent and m.snd.Volume == 0 then
+			if m.snd.Parent and math.abs(m.snd.Volume - m.vol * level) < 1e-3 then
 				m.snd.Volume = m.vol
 			end
 		end
 	end)
+end
+
+-- spotlight: die eigene Figur leuchtet, waehrend die Welt entfaerbt ist
+-- (Highlight, lokal, nur Besitzer). Roblox kann einzelne Objekte NICHT vom
+-- Farbfilter ausnehmen — das Leuchten haelt die Figur aber klar heller als
+-- die graue Welt.
+--   at, dur, fill (Farbe), strength (0..1)
+BLOCKS.spotlight = function(ctx, s)
+	if not ctx.isOwner then return end
+	local model = if s.at == "target" then ctx.targetModel else ctx.selfModel
+	if not model then return end
+	local dur = s.dur or 2
+	local h = Instance.new("Highlight")
+	h.Adornee = model
+	h.DepthMode = Enum.HighlightDepthMode.Occluded
+	h.FillColor = s.fill or Color3.fromRGB(255, 245, 225)
+	h.OutlineColor = Color3.new(1, 1, 1)
+	h.FillTransparency = 1
+	h.OutlineTransparency = 1
+	h.Parent = folder()
+	local strength = s.strength or 0.35
+	tween(h, 0.5, { FillTransparency = 1 - strength, OutlineTransparency = 0.3 })
+	tweenLater(h, math.max(0.5, dur - 0.4), 0.4, { FillTransparency = 1, OutlineTransparency = 1 })
+	Debris:AddItem(h, dur + 0.1)
+end
+
+-- wipe: ein Farbspektrum laeuft als Welle durchs Bild; dahinter bekommt die
+-- Welt ihre Farbe zurueck (Farbfilter -> neutral). Nur Besitzer.
+--   dur, tex (Spektrum-Verlauf; ohne Bild: UIGradient)
+BLOCKS.wipe = function(ctx, s)
+	if not ctx.isOwner then return end
+	local dur = s.dur or 0.9
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "SkillFXWipe"
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 49
+	gui.ResetOnSpawn = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+	local texture = texOf(ctx, s.tex)
+	local band: GuiObject
+	if texture then
+		local img = Instance.new("ImageLabel")
+		img.Image = texture
+		img.BackgroundTransparency = 1
+		img.ImageTransparency = 0.35
+		img.ScaleType = Enum.ScaleType.Stretch
+		band = img
+	else
+		local f = Instance.new("Frame")
+		f.BackgroundColor3 = Color3.new(1, 1, 1)
+		f.BackgroundTransparency = 0.35
+		f.BorderSizePixel = 0
+		local g = Instance.new("UIGradient")
+		local keys = {}
+		for i, c in RAINBOW do
+			table.insert(keys, ColorSequenceKeypoint.new((i - 1) / (#RAINBOW - 1), c))
+		end
+		g.Color = ColorSequence.new(keys)
+		g.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, 0.2),
+			NumberSequenceKeypoint.new(0.75, 0.2), NumberSequenceKeypoint.new(1, 1),
+		})
+		g.Parent = f
+		band = f
+	end
+	band.AnchorPoint = Vector2.new(0.5, 0.5)
+	band.Size = UDim2.fromScale(0.45, 1.6)
+	band.Rotation = 12
+	band.Position = UDim2.fromScale(-0.3, 0.5)
+	band.Parent = gui
+	tween(band, dur, { Position = UDim2.fromScale(1.3, 0.5) }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	Debris:AddItem(gui, dur + 0.1)
+	-- Farbe kommt hinter der Welle zurueck
+	local cc = ensureCC(ctx)
+	tweenLater(cc, dur * 0.2, dur * 0.8, { Saturation = 0, Brightness = 0, Contrast = 0, TintColor = Color3.new(1, 1, 1) })
 end
 
 local _flashGui: ScreenGui? = nil
@@ -1976,6 +2223,13 @@ BLOCKS.cinematic = function(ctx, s)
 				eye = chaseEye or (ctx.targetPos + Vector3.new(10, 8, 10))
 				cam.CFrame = CFrame.lookAt(eye, ctx.targetPos)
 			end
+		elseif style == "orbitSelf" then
+			-- v16: langsamer Halbkreis um den eigenen Baerchi, Blick leicht
+			-- nach oben (Baerchi und Himmel im Bild)
+			local a = math.pi * 0.25 + k * math.pi
+			local me = ctx.selfPos
+			eye = me + Vector3.new(math.cos(a) * 13, 3.5, math.sin(a) * 13)
+			cam.CFrame = CFrame.lookAt(eye, me + Vector3.new(0, 4 + 3 * k, 0))
 		else
 			local a = k * math.pi * 0.9
 			eye = center + Vector3.new(math.cos(a) * 16, 6, math.sin(a) * 16)
@@ -2040,12 +2294,18 @@ function SkillFXController.play(req: PlayRequest)
 	local targetPos = centerOf(req.target) or (selfPos + Vector3.new(0, 0, -8))
 	local isOwner = req.owner == player.UserId
 
+	-- v16: weit weg = nur Schritte mit `global = true` (z. B. die Omega-
+	-- Lichtsaeule, die man von der Hauptinsel sieht) und nur in der vollen Show.
+	local far = false
 	if not isOwner then
 		local char = player.Character
 		local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if not root or (root.Position - selfPos).Magnitude > SPECTATOR_DISTANCE then
-			return
+			far = true
 		end
+	end
+	if far and not req.full then
+		return
 	end
 
 	local selfSize = sizeOf(req.attacker)
@@ -2070,6 +2330,7 @@ function SkillFXController.play(req: PlayRequest)
 		fwd = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1),
 		path = nil,
 		cometHead = nil,
+		far = far,
 	}
 
 	-- Schritte abspielen (volle Show oder eigenes Echo), je Schritt EIN
@@ -2077,7 +2338,9 @@ function SkillFXController.play(req: PlayRequest)
 	local function run(steps: { SkillFXConfig.Step }, limit: number, echo: boolean)
 		for _, step in steps do
 			local block = BLOCKS[step.fx]
-			if block and not (step.extra and not extrasOn(ctx)) and not (step.ownerOnly and not ctx.isOwner) then
+			if block and not (step.extra and not extrasOn(ctx)) and not (step.ownerOnly and not ctx.isOwner)
+				and not (ctx.far and not step.global)
+			then
 				local st = step
 				if echo and step.fx == "sound" then
 					st = table.clone(step)

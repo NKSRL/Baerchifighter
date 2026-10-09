@@ -109,6 +109,23 @@
 --              Kamera jedes Clients ausgerichtet), reisst auf          angle, tex
 -- Erweiterte Parameter (v16):
 --   shards   tex  Bild auf beiden grossen Flaechen (Schattenfetzen)
+--
+-- v16 (Omega-Show) — neue Bausteine:
+--   omega     Omega-Zeichen Strich fuer Strich. mode "sky": hoch     mode, radius, lift, segments, draw,
+--             ueber der Arena, zur Kamera gedreht, zieht sich bei    pullAt, jerk, burnFor, fade, tex
+--             `pullAt` mit einem Ruck auf die Pfote. mode "brand":
+--             flach am Boden eingebrannt, verblasst.
+--   converge  Lichtpunkte aus vier Himmelsrichtungen (eine Farbe     colors, perSide, from, lift,
+--             je Richtung) fliegen in einen Punkt ueber der Arena    flight, stagger, tex
+--   spotlight Figur leuchtet (Highlight, nur Besitzer)               dur, fill, strength
+--   wipe      Spektrum laeuft als Welle durchs Bild, dahinter        dur, tex
+--             kommt die Farbe zurueck (nur Besitzer)
+-- Erweiterte Parameter (v16):
+--   alle      color = Color3  feste Farbe fuer diesen Schritt
+--   alle      global = true   auch Spieler AUSSERHALB der Zuschauer-
+--             Reichweite sehen diesen Schritt (nur volle Show)
+--   silence   level = 0..1    statt stumm nur leiser (0,15 = ganz leise)
+--   cinematic style "orbitSelf"  langsamer Halbkreis um den eigenen Baerchi
 -- Fuer jeden Schritt:
 --   extra = true  Beiwerk — faellt auf niedriger Grafikstufe weg
 --                 (PARTICLE_BUDGET.EXTRAS_MIN), der Kernmoment bleibt.
@@ -195,6 +212,14 @@ local TEXTURES: { [string]: { [string]: number } } = {
 		cut        = 0, -- assets/vfx/shade_slash/cut.png          (cut: Schnittlinie)
 		pool       = 0, -- assets/vfx/shade_slash/pool.png         (shades: Pfuetze)
 		smoke      = 0, -- assets/vfx/shade_slash/smoke.png        (silhouette/shades: Rauch)
+	},
+	OmegaStrike = {
+		omega     = 0,  -- assets/vfx/omega_strike/omega.png       (omega sky: Ω-Ring)
+		spectrum  = 0,  -- assets/vfx/omega_strike/spectrum.png    (wipe: Spektrum-Verlauf)
+		orb       = 0,  -- assets/vfx/omega_strike/orb.png         (converge: Lichtpunkt, je Pfadfarbe eingefaerbt)
+		brand     = 0,  -- assets/vfx/omega_strike/brand.png       (omega brand: Ω-Brandzeichen)
+		shockring = 0,  -- assets/vfx/omega_strike/shockring.png   (ring)
+		column    = 0,  -- assets/vfx/omega_strike/column.png      (pillar: Lichtsaeule, Beam)
 	},
 }
 
@@ -801,26 +826,59 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	OmegaStrike = {
-		-- "Ein Moment, den man filmt und teilt": die Arena friert ein, ein
-		-- Farbspektrum laeuft durch, dann EIN Schlag.
-		tier = 4, duration = 6.0, color = C(255, 255, 255), color2 = C(0, 0, 0),
-		sounds = { charge = "bass", strike = "thunder", impact = "boom" }, pitch = 0.45,
+		-- v16 (Show-Paket, Prompt 5): die groesste Show. Erhaben, endgueltig,
+		-- still vor dem Sturm — die Stille ist so wichtig wie der Schlag.
+		-- Aufladen: alle Geraeusche werden leise, die Welt fast schwarz-weiss
+		--   (Besitzer); der Baerchi leuchtet (Highlight) — ganz aus dem
+		--   Filter nehmen kann Roblox ihn nicht. AmbienceController bietet
+		--   kein Anhalten von Wolken/Pollen/Schaum -> nur Farbfilter.
+		-- Sammeln: riesiges Omega am Himmel, Lichtpunkte in den vier
+		--   Pfadfarben fliegen aus allen Himmelsrichtungen hinein; Kamera
+		--   im langsamen Halbkreis um den Baerchi (2,4 s).
+		-- Schlag (3,3 s): das Omega zieht sich mit einem Ruck auf die Pfote.
+		-- Einschlag (3,55 s): Spektrum laeuft durchs Bild, die Farbe kommt
+		--   zurueck; Schockwelle in den vier Pfadfarben bis zum Zaun; schmale
+		--   Lichtsaeule fuer ALLE Spieler (`global`, 1,3 s, nur volle Show =
+		--   hoechstens einmal pro Lauf); Omega brennt sich unter dem Gegner
+		--   ein und verblasst.
+		tier = 4, duration = 5.8, color = C(255, 255, 255), color2 = C(70, 60, 95),
+		sounds = { charge = "bass", strike = "whoosh", impact = "boom" }, pitch = 0.45,
+		impactAt = 3.55,
 		steps = {
-			{ t = 0.00, fx = "sound",     slot = "charge" },
-			{ t = 0.00, fx = "sky",       tint = C(255, 255, 255), brightness = -0.3, saturation = -1.0, dur = 1.8 },
-			{ t = 0.00, fx = "hitstop",   dur = 1.4 },
-			{ t = 0.00, fx = "cinematic", dur = 2.5, style = "orbit" },
-			{ t = 0.20, fx = "starfield", count = 80, dur = 5.6 },
-			{ t = 1.60, fx = "spectrum",  dur = 1.8 },
-			{ t = 1.60, fx = "aura",      at = "self", size = 10, dur = 1.8, rainbow = true },
-			{ t = 3.40, fx = "beam",      width = 5, dur = 0.5 },
-			{ t = 3.40, fx = "flash",     dur = 0.5 },
-			{ t = 3.40, fx = "sound",     slot = "strike" },
-			{ t = 3.50, fx = "pillar",    at = "target", height = 120, width = 10, dur = 1.6, fromSky = true },
-			{ t = 3.50, fx = "wave",      at = "target", radius = 45, dur = 1.2 },
-			{ t = 3.50, fx = "shake",     power = 2.0, dur = 1.2 },
+			-- 1. Aufladen (Stille vor dem Sturm)
+			{ t = 0.00, fx = "silence",   level = 0.15, dur = 3.3 },
+			{ t = 0.00, fx = "sky",       tint = C(255, 255, 255), brightness = -0.08, saturation = -0.92, dur = 5.5, fade = 1.2 },
+			{ t = 0.00, fx = "spotlight", at = "self", dur = 3.6, strength = 0.35 },
+			{ t = 0.15, fx = "sound",     slot = "charge" },
+			-- 2. Sammeln
+			{ t = 1.00, fx = "omega",     mode = "sky", at = "arena", radius = 7, lift = 34, segments = 20, draw = 0.9, pullAt = 2.3, jerk = 0.22, tex = "omega" },
+			{ t = 1.00, fx = "cinematic", dur = 2.4, style = "orbitSelf" },
+			{ t = 1.30, fx = "converge",  colors = { C(255, 200, 60), C(110, 200, 255), C(150, 80, 255), C(235, 235, 255) },
+				perSide = 4, from = 45, lift = 34, flight = 0.9, stagger = 0.25, tex = "orb" },
+			-- 3. Schlag: Ruck auf die Pfote (3,30 .. 3,52)
+			{ t = 3.30, fx = "sound",     slot = "strike" },
+			-- 4. Einschlag
+			{ t = 3.55, fx = "flash",     dur = 0.4 },
 			{ t = 3.55, fx = "sound",     slot = "impact" },
-			{ t = 3.60, fx = "shards",    at = "target", count = 50, size = 1.2, dur = 1.6, rainbow = true },
+			{ t = 3.55, fx = "shake",     power = 0.9, dur = 0.5 },
+			{ t = 3.55, fx = "wipe",      dur = 0.9, tex = "spectrum" },
+			{ t = 3.58, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(255, 200, 60), tex = "shockring" },
+			{ t = 3.66, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(110, 200, 255), tex = "shockring" },
+			{ t = 3.74, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(150, 80, 255), tex = "shockring" },
+			{ t = 3.82, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(235, 235, 255), tex = "shockring" },
+			{ t = 3.60, fx = "pillar",    at = "arena", feet = true, soft = true, height = 160, width = 1.6, dur = 1.3, tex = "column", global = true },
+			{ t = 3.70, fx = "omega",     mode = "brand", at = "target", radius = 2.2, segments = 14, draw = 0.2, burnFor = 0.5, fade = 1.5, tex = "brand" },
+		},
+		-- Echo (0,65 s): Ruck des Rings auf die Pfote und die Schockwelle —
+		-- ohne Entfaerbung, Kamera und Lichtsaeule.
+		echo = {
+			{ t = 0.00, fx = "omega", mode = "sky", at = "self", radius = 2.5, lift = 6, segments = 12, draw = 0.12, pullAt = 0.16, jerk = 0.16, tex = "omega" },
+			{ t = 0.16, fx = "sound", slot = "strike" },
+			{ t = 0.32, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(255, 200, 60) },
+			{ t = 0.35, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(110, 200, 255) },
+			{ t = 0.38, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(150, 80, 255) },
+			{ t = 0.41, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(235, 235, 255) },
+			{ t = 0.32, fx = "sound", slot = "impact" },
 		},
 	},
 }
