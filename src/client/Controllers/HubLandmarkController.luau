@@ -64,6 +64,8 @@ local function facing(position: Vector3, outward: Vector3): CFrame
 	return CFrame.fromMatrix(position, outward, Vector3.yAxis)
 end
 
+local _crownCells: { BasePart } = {}
+
 local function buildCrown(folder: Instance)
 	local cfg = WorldFXConfig.MAST
 	local model = Instance.new("Model")
@@ -86,6 +88,7 @@ local function buildCrown(folder: Instance)
 				decal.Parent = cell
 			end
 			DayCycleController.registerGlow(cell, cfg.CELL_DAY, cfg.CELL_NIGHT)
+			table.insert(_crownCells, cell)
 		end
 	end
 	model.Parent = folder
@@ -457,6 +460,20 @@ end
 --------------------------------------------------------------------------------
 -- Einstieg
 --------------------------------------------------------------------------------
+
+-- Paket G (Event startet): die Wabenkrone blinkt zweimal auf (2 Hz, unter
+-- der 3-Hz-Grenze), danach gilt wieder der Tageslauf.
+function HubLandmarkController.flashCrown()
+	if #_crownCells == 0 then return end
+	task.spawn(function()
+		for _ = 1, 2 do
+			for _, cell in _crownCells do cell.Color = Color3.fromRGB(255, 244, 200) end
+			task.wait(0.25)
+			DayCycleController.refreshGlow()
+			task.wait(0.25)
+		end
+	end)
+end
 
 function HubLandmarkController.init()
 	if not FeatureFlags.isOn("WORLD_C_HUB") then return end

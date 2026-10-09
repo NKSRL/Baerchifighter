@@ -32,6 +32,8 @@ local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 
 local WorldFXKit = require(script.Parent.WorldFXKit)
+-- Paket G: Event-Start als Welt-Moment (Krone blinkt, Bienen ziehen los)
+local WorldMomentController = require(script.Parent.WorldMomentController)
 
 local HubEventController = {}
 
@@ -48,6 +50,7 @@ local _pennantParts: { BasePart } = {}
 local _lanterns: { BasePart } = {}
 local _lights: { BasePart } = {}
 local _pitState: PitState = "idle"
+local _pitStateKnown = false   -- erst nach dem ersten Lesen: ein Beitritt mitten im Event ist kein Start
 local _pitOverride: PitState? = nil
 local _eventColor = Color3.fromRGB(255, 214, 110)
 
@@ -347,9 +350,13 @@ function HubEventController.init()
 			stateAcc = 0
 			local state = readPitState()
 			if state ~= _pitState then
+				if state == "live" and _pitStateKnown then
+					WorldMomentController.eventStarted()
+				end
 				_pitState = state
 				applyPitState(state)
 			end
+			_pitStateKnown = _ring ~= nil or _pitOverride ~= nil
 		end
 		if acc < TICK then return end
 		acc = 0

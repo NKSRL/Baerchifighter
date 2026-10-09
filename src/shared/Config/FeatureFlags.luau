@@ -80,6 +80,9 @@ local FLAGS: { [string]: boolean } = {
 	WORLD_D_PLOTS     = true,   -- Insel-Stufen, Teich-Glanz/Ueberlauf, eigene Insel, leere Inseln
 	WORLD_E_ARENA     = true,   -- Steg-Laternen, Torbogen, Zuschauer, Flagge am Schau-Turm
 	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
+	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
+	WORLD_H_SOUND     = true,   -- Klang-Kulisse nach Zonen (laeuft nur mit gepruefter Sound-ID)
+	WORLD_I_ZONES     = true,   -- Licht-Feinschliff nach Zonen (Insel / Arena / Turm)
 }
 
 local FeatureFlags = {}

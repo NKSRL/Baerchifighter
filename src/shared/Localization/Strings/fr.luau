@@ -507,4 +507,6 @@ return {
 	["world.sign.home"]     = "Ton île",
 	["world.sign.free"]     = "Île libre",
 	["world.sign.island"]   = "Île de {name}",
+	-- Welt aufwerten, Paket G: Zeile fuer die anderen Spieler
+	["world.moment.hatch"] = "{name} a obtenu un Baerchi {rarity} !",
 }

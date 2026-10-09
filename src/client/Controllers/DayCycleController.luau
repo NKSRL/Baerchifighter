@@ -54,11 +54,13 @@ local _dusk = WorldFXConfig.DAY_BASE_D
 local _glows: { Glow } = {}
 local _lastGlow = -1
 local _cloudParts: { BasePart } = {}
+local _running = false   -- laeuft der Takt (Tageslauf an)?
 local _pollen: ParticleEmitter? = nil      -- Paket F: Pollenfarbe folgt dem Tageslauf
 local _lastPollen: Color3? = nil
 local _lastCloud: Color3? = nil
 local _override: number? = nil      -- Debug: feste Uhrzeit
 local _held: { [string]: any }? = nil
+local _atmScale = { density = 1, haze = 1 }   -- Paket I: klare Luft hoch oben
 local _returnStart = 0
 local _returnFrom: { [string]: any }? = nil
 
@@ -80,6 +82,16 @@ end
 -- 0 = Nachmittag, 1 = blaue Stunde.
 function DayCycleController.dusk(): number
 	return _dusk
+end
+
+-- Nach einem kurzen fremden Farbwechsel (Kronen-Blinken, Paket G): beim
+-- naechsten Takt alle angemeldeten Teile wieder auf den Tageslauf setzen.
+function DayCycleController.refreshGlow()
+	_lastGlow = -1
+	local glow = math.clamp(_values.glow or 0, 0, 1)
+	for _, g in _glows do
+		g.part.Color = g.day:Lerp(g.night, glow)
+	end
 end
 
 -- Ein Neon-Teil leuchtet mit dem Tageslauf: Farbe `day` bei glow = 0,
@@ -105,6 +117,21 @@ local function showActive(): boolean
 		or math.abs(cc.Brightness) > 0.01 or math.abs(cc.Saturation) > 0.01 or math.abs(cc.Contrast) > 0.01
 end
 
+-- Paket I (ZoneLightController): Faktoren auf Dichte und Dunst der
+-- Atmosphaere. Gibt false zurueck, wenn der Tageslauf aus ist (dann setzt der
+-- Aufrufer die Atmosphaere selbst).
+function DayCycleController.setAtmosphereScale(density: number, haze: number): boolean
+	_atmScale.density = density
+	_atmScale.haze = haze
+	return _running
+end
+
+-- Fuer andere Controller: laeuft gerade eine Faehigkeiten-Show mit Farbfilter?
+-- (Paket G haelt grosse Welt-Momente solange zurueck.)
+function DayCycleController.showActive(): boolean
+	return showActive()
+end
+
 --------------------------------------------------------------------------------
 -- Anwenden
 --------------------------------------------------------------------------------
@@ -119,12 +146,12 @@ local function apply(v: { [string]: any }, clock: number)
 
 	local atm = Lighting:FindFirstChild("BaerchiAtmosphere")
 	if atm and atm:IsA("Atmosphere") then
-		atm.Density = v.atmDensity
+		atm.Density = v.atmDensity * _atmScale.density
 		atm.Offset  = v.atmOffset
 		atm.Color   = v.atmColor
 		atm.Decay   = v.atmDecay
 		atm.Glare   = v.atmGlare
-		atm.Haze    = v.atmHaze
+		atm.Haze    = v.atmHaze * _atmScale.haze
 	end
 
 	local bloom = Lighting:FindFirstChild("BaerchiBloom")
@@ -358,6 +385,7 @@ function DayCycleController.init()
 		return
 	end
 
+	_running = true
 	local folder = WorldFXKit.folder("DayCycle", WorldFXKit.root())
 	buildEmitters(folder)
 	task.spawn(collectGlows)

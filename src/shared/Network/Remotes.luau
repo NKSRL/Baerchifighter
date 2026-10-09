@@ -202,6 +202,11 @@ local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
 local EggTreeUnlocked        = getOrCreateEvent("EggTreeUnlocked")        -- S->C (Types.EggUnlockResult)
 local EggPressResultReceived = getOrCreateEvent("EggPressResultReceived") -- S->C (Types.EggPressResult)
 local SkillFXPlay            = getOrCreateEvent("SkillFXPlay")            -- S->C (alle Clients, siehe PitArenaService)
+-- Welt aufwerten, Paket G: ein grosser Moment eines Spielers, an ALLE Clients.
+-- Der Server sagt nur WAS passiert ist; wie es aussieht entscheidet der Client
+-- (WorldMomentController). Args: { userId, kind, value, number?, big }
+-- (kind: "hatch" | "tower" | "record" | "rebirth" | "mutation", siehe Modules/WorldMoments)
+local WorldMoment            = getOrCreateEvent("WorldMoment")            -- S->C (alle Clients, siehe WorldMomentService)
 local RequestPressEggs       = getOrCreateEvent("RequestPressEggs")       -- C->S (eggType, path?)
 local RequestUseBlueprint    = getOrCreateEvent("RequestUseBlueprint")    -- C->S (eggType)
 
@@ -373,6 +378,7 @@ return {
 	EggTreeUnlocked        = EggTreeUnlocked,
 	EggPressResultReceived = EggPressResultReceived,
 	SkillFXPlay            = SkillFXPlay,
+	WorldMoment            = WorldMoment,
 	RequestPressEggs       = RequestPressEggs,
 	RequestUseBlueprint    = RequestUseBlueprint,
 

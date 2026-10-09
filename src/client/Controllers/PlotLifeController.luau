@@ -63,9 +63,26 @@ local _homeGroup: Folder? = nil
 -- Deklarative Deko (WorldFXConfig.ISLAND_KINDS, wie MapParts.buildDecor)
 --------------------------------------------------------------------------------
 
-local function buildKind(parent: Instance, kind: string, ground: CFrame)
+-- Blumengruppen je Slot (Model + Ausgangslage) fuer den Windstoss (Paket G)
+type Sway = { model: Model, base: CFrame, rel: CFrame? }
+local _sways: { [number]: { Sway } } = {}
+local _gust: { [number]: number } = {}   -- Slot → Startzeit des Windstosses
+local GUST_TIME = 1.6
+local GUST_DEGREES = 26
+
+local function buildKind(parent: Instance, kind: string, ground: CFrame, slot: number?)
 	local pieces = (WorldFXConfig.ISLAND_KINDS :: any)[kind]
 	if not pieces then return end
+	if kind == "Flowers" and slot then
+		-- Blumen als eigenes Model, damit sie sich als Gruppe wiegen koennen
+		local model = Instance.new("Model")
+		model.Name = "FlowerGroup"
+		model.Parent = parent
+		parent = model
+		local list = _sways[slot] or {}
+		_sways[slot] = list
+		table.insert(list, { model = model, base = ground, rel = nil })
+	end
 	for _, piece in pieces do
 		local cf = ground * CFrame.new(piece.offset)
 		local rot = piece.rotation
@@ -119,11 +136,12 @@ local function rebuildDecor(state: PlotState)
 	local uncull = state.uncull
 	if uncull then uncull() end
 	if old then old:Destroy() end
+	_sways[state.slot] = nil
 	local folder = _folder :: Folder
 	local group = WorldFXKit.folder("IslandDecor_" .. state.slot, folder)
 	for _, item in WorldFXConfig.ISLAND_STAGE_ITEMS do
 		if item.stage <= stage then
-			buildKind(group, item.kind, rimGround(state.slot, item.angle, WorldFXConfig.ISLAND_STAGE.RIM_RADIUS))
+			buildKind(group, item.kind, rimGround(state.slot, item.angle, WorldFXConfig.ISLAND_STAGE.RIM_RADIUS), state.slot)
 		end
 	end
 	state.decor = group
@@ -262,6 +280,32 @@ local function buildHome(slot: number)
 		emitter:Destroy()
 	end
 	_homeGroup = group
+end
+
+-- Paket G (Rebirth): die Blumen der Insel wiegen sich einmal stark.
+function PlotLifeController.gust(slot: number)
+	_gust[slot] = os.clock()
+end
+
+local function stepGusts(now: number)
+	for slot, start in _gust do
+		local t = (now - start) / GUST_TIME
+		local list = _sways[slot]
+		if list then
+			local angle = if t >= 1 then 0 else math.rad(GUST_DEGREES) * math.sin(t * math.pi * 3) * (1 - t)
+			for _, sway in list do
+				-- Lage relativ zum Fuss einmal merken (vor dem ersten Kippen)
+				local rel = sway.rel
+				if not rel then
+					rel = sway.base:ToObjectSpace(sway.model:GetPivot())
+					sway.rel = rel
+				end
+				-- um den Fuss kippen, seitlich (Achse = Richtung zur Inselmitte)
+				sway.model:PivotTo(sway.base * CFrame.fromAxisAngle(Vector3.new(0, 0, 1), angle) * (rel :: CFrame))
+			end
+		end
+		if t >= 1 then _gust[slot] = nil end
+	end
 end
 
 -- Fuer andere Controller (Paket F: mehr Bienen auf der eigenen Insel).
@@ -443,6 +487,7 @@ function PlotLifeController.init()
 		for _, state in _plots do
 			stepPond(state, clock)
 		end
+		stepGusts(os.clock())
 		for slot, free in _free do
 			stepFree(free, slot, clock)
 		end

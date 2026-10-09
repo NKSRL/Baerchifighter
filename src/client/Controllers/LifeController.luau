@@ -80,7 +80,9 @@ end
 -- Bienen
 --------------------------------------------------------------------------------
 
-type Swarm = { parts: { BasePart }, count: number, site: Site?, phase: number }
+type Swarm = { parts: { BasePart }, count: number, site: Site?, phase: number, center: Vector3? }
+local SWARM_SPEED = 14   -- Studs/s: so schnell zieht ein Schwarm zu seinem neuen Ort
+local _rally: { position: Vector3, untilTime: number }? = nil
 local _swarms: { Swarm } = {}
 local _hubSites: { Site } = {}
 local _swarmFolder: Folder? = nil
@@ -109,6 +111,16 @@ local function assignSwarms()
 	local cfg = WorldFXConfig.BEES
 	local eye = camera.CFrame.Position
 	local candidates: { { site: Site, d: number } } = {}
+	-- Paket G: Event startet — alle Schwaerme in Sicht ziehen zum Event-Pit
+	local rally = _rally
+	if rally and os.clock() < rally.untilTime then
+		local site: Site = { position = rally.position, home = false }
+		for _, swarm in _swarms do
+			if swarm.site then swarm.site = site end
+		end
+		return
+	end
+	_rally = nil
 	local all = plotSites()
 	for _, s in _hubSites do table.insert(all, s) end
 	for _, site in all do
@@ -126,25 +138,33 @@ local function assignSwarms()
 		local allowed = entry ~= nil and (used < cfg.MAX_SWARMS or (entry.site.home and homeLeft > 0))
 		if allowed and entry then
 			if entry.site.home and used >= cfg.MAX_SWARMS then homeLeft -= 1 else used += 1 end
+			if not swarm.site then swarm.center = entry.site.position end   -- neu: dort erscheinen
 			swarm.site = entry.site
 			for _, part in swarm.parts do part.Parent = _swarmFolder end
 		else
 			swarm.site = nil
+			swarm.center = nil
 			for _, part in swarm.parts do part.Parent = nil end
 		end
 	end
 end
 
-local function stepBees(clock: number, parts: { BasePart }, cframes: { CFrame })
+local function stepBees(clock: number, dt: number, parts: { BasePart }, cframes: { CFrame })
 	local cfg = WorldFXConfig.BEES
 	for _, swarm in _swarms do
 		local site = swarm.site
 		if site then
+			-- weich zum (neuen) Ort fliegen statt zu springen
+			local center = swarm.center or site.position
+			local delta = site.position - center
+			local step = SWARM_SPEED * dt
+			center = if delta.Magnitude <= step then site.position else center + delta.Unit * step
+			swarm.center = center
 			for j = 1, swarm.count do
 				-- Acht ueber dem Ort, jede Biene etwas schneller und versetzt
 				local a = clock * cfg.SPEED * TAU * (1 + 0.17 * j) + swarm.phase + j * 1.3
 				local r = cfg.SITE_RADIUS * (0.6 + 0.12 * j)
-				local pos = site.position + Vector3.new(math.cos(a) * r, 1.8 + 0.6 * math.sin(a * 3), math.sin(a * 2) * r * 0.5)
+				local pos = center + Vector3.new(math.cos(a) * r, 1.8 + 0.6 * math.sin(a * 3), math.sin(a * 2) * r * 0.5)
 				local ahead = Vector3.new(-math.sin(a), 0, math.cos(a * 2))
 				local body = CFrame.lookAt(pos, pos + (if ahead.Magnitude > 1e-3 then ahead else Vector3.new(0, 0, 1)))
 				table.insert(parts, swarm.parts[j * 2 - 1])
@@ -349,6 +369,12 @@ local function stepPrints(folder: Folder, character: Model?)
 	p.part.Parent = folder
 end
 
+-- Paket G (Event startet): Bienen in Sicht fliegen `seconds` lang zu `position`.
+function LifeController.rally(position: Vector3, seconds: number)
+	_rally = { position = position + Vector3.new(0, 4, 0), untilTime = os.clock() + seconds }
+	assignSwarms()
+end
+
 --------------------------------------------------------------------------------
 -- Einstieg
 --------------------------------------------------------------------------------
@@ -390,7 +416,7 @@ function LifeController.init()
 
 		local parts: { BasePart } = {}
 		local cframes: { CFrame } = {}
-		if bees then stepBees(clock, parts, cframes) end
+		if bees then stepBees(clock, TICK, parts, cframes) end
 		if butterflies then stepButterflies(clock, eye, parts, cframes) end
 		local character = localPlayer.Character
 		if sway then

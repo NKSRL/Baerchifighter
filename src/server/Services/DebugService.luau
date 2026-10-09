@@ -101,6 +101,9 @@
 --   D:Invoke("pondfull")             -- Teich bis zum Rand fuellen (Ueberlauf-Tropfen)
 --   D:Invoke("spectators", "hop")    -- Zuschauer an der eigenen Arena: hop | cheer
 --   D:Invoke("record")               -- Rekord-Moment am eigenen Schau-Turm (Flagge glaenzt, Jubel)
+--   D:Invoke("moment", "hatch", "Cosmic") -- Welt-Moment an alle: hatch <Rarity> | tower <Id> | record | rebirth | mutation <Id>
+--   D:Invoke("moments5")             -- fuenf grosse Momente gleichzeitig (Drosselung pruefen)
+--   (Event-Start und Boss: D:Invoke("pitstate", "live") / D:Invoke("neststate", "boss"))
 --
 -- HBB Paket 0 (Test-Zustaende, erst "snapshot"):
 --   D:Invoke("state", "fresh")       -- neues Konto, Trichter F01–F10 misst
@@ -530,6 +533,26 @@ commands.spectators = function(player, _data, mode: any)
 	_worldSignal += 1
 	workspace:SetAttribute("DebugSpectators", string.format("%d|%s|%d", player.UserId, tostring(mode or "hop"), _worldSignal))
 	return { zuschauer = tostring(mode or "hop") }
+end
+
+-- Paket G: Welt-Moment wie vom Server erkannt an alle schicken (ohne den
+-- Spielstand zu aendern). Erzwingt "gross", damit man jede Art sieht.
+commands.moment = function(player, _data, kind: any, value: any)
+	local WorldMomentService = require(ServerScriptService.Services.WorldMomentService)
+	local k = tostring(kind or "hatch")
+	local defaults = { hatch = "Cosmic", tower = "II", record = "I", rebirth = "1", mutation = "Galaxy" }
+	local v = if value ~= nil then tostring(value) else defaults[k] or "?"
+	WorldMomentService.announce(player, { kind = k :: any, value = v, number = 42 }, true)
+	return { moment = k, wert = v }
+end
+
+-- Paket G: fuenf grosse Momente auf einmal (Client muss sie nacheinander zeigen)
+commands.moments5 = function(player, _data)
+	local WorldMomentService = require(ServerScriptService.Services.WorldMomentService)
+	for _, m in { { "hatch", "Mythic" }, { "tower", "III" }, { "rebirth", "2" }, { "mutation", "Rainbow" }, { "hatch", "Omega" } } do
+		WorldMomentService.announce(player, { kind = m[1] :: any, value = m[2], number = 2 }, true)
+	end
+	return { momente = 5 }
 end
 
 -- Paket E: Rekord-Moment am eigenen Schau-Turm
@@ -1146,6 +1169,7 @@ commands.help = function()
 		"worldshots [1..6|0]", "daytime <uhrzeit|auto>", "pitstate <idle|soon|live|auto>",
 		"neststate <calm|boss|auto>", "arrival", "fish",
 		"islandstage <1..4|auto>", "pondfull", "spectators <hop|cheer>", "record",
+		"moment <hatch|tower|record|rebirth|mutation> [wert]", "moments5",
 	}
 end
 

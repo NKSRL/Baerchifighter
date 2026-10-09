@@ -365,6 +365,13 @@ local function arenaOfUser(userId: number?): Arena?
 	return nil
 end
 
+-- Paket G (neuer Rekord): Zuschauer jubeln, Flagge glaenzt — sichtbar nur,
+-- wo die Arena bzw. der Turm in Sichtweite ist.
+function ArenaLifeController.celebrate(userId: number)
+	local arena = arenaOfUser(userId)
+	if arena then cheer(arena) end
+end
+
 --------------------------------------------------------------------------------
 -- Einstieg
 --------------------------------------------------------------------------------

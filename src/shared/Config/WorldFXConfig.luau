@@ -117,6 +117,11 @@ WorldFXConfig.MIN_QUALITY = {
 	flowerSway    = 1,   -- F: Blumen nicken im Wind, weichen dem Spieler aus
 	pollenTint    = 0,   -- F: Pollenfarbe folgt dem Tageslauf
 	footprints    = 1,   -- F: Pfotenabdruecke im Sand
+	moments       = 0,   -- G: Welt-Momente (Saeule, Feuerwerk, Welle, Spirale)
+	momentRing    = 1,   -- G: Funkenring ab Cosmic (niedrig: nur Saeule)
+	eventBell     = 0,   -- G: Event-Start am Honigmast (Krone blinkt, Bienen ziehen los)
+	soundscape    = 0,   -- H: Klang-Kulisse (still ohne gepruefte IDs)
+	zoneLight     = 0,   -- I: Kontrast/Saettigung in der Arena, klare Luft hoch oben
 }
 
 --------------------------------------------------------------------------------
@@ -584,12 +589,94 @@ WorldFXConfig.FOOTPRINTS = {
 	COLOR        = Color3.fromRGB(196, 168, 112),   -- etwas dunkler als der Sand
 }
 
+--------------------------------------------------------------------------------
+-- PAKET G: DIE WELT REAGIERT AUF DIE SPIELER
+--------------------------------------------------------------------------------
+-- Der Server meldet nur WAS passiert ist (Modules/WorldMoments erkennt es aus
+-- dem Spielstand), wie es aussieht entscheidet der Client.
+WorldFXConfig.MOMENTS = {
+	HATCH_MIN_RARITY  = "Mythic",   -- ab hier: Lichtsaeule + Zeile fuer alle
+	RING_MIN_RARITY   = "Cosmic",   -- ab hier zusaetzlich Funkenring am Himmel
+	RARE_MUTATIONS    = { Celestial = true, Candy = true, Lava = true, Galaxy = true, Rainbow = true },
+	PLAYER_COOLDOWN   = 30,     -- je Spieler hoechstens ein GROSSER Moment, sonst klein
+	QUEUE_MAX         = 4,      -- so viele grosse Momente warten hoechstens
+	QUEUE_GAP         = 0.6,    -- Pause zwischen zwei grossen Momenten (s)
+	MAX_WAIT          = 12,     -- laenger gewartet: wird klein gezeigt statt gross
+	-- Dauer der grossen Momente (so lange ist die Buehne belegt)
+	DURATION = { hatch = 2.4, tower = 2.6, rebirth = 2.2, mutation = 2.2, record = 1.6 },
+	-- Momente anderer Spieler: "on" | "small" | "off". Es gibt kein
+	-- Einstellungs-Fenster im Spiel (nur Sprache); bis dahin gilt dieser Wert.
+	OTHERS_DEFAULT    = "on",
+	COLUMN_HEIGHT     = 70,
+	COLUMN_WIDTH      = 7,
+	RING_HEIGHT       = 55,
+	RING_SPARKS       = 16,
+	FIREWORK_ROCKETS  = 3,
+	FIREWORK_SPARKS   = 12,
+	WAVE_RADIUS       = 64,
+	SPIRAL_SPARKS     = 10,
+	NEAR_DISTANCE     = 180,    -- Rekord/Mutation: nur in der Naehe sichtbar
+	LINE_SECONDS      = 3.5,
+}
+
 -- Klaenge: nur IDs, die in Studio geprueft sind. Leer = kein Klang (die
 -- Sound-Pakete H und der Wespen-Summton warten auf eine geprufte ID).
 WorldFXConfig.SOUNDS = {
-	waspHum = "",
+	waspHum  = "",
+	-- Paket H: Klang-Kulisse (Schleifen). Leer = still. Jede ID vorher in
+	-- Studio abspielen und pruefen (Toolbox, kostenlos, oder eingebaut).
+	waves    = "",   -- Ufer: leise Wellen
+	gull     = "",   -- Ufer: ab und zu eine Moewe (Einzelklang, kein Loop)
+	meadow   = "",   -- Wiese tags: Bienensummen + Voegel
+	crickets = "",   -- Wiese in der blauen Stunde: Grillen
+	drip     = "",   -- Honigmast: leises Tropfen
+	crowd    = "",   -- Event-Pit: Stimmengewirr, nur wenn ein Event laeuft
+	wind     = "",   -- Arena und hoch oben auf dem Turm
+	bell     = "",   -- Paket G: Glocke beim Event-Start (Einzelklang)
 } :: { [string]: string }
-WorldFXConfig.SOUND_VOLUME = { waspHum = 0.08 }   -- immer unter Kampf (0,12/0,35)
+-- Immer unter den Kampf-Sounds (Besitzer 0,35, Zuschauer 0,12).
+WorldFXConfig.SOUND_VOLUME = {
+	waspHum = 0.08, waves = 0.08, gull = 0.06, meadow = 0.07, crickets = 0.07,
+	drip = 0.06, crowd = 0.08, wind = 0.07, bell = 0.1,
+}
+
+--------------------------------------------------------------------------------
+-- PAKET H: KLANG-KULISSE
+--------------------------------------------------------------------------------
+-- Zonen nach Kamera-Position, weich ineinander geblendet; hoechstens
+-- MAX_AUDIBLE Schleifen gleichzeitig hoerbar.
+WorldFXConfig.SOUNDSCAPE = {
+	TICK        = 0.2,
+	FADE        = 0.12,     -- Anteil je Takt, mit dem die Lautstaerke dem Ziel folgt (~1,5 s)
+	MAX_AUDIBLE = 3,
+	MIN_WEIGHT  = 0.03,     -- darunter gilt eine Zone als still
+	MAST_RADIUS = 45,
+	PIT_RADIUS  = 80,
+	ARENA_RADIUS = 70,
+	HIGH_FROM   = 40,       -- ab dieser Kamerahoehe ueber der Arena mehr Wind
+	SHORE_BAND  = 30,       -- so breit (Studs) klingt das Ufer um jede Kueste
+	GULL_EVERY  = { 25, 60 },
+	NIGHT_FROM  = 0.75,     -- Daemmerung, ab der Grillen statt Voegel
+}
+
+--------------------------------------------------------------------------------
+-- PAKET I: LICHT NACH ZONEN
+--------------------------------------------------------------------------------
+-- Ein eigener Farbfilter "ZoneGrade" (stapelt sich mit der Basis und liegt
+-- nie ueber einem Show-Filter: der Show-Filter faerbt, ZoneGrade hebt nur
+-- Kontrast/Saettigung leicht). Hoch oben auf dem Turm wird die Atmosphaere
+-- klarer (Dichte und Dunst skaliert). Keine Tiefenunschaerfe.
+WorldFXConfig.ZONE_LIGHT = {
+	TICK          = 0.1,
+	BLEND_SECONDS = 1.5,
+	island = { saturation = 0,    contrast = 0,    brightness = 0 },
+	arena  = { saturation = 0.08, contrast = 0.07, brightness = 0.01 },
+	ARENA_RADIUS  = 60,         -- um die Arena-Mitte, plus der aeussere Steg
+	HIGH_FROM     = 30 * 2.4,   -- Etage 30 (MapConfig.PIT_TOWER_STEP_HEIGHT)
+	HIGH_FULL     = 60 * 2.4,
+	HIGH_DENSITY  = 0.55,       -- Faktor auf die Atmosphaeren-Dichte ganz oben
+	HIGH_HAZE     = 0.45,
+}
 
 --------------------------------------------------------------------------------
 -- PAKET 0: FESTE KAMERAPUNKTE ("worldshots")
