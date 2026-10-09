@@ -59,6 +59,23 @@
 --          perch = true  kleine Kristalle auf Ohren und Schultern, glint = true
 --                        laesst jede Kante EINMAL weiss aufleuchten
 --   ring   ground = true flacher Ring auf dem Boden unter der Figur; tex
+--
+-- v16 (Seraph-Show) — neue Bausteine:
+--   wings      Lichtfluegel hinter der Figur, Feder fuer Feder  count, span, dur, foldAt, tex, sparkTex
+--              von innen nach aussen; bei foldAt falten und
+--              in Funken zerfallen (1 Emitter, Beiwerk)
+--   halo       Heiligenschein ueber dem Kopf, dreht langsam,    radius, lift, count, dur, tex
+--              folgt der Figur
+--   honeycomb  Wabenmuster laeuft Fuesse -> Kopf, zieht ein,  cols, rows, sweep, pull, hold, tex
+--              warmer Schein bleibt `hold` s an der Figur
+--              (folgt ihr auch beim Anlauf zum Stoss)
+-- Erweiterte Parameter (v16):
+--   ring     lift = n     Ring n Studs ueber der Figur (Wolkenloch), mit tex
+--                        auch von unten sichtbar
+--   pillar   feet = true  Fuss der Saeule unter der Figur; soft = true
+--                        halbdurchsichtig; tex = Bild als Beam (weicher Verlauf)
+--   snowfall noShell = true nur Emitter (z. B. rieselnde Federn); lift, size
+--   alle     second = true Zweitfarbe (color2) statt Hauptfarbe
 -- Fuer jeden Schritt:
 --   extra = true  Beiwerk — faellt auf niedriger Grafikstufe weg
 --                 (PARTICLE_BUDGET.EXTRAS_MIN), der Kernmoment bleibt.
@@ -122,6 +139,14 @@ local TEXTURES: { [string]: { [string]: number } } = {
 		spike     = 0,  -- assets/vfx/glacier_frost/spike.png      (spikes)
 		frostring = 0,  -- assets/vfx/glacier_frost/frostring.png  (ring)
 		flake     = 0,  -- assets/vfx/glacier_frost/flake.png      (snowfall)
+	},
+	SeraphGrace = {
+		feather   = 0,  -- assets/vfx/seraph_grace/feather.png     (wings, snowfall)
+		halo      = 0,  -- assets/vfx/seraph_grace/halo.png        (halo)
+		comb      = 0,  -- assets/vfx/seraph_grace/comb.png        (honeycomb)
+		column    = 0,  -- assets/vfx/seraph_grace/column.png      (pillar, Beam)
+		cloudrim  = 0,  -- assets/vfx/seraph_grace/cloudrim.png    (ring lift)
+		spark     = 0,  -- assets/vfx/seraph_grace/spark.png       (wings: Funken)
 	},
 }
 
@@ -436,16 +461,45 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	SeraphGrace = {
-		tier = 3, duration = 3.4, color = C(255, 245, 190), color2 = C(255, 255, 255),
-		sounds = { charge = "flash", strike = "ping" }, pitch = 1.6,
+		-- v16 (Show-Paket, Prompt 2): warm, feierlich, ruhig.
+		-- Aufladen: Lichtfluegel entfalten sich Feder fuer Feder, Heiligenschein
+		--   aus Honiggold dreht sich ueber dem Kopf, das Licht wird waermer
+		--   (nur Besitzer).
+		-- Schlag: rundes Wolkenloch mit leuchtendem Rand, breite Lichtsaeule
+		--   faellt auf den Baerchi (nicht auf den Gegner), Federn rieseln.
+		-- Einschlag: Wabenmuster laeuft von den Fuessen zum Kopf und zieht ein
+		--   (fertig bei 3,4 s = Show-Ende), warmer Lichtpuls ueber den Boden,
+		--   Fluegel falten sich und zerfallen in Funken.
+		-- HP-Balken: PitArenaService setzt ihn erst im Stoss NACH der Show
+		--   (Show-Ende + CLASH_IMPACT_AT x FIGHT_SKILL_BEAT_SECONDS x Tempo =
+		--   3,4 + 0,28 .. 0,69 s). Deshalb zieht das Muster genau zum Show-Ende
+		--   ein und der warme Schein bleibt `hold` = 1,0 s an der Figur, also
+		--   bis nach dem Balken (Bericht SHOW_SERAPHEN_SEGEN).
+		tier = 3, duration = 3.4, color = C(255, 196, 70), color2 = C(255, 246, 225),
+		sounds = { charge = "whoosh", strike = "ping", impact = "ping" }, pitch = 1.3,
+		impactAt = 3.4,
 		steps = {
-			{ t = 0.00, fx = "sky",    tint = C(255, 248, 210), brightness = 0.2, saturation = 0.1, dur = 3.0 },
-			{ t = 0.00, fx = "sound",  slot = "charge" },
-			{ t = 0.00, fx = "pillar", at = "self", height = 40, width = 7, dur = 2.2, fromSky = true },
-			{ t = 0.50, fx = "rise",   at = "self", count = 30, dur = 1.8 },
-			{ t = 1.20, fx = "ring",   at = "self", radius = 9, dur = 1.0 },
-			{ t = 1.20, fx = "sound",  slot = "strike" },
-			{ t = 1.30, fx = "aura",   at = "self", size = 7, dur = 1.5 },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",       tint = C(255, 236, 205), brightness = 0.08, saturation = 0.15, dur = 3.3 },
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "wings",     at = "self", count = 7, span = 2.6, dur = 3.4, foldAt = 3.05, tex = "feather", sparkTex = "spark" },
+			{ t = 0.30, fx = "halo",      at = "self", radius = 0.9, lift = 0.7, count = 14, dur = 3.0, tex = "halo" },
+			-- 2. Schlag
+			{ t = 1.15, fx = "ring",      at = "self", lift = 26, radius = 5, dur = 2.1, tex = "cloudrim", extra = true },
+			{ t = 1.35, fx = "pillar",    at = "self", fromSky = true, feet = true, soft = true, second = true, height = 26, width = 4.5, dur = 1.5, tex = "column" },
+			{ t = 1.35, fx = "sound",     slot = "strike" },
+			{ t = 1.60, fx = "snowfall",  at = "self", noShell = true, lift = 3, size = 0.45, count = 8, dur = 1.6, tex = "feather", extra = true },
+			-- 3. Einschlag (Waben fertig eingezogen bei 2,55 + 0,5 + 0,35 = 3,40)
+			{ t = 2.55, fx = "honeycomb", at = "self", cols = 9, rows = 6, sweep = 0.5, pull = 0.35, hold = 1.0, tex = "comb" },
+			{ t = 3.30, fx = "ring",      at = "self", ground = true, radius = 14, dur = 0.8 },
+			{ t = 3.35, fx = "sound",     slot = "impact" },
+		},
+		-- Echo (0,55 s): schmale, kurze Lichtsaeule und das einziehende Wabenmuster.
+		echo = {
+			{ t = 0.00, fx = "pillar",    at = "self", fromSky = true, feet = true, soft = true, second = true, height = 18, width = 2.2, dur = 0.45, tex = "column" },
+			{ t = 0.00, fx = "sound",     slot = "strike" },
+			{ t = 0.12, fx = "honeycomb", at = "self", cols = 7, rows = 4, sweep = 0.18, pull = 0.18, hold = 0.9, tex = "comb" },
+			{ t = 0.45, fx = "sound",     slot = "impact" },
 		},
 	},
 

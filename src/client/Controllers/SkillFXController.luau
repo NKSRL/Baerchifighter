@@ -166,7 +166,7 @@ local function pickColor(step: { [string]: any }, fx: SkillFXConfig.SkillFX, i: 
 	if step.rainbow then
 		return RAINBOW[((i or 1) - 1) % #RAINBOW + 1]
 	end
-	if step.dark then
+	if step.dark or step.second then
 		return fx.color2
 	end
 	if i and i % 2 == 0 then
@@ -281,24 +281,33 @@ end
 BLOCKS.ring = function(ctx, s)
 	-- `ground = true`: flach auf dem Boden unter der Figur (v16).
 	local pos = if s.ground then groundAt(ctx, s.at) + Vector3.new(0, 0.1, 0) else at(ctx, s.at) - Vector3.new(0, 1.2, 0)
+	if s.lift then
+		-- v16: `lift` = so viele Studs ueber der Figur (z. B. Wolkenloch)
+		pos = at(ctx, s.at) + Vector3.new(0, s.lift, 0)
+	end
 	local r = s.radius or 6
 	local dur = s.dur or 0.6
 	local startD = if s.shrink then r * 2 else 0.5
 	local endD   = if s.shrink then 0.5 else r * 2
 	-- `ground` + `tex`: das Bild liegt als Decal auf einer flachen, unsichtbaren
 	-- Platte (quadratisches PNG mit rundem Motiv).
-	local texture = if s.ground then texOf(ctx, s.tex) else nil
+	local texture = if s.ground or s.lift then texOf(ctx, s.tex) else nil
 	if texture then
 		local plate = newPart(Enum.PartType.Block, Vector3.new(startD, 0.05, startD), pickColor(s, ctx.fx), CFrame.new(pos), 1)
 		local d = addDecal(plate, texture, Enum.NormalId.Top, plate.Color)
 		tween(plate, dur, { Size = Vector3.new(endD, 0.05, endD) })
 		tweenLater(d, dur * 0.6, dur * 0.4, { Transparency = 1 })
+		if s.lift then
+			-- von unten sichtbar
+			local under = addDecal(plate, texture, Enum.NormalId.Bottom, plate.Color)
+			tweenLater(under, dur * 0.6, dur * 0.4, { Transparency = 1 })
+		end
 		Debris:AddItem(plate, dur + 0.1)
 		return
 	end
-	local ring = newPart(Enum.PartType.Cylinder, Vector3.new(if s.ground then 0.08 else 0.25, startD, startD), pickColor(s, ctx.fx),
+	local ring = newPart(Enum.PartType.Cylinder, Vector3.new(if s.ground or s.lift then 0.08 else 0.25, startD, startD), pickColor(s, ctx.fx),
 		CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)), 0.2)
-	if s.ground then
+	if s.ground or s.lift then
 		-- flacher Ring: Dicke bleibt, nur der Durchmesser waechst
 		tween(ring, dur, { Size = Vector3.new(0.08, endD, endD) })
 		task.delay(dur * 0.6, function()
@@ -329,10 +338,40 @@ BLOCKS.pillar = function(ctx, s)
 	local w = s.width or 3
 	local dur = s.dur or 0.8
 	local base = pos - Vector3.new(0, 1.5, 0)
+	if s.feet then
+		-- v16: Fuss der Saeule genau unter der Figur (Tower in jeder Hoehe)
+		base = groundAt(ctx, s.at)
+	end
+	local texture = texOf(ctx, s.tex)
+	if texture then
+		-- v16: Saeule als Beam mit Bild (weicher Verlauf). Zwei unsichtbare
+		-- Anker; bei `fromSky` faellt der untere Anker von oben herab.
+		local topPart = newPart(Enum.PartType.Block, Vector3.one * 0.2, Color3.new(1, 1, 1), CFrame.new(base + Vector3.new(0, h, 0)), 1)
+		local lowPart = newPart(Enum.PartType.Block, Vector3.one * 0.2, Color3.new(1, 1, 1),
+			CFrame.new(if s.fromSky then base + Vector3.new(0, h, 0) else base), 1)
+		local a0 = Instance.new("Attachment"); a0.Parent = topPart
+		local a1 = Instance.new("Attachment"); a1.Parent = lowPart
+		local beam = Instance.new("Beam")
+		beam.Attachment0 = a0
+		beam.Attachment1 = a1
+		beam.Texture = texture
+		beam.TextureMode = Enum.TextureMode.Stretch
+		beam.FaceCamera = true
+		beam.LightEmission = 1
+		beam.Color = ColorSequence.new(pickColor(s, ctx.fx))
+		beam.Width0 = w
+		beam.Width1 = w
+		beam.Parent = topPart
+		tween(lowPart, dur * 0.35, { CFrame = CFrame.new(base) }, Enum.EasingStyle.Quart)
+		tweenLater(beam, dur * 0.6, dur * 0.4, { Width0 = w * 0.2, Width1 = w * 0.2 })
+		Debris:AddItem(topPart, dur + 0.1)
+		Debris:AddItem(lowPart, dur + 0.1)
+		return
+	end
 	local startCf = if s.fromSky
 		then CFrame.new(base + Vector3.new(0, h * 1.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
 		else CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90))
-	local col = newPart(Enum.PartType.Cylinder, Vector3.new(0.2, w, w), pickColor(s, ctx.fx), startCf, 0.15)
+	local col = newPart(Enum.PartType.Cylinder, Vector3.new(0.2, w, w), pickColor(s, ctx.fx), startCf, if s.soft then 0.5 else 0.15)
 	tween(col, dur * 0.35, {
 		Size = Vector3.new(h, w, w),
 		CFrame = CFrame.new(base + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
@@ -873,7 +912,7 @@ BLOCKS.snowfall = function(ctx, s)
 	local center = at(ctx, s.at)
 	local size = sizeAt(ctx, s.at)
 	local dur = s.dur or 1.2
-	local top = center + Vector3.new(0, size.Y * 0.5 + 1.5, 0)
+	local top = center + Vector3.new(0, size.Y * 0.5 + (s.lift or 1.5), 0)
 	local w = math.max(size.X, size.Z) * 1.6
 	local anchor = newPart(Enum.PartType.Block, Vector3.new(w, 0.2, w), Color3.new(1, 1, 1), CFrame.new(top), 1)
 	local em = Instance.new("ParticleEmitter")
@@ -886,7 +925,7 @@ BLOCKS.snowfall = function(ctx, s)
 	em.Acceleration = Vector3.new(0, -0.4, 0)
 	em.Drag = 0.5
 	em.Lifetime = NumberRange.new(dur * 0.8, dur * 1.2)
-	em.Size = NumberSequence.new(0.22)
+	em.Size = NumberSequence.new(s.size or 0.22)
 	em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.7, 0.3), NumberSequenceKeypoint.new(1, 1) })
 	em.Color = ColorSequence.new(Color3.new(1, 1, 1), ctx.fx.color)
 	em.LightEmission = 0.5
@@ -896,10 +935,218 @@ BLOCKS.snowfall = function(ctx, s)
 	em:Emit(scaled(s.count, ctx.factor))
 	Debris:AddItem(anchor, dur * 1.2 + 0.2)
 	-- Reifschimmer: eine fast durchsichtige Huelle, blendet langsam aus.
+	-- `noShell` (v16, z. B. rieselnde Federn): nur der Emitter.
+	if s.noShell then return end
 	local shell = newPart(Enum.PartType.Ball, size * 1.15, ctx.fx.color, CFrame.new(center), 0.82)
 	shell.Material = Enum.Material.ForceField
 	tweenLater(shell, dur * 0.4, dur * 0.6, { Transparency = 1 }, Enum.EasingStyle.Sine)
 	Debris:AddItem(shell, dur + 0.1)
+end
+
+--------------------------------------------------------------------------------
+-- v16 (Seraph-Show): Fluegel, Heiligenschein, Wabenmuster. Wiederverwendbar;
+-- Doku in SkillFXConfig ("BAUSTEINE").
+--------------------------------------------------------------------------------
+
+-- Haelt Teile an einer Figur fest, waehrend sie sich bewegt (Wippen, Anlauf
+-- zum Stoss). EINE RenderStepped-Verbindung pro Effekt, endet nach `seconds`
+-- oder wenn die Figur weg ist. `place(center, k)` setzt die Teile.
+local function followModel(model: Model?, fallback: Vector3, seconds: number, place: (Vector3, number) -> ())
+	local t0 = os.clock()
+	local conn: RBXScriptConnection? = nil
+	conn = RunService.RenderStepped:Connect(function()
+		local k = os.clock() - t0
+		if k >= seconds then
+			if conn then conn:Disconnect() end
+			return
+		end
+		local c = centerOf(model) or fallback
+		local ok = pcall(place, c, k)
+		if not ok and conn then conn:Disconnect() end
+	end)
+end
+
+-- wings: zwei Fluegel aus langen Lichtfedern entfalten sich hinter der Figur,
+-- Feder fuer Feder von innen nach aussen; bei `foldAt` falten sie sich
+-- zusammen und zerfallen in Funken (EIN Emitter).
+--   at, count (Federn je Fluegel), span (Laenge), dur, foldAt, tex (Feder), sparkTex
+BLOCKS.wings = function(ctx, s)
+	local center = at(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local fwd = if s.at == "target" then -ctx.fwd else ctx.fwd
+	local side = fwd:Cross(Vector3.yAxis)
+	local n = math.max(4, scaled(s.count or 7, ctx.factor))
+	local span = s.span or 2.6
+	local dur = s.dur or 3
+	local foldAt = s.foldAt or (dur - 0.4)
+	local unfold = math.min(0.9, dur * 0.3)
+	local texture = texOf(ctx, s.tex)
+	for _, sgn in { 1, -1 } do
+		local origin = center - fwd * size.Z * 0.3 + Vector3.new(0, size.Y * 0.18, 0) + side * sgn * size.X * 0.12
+		for i = 1, n do
+			local k = (i - 1) / math.max(1, n - 1)                  -- 0 = innen (oben), 1 = aussen (unten)
+			local a = math.rad(18 + 92 * k)
+			local dir = (Vector3.yAxis * math.cos(a) + side * sgn * math.sin(a) - fwd * 0.3).Unit
+			local len = span * (1.05 - 0.35 * k)
+			local p = newPart(Enum.PartType.Block, Vector3.new(0.34, 0.06, 0.05), if i % 2 == 0 then ctx.fx.color else ctx.fx.color2,
+				CFrame.lookAt(origin, origin + dir, fwd), 0.25)
+			if texture then
+				p.Transparency = 1
+				for _, face in { Enum.NormalId.Top, Enum.NormalId.Bottom } do
+					local d = addDecal(p, texture, face, p.Color)
+					tweenLater(d, foldAt, 0.35, { Transparency = 1 })
+				end
+			end
+			tweenLater(p, k * unfold, 0.3, {
+				Size = Vector3.new(0.34, 0.06, len),
+				CFrame = CFrame.lookAt(origin + dir * len / 2, origin + dir * len, fwd),
+			}, Enum.EasingStyle.Sine)
+			-- zusammenfalten (aussen zuerst) und verblassen
+			tweenLater(p, foldAt + (1 - k) * 0.12, 0.3, {
+				Size = Vector3.new(0.34, 0.06, 0.05),
+				CFrame = CFrame.lookAt(origin, origin + dir, fwd),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			tweenLater(p, foldAt, 0.42, { Transparency = 1 })
+			Debris:AddItem(p, foldAt + 0.5)
+		end
+	end
+	-- Funken beim Zerfallen (Beiwerk)
+	if extrasOn(ctx) then
+		local back = center - fwd * size.Z * 0.35 + Vector3.new(0, size.Y * 0.3, 0)
+		local anchor = newPart(Enum.PartType.Block, Vector3.new(span * 2, span, 0.2), Color3.new(1, 1, 1),
+			CFrame.lookAt(back, back + fwd), 1)
+		local em = Instance.new("ParticleEmitter")
+		em.Texture = texOf(ctx, s.sparkTex) or "rbxasset://textures/particles/sparkles_main.dds"
+		em.Shape = Enum.ParticleEmitterShape.Box
+		em.Rate = 0
+		em.Speed = NumberRange.new(0.5, 1.5)
+		em.SpreadAngle = Vector2.new(180, 180)
+		em.Acceleration = Vector3.new(0, -1, 0)
+		em.Drag = 1
+		em.Lifetime = NumberRange.new(0.6, 1.0)
+		em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0) })
+		em.Color = ColorSequence.new(ctx.fx.color2, ctx.fx.color)
+		em.LightEmission = 1
+		em.Parent = anchor
+		task.delay(foldAt + 0.15, function()
+			if em.Parent then em:Emit(scaled(s.sparks or 24, ctx.factor)) end
+		end)
+		Debris:AddItem(anchor, foldAt + 1.3)
+	end
+end
+
+-- halo: Heiligenschein ueber dem Kopf, dreht sich langsam und bleibt an der
+-- Figur. Ohne Bild: Perlen im Kreis; mit Bild: eine flache Scheibe.
+--   at, radius, lift (ueber dem Kopf), count (Perlen), dur, tex
+BLOCKS.halo = function(ctx, s)
+	local model = if s.at == "target" then ctx.targetModel else ctx.selfModel
+	local start = at(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local up = size.Y * 0.5 + (s.lift or 0.7)
+	local r = s.radius or 0.9
+	local dur = s.dur or 2.5
+	local texture = texOf(ctx, s.tex)
+	local parts: { BasePart } = {}
+	if texture then
+		local plate = newPart(Enum.PartType.Block, Vector3.new(r * 2.4, 0.05, r * 2.4), ctx.fx.color, CFrame.new(start + Vector3.new(0, up, 0)), 1)
+		for _, face in { Enum.NormalId.Top, Enum.NormalId.Bottom } do
+			local d = addDecal(plate, texture, face, ctx.fx.color)
+			d.Transparency = 1
+			tween(d, 0.4, { Transparency = 0 })
+			tweenLater(d, dur - 0.4, 0.4, { Transparency = 1 })
+		end
+		table.insert(parts, plate)
+	else
+		local n = math.max(8, scaled(s.count or 14, ctx.factor))
+		for i = 1, n do
+			local p = newPart(Enum.PartType.Ball, Vector3.one * 0.26, if i % 4 == 0 then ctx.fx.color2 else ctx.fx.color,
+				CFrame.new(start + Vector3.new(0, up, 0)), 1)
+			tween(p, 0.4, { Transparency = 0.05 })
+			tweenLater(p, dur - 0.4, 0.4, { Transparency = 1 })
+			table.insert(parts, p)
+		end
+	end
+	for _, p in parts do Debris:AddItem(p, dur + 0.1) end
+	local n = #parts
+	local cfs = table.create(n) :: { CFrame }
+	followModel(model, start, dur, function(c, k)
+		local spin = k * 0.8                    -- langsam: etwa eine Umdrehung in 8 s
+		local mid = c + Vector3.new(0, up, 0)
+		if texture then
+			cfs[1] = CFrame.new(mid) * CFrame.Angles(0, spin, 0)
+		else
+			for i = 1, n do
+				local a = spin + (i / n) * math.pi * 2
+				cfs[i] = CFrame.new(mid + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r))
+			end
+		end
+		workspace:BulkMoveTo(parts, cfs, Enum.BulkMoveMode.FireCFrameChanged)
+	end)
+end
+
+-- honeycomb: feines Wabenmuster laeuft von den Fuessen bis zum Kopf ueber die
+-- Figur (`sweep`), zieht dann in sie ein (`pull`) und laesst einen warmen
+-- Schein zurueck, der `hold` Sekunden an der Figur bleibt, auch wenn sie sich
+-- bewegt (z. B. bis der HP-Balken die Heilung zeigt).
+--   at, cols, rows, sweep, pull, hold, tex (Wabe)
+BLOCKS.honeycomb = function(ctx, s)
+	local model = if s.at == "target" then ctx.targetModel else ctx.selfModel
+	local center = at(ctx, s.at)
+	local feet = groundAt(ctx, s.at)
+	local size = sizeAt(ctx, s.at)
+	local radius = math.max(size.X, size.Z) * 0.58
+	local cols = math.max(5, scaled(s.cols or 9, ctx.factor))
+	local rows = math.max(4, scaled(s.rows or 6, ctx.factor))
+	local sweep = s.sweep or 0.5
+	local pull = s.pull or 0.35
+	local hold = s.hold or 0.8
+	local tile = math.min(0.7, (2 * math.pi * radius) / cols * 0.8)
+	local texture = texOf(ctx, s.tex)
+	for row = 1, rows do
+		local y = (row - 0.5) / rows * size.Y
+		local appear = (row - 1) / rows * sweep
+		for col = 1, cols do
+			-- jede zweite Reihe um eine halbe Wabe versetzt (Bienenwaben)
+			local a = (col + (if row % 2 == 0 then 0.5 else 0)) / cols * math.pi * 2
+			local out = Vector3.new(math.cos(a), 0, math.sin(a))
+			local pos = feet + Vector3.new(0, y, 0) + out * radius
+			local face = CFrame.lookAt(pos, pos + out)
+			local p: BasePart
+			if texture then
+				p = newPart(Enum.PartType.Block, Vector3.new(0.05, 0.05, 0.04), ctx.fx.color, face, 1)
+				local d = addDecal(p, texture, Enum.NormalId.Front, ctx.fx.color)  -- Front = -Z = nach aussen
+				tweenLater(d, sweep + pull * 0.5, pull * 0.5, { Transparency = 1 })
+			else
+				-- Rueckfall: flache Neon-Scheibe (Zylinder-Achse zeigt nach aussen)
+				p = newPart(Enum.PartType.Cylinder, Vector3.new(0.04, 0.05, 0.05), if (row + col) % 3 == 0 then ctx.fx.color2 else ctx.fx.color,
+					face * CFrame.Angles(0, math.rad(90), 0), 0.2)
+			end
+			local full = if texture then Vector3.new(tile, tile, 0.04) else Vector3.new(0.04, tile, tile)
+			tweenLater(p, appear, 0.12, { Size = full }, Enum.EasingStyle.Back)
+			-- einziehen: zur Mitte der Figur, dabei klein werden
+			local inPos = center + Vector3.new(0, y - size.Y * 0.5, 0) * 0.3
+			tweenLater(p, sweep, pull, {
+				CFrame = CFrame.new(inPos) * (p.CFrame - p.CFrame.Position),
+				Size = if texture then Vector3.new(0.05, 0.05, 0.04) else Vector3.new(0.04, 0.05, 0.05),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			if not texture then
+				tweenLater(p, sweep + pull * 0.5, pull * 0.5, { Transparency = 1 })
+			end
+			Debris:AddItem(p, sweep + pull + 0.05)
+		end
+	end
+	-- Der warme Schein bleibt an der Figur.
+	task.delay(sweep + pull * 0.7, function()
+		local now = centerOf(model) or center
+		local glowPart = newPart(Enum.PartType.Ball, size * 1.25, ctx.fx.color, CFrame.new(now), 0.45)
+		glowPart.Material = Enum.Material.ForceField
+		tween(glowPart, 0.25, { Size = size * 0.95 }, Enum.EasingStyle.Quad)
+		tweenLater(glowPart, hold * 0.55, hold * 0.45, { Transparency = 1 }, Enum.EasingStyle.Sine)
+		Debris:AddItem(glowPart, hold + 0.1)
+		followModel(model, now, hold, function(c)
+			glowPart.CFrame = CFrame.new(c)
+		end)
+	end)
 end
 
 -- Ab hier: nur fuer den Besitzer (Bildschirm und Kamera gehoeren ihm).
