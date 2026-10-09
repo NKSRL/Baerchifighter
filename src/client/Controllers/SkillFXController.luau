@@ -567,6 +567,7 @@ end
 
 BLOCKS.shards = function(ctx, s)
 	if s.arc then shardsArc(ctx, s) return end
+	local shardTex = texOf(ctx, s.tex)
 	local pos = at(ctx, s.at)
 	local n = scaled(s.count, ctx.factor)
 	local size = s.size or 0.6
@@ -583,6 +584,14 @@ BLOCKS.shards = function(ctx, s)
 		end
 		if s.glyphs then
 			p.Shape = Enum.PartType.Ball
+		end
+		if shardTex then
+			-- v16: Bild auf beiden grossen Flaechen (z. B. Schattenfetzen)
+			p.Transparency = 1
+			for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+				local d = addDecal(p, shardTex, face, p.Color)
+				tweenLater(d, dur * 0.5, dur * 0.5, { Transparency = 1 })
+			end
 		end
 		tween(p, dur, { CFrame = CFrame.new(to) * CFrame.Angles(math.random() * 6, math.random() * 6, 0) })
 		task.delay(dur * 0.5, function()
@@ -1449,6 +1458,340 @@ BLOCKS.dust = function(ctx, s)
 	Debris:AddItem(anchor, dur + 0.2)
 end
 
+--------------------------------------------------------------------------------
+-- v16 (Schemen-Show): Tinten-Klone des Baerchis, Verblassen, Stille, Schnitt.
+-- Doku in SkillFXConfig ("BAUSTEINE").
+--------------------------------------------------------------------------------
+
+-- Was an einem Klon nichts zu suchen hat (Aussehen, Leben, Ton, Licht).
+local CLONE_STRIP: { [string]: boolean } = {
+	Decal = true, Texture = true, SurfaceAppearance = true, BillboardGui = true, SurfaceGui = true,
+	Script = true, LocalScript = true, ModuleScript = true, Sound = true, ParticleEmitter = true,
+	PointLight = true, SpotLight = true, SurfaceLight = true, Highlight = true, Humanoid = true,
+	Fire = true, Smoke = true, Sparkles = true, Trail = true, Beam = true,
+	Weld = true, WeldConstraint = true, Motor6D = true,
+}
+
+-- Ein tintenschwarzer Klon der Figur (lokal, nur auf diesem Rechner). Ohne
+-- klonbares Modell: ein einfacher Kugel-Baerchi in derselben Groesse.
+-- `feet` + `fwd` geben die Lage vor; `flat` (0..1) staucht die Tiefe
+-- (flache Silhouette). Rueckgabe: Modell und Pivot relativ zu den Fuessen.
+local function inkBear(source: Model?, size: Vector3, color: Color3, transparency: number,
+	feet: Vector3, fwd: Vector3, flat: number?): (Model, CFrame)
+	local frame = CFrame.lookAt(feet, feet + fwd)
+	local m: Model? = nil
+	if source and source.Parent then
+		local ok, c = pcall(function() return (source :: Model):Clone() end)
+		if ok and c then m = c end
+	end
+	if m then
+		for _, d in m:GetDescendants() do
+			if CLONE_STRIP[d.ClassName] then
+				d:Destroy()
+			elseif d:IsA("BasePart") then
+				d.Anchored = true
+				d.CanCollide = false
+				d.CanQuery = false
+				d.CanTouch = false
+				d.CastShadow = false
+				d.Material = Enum.Material.SmoothPlastic
+				d.Color = color
+				d.Transparency = transparency
+				d.LocalTransparencyModifier = 0
+				if d:IsA("MeshPart") then
+					pcall(function() (d :: any).TextureID = "" end)
+				end
+			end
+		end
+	else
+		-- Rueckfall: Koerper, Kopf, zwei Ohren
+		local bear = Instance.new("Model")
+		local function ball(d: number, off: Vector3)
+			local p = Instance.new("Part")
+			p.Shape = Enum.PartType.Ball
+			p.Size = Vector3.one * d
+			prepPart(p, color, frame * CFrame.new(off), transparency)
+			p.Material = Enum.Material.SmoothPlastic
+			p.Parent = bear
+		end
+		ball(size.X * 0.8, Vector3.new(0, size.Y * 0.32, 0))
+		ball(size.X * 0.55, Vector3.new(0, size.Y * 0.74, 0))
+		ball(size.X * 0.2, Vector3.new(size.X * 0.2, size.Y * 0.95, 0))
+		ball(size.X * 0.2, Vector3.new(-size.X * 0.2, size.Y * 0.95, 0))
+		bear.WorldPivot = frame
+		m = bear
+	end
+	local model = m :: Model
+	if flat and flat < 1 then
+		-- Tiefe (entlang der Blickrichtung) stauchen: Positionen und die
+		-- Teil-Achse, die am ehesten nach vorn zeigt.
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				local rel = frame:ToObjectSpace(d.CFrame)
+				d.CFrame = frame * (CFrame.new(rel.X, rel.Y, rel.Z * flat) * rel.Rotation)
+				local look = frame.LookVector
+				local ax = math.abs(d.CFrame.RightVector:Dot(look))
+				local ay = math.abs(d.CFrame.UpVector:Dot(look))
+				local az = math.abs(d.CFrame.LookVector:Dot(look))
+				local sz = d.Size
+				if ax >= ay and ax >= az then
+					d.Size = Vector3.new(math.max(0.05, sz.X * flat), sz.Y, sz.Z)
+				elseif ay >= az then
+					d.Size = Vector3.new(sz.X, math.max(0.05, sz.Y * flat), sz.Z)
+				else
+					d.Size = Vector3.new(sz.X, sz.Y, math.max(0.05, sz.Z * flat))
+				end
+			end
+		end
+	end
+	model.Name = "SkillFXInk"
+	model.Parent = folder()
+	return model, frame:ToObjectSpace(model:GetPivot())
+end
+
+local function fadeModel(model: Model, delaySeconds: number, seconds: number)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			tweenLater(d, delaySeconds, seconds, { Transparency = 1 }, Enum.EasingStyle.Sine)
+		elseif d:IsA("Decal") then
+			tweenLater(d, delaySeconds, seconds, { Transparency = 1 }, Enum.EasingStyle.Sine)
+		end
+	end
+	Debris:AddItem(model, delaySeconds + seconds + 0.1)
+end
+
+-- Rauch-Emitter (EIN Emitter pro Effekt); `puff(pos, n)` stoesst an pos aus.
+local function smokeAt(ctx: Ctx, texKey: string?, life: number): (Vector3, number) -> ()
+	local anchor = newPart(Enum.PartType.Block, Vector3.one * 0.3, Color3.new(), CFrame.new(ctx.selfPos), 1)
+	local em = Instance.new("ParticleEmitter")
+	em.Texture = texOf(ctx, texKey) or "rbxasset://textures/particles/smoke_main.dds"
+	em.Rate = 0
+	em.EmissionDirection = Enum.NormalId.Top
+	em.Speed = NumberRange.new(0.6, 1.6)
+	em.SpreadAngle = Vector2.new(60, 60)
+	em.Drag = 1.5
+	em.Lifetime = NumberRange.new(0.6, 1.0)
+	em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 2.2) })
+	em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+	em.Color = ColorSequence.new(ctx.fx.color, ctx.fx.color2)
+	em.LightEmission = 0
+	em.Rotation = NumberRange.new(0, 360)
+	em.RotSpeed = NumberRange.new(-25, 25)
+	em.Parent = anchor
+	Debris:AddItem(anchor, life + 1.2)
+	local on = extrasOn(ctx)
+	return function(pos: Vector3, n: number)
+		if not on or not anchor.Parent then return end
+		anchor.CFrame = CFrame.new(pos)
+		em:Emit(scaled(n, ctx.factor))
+	end
+end
+
+-- silhouette: der Schatten der Figur loest sich vom Boden und richtet sich
+-- als flache, tintenschwarze Silhouette hinter ihr auf; zerfaellt dann in Rauch.
+--   at, behind, rise, hold, dissolve, tex (Silhouette), smokeTex
+BLOCKS.silhouette = function(ctx, s)
+	local size = sizeAt(ctx, s.at)
+	local fwd = if s.at == "target" then -ctx.fwd else ctx.fwd
+	local feet = groundAt(ctx, s.at) - fwd * (s.behind or 1.4)
+	local rise = s.rise or 1.0
+	local hold = s.hold or 0.4
+	local dissolve = s.dissolve or 0.4
+	local model: Model
+	local offset: CFrame
+	local texture = texOf(ctx, s.tex)
+	if texture then
+		-- Bild-Silhouette: flache Platte mit dem Umriss (vorn und hinten).
+		model = Instance.new("Model")
+		local frame = CFrame.lookAt(feet, feet + fwd)
+		local plate = Instance.new("Part")
+		plate.Size = Vector3.new(size.X * 1.3, size.Y * 1.3, 0.05)
+		prepPart(plate, ctx.fx.color, frame * CFrame.new(0, size.Y * 0.65, 0), 1)
+		plate.Parent = model
+		addDecal(plate, texture, Enum.NormalId.Front, ctx.fx.color)
+		addDecal(plate, texture, Enum.NormalId.Back, ctx.fx.color)
+		model.WorldPivot = frame
+		model.Parent = folder()
+		offset = CFrame.new()
+	else
+		model, offset = inkBear(if s.at == "target" then ctx.targetModel else ctx.selfModel, size,
+			ctx.fx.color, 0.08, feet, fwd, 0.12)
+	end
+	local footFrame = CFrame.lookAt(feet, feet + fwd)
+	-- liegt zuerst flach nach hinten auf dem Boden (wie ein Schatten)
+	model:PivotTo(footFrame * CFrame.Angles(math.rad(90), 0, 0) * offset)
+	local t0 = os.clock()
+	local conn: RBXScriptConnection? = nil
+	conn = RunService.RenderStepped:Connect(function()
+		local k = math.clamp((os.clock() - t0) / rise, 0, 1)
+		local e = 1 - (1 - k) ^ 3
+		if model.Parent then
+			model:PivotTo(footFrame * CFrame.Angles(math.rad(90) * (1 - e), 0, 0) * offset)
+		end
+		if k >= 1 or not model.Parent then
+			if conn then conn:Disconnect() end
+		end
+	end)
+	fadeModel(model, rise + hold, dissolve)
+	local puff = smokeAt(ctx, s.smokeTex, rise + hold + dissolve)
+	task.delay(rise + hold, function()
+		puff(feet + Vector3.new(0, size.Y * 0.5, 0), 14)
+	end)
+end
+
+-- shades: dunkle Pfuetzen rund um die Figur, aus jeder steigt gleichzeitig
+-- ein Schatten-Baerchi aus Rauch (Tinten-Klon), der sie anschaut; nach
+-- `fadeAt` loesen sie sich auf. EINE Verbindung fuer alle, EIN Emitter.
+--   at, count, distance, pool, rise, fadeAt, dissolve, tex (Pfuetze), smokeTex
+BLOCKS.shades = function(ctx, s)
+	local center = groundAt(ctx, s.at)
+	local size = ctx.selfSize                              -- Klone des eigenen Baerchis
+	local n = s.count or 3
+	local dist = s.distance or 3.4
+	local poolR = s.pool or 1.7
+	local rise = s.rise or 0.5
+	local fadeAt = s.fadeAt or 1.2
+	local dissolve = s.dissolve or 0.35
+	local poolTex = texOf(ctx, s.tex)
+	local puff = smokeAt(ctx, s.smokeTex, fadeAt + dissolve)
+	local models: { Model } = {}
+	local finals: { CFrame } = {}
+	local offsets: { CFrame } = {}
+	local spin = math.random() * math.pi * 2
+	for i = 1, n do
+		local a = spin + (i / n) * math.pi * 2
+		local spot = center + Vector3.new(math.cos(a) * dist, 0, math.sin(a) * dist)
+		-- Pfuetze
+		local pool: BasePart
+		if poolTex then
+			pool = newPart(Enum.PartType.Block, Vector3.new(0.1, 0.04, 0.1), ctx.fx.color, CFrame.new(spot + Vector3.new(0, 0.05, 0)), 1)
+			local d = addDecal(pool, poolTex, Enum.NormalId.Top, ctx.fx.color)
+			tweenLater(d, fadeAt, dissolve, { Transparency = 1 })
+			tween(pool, 0.15, { Size = Vector3.new(poolR * 2, 0.04, poolR * 2) })
+		else
+			pool = newPart(Enum.PartType.Cylinder, Vector3.new(0.04, 0.1, 0.1), ctx.fx.color,
+				CFrame.new(spot + Vector3.new(0, 0.05, 0)) * CFrame.Angles(0, 0, math.rad(90)), 0.15)
+			pool.Material = Enum.Material.SmoothPlastic
+			tween(pool, 0.15, { Size = Vector3.new(0.04, poolR * 2, poolR * 2) })
+			tweenLater(pool, fadeAt, dissolve, { Transparency = 1 })
+		end
+		Debris:AddItem(pool, fadeAt + dissolve + 0.1)
+		-- Schatten-Baerchi, blickt zur Mitte
+		local look = (center - spot)
+		local fwd = if look.Magnitude > 0.1 then Vector3.new(look.X, 0, look.Z).Unit else ctx.fwd
+		local m, off = inkBear(ctx.selfModel, size, ctx.fx.color, 0.25, spot, fwd, nil)
+		local final = CFrame.lookAt(spot, spot + fwd)
+		m:PivotTo(final * CFrame.new(0, -size.Y * 1.1, 0) * off)   -- noch unter dem Boden
+		table.insert(models, m)
+		table.insert(finals, final)
+		table.insert(offsets, off)
+		fadeModel(m, fadeAt, dissolve)
+	end
+	local t0 = os.clock()
+	local start = 0.15                                     -- erst die Pfuetzen
+	local puffed = false
+	local conn: RBXScriptConnection? = nil
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - t0 - start
+		if t < 0 then return end
+		if not puffed then
+			puffed = true
+			for i = 1, #models do puff(finals[i].Position, 6) end
+		end
+		local k = math.clamp(t / rise, 0, 1)
+		local e = 1 - (1 - k) ^ 2
+		for i, m in models do
+			if m.Parent then
+				m:PivotTo(finals[i] * CFrame.new(0, -size.Y * 1.1 * (1 - e), 0) * offsets[i])
+			end
+		end
+		if k >= 1 then
+			if conn then conn:Disconnect() end
+		end
+	end)
+	task.delay(fadeAt, function()
+		for i = 1, #models do puff(finals[i].Position + Vector3.new(0, size.Y * 0.5, 0), 8) end
+	end)
+end
+
+-- vanish: die Figur wird blasser bis fast durchsichtig (LocalTransparency-
+-- Modifier: nur auf diesem Rechner, nie zum Server repliziert) und steht bei
+-- `back` Sekunden schlagartig wieder voll da. EINE Verbindung.
+--   at, to (0..1), fadeIn, back
+BLOCKS.vanish = function(ctx, s)
+	local model = if s.at == "target" then ctx.targetModel else ctx.selfModel
+	if not model then return end
+	local goal = s.to or 0.85
+	local fadeIn = s.fadeIn or 1.0
+	local back = s.back or 2.0
+	local parts: { BasePart } = {}
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then table.insert(parts, d) end
+	end
+	local function set(v: number)
+		for _, p in parts do
+			if p.Parent then p.LocalTransparencyModifier = v end
+		end
+	end
+	local t0 = os.clock()
+	local conn: RBXScriptConnection? = nil
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - t0
+		if t >= back or not model.Parent then
+			if conn then conn:Disconnect() end
+			set(0)                                         -- als waere er nie weg gewesen
+			return
+		end
+		set(goal * math.clamp(t / fadeIn, 0, 1))
+	end)
+end
+
+-- cut: ein einziger duenner, weisser Schnitt quer durch das Bild (jeder Client
+-- richtet ihn an SEINER Kamera aus) durch den Gegner. Er bleibt `tearAt` s
+-- stehen, dann reisst er auf: zwei Raender weichen auseinander, dazwischen
+-- dunkles Violett.
+--   at, length, width, draw, tearAt, tex (ausgefranste Schnittlinie)
+BLOCKS.cut = function(ctx, s)
+	local cam = workspace.CurrentCamera
+	local pos = at(ctx, s.at or "target") + Vector3.new(0, 0.3, 0)
+	local view = if cam then cam.CFrame else CFrame.lookAt(pos + Vector3.new(0, 4, 12), pos)
+	local tilt = math.rad(s.angle or 18)
+	local dir = (view.RightVector * math.cos(tilt) + view.UpVector * math.sin(tilt)).Unit
+	local across = view.LookVector:Cross(dir).Unit             -- quer zur Linie, im Bild
+	local len = s.length or 20
+	local w = s.width or 0.12
+	local draw = s.draw or 0.08
+	local tearAt = s.tearAt or 0.4
+	local fromPt = pos - dir * len / 2
+	-- Y der Linie zeigt zur Kamera: die sichtbare Breite ist X
+	local function frame(c: Vector3): CFrame
+		return CFrame.lookAt(c, c + dir, view.LookVector)
+	end
+	local texture = texOf(ctx, s.tex)
+	local line = newPart(Enum.PartType.Block, Vector3.new(w, 0.02, 0.05), Color3.new(1, 1, 1), frame(fromPt), if texture then 1 else 0)
+	if texture then
+		addDecal(line, texture, Enum.NormalId.Top)
+		addDecal(line, texture, Enum.NormalId.Bottom)
+	end
+	tween(line, draw, { Size = Vector3.new(w, 0.02, len), CFrame = frame(pos) }, Enum.EasingStyle.Linear)
+	Debris:AddItem(line, tearAt + 0.6)
+	task.delay(tearAt, function()
+		if not line.Parent then return end
+		-- dunkler Spalt in der Mitte
+		tween(line, 0.3, { Size = Vector3.new(w * 6, 0.02, len), Color = ctx.fx.color2, Transparency = 1 })
+		for _, d in line:GetChildren() do
+			if d:IsA("Decal") then tween(d, 0.2, { Transparency = 1 }) end
+		end
+		-- zwei weisse Raender weichen auseinander
+		for _, sgn in { 1, -1 } do
+			local edge = newPart(Enum.PartType.Block, Vector3.new(w * 0.6, 0.02, len), Color3.new(1, 1, 1), frame(pos), 0)
+			tween(edge, 0.35, { CFrame = frame(pos + across * sgn * 0.9), Transparency = 1, Size = Vector3.new(w * 0.3, 0.02, len * 0.85) },
+				Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			Debris:AddItem(edge, 0.45)
+		end
+	end)
+end
+
 -- Ab hier: nur fuer den Besitzer (Bildschirm und Kamera gehoeren ihm).
 
 local function ensureCC(ctx: Ctx): ColorCorrectionEffect
@@ -1512,6 +1855,33 @@ BLOCKS.hitstop = function(ctx, s)
 			task.delay(dur, function() tween(cam, 0.3, { FieldOfView = fov }) end)
 		end
 	end
+end
+
+-- silence: der Ton geht fuer `dur` Sekunden ganz aus (nur Besitzer). Alle
+-- gerade spielenden Klaenge werden lokal stumm und danach auf ihre
+-- Lautstaerke zurueckgesetzt (ausser der Server hat sie inzwischen geaendert).
+BLOCKS.silence = function(ctx, s)
+	if not ctx.isOwner then return end
+	local dur = s.dur or 0.3
+	local muted: { { snd: Sound, vol: number } } = {}
+	local roots: { Instance } = { workspace, game:GetService("SoundService") }
+	local gui = player:FindFirstChildOfClass("PlayerGui")
+	if gui then table.insert(roots, gui) end
+	for _, root in roots do
+		for _, d in root:GetDescendants() do
+			if d:IsA("Sound") and d.IsPlaying and d.Volume > 0 then
+				table.insert(muted, { snd = d, vol = d.Volume })
+				d.Volume = 0
+			end
+		end
+	end
+	task.delay(dur, function()
+		for _, m in muted do
+			if m.snd.Parent and m.snd.Volume == 0 then
+				m.snd.Volume = m.vol
+			end
+		end
+	end)
 end
 
 local _flashGui: ScreenGui? = nil

@@ -95,6 +95,20 @@
 --   cinematic style "chase"  Kamera schraeg hinter dem laufenden `comet`
 --   alle     ownerOnly = true Schritt nur fuer den Besitzer (z. B. Sterne
 --            als Teil seines Nachthimmels)
+--
+-- v16 (Schemen-Show) — neue Bausteine:
+--   silhouette Schatten der Figur richtet sich als flache Tinten-       behind, rise, hold, dissolve,
+--              Silhouette hinter ihr auf, zerfaellt in Rauch           tex, smokeTex
+--              (Tinten-Klon der Figur, Tiefe gestaucht; 1 Emitter)
+--   shades     Pfuetzen rund um die Figur, aus jeder steigt ein       count, distance, pool, rise,
+--              Schatten-Baerchi (Tinten-Klon), loest sich auf        fadeAt, dissolve, tex, smokeTex
+--   vanish     Figur wird blasser (LocalTransparencyModifier, nur     to, fadeIn, back
+--              lokal) und steht bei `back` schlagartig wieder da
+--   silence    der Ton geht ganz aus (nur Besitzer)                   dur
+--   cut        ein duenner weisser Schnitt quer durchs Bild (an der   length, width, draw, tearAt,
+--              Kamera jedes Clients ausgerichtet), reisst auf          angle, tex
+-- Erweiterte Parameter (v16):
+--   shards   tex  Bild auf beiden grossen Flaechen (Schattenfetzen)
 -- Fuer jeden Schritt:
 --   extra = true  Beiwerk — faellt auf niedriger Grafikstufe weg
 --                 (PARTICLE_BUDGET.EXTRAS_MIN), der Kernmoment bleibt.
@@ -174,6 +188,13 @@ local TEXTURES: { [string]: { [string]: number } } = {
 		stardust  = 0,  -- assets/vfx/comet_impact/stardust.png    (dust, comet-Funken)
 		shockring = 0,  -- assets/vfx/comet_impact/shockring.png   (ring)
 		debris    = 0,  -- assets/vfx/comet_impact/debris.png      (shards)
+	},
+	ShadeSlash = {
+		silhouette = 0, -- assets/vfx/shade_slash/silhouette.png   (silhouette)
+		shred      = 0, -- assets/vfx/shade_slash/shred.png        (shards: Schattenfetzen)
+		cut        = 0, -- assets/vfx/shade_slash/cut.png          (cut: Schnittlinie)
+		pool       = 0, -- assets/vfx/shade_slash/pool.png         (shades: Pfuetze)
+		smoke      = 0, -- assets/vfx/shade_slash/smoke.png        (silhouette/shades: Rauch)
 	},
 }
 
@@ -645,20 +666,44 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	ShadeSlash = {
-		tier = 4, duration = 4.4, color = C(30, 30, 40), color2 = C(200, 40, 80),
-		sounds = { charge = "whoosh", strike = "slash", impact = "boom" }, pitch = 0.7,
+		-- v16 (Show-Paket, Prompt 4): lautlos, scharf, unheimlich; kein Blut.
+		-- Aufladen: Licht kalt und grau (Besitzer); der Schatten des
+		--   Baerchis richtet sich als flache Tinten-Silhouette hinter ihm auf;
+		--   der Baerchi selbst wird fast durchsichtig (nur lokal).
+		-- Schlag: Silhouette zerfaellt in Rauch; aus drei Schattenpfuetzen um
+		--   den Gegner steigen drei Schatten-Baerchis; 0,3 s Stillstand, der
+		--   Ton geht ganz aus (Besitzer); EIN duenner weisser Schnitt quer
+		--   durchs Bild.
+		-- Einschlag (2,65 s): Schnitt reisst auf, Schattenfetzen flattern weg,
+		--   der Ton kommt mit einem scharfen Hieb zurueck, die Schatten loesen
+		--   sich auf, der echte Baerchi steht schlagartig wieder voll da.
+		-- Finisher-Bonus (violetter Schnitt): der Client erfaehrt ihn nicht,
+		--   siehe Bericht SHOW_SCHATTENHIEB.
+		tier = 4, duration = 4.2, color = C(18, 14, 26), color2 = C(85, 50, 135),
+		sounds = { charge = "ghost", strike = "whoosh", impact = "slash" }, pitch = 0.7,
+		impactAt = 2.65,
 		steps = {
-			{ t = 0.00, fx = "sky",       tint = C(90, 80, 110), brightness = -0.45, saturation = -0.7, dur = 4.0 },
-			{ t = 0.00, fx = "sound",     slot = "charge" },
-			{ t = 0.00, fx = "aura",      at = "self", size = 8, dur = 1.5, dark = true },
-			{ t = 1.20, fx = "cinematic", dur = 1.6, style = "low" },
-			{ t = 1.50, fx = "beam",      width = 0.5, dur = 0.25, slash = true },
-			{ t = 1.50, fx = "sound",     slot = "strike" },
-			{ t = 1.80, fx = "beam",      width = 0.5, dur = 0.25, slash = true, cross = true },
-			{ t = 2.10, fx = "hitstop",   dur = 0.5 },
-			{ t = 2.60, fx = "shards",    at = "target", count = 26, size = 0.7, dur = 1.0 },
-			{ t = 2.60, fx = "sound",     slot = "impact" },
-			{ t = 2.60, fx = "shake",     power = 1.0, dur = 0.5 },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",        tint = C(165, 165, 185), brightness = -0.25, saturation = -0.85, dur = 3.4, fade = 0.6 },
+			{ t = 0.00, fx = "sound",      slot = "charge" },
+			{ t = 0.10, fx = "silhouette", at = "self", behind = 1.4, rise = 1.0, hold = 0.45, dissolve = 0.4, tex = "silhouette", smokeTex = "smoke" },
+			{ t = 0.20, fx = "vanish",     at = "self", to = 0.85, fadeIn = 1.1, back = 2.55 },
+			-- 2. Schlag
+			{ t = 1.55, fx = "shades",     at = "target", count = 3, distance = 3.4, pool = 1.7, rise = 0.5, fadeAt = 1.15, dissolve = 0.35, tex = "pool", smokeTex = "smoke" },
+			{ t = 1.60, fx = "sound",      slot = "strike" },
+			{ t = 2.20, fx = "silence",    dur = 0.45 },
+			{ t = 2.20, fx = "hitstop",    dur = 0.3 },
+			{ t = 2.25, fx = "cut",        at = "target", length = 22, width = 0.12, draw = 0.08, tearAt = 0.4, tex = "cut" },
+			-- 3. Einschlag
+			{ t = 2.65, fx = "sound",      slot = "impact" },
+			{ t = 2.65, fx = "shards",     at = "target", count = 18, size = 0.5, dur = 0.9, tex = "shred" },
+			{ t = 2.65, fx = "shake",      power = 0.4, dur = 0.25 },
+		},
+		-- Echo (0,65 s): nur die Stille (0,15 s) und der weisse Schnitt.
+		echo = {
+			{ t = 0.00, fx = "silence", dur = 0.15 },
+			{ t = 0.02, fx = "cut",     at = "target", length = 16, width = 0.1, draw = 0.05, tearAt = 0.13, tex = "cut" },
+			{ t = 0.15, fx = "sound",   slot = "impact" },
 		},
 	},
 
