@@ -19,7 +19,9 @@ Instanz-Pfade, und `require(RS.Config.X)` geht ueber rbxRequire.
 import os, sys, subprocess, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MAPS = {"src/shared": "ReplicatedStorage", "src/server": "ServerScriptService"}
+MAPS = {"src/shared": "ReplicatedStorage", "src/server": "ServerScriptService",
+        # reine Daten-Module des Clients (z. B. UI/EggTreeLayout)
+        "src/client": "StarterPlayerScripts"}
 
 def long_string(text):
     level = 1
