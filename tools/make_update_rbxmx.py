@@ -20,6 +20,12 @@ Skripte und LocalScripts sind in der Datei deaktiviert (Disabled), damit
 nichts im Workspace losläuft, bevor es an seinem Platz ist.
 
 Geloeschte Dateien werden nur gemeldet (nichts loeschen ist Projektregel).
+
+Schutz (10.10.2026): Enthaelt das Update WorldFXConfig oder SkillFXConfig,
+muessen deren Asset-IDs (SOUNDS, TEXTURE_IDS, TEXTURES) gefuellt sein
+(tools/check_asset_ids.py). Sonst wird KEINE Datei geschrieben — das Update
+wuerde die in Studio eingetragenen IDs leeren. --allow-empty-ids nur, wenn
+das wirklich gewollt ist.
 """
 import argparse
 import subprocess
@@ -112,11 +118,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("since", help="Commit, seit dem die Aenderungen gelten")
     parser.add_argument("-o", "--out", default=None)
+    parser.add_argument("--allow-empty-ids", action="store_true",
+                        help="Update auch mit leeren Asset-IDs schreiben (leert sie in Studio!)")
     args = parser.parse_args()
 
     files, deleted = changed_files(args.since)
     if not files:
         print("Keine geaenderten .luau-Dateien.")
+        return 1
+
+    # Asset-IDs: kein Update, das in Studio gefuellte IDs wieder leert
+    sys.path.insert(0, str(ROOT / "tools"))
+    import check_asset_ids
+    problems = []
+    for path in files:
+        name = Path(path).name[: -len(".luau")]
+        if name in check_asset_ids.MINDESTENS:
+            problems += check_asset_ids.check(name, (ROOT / path).read_text(encoding="utf-8"))
+    if problems and not args.allow_empty_ids:
+        print("ABBRUCH: Das Update wuerde Asset-IDs in Studio leeren. Erst die IDs aus Studio")
+        print("ins Repo uebernehmen (tools/check_asset_ids.py muss gruen sein).")
         return 1
     tree = build_tree(files)
     out = [
