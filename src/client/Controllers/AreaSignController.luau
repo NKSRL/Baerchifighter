@@ -74,7 +74,10 @@ local function attach(part: BasePart)
 	gui.Name = "AreaSign_" .. part.Name
 	gui.Adornee = part
 	gui.Size = UDim2.fromScale(def.size.X, def.size.Y)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, def.lift, 0)
+	-- StudsOffsetWorldSpace wirkt in den Achsen des Adornee. EventFloor und
+	-- FightFloor sind liegende Zylinder (um Z gedreht): "oben" waere dort
+	-- seitlich, das Schild laege halb im Boden. Darum Welt-Oben umrechnen.
+	gui.StudsOffsetWorldSpace = part.CFrame:VectorToObjectSpace(Vector3.new(0, def.lift, 0))
 	gui.MaxDistance = SIGN_DISTANCE
 	gui.LightInfluence = 0
 	gui.AlwaysOnTop = false
