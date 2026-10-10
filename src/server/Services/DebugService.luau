@@ -38,6 +38,7 @@
 --   D:Invoke("honey")               -- alle Honig-Lager sofort voll
 --   D:Invoke("feed", uid, 20)       -- 20x fuettern (heilt + gibt XP)
 --   D:Invoke("fight", uid)          -- kompletter Lauf im gewaehlten Tower
+--   D:Invoke("skill", "equipped", "OmegaStrike") -- Faehigkeit tauschen (Show-Test)
 --   D:Invoke("rebirth")
 --
 -- v8 (Promotion / Charms / Event-Teilnahme):
@@ -135,6 +136,7 @@ local Loc = require(ReplicatedStorage.Localization.Loc)   -- Belohnung ist eine 
 local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiFactory   = require(ReplicatedStorage.Modules.BaerchiFactory)
+local SkillConfig      = require(ReplicatedStorage.Config.SkillConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local EggCalculator    = require(ReplicatedStorage.Modules.EggCalculator)
 local CombConfig       = require(ReplicatedStorage.Config.CombConfig)
@@ -311,6 +313,24 @@ commands.add = function(player, data, configId: any, level: any, mutation: any)
 		level    = baerchi.level,
 		mutation = baerchi.mutation,
 	}
+end
+
+-- Faehigkeit eines Baerchis tauschen (zum Testen der Shows).
+-- uid "equipped" (oder leer) = der ausgeruestete Baerchi.
+--   D:Invoke("skill", "equipped", "OmegaStrike")
+commands.skill = function(player, data, uid: any, skillId: any)
+	local id = if uid == nil or uid == "equipped" then data.island.equippedUid else tostring(uid)
+	local baerchi = if id then data.island.baerchis[id] else nil
+	if not baerchi then
+		return { error = "Kein Baerchi mit uid " .. tostring(id) }
+	end
+	if not SkillConfig.getById(tostring(skillId)) then
+		return { error = "Unbekannte Faehigkeit: " .. tostring(skillId) }
+	end
+	local before = baerchi.skillId
+	baerchi.skillId = tostring(skillId) :: any
+	PlayerService.markDirty(player)
+	return { uid = baerchi.uid, configId = baerchi.configId, vorher = before, jetzt = baerchi.skillId }
 end
 
 -- Die Kampfwerte eines Baerchis so, wie der Kampf sie sieht. Praktisch, um
@@ -1172,7 +1192,7 @@ commands.help = function()
 		"add <configId> <level> [mutation]", "stats <uid>",
 		"building <id> <level>",
 		"hatch <eggType>", "egg <eggType> [anzahl]", "pitprogress <stage>", "honey", "feed <uid> <times>",
-		"fight <uid>",
+		"fight <uid>", "skill <uid|equipped> <skillId>",
 		"fuse <uidA> <uidB> [ability|level|eggs] [A|B]",
 		"recycle <uid>", "upgrade <buildingId>", "rebirth",
 
