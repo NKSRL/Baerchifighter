@@ -168,7 +168,12 @@ def build_material(lk):
         edge_line = g.mul(g.smooth(dz, half + 0.012, half - 0.012), g.smooth(dz, half - 0.07, half - 0.045))
         dark = bl.lerp(acc, (0, 0, 0), 0.0)
         deep = tuple(c * 0.42 for c in base[:3]) + (1.0,)
-        col = g.mix(band, base, acc)
+        band_c = lk["accent"]
+        if abs(lum(band_c) - lum(lk["base"])) < 0.15:
+            # Heller Guertel auf hellem Ei (Platin, Zenit) waere unsichtbar:
+            # dann ein Honiggold-Guertel.
+            band_c = (236, 162, 40)
+        col = g.mix(band, base, bl.srgb(band_c))
         col = g.mix(edge_line, col, deep)
         studs = [(surface(u, (zc - HALF_H) / HALF_H), 0.065) for u in (-48, -16, 16, 48)]
         sm = spot_mask(g, studs, 0.012)
@@ -218,10 +223,16 @@ def build_material(lk):
             col = g.mix(g.mul(g.smooth(p1, 0.35, 0.7), 0.35), col, bl.srgb((255, 170, 230)))
             p2 = g.noise(g.obj, 1.1, 2.0, 0.5, w=11.0)
             col = g.mix(g.mul(g.smooth(p2, 0.45, 0.75), 0.3), col, bl.srgb((150, 210, 255)))
-        star_col = acc if (lk["path"] in ("Ascension", "Event") or lum(lk["accent"]) >= lum(lk["base"])) else bl.lerp(base, (1, 1, 1), 0.85) + (1.0,)
+        if lk["path"] == "Kosmos" and lum(lk["base"]) > 0.8:
+            # Sterne auf dem fast weissen Nova-Ei: Kosmos-Violett statt Weiss
+            star_col = bl.srgb((120, 96, 255))
+        elif lk["path"] in ("Ascension", "Event") or lum(lk["accent"]) >= lum(lk["base"]):
+            star_col = acc
+        else:
+            star_col = bl.lerp(base, (1, 1, 1), 0.85) + (1.0,)
         c = lambda u, v, r: (surface(u, v), r)  # noqa: E731
         big = star_mask(g, [c(-24, -0.2, 0.24), c(26, 0.32, 0.17), c(30, -0.6, 0.12), c(-40, 0.55, 0.09)])
-        tiny = tiny_stars(g, 7.0, 0.055, 1.7)
+        tiny = tiny_stars(g, 9.0 if lk["path"] == "Kosmos" else 7.0, 0.05, 1.7)
         neon_mask = g.maxi(big, g.mul(tiny, 0.9))
         neon_col = star_col
 
@@ -249,7 +260,7 @@ def render_egg(scene, egg, out):
     obj = make_egg()
     obj.data.materials.append(build_material(lk))
     bl.add_hull(obj, OUTLINE_W).rotation_euler = obj.rotation_euler
-    bl.soft_shadow("Shadow", 1.75, 0.38, 0.06, alpha=0.5, x=0.05)
+    bl.soft_shadow("Shadow", 1.9, 0.42, 0.07, alpha=0.62, x=0.06)
     bl.render(scene, os.path.join(out, egg["id"] + ".png"))
 
 

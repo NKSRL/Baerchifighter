@@ -28,6 +28,7 @@ local Theme        = require(script.Parent.Theme)
 local UiScale      = require(script.Parent.UiScale)
 local PanelManager = require(script.Parent.PanelManager)
 local Icons        = require(script.Parent.Icons)
+local EggIcon      = require(script.Parent.EggIcon)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local Unlock       = require(script.Parent.Unlock)
 
@@ -123,9 +124,19 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	button.TextColor3  = Theme.COLORS.outline
 	Theme.gradient(button, Theme.shade(entry.color, 0.34), Theme.shade(entry.color, -0.16))
 
-	-- Bild-Icon gross in die Kachel. Ohne Asset bleibt das Text-Kuerzel stehen.
-	local hasImage = Icons.has(entry.icon)
-	if hasImage then
+	-- Eier-Kachel im Bilderbuch-Stil wie Ei-Fenster und Ei-Baum: Zierrahmen
+	-- und das gezeichnete Basis-Ei auf einem Sockel. Erst wenn die Bilder
+	-- hochgeladen sind (Icons.luau); bis dahin die normale Kachel.
+	local storybook = entry.panel == "Hatch" and EggIcon.imageId("BasicEgg") ~= nil
+	local hasImage = storybook or Icons.has(entry.icon)
+	if storybook then
+		button.Text = ""
+		Theme.gradient(button, Theme.COLORS.cream, Theme.shade(Theme.COLORS.honey, -0.05))
+		Theme.ornate(button, "tile", 0.3)
+		local egg = EggIcon.make(button, "BasicEgg", 38, 3, { idle = true, pedestal = true })
+		egg.AnchorPoint = Vector2.new(0.5, 0)
+		egg.Position    = UDim2.new(0.5, 0, 0, 2)
+	elseif hasImage then
 		button.Text = ""
 		local icon = Icons.make(button, entry.icon)
 		icon.AnchorPoint = Vector2.new(0.5, 0.5)

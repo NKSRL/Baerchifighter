@@ -35,6 +35,119 @@ local IDS: { [string]: string } = {
 	lock      = "rbxassetid://93949208631544",
 }
 
+--------------------------------------------------------------------------------
+-- Bilder fuer Ei-Menue, Ei-Baum und MenuBar (assets/ui/, gezeichnet in Blender
+-- mit tools/art/render_eggs.py und tools/art/render_ui.py)
+--------------------------------------------------------------------------------
+--
+-- Schluessel = Pfad unter assets/ui/ ohne ".png". Nach dem Hochladen kommt
+-- die ID als "rbxassetid://<id>" hinter den Schluessel. Leer = noch nicht
+-- hochgeladen: dann zeichnen EggIcon, Theme und EggTreePanel ihren
+-- einfachen Rueckfall (Frames, Farben, Text) — das UI bleibt bedienbar.
+-- Anleitung: docs/HBB_COWORK_EI_UI_PROMPT.md
+local UI_IDS: { [string]: string } = {
+	["eggs/AbyssEgg"]               = "",
+	["eggs/AscensionEgg"]           = "",
+	["eggs/AuroraEgg"]              = "",
+	["eggs/BasicEgg"]               = "",
+	["eggs/CometEgg"]               = "",
+	["eggs/CrystalEgg"]             = "",
+	["eggs/EternityEgg"]            = "",
+	["eggs/GalaxyEgg"]              = "",
+	["eggs/GoldenEgg"]              = "",
+	["eggs/MistEgg"]                = "",
+	["eggs/NovaEgg"]                = "",
+	["eggs/OmegaEgg"]               = "",
+	["eggs/PlatinumEgg"]            = "",
+	["eggs/PrismEgg"]               = "",
+	["eggs/ShadowEgg"]              = "",
+	["eggs/SugarEgg"]               = "",
+	["eggs/SunEgg"]                 = "",
+	["eggs/TranscendenceEgg"]       = "",
+	["eggs/UfoJackpotEgg"]          = "",
+	["eggs/VoidEgg"]                = "",
+	["eggs/ZenithEgg"]              = "",
+	["eggs/egg_mask"]               = "",
+	["tree/branch_ascension"]       = "",
+	["tree/branch_glow"]            = "",
+	["tree/branch_gold"]            = "",
+	["tree/branch_kosmos"]          = "",
+	["tree/branch_kristall"]        = "",
+	["tree/branch_stamm"]           = "",
+	["tree/branch_void"]            = "",
+	["tree/cup_locked_back"]        = "",
+	["tree/cup_locked_front"]       = "",
+	["tree/cup_open_back"]          = "",
+	["tree/cup_open_front"]         = "",
+	["tree/cup_ready_back"]         = "",
+	["tree/cup_ready_front"]        = "",
+	["tree/lock"]                   = "",
+	["tree/tree_bg"]                = "",
+	["tree/trunk"]                  = "",
+	["fx/honeylight"]               = "",
+	["fx/pollen"]                   = "",
+	["fx/ring_rays"]                = "",
+	["fx/ring_soft"]                = "",
+	["fx/sparkle"]                  = "",
+	["frames/frame_card"]           = "",
+	["frames/frame_panel"]          = "",
+	["frames/frame_tile"]           = "",
+	["frames/pedestal"]             = "",
+	["frames/seal"]                 = "",
+}
+
+-- 9-Slice-Rahmen: SliceCenter in Bildpixeln {links, oben, rechts, unten}.
+-- Fest, weil die Bilder fest sind (render_ui.py: frame()/render_seal()).
+local SLICES: { [string]: { number } } = {
+	["frames/frame_panel"] = { 72, 72, 184, 184 },   -- 256 × 256
+	["frames/frame_card"]  = { 64, 64, 192, 192 },   -- 256 × 256
+	["frames/frame_tile"]  = { 76, 76, 180, 180 },   -- 256 × 256, Mitte durchsichtig
+	["frames/seal"]        = { 76, 44, 180, 84 },    -- 256 × 128
+}
+
+-- ID eines UI-Bildes oder nil, wenn es (noch) keine gibt.
+function Icons.ui(name: string): string?
+	local id = UI_IDS[name]
+	if id == nil or id == "" then return nil end
+	return id
+end
+
+function Icons.hasUi(name: string): boolean
+	return Icons.ui(name) ~= nil
+end
+
+-- Alle Schluessel (fuer Tests und den Upload-Abgleich).
+function Icons.uiNames(): { string }
+	local list = {}
+	for name in UI_IDS do table.insert(list, name) end
+	table.sort(list)
+	return list
+end
+
+-- Bild als ImageLabel in `parent`, oder nil ohne ID (der Aufrufer baut dann
+-- seinen Rueckfall). 9-Slice-Rahmen bekommen SliceCenter automatisch;
+-- `sliceScale` macht den Rand auf kleinen Flaechen schmaler.
+function Icons.uiImage(parent: Instance, name: string, sliceScale: number?): ImageLabel?
+	local id = Icons.ui(name)
+	if not id then return nil end
+	local image = Instance.new("ImageLabel")
+	image.Name                   = string.match(name, "[^/]+$") or name
+	image.BackgroundTransparency = 1
+	image.BorderSizePixel        = 0
+	image.Image                  = id
+	image.Active                 = false
+	local slice = SLICES[name]
+	if slice then
+		image.ScaleType   = Enum.ScaleType.Slice
+		image.SliceCenter = Rect.new(slice[1], slice[2], slice[3], slice[4])
+		image.SliceScale  = sliceScale or 1
+	else
+		image.ScaleType = Enum.ScaleType.Stretch
+	end
+	image.Parent = parent
+	return image
+end
+
 function Icons.has(name: string): boolean
 	local id = IDS[name]
 	return id ~= nil and id ~= ""
