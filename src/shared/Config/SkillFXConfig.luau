@@ -185,43 +185,43 @@ local PARTICLE_BUDGET = {
 -- (gezeichnet von tools/render_vfx_glacier.py).
 local TEXTURES: { [string]: { [string]: number } } = {
 	GlacierFrost = {
-		breath    = 0,  -- assets/vfx/glacier_frost/breath.png     (breath)
-		veins     = 0,  -- assets/vfx/glacier_frost/veins.png      (groundmark)
-		crack     = 0,  -- assets/vfx/glacier_frost/crack.png      (crack)
-		spike     = 0,  -- assets/vfx/glacier_frost/spike.png      (spikes)
-		frostring = 0,  -- assets/vfx/glacier_frost/frostring.png  (ring)
-		flake     = 0,  -- assets/vfx/glacier_frost/flake.png      (snowfall)
+		breath    = 128701191651763,  -- assets/vfx/glacier_frost/breath.png     (breath)
+		veins     = 108102700609452,  -- assets/vfx/glacier_frost/veins.png      (groundmark)
+		crack     = 83712175066666,  -- assets/vfx/glacier_frost/crack.png      (crack)
+		spike     = 108620496348253,  -- assets/vfx/glacier_frost/spike.png      (spikes)
+		frostring = 122675729761295,  -- assets/vfx/glacier_frost/frostring.png  (ring)
+		flake     = 131706213425867,  -- assets/vfx/glacier_frost/flake.png      (snowfall)
 	},
 	SeraphGrace = {
-		feather   = 0,  -- assets/vfx/seraph_grace/feather.png     (wings, snowfall)
-		halo      = 0,  -- assets/vfx/seraph_grace/halo.png        (halo)
-		comb      = 0,  -- assets/vfx/seraph_grace/comb.png        (honeycomb)
-		column    = 0,  -- assets/vfx/seraph_grace/column.png      (pillar, Beam)
-		cloudrim  = 0,  -- assets/vfx/seraph_grace/cloudrim.png    (ring lift)
-		spark     = 0,  -- assets/vfx/seraph_grace/spark.png       (wings: Funken)
+		feather   = 118911033478580,  -- assets/vfx/seraph_grace/feather.png     (wings, snowfall)
+		halo      = 76906350593962,  -- assets/vfx/seraph_grace/halo.png        (halo)
+		comb      = 83718216641782,  -- assets/vfx/seraph_grace/comb.png        (honeycomb)
+		column    = 71806259051383,  -- assets/vfx/seraph_grace/column.png      (pillar, Beam)
+		cloudrim  = 127806895070731,  -- assets/vfx/seraph_grace/cloudrim.png    (ring lift)
+		spark     = 106826574005325,  -- assets/vfx/seraph_grace/spark.png       (wings: Funken)
 	},
 	CometImpact = {
-		glow      = 0,  -- assets/vfx/comet_impact/glow.png        (comet: Glut des Kopfs)
-		tail      = 0,  -- assets/vfx/comet_impact/tail.png        (comet: Schweif-Streifen)
-		crater    = 0,  -- assets/vfx/comet_impact/crater.png      (crater: Bodenbild)
-		stardust  = 0,  -- assets/vfx/comet_impact/stardust.png    (dust, comet-Funken)
-		shockring = 0,  -- assets/vfx/comet_impact/shockring.png   (ring)
-		debris    = 0,  -- assets/vfx/comet_impact/debris.png      (shards)
+		glow      = 78155128670440,  -- assets/vfx/comet_impact/glow.png        (comet: Glut des Kopfs)
+		tail      = 101351895284831,  -- assets/vfx/comet_impact/tail.png        (comet: Schweif-Streifen)
+		crater    = 91967482890855,  -- assets/vfx/comet_impact/crater.png      (crater: Bodenbild)
+		stardust  = 90923615677992,  -- assets/vfx/comet_impact/stardust.png    (dust, comet-Funken)
+		shockring = 94175665045126,  -- assets/vfx/comet_impact/shockring.png   (ring)
+		debris    = 109358680968881,  -- assets/vfx/comet_impact/debris.png      (shards)
 	},
 	ShadeSlash = {
-		silhouette = 0, -- assets/vfx/shade_slash/silhouette.png   (silhouette)
-		shred      = 0, -- assets/vfx/shade_slash/shred.png        (shards: Schattenfetzen)
-		cut        = 0, -- assets/vfx/shade_slash/cut.png          (cut: Schnittlinie)
-		pool       = 0, -- assets/vfx/shade_slash/pool.png         (shades: Pfuetze)
-		smoke      = 0, -- assets/vfx/shade_slash/smoke.png        (silhouette/shades: Rauch)
+		silhouette = 125015870422458, -- assets/vfx/shade_slash/silhouette.png   (silhouette)
+		shred      = 94910203650752, -- assets/vfx/shade_slash/shred.png        (shards: Schattenfetzen)
+		cut        = 119530388511860, -- assets/vfx/shade_slash/cut.png          (cut: Schnittlinie)
+		pool       = 138683105162589, -- assets/vfx/shade_slash/pool.png         (shades: Pfuetze)
+		smoke      = 84950422585772, -- assets/vfx/shade_slash/smoke.png        (silhouette/shades: Rauch)
 	},
 	OmegaStrike = {
-		omega     = 0,  -- assets/vfx/omega_strike/omega.png       (omega sky: Ω-Ring)
-		spectrum  = 0,  -- assets/vfx/omega_strike/spectrum.png    (wipe: Spektrum-Verlauf)
-		orb       = 0,  -- assets/vfx/omega_strike/orb.png         (converge: Lichtpunkt, je Pfadfarbe eingefaerbt)
-		brand     = 0,  -- assets/vfx/omega_strike/brand.png       (omega brand: Ω-Brandzeichen)
-		shockring = 0,  -- assets/vfx/omega_strike/shockring.png   (ring)
-		column    = 0,  -- assets/vfx/omega_strike/column.png      (pillar: Lichtsaeule, Beam)
+		omega     = 74052847419711,  -- assets/vfx/omega_strike/omega.png       (omega sky: Ω-Ring)
+		spectrum  = 130680123382821,  -- assets/vfx/omega_strike/spectrum.png    (wipe: Spektrum-Verlauf)
+		orb       = 108821180032706,  -- assets/vfx/omega_strike/orb.png         (converge: Lichtpunkt, je Pfadfarbe eingefaerbt)
+		brand     = 99596249189534,  -- assets/vfx/omega_strike/brand.png       (omega brand: Ω-Brandzeichen)
+		shockring = 113660680485949,  -- assets/vfx/omega_strike/shockring.png   (ring)
+		column    = 88556419138916,  -- assets/vfx/omega_strike/column.png      (pillar: Lichtsaeule, Beam)
 	},
 }
 

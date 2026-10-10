@@ -31,28 +31,28 @@ local WorldFXConfig = {}
 -- Farbe/Neon. Alles laeuft also auch ohne Upload.
 WorldFXConfig.TEXTURE_IDS = {
 	-- Paket A
-	cloud_puff_flipbook = "",
-	firefly             = "",
-	star_twinkle        = "",
+	cloud_puff_flipbook = "rbxassetid://128747336317638",
+	firefly             = "rbxassetid://89196054022807",
+	star_twinkle        = "rbxassetid://106120148946352",
 	-- Paket B
-	water_glitter       = "",
-	water_waves         = "",
-	foam_lace           = "",
-	splash_flipbook     = "",
-	water_ring          = "",
+	water_glitter       = "rbxassetid://108040798835003",
+	water_waves         = "rbxassetid://134312309838253",
+	foam_lace           = "rbxassetid://83236022496772",
+	splash_flipbook     = "rbxassetid://87718069497123",
+	water_ring          = "rbxassetid://132322273098765",
 	-- Paket C
-	amber_comb          = "",
-	honey_drop          = "",
-	honey_bubble        = "",
-	bee_flipbook        = "",
-	wasp_flipbook       = "",
-	pennant_fabric      = "",
-	stall_stripes       = "",
-	bear_sign           = "",
-	shine_strip         = "",
+	amber_comb          = "rbxassetid://118473973330379",
+	honey_drop          = "rbxassetid://77293210275617",
+	honey_bubble        = "rbxassetid://81052068557787",
+	bee_flipbook        = "rbxassetid://133978541244351",
+	wasp_flipbook       = "rbxassetid://99266011477739",
+	pennant_fabric      = "rbxassetid://88098201045096",
+	stall_stripes       = "rbxassetid://105107918096375",
+	bear_sign           = "rbxassetid://123127222689607",
+	shine_strip         = "rbxassetid://137138601948832",
 	-- Paket E–F (D braucht keine: Blumen, Pilze, Bienenhaus sind Formen)
-	flag_fabric         = "",
-	paw_print           = "",
+	flag_fabric         = "rbxassetid://123262592121745",
+	paw_print           = "rbxassetid://78747112186843",
 } :: { [string]: string }
 
 -- Eingebaute Roblox-Texturen als Rueckfall fuer Partikel. Was hier fehlt, hat
