@@ -30,6 +30,7 @@ local Loc              = require(ReplicatedStorage.Localization.Loc)   -- Sammel
 local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
 
 local Theme           = require(script.Parent.Theme)
+local PanelManager = require(script.Parent.PanelManager)   -- 08.10.: Tower-Name oeffnet das Tower-Panel
 local UiScale         = require(script.Parent.UiScale)
 local TouchSafeArea   = require(script.Parent.TouchSafeArea)
 local Icons           = require(script.Parent.Icons)
@@ -327,6 +328,11 @@ end
 -- HBB Paket 2: Anker fuer die Fuehrung (GuideController)
 --------------------------------------------------------------------------------
 
+-- 08.10.: letzter Zustand vom Server ("Home", "ToPit", "InPit", ...)
+function PetBar.getState(): string
+	return _state
+end
+
 function PetBar.getButton(mode: string): GuiObject?
 	local view = if mode == "Fight" then _fight elseif mode == "Event" then _event else nil
 	return if view then view.button else nil
@@ -428,6 +434,26 @@ function PetBar.init(screenGui: ScreenGui)
 		refresh()
 	end)
 	FightStartPrompt.init(screenGui, bar)
+
+	-- 08.10. (Tower-Terminal): Antippen des Tower-Namens unter "Kampf"
+	-- ("HP 100% · Tower I") oeffnet das Tower-Panel — derselbe Weg wie am
+	-- Terminal, nur kuerzer. Eine unsichtbare Flaeche ueber der Unterzeile.
+	local towerTap = Instance.new("TextButton")
+	towerTap.Name = "TowerTap"
+	towerTap.BackgroundTransparency = 1
+	towerTap.Text = ""
+	towerTap.AnchorPoint = Vector2.new(1, 1)
+	towerTap.Position = UDim2.new(1, 0, 1, 0)
+	towerTap.Size = UDim2.new(1, -64, 0, 30)
+	towerTap.ZIndex = 7
+	towerTap.Parent = _fight.button
+	towerTap.Activated:Connect(function()
+		if _state == "ToPit" or _state == "InPit" then
+			onFightClicked()   -- waehrend des Kampfs bleibt es der Zurueckholen-Knopf
+			return
+		end
+		PanelManager.open(PanelManager.ARENA_PANEL)
+	end)
 
 	PitResumeDialog.init(screenGui)
 

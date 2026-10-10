@@ -356,10 +356,15 @@ function CombatPanel.init(screenGui: ScreenGui)
 		PanelManager.open(REBIRTH_PANEL)
 	end)
 
-	PanelManager.register(PANEL_NAME, {
-		open  = openInternal,
-		close = closeInternal,
-	})
+	-- 08.10. (Paket D): mit TOWER_PANEL_V2 meldet sich das neue Tower-Panel
+	-- (UI/TowerPanel) unter demselben Namen an; dieses Fenster bleibt dann
+	-- unsichtbar, die Ergebnis-/Meilenstein-Meldungen unten laufen weiter.
+	if not FeatureFlags.isOn("TOWER_PANEL_V2") then
+		PanelManager.register(PANEL_NAME, {
+			open  = openInternal,
+			close = closeInternal,
+		})
+	end
 
 	ClientState.onChanged(function()
 		CombatPanel.refresh()

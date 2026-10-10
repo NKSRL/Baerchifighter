@@ -412,11 +412,12 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 		{ name = "Topfdeckel",  shape = Enum.PartType.Cylinder, size = Vector3.new( 0.4, 1.8,  1.8), offset = Vector3.new( 2.8, 10.70, 2.8), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT },
 	},
 
-	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe. Alles
-	-- steht auf Beet-Hoehe in der Beckenmitte; der Boden (0,45) und der Honig
-	-- verdecken die Fuesse. Die Looks 2-6 bauen darum den Brunnen auf.
+	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe. Was
+	-- im Becken steht, steht AUF dem Beckenboden (POND_FLOOR_TOP 0.45), nicht
+	-- im Beet darunter (check_decor.py Regel 6). Die Looks 2-6 bauen darum den
+	-- Brunnen auf.
 	HoneyPond = {
-		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(2.4, 0.9, 0.9),   offset = Vector3.new(0, 1.20, 0), color = WOOD,  material = Enum.Material.Wood, rotation = UPRIGHT },
+		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(1.95, 0.9, 0.9),  offset = Vector3.new(0, 1.425, 0), color = WOOD,  material = Enum.Material.Wood, rotation = UPRIGHT },
 		{ name = "Wabe",       shape = Enum.PartType.Block,    size = Vector3.new(1.6, 1.2, 0.5),   offset = Vector3.new(0, 2.90, 0), color = HONEY, material = Enum.Material.Neon },
 	},
 }
@@ -471,10 +472,10 @@ local BUILDING_LOOK_DECOR: { [string]: { [number]: { DecorPiece } } } = {
 		[2] = {
 			{ name = "L2Rinne",    shape = Enum.PartType.Block,    size = Vector3.new(0.6, 0.5, 3.2),   offset = Vector3.new(0, 2.55, -1.6), color = WOOD_DARK, material = Enum.Material.Wood },
 			{ name = "L2Strahl",   shape = Enum.PartType.Cylinder, size = Vector3.new(2.3, 0.5, 0.5), offset = Vector3.new(0, 1.15, -3.0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
-			{ name = "L2Topf",     shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.6, 1.8),   offset = Vector3.new(5.5, 0.80, 3.0), color = HONEY_DEEP },
+			{ name = "L2Topf",     shape = Enum.PartType.Ball,     size = Vector3.new(1.8, 1.6, 1.8),   offset = Vector3.new(5.5, 1.25, 3.0), color = HONEY_DEEP },
 		},
 		[3] = {
-			{ name = "L3Saeule",   shape = Enum.PartType.Cylinder, size = Vector3.new(4.0, 4.0, 4.0),   offset = Vector3.new(0, 2.00, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+			{ name = "L3Saeule",   shape = Enum.PartType.Cylinder, size = Vector3.new(3.55, 4.0, 4.0),  offset = Vector3.new(0, 2.225, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
 			{ name = "L3Schale",   shape = Enum.PartType.Cylinder, size = Vector3.new(0.8, 9.0, 9.0),   offset = Vector3.new(0, 4.40, 0), color = POND_STONE, material = Enum.Material.Slate, rotation = UPRIGHT },
 			{ name = "L3Honig",    shape = Enum.PartType.Cylinder, size = Vector3.new(0.2, 8.2, 8.2),   offset = Vector3.new(0, 4.90, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
 		},
@@ -741,17 +742,22 @@ local POND_STAND_GAP = 3.2
 
 -- Die Bohlen, auf denen er dabei steht.
 --
--- Sie liegen fast buendig im Gras (Oberkante 0.06 statt einer richtigen
--- Steghoehe): FigureWalker setzt den Baerchi beim Laufen auf BEET-Hoehe, ein
--- aufgestaender Steg waere also eine Bohle, in der er bis zum Knie steckt.
-local POND_PLANK_SIZE   = Vector3.new(8.4, 0.9, 2.4)
+-- Sie LIEGEN auf dem Gras (Unterkante = Beet) und sind dafuer duenn:
+-- FigureWalker setzt den Baerchi beim Laufen auf BEET-Hoehe, ein hoher Steg
+-- waere also eine Bohle, in der er bis zum Knie steckt. 08.10. (Playtest):
+-- vorher 0.9 dick mit Oberkante 0.06 — 0.84 steckten im Boden, von der
+-- Seite sah man nur eine Kante im Gras. Jetzt 0.2: der Fuss sinkt 0.2 ein,
+-- das liest das Auge als "steht auf dem Brett".
+local POND_PLANK_SIZE   = Vector3.new(8.4, 0.2, 2.4)
 local POND_PLANK_GAP    = 0.2    -- Fuge zwischen den beiden Bohlen
-local POND_PLANK_TOP    = 0.06   -- Oberkante ueber dem Beet
+local POND_PLANK_TOP    = 0.2    -- Oberkante ueber dem Beet (= Dicke: liegt auf)
 local POND_PLANK_COLORS: { Color3 } = {
 	Color3.fromRGB(168, 118, 70),
 	Color3.fromRGB(138,  94,  55),
 }
-local POND_PEG_SIZE   = Vector3.new(1.7, 0.9, 0.9)   -- Pflock, liegender Zylinder
+-- Pflock: STEHENDER Zylinder (Laenge = Size.X), ein kleiner Pfosten an jedem
+-- Bohlen-Ende. Hoehe ueber dem Beet: POND_PEG_LIFT (Rueckgabe-Tabelle).
+local POND_PEG_SIZE   = Vector3.new(1.7, 0.9, 0.9)
 local POND_PEG_SPREAD = 4.8                          -- Abstand der beiden Pfloecke zur Mitte
 
 -- Reine Zierde am Becken. Die Offsets sind TEICH-lokal, mit derselben Regel
@@ -1481,6 +1487,9 @@ return {
 
 	POND_STAND_GAP    = POND_STAND_GAP,
 	POND_PLANK_SIZE   = POND_PLANK_SIZE,
+	-- Pflock-Mittelpunkt ueber dem Beet als Anteil seines Durchmessers
+	-- (liegender Zylinder): 0.5 = liegt auf (direkt hier: 200-Locals-Limit)
+	POND_PEG_LIFT     = 0.5,
 	POND_PLANK_GAP    = POND_PLANK_GAP,
 	POND_PLANK_TOP    = POND_PLANK_TOP,
 	POND_PLANK_COLORS = POND_PLANK_COLORS,
@@ -1533,6 +1542,50 @@ return {
 	WASP_NEST = WASP_NEST,
 	ARENA_WALK_SPEED = ARENA_WALK_SPEED,
 	TOWER_LOOKS    = TOWER_LOOKS,
+
+	-- 08.10. (Paket B2): das Tower-Terminal auf der Plot-Insel, am Stegbeginn
+	-- zur Arena. Plot-lokal (+Z = zur Arena), ausserhalb des Beets, neben dem
+	-- Laufweg (Steg-Achse x = 0). Terminal-lokal: Ursprung = Boden, -Z = die
+	-- Seite mit dem Bildschirm (zum Beet hin, `yaw` dreht ihn schraeg zum
+	-- Weg). Ein kleiner Kiosk als Baerchi-Kopf (Ohren), Bildschirm (Client
+	-- haengt dort ein SurfaceGui an), Antenne mit Lampe (Zustandsfarbe).
+	-- Gebaut einmal mit dem Plot (TerminalBuilder); was er zeigt, kommt als
+	-- Attribut, nie durch Neubau. Direkt hier: 200-Locals-Limit.
+	-- tools/luau-tests/tower_unlock.test.lua prueft Platz, Boden und Budget.
+	TOWER_TERMINAL = {
+		offset         = Vector3.new(11, 0, 45),
+		yaw            = 36,     -- Grad um Y: Bildschirm schaut schraeg zum Beet/Steg
+		footprint      = 3.6,    -- Radius um den Grundriss (Abstands-Test)
+		screenPart     = "Bildschirm",
+		lampPart       = "Lampe",
+		screenPixels   = Vector2.new(420, 240),   -- SurfaceGui-Aufloesung
+		markerHeight   = 6.4,    -- "!" ueber der Lampe (Studs ueber der Bildschirm-Mitte)
+		promptDistance = 12,
+		blinkSeconds   = 0.55,
+		lampColors = {
+			locked = Color3.fromRGB(255,  70,  70),
+			ready  = Color3.fromRGB( 90, 255, 120),
+			normal = Color3.fromRGB(255, 200,  70),
+		},
+		pieces = {
+			{ name = "Sockel",     shape = Enum.PartType.Block,    size = Vector3.new(5.0, 0.6, 3.6), offset = Vector3.new(0, 0.30, 0),     color = WOOD_DARK, material = Enum.Material.Wood, solid = true },
+			{ name = "Matte",      shape = Enum.PartType.Block,    size = Vector3.new(4.4, 0.1, 2.0), offset = Vector3.new(0, 0.05, -2.9),  color = HONEY_DEEP },
+			{ name = "Saeule",     shape = Enum.PartType.Block,    size = Vector3.new(2.0, 3.0, 1.6), offset = Vector3.new(0, 2.10, 0.2),   color = HONEY, solid = true },
+			{ name = "Knopf",      shape = Enum.PartType.Cylinder, size = Vector3.new(0.3, 0.9, 0.9), offset = Vector3.new(0, 2.80, -0.72), color = Color3.fromRGB(255, 90, 110), material = Enum.Material.Neon, rotation = Vector3.new(0, 90, 0) },
+			{ name = "Licht1",     shape = Enum.PartType.Block,    size = Vector3.new(0.4, 0.4, 0.2), offset = Vector3.new(-0.6, 1.70, -0.66), color = Color3.fromRGB(120, 220, 255), material = Enum.Material.Neon },
+			{ name = "Licht2",     shape = Enum.PartType.Block,    size = Vector3.new(0.4, 0.4, 0.2), offset = Vector3.new( 0.6, 1.70, -0.66), color = Color3.fromRGB(120, 255, 150), material = Enum.Material.Neon },
+			{ name = "Kopf",       shape = Enum.PartType.Block,    size = Vector3.new(5.2, 3.4, 1.8), offset = Vector3.new(0, 5.30, 0),     color = Color3.fromRGB(150, 98, 56), solid = true },
+			{ name = "Rahmen",     shape = Enum.PartType.Block,    size = Vector3.new(4.6, 2.8, 0.3), offset = Vector3.new(0, 5.30, -0.95), color = Color3.fromRGB(70, 44, 26) },
+			{ name = "Bildschirm", shape = Enum.PartType.Block,    size = Vector3.new(4.1, 2.35, 0.1), offset = Vector3.new(0, 5.30, -1.12), color = Color3.fromRGB(36, 28, 46) },
+			{ name = "Dach",       shape = Enum.PartType.Block,    size = Vector3.new(5.6, 0.4, 2.2), offset = Vector3.new(0, 7.20, 0),     color = HONEY_DEEP },
+			{ name = "Ohr1",       shape = Enum.PartType.Ball,     size = Vector3.new(1.6, 1.6, 1.0), offset = Vector3.new(-2.1, 7.60, 0),  color = Color3.fromRGB(150, 98, 56) },
+			{ name = "Ohr2",       shape = Enum.PartType.Ball,     size = Vector3.new(1.6, 1.6, 1.0), offset = Vector3.new( 2.1, 7.60, 0),  color = Color3.fromRGB(150, 98, 56) },
+			{ name = "OhrInnen1",  shape = Enum.PartType.Ball,     size = Vector3.new(0.9, 0.9, 0.4), offset = Vector3.new(-2.1, 7.60, -0.35), color = Color3.fromRGB(255, 160, 190) },
+			{ name = "OhrInnen2",  shape = Enum.PartType.Ball,     size = Vector3.new(0.9, 0.9, 0.4), offset = Vector3.new( 2.1, 7.60, -0.35), color = Color3.fromRGB(255, 160, 190) },
+			{ name = "Antenne",    shape = Enum.PartType.Cylinder, size = Vector3.new(1.6, 0.25, 0.25), offset = Vector3.new(0, 8.20, 0),  color = METAL, material = Enum.Material.Metal, rotation = UPRIGHT },
+			{ name = "Lampe",      shape = Enum.PartType.Ball,     size = Vector3.new(0.9, 0.9, 0.9), offset = Vector3.new(0, 9.25, 0),     color = Color3.fromRGB(255, 70, 70), material = Enum.Material.Neon },
+		},
+	},
 
 	PIT_TOWER_STEP_HEIGHT = PIT_TOWER_STEP_HEIGHT,
 	PIT_TOWER_RADIUS      = PIT_TOWER_RADIUS,

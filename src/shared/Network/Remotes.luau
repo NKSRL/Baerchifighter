@@ -194,6 +194,9 @@ local EventHazardHit = getOrCreateEvent("EventHazardHit")
 -- v15 (Tower): ein Tower-Meilenstein wurde ausgezahlt (Toast).
 -- Args: Types.TowerMilestoneReward
 local TowerMilestoneReceived = getOrCreateEvent("TowerMilestoneReceived")
+-- 08.10.: ein Tower ist durch Schaffen des vorherigen frei geworden
+-- (Server → Client, Argument: TowerId). Feier-Moment + "NEU"-Abzeichen.
+local TowerUnlocked = getOrCreateEvent("TowerUnlocked")
 
 -- v15: Login-Bonus ausgezahlt (Toast). Args: Types.DailyBonusResult
 local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
@@ -236,6 +239,9 @@ local RequestUpgradeBuilding = getOrCreateEvent("RequestUpgradeBuilding")
 -- der Tower beim aktuellen Rebirth offen ist (TowerConfig.isOpen).
 -- Args: towerId: string
 local RequestSelectTower = getOrCreateEvent("RequestSelectTower")
+-- 08.10. (Paket C): Kauf-Dialog fuer einen Gamepass (Argument: Pass-Key aus
+-- GamepassConfig). Der Server prueft Id und Besitz.
+local RequestBuyGamepass = getOrCreateEvent("RequestBuyGamepass")
 
 -- v15: taeglichen Login-Bonus abholen. Der Server prueft UTC-Tag,
 -- Gnadenfrist und doppelte Abholung (Modules/LoginBonusCalc).
@@ -391,6 +397,7 @@ return {
 	EventHazardHit        = EventHazardHit,
 
 	TowerMilestoneReceived = TowerMilestoneReceived,
+	TowerUnlocked          = TowerUnlocked,
 	DailyBonusReceived     = DailyBonusReceived,
 
 	EggTreeUnlocked        = EggTreeUnlocked,
@@ -405,6 +412,7 @@ return {
 	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,
 	RequestSelectTower     = RequestSelectTower,
+	RequestBuyGamepass     = RequestBuyGamepass,
 	RequestClaimDailyBonus = RequestClaimDailyBonus,
 	RequestUpgradeRecycler = RequestUpgradeRecycler,
 	RequestFuseBaerchis    = RequestFuseBaerchis,

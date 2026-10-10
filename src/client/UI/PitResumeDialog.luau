@@ -15,10 +15,12 @@
 -- bleibt zu Hause.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players           = game:GetService("Players")
 local Loc = require(game:GetService("ReplicatedStorage").Localization.Loc)   -- Sammel-Update 2.4
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local GamepassConfig   = require(ReplicatedStorage.Config.GamepassConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
@@ -65,7 +67,13 @@ local function offer(data: Types.PlayerDataUpdate, choice: Choice): (number, num
 		then reached
 		else TowerConfig.getResumePercentStage(reached)
 	stage = math.clamp(stage, 1, if def then def.stages else 1)
-	return stage, TowerConfig.getResumeCost(towerId, stage, data.rebirthMult)
+	return stage, TowerConfig.getResumeCost(towerId, stage, data.rebirthMult, PitResumeDialog.hasSkipPass())
+end
+
+-- 08.10. (Paket C): Gamepass Gratis-Skip besessen? Nur Anzeige — die Kosten
+-- rechnet der Server selbst (GamepassService), das Attribut setzt er auch.
+function PitResumeDialog.hasSkipPass(): boolean
+	return Players.LocalPlayer:GetAttribute(GamepassConfig.attributeName("SKIP_PASS")) == true
 end
 
 -- Sammel-Update 2.4: Schluessel statt fester Texte

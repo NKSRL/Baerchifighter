@@ -68,6 +68,7 @@ local LaidEggBuilder = require(MapBuild.LaidEggBuilder)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local RecyclerBuilder = require(MapBuild.RecyclerBuilder)
 local IncubatorBuilder = require(MapBuild.IncubatorBuilder)   -- Sammel-Update Paket 8
+local TerminalBuilder  = require(MapBuild.TerminalBuilder)    -- 08.10. Tower-Terminal
 
 --------------------------------------------------------------------------------
 -- Interner Zustand
@@ -108,6 +109,8 @@ local _incubatorSlots: (Player) -> number = function(_player: Player): number re
 type Badge = { text: string, color: Color3 }
 local _badge: { [Player]: Badge } = {}
 local _crown: { [Player]: boolean } = {}   -- Paket 9: Top 10 der Endless-Woche
+-- 08.10.: zuletzt gesetzter Terminal-Zustand (Neuaufbau nach Rebirth baut ihn mit)
+local _terminal: { [Player]: TerminalBuilder.TerminalView } = {}
 
 local function badgeText(player: Player, text: string | Types.LocMsg): string | Types.LocMsg
 	return if _crown[player] then Loc.msg("fmt.append", { a = "♛", b = text }) else text
@@ -132,6 +135,10 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	-- weil sie auch an Rebirths und Index haengen, die nicht in der Insel stehen).
 	if FeatureFlags.isOn("INCUBATOR") and islandData.incubator then
 		IncubatorBuilder.build(plotModel, slot, islandData.incubator, _incubatorSlots(owner), islandData.baerchis)
+	end
+	-- 08.10.: Tower-Terminal am Stegbeginn (Zustand nur als Attribute)
+	if FeatureFlags.isOn("TOWER_TERMINAL") then
+		TerminalBuilder.build(plotModel, slot, _terminal[owner])
 	end
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
@@ -216,6 +223,7 @@ function MapService.despawnIsland(player: Player)
 	_showcase[player] = nil
 	_badge[player] = nil
 	_crown[player] = nil
+	_terminal[player] = nil
 
 	local model = _plotModels[player]
 	if model then
@@ -543,6 +551,17 @@ end
 -- auch an Rebirths und Index-Belohnungen haengt).
 function MapService.setIncubatorSlotProvider(provider: (Player) -> number)
 	_incubatorSlots = provider
+end
+
+-- 08.10.: Zustand des Tower-Terminals (Attribute, kein Neubau). Aufrufer ist
+-- PlotDisplayService bei geaenderter Signatur.
+function MapService.updateTerminal(player: Player, view: TerminalBuilder.TerminalView)
+	_terminal[player] = view
+	local model = _plotModels[player]
+	local terminal = if model then model:FindFirstChild(TerminalBuilder.MODEL_NAME) else nil
+	if terminal and terminal:IsA("Model") then
+		TerminalBuilder.writeState(terminal, view)
+	end
 end
 
 -- Schreibt Level, Warteschlange und Lampe des Waben-Recyclers neu.

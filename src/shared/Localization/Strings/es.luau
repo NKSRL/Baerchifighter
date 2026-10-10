@@ -1047,4 +1047,61 @@ return {
 	["ev.bonus.gold"]             = "+{n} GoldGummies",
 	["ev.bonus.mutation"]         = "¡MUTACIÓN: {mutation}!",
 	["ev.bonus.mutation_weaker"]  = "Tirada de mutación: {mutation} — más débil que la suya, no cambia nada",
+
+	----------------------------------------------------------------------------
+	-- 08.10. Paket G: Ausbau mit einem Druck, Erfolgs-Moment
+	----------------------------------------------------------------------------
+	["ui.upgrade.prompt_buy"] = "Mejorar · {cost} Gummies",
+	["ui.upgrade.prompt_need"] = "Faltan {missing} Gummies",
+	["ui.upgrade.fx_level"] = "Nivel {from} ➡ {to}",
+	["ui.upgrade.fx_look"] = "¡NUEVO LOOK!",
+
+	----------------------------------------------------------------------------
+	-- 08.10. Tower-Terminal: Freischaltung, Einstieg, Gamepass
+	----------------------------------------------------------------------------
+	["err.tower_locked_clear"] = "Supera primero {tower} (etapa {stages})",
+	["ui.fight.fresh_free"] = "▶ Etapa 1 · GRATIS",
+	["ui.fight.resume_pass"] = "⏩ Etapa {stage} · Gratis (Pase)",
+	["ui.pass.skip.name"] = "Salto gratis",
+	["ui.pass.skip.desc"] = "Sigue desde tu última etapa — siempre gratis",
+	["ui.pass.soon"] = "Pronto",
+
+	----------------------------------------------------------------------------
+	-- 08.10. Paket D: Tower-Panel (neuer Look) und Tower-Terminal
+	----------------------------------------------------------------------------
+	["ui.tower2.choose"] = "ELEGIR",
+	["ui.tower2.active"] = "ACTIVO",
+	["ui.tower2.new"] = "¡NUEVO!",
+	["ui.tower2.title_stages"] = "{tower} · {stages} etapas",
+	["ui.tower2.record"] = "Récord {record}/{stages}",
+	["ui.tower2.record_endless"] = "Récord: etapa {record}",
+	["ui.tower2.reward_egg"] = "Etapa {stage}: +{n}",
+	["ui.tower2.reward_amount"] = "Etapa {stage}: +{n}",
+	["ui.tower2.reward_endless"] = "Etapa {stage}: +{n} nivel infinito",
+	["ui.tower2.locked_hint"] = "Aún bloqueado",
+	["ui.tower2.unlock_by"] = "Supera {tower}",
+	["ui.tower2.status_selected"] = "Elegido: {tower}",
+	["ui.tower2.status_all_open"] = "¡Todas las torres abiertas!",
+	["ui.tower2.status_next"] = "Siguiente: {tower} · {have}/{need}",
+	["ui.tower2.running"] = "EN COMBATE",
+	["ui.tower2.start"] = "¡VAMOS!",
+	["ui.tower2.start_sub"] = "desde la etapa {stage}",
+	["ui.tower2.free"] = "GRATIS",
+	["ui.tower2.skip"] = "⏩ Etapa {stage}",
+	["ui.tower2.price"] = "{price} Gummies",
+	["ui.tower2.pass_free"] = "Gratis (Pase)",
+	["ui.tower2.pass_owned"] = "Ya es tuyo",
+	["ui.tower2.pass_buy"] = "Conseguir",
+	["ui.tower2.hint_free"] = "Empezar en la etapa 1 siempre es gratis",
+	["ui.tower2.hint_running"] = "Tu Baerchi está luchando",
+	["ui.moment.tower_unlocked"] = "¡NUEVA TORRE!",
+	["msg.tower_unlocked"] = "¡{tower} desbloqueada!",
+	["ui.terminal.prompt_action"] = "Elegir torre",
+	["ui.terminal.prompt_object"] = "Terminal de torres",
+	["ui.terminal.prompt_locked"] = "Bloqueado: {tower} {have}/{need}",
+	["ui.terminal.screen_locked"] = "BLOQUEADO",
+	["ui.terminal.screen_unlock_by"] = "Supera {tower}",
+	["ui.terminal.screen_new"] = "¡NUEVO: {tower}!",
+	["ui.terminal.screen_selected"] = "Elegida",
+	["msg.terminal_locked"] = "Supera primero {tower} (etapa {need}) y luego podrás cambiar de torre aquí.",
 }

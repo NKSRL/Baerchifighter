@@ -62,6 +62,7 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "PetModeService",  module = ServerScriptService.Services.PetModeService },
 	-- v15: Tower-Fortschritt (ersetzt das PIT-Level)
 	{ name = "TowerService",    module = ServerScriptService.Services.TowerService },
+	{ name = "GamepassService", module = ServerScriptService.Services.GamepassService },   -- 08.10. Paket C
 
 	-- Events
 	{ name = "EventService",              module = ServerScriptService.Services.EventService },

@@ -46,6 +46,9 @@
 --         Look-Wechsel) und MapService.setOwnerBadge (Symbol am Plot-Schild).
 --         Aendert sich nur bei einem neuen Rekord oder Tower.
 --
+--   TERMINAL   (08.10.: Zustand, gewaehlter Tower, Rekord, Fortschritt)
+--      → MapService.updateTerminal: schreibt nur Attribute, kein Neubau.
+--
 -- Die Figuren und Schilder selbst baut MapService — dieser Service entscheidet
 -- nur WANN und WELCHE Tiefe.
 --
@@ -88,6 +91,7 @@ type Signatures = {
 	recycler  : string,
 	looks     : string,
 	tower     : string,
+	terminal  : string,   -- 08.10. Tower-Terminal
 }
 
 local _signatures: { [Player]: Signatures } = {}
@@ -200,8 +204,38 @@ local function incubatorSignature(data: Types.PlayerData): string
 	return table.concat(parts, "|")
 end
 
+-- 08.10.: Tower-Terminal — Zustand, gewaehlter Tower, Rekord, Fortschritt.
+local function terminalView(data: Types.PlayerData): { state: string, tower: string, record: number, nextTower: string, newTower: string, progress: number, needed: number }
+	local towers = data.towers
+	local nextTower, newTower = "", ""
+	for _, def in TowerConfig.TOWERS do
+		if newTower == "" and TowerConfig.isNew(def.id, towers) then
+			newTower = def.id
+		end
+		if nextTower == "" and not TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
+			nextTower = def.id
+		end
+	end
+	local _, progress, needed = TowerConfig.getUnlockProgress(nextTower, towers.records)
+	return {
+		state     = TowerConfig.terminalState(towers),
+		tower     = towers.selected,
+		record    = towers.records[towers.selected] or 0,
+		nextTower = nextTower,
+		newTower  = newTower,
+		progress  = progress,
+		needed    = needed,
+	}
+end
+
+local function terminalSignature(data: Types.PlayerData): string
+	local v = terminalView(data)
+	return string.format("%s|%s|%d|%s|%s|%d|%d", v.state, v.tower, v.record, v.nextTower, v.newTower, v.progress, v.needed)
+end
+
 local function allSignatures(data: Types.PlayerData): Signatures
 	return {
+		terminal  = terminalSignature(data),
 		incubator = incubatorSignature(data),
 		structure = structureSignature(data),
 		state     = stateSignature(data),
@@ -287,6 +321,10 @@ local function refresh(player: Player, data: Types.PlayerData)
 		MapService.updateBuildingLooks(player, data.island, true)
 	end
 
+	if previous.terminal ~= current.terminal then
+		MapService.updateTerminal(player, terminalView(data))
+	end
+
 	if previous.tower ~= current.tower then
 		local oldTower = string.match(previous.tower, "^([^:]+):")
 		local newTower = string.match(current.tower, "^([^:]+):")
@@ -329,6 +367,7 @@ function PlotDisplayService.init()
 
 		local signatures = allSignatures(data)
 		applyTower(player, signatures.tower, false)
+		MapService.updateTerminal(player, terminalView(data))
 
 		_signatures[player] = signatures
 	end)

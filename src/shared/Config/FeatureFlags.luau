@@ -97,6 +97,15 @@ local FLAGS: { [string]: boolean } = {
 	-- wieder sofort auf (kein Brueten von Eiern mehr). Aus = Ei-Inkubator wie
 	-- im Sammel-Update.
 	INCUBATOR_BREED   = true,
+
+	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
+	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
+	-- begrenzt dann nichts mehr. Aus = alte Regel (STAGE_CAP_BY_REBIRTH).
+	TOWER_UNLOCK_BY_CLEAR = true,
+	-- 08.10.: Tower-Terminal an der Bruecke (Paket B2)
+	TOWER_TERMINAL    = true,
+	-- 08.10.: neues Tower-Panel im Look Theme.v2 (Paket D); aus = altes CombatPanel
+	TOWER_PANEL_V2    = true,
 }
 
 local FeatureFlags = {}

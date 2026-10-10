@@ -75,6 +75,7 @@ type Flyer = {
 	to     : Vector2?,
 	kind   : string,
 	landed : boolean,
+	spent  : boolean,   -- Paket G: Betrag fliegt AUS der Pille (keinen Puls am Ziel)
 }
 
 type Floater = {
@@ -229,7 +230,7 @@ local function makeFlyer(layer: Frame): Flyer
 
 	return {
 		frame = frame, icon = frame, number = number, busy = false,
-		t0 = 0, from = Vector2.zero, to = nil, kind = "", landed = false,
+		t0 = 0, from = Vector2.zero, to = nil, kind = "", landed = false, spent = false,
 	}
 end
 
@@ -285,6 +286,7 @@ local function launchFlyer(kind: string, amount: number, origin: Origin?)
 	setFlyerLook(free, kind)
 	free.busy   = true
 	free.landed = false
+	free.spent  = false
 	free.t0     = os.clock()
 	free.from   = from
 	free.to     = if target then guiCenter(target) else nil
@@ -366,6 +368,40 @@ function Feedback.gain(kind: string, amount: number, origin: Origin?, suffix: st
 	end
 end
 
+-- Paket G (08.10.): einen BEZAHLTEN Betrag zeigen. Das Icon fliegt aus der
+-- Pille zum Ziel in der Welt (z. B. dem ausgebauten Gebaeude), an der Pille
+-- steigt "-1.234" auf. Nur aufrufen, wenn der Server die Ausgabe bestaetigt
+-- hat (Datenstand), nie spekulativ.
+function Feedback.spend(kind: string, amount: number, toWorld: Vector3?)
+	if not enabled() or amount <= 0 then return end
+	local pill = targetFor(kind)
+	if not pill then return end
+	local free: Flyer? = nil
+	for _, flyer in _flyers do
+		if not flyer.busy then
+			free = flyer
+			break
+		end
+	end
+	if not free then return end
+	local from = guiCenter(pill)
+	setFlyerLook(free, kind)
+	free.busy   = true
+	free.landed = false
+	free.spent  = true
+	free.t0     = os.clock()
+	free.from   = from
+	free.to     = if toWorld then worldToScreen(toWorld) else nil
+	free.frame.Position = UDim2.fromOffset(from.X, from.Y)
+	free.frame.Visible  = true
+	free.number.Text       = "-" .. Theme.formatNumber(amount)
+	free.number.TextColor3 = Theme.COLORS.bad
+	free.number.Position   = UDim2.fromOffset(from.X, from.Y + 20)
+	free.number.TextTransparency = 0
+	free.number.Visible    = true
+	Hud.pulse(kind)
+end
+
 --------------------------------------------------------------------------------
 -- Die eine Schleife
 --------------------------------------------------------------------------------
@@ -391,7 +427,10 @@ local function step()
 
 		-- Zahl: steigt am Startpunkt auf und blendet aus
 		local tn = math.clamp(t / rise, 0, 1)
-		flyer.number.Position = UDim2.fromOffset(flyer.from.X, flyer.from.Y - 20 - NUMBER_RISE * easeOut(tn))
+		-- Ausgaben (spend) sinken unter der Pille ab: die Pille sitzt oben
+		-- am Rand, nach oben waere kein Platz.
+		local dy = if flyer.spent then 26 + NUMBER_RISE * easeOut(tn) else -20 - NUMBER_RISE * easeOut(tn)
+		flyer.number.Position = UDim2.fromOffset(flyer.from.X, flyer.from.Y + dy)
 		flyer.number.TextTransparency = math.max(0, (tn - 0.6) / 0.4)
 
 		-- Icon: Bogen zum Ziel (ohne Ziel: nur kurz aufsteigen)
@@ -409,7 +448,9 @@ local function step()
 		if tf >= 1 and not flyer.landed then
 			flyer.landed = true
 			flyer.frame.Visible = false
-			pulseTarget(flyer.kind, targetFor(flyer.kind))
+			if not flyer.spent then
+				pulseTarget(flyer.kind, targetFor(flyer.kind))
+			end
 		end
 		if tf >= 1 and tn >= 1 then
 			flyer.busy = false

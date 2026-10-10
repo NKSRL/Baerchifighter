@@ -29,6 +29,7 @@ local Moment = {}
 -- Art → Icon. Unbekannte Arten bekommen den Stern.
 local ICON_FOR: { [string]: string } = {
 	record    = "trophy",
+	tower_unlocked = "crown",   -- 08.10. neuer Tower frei
 	milestone = "trophy",
 	unlock    = "tree",
 	rebirth   = "rebirth",
