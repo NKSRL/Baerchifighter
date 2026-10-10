@@ -45,6 +45,100 @@
 --   cinematic kurze Kamerafahrt (nur Besitzer, Stufe 4)  dur
 --   sound     ein Sound-Slot                              slot = "charge"|"strike"|"impact"
 --
+-- v16 (Gletscher-Show) — neue Bausteine, alle relativ zu den Figuren (Fuesse
+-- aus der Bounding-Box), stimmen also auf dem Tower in jeder Hoehe:
+--   breath     Atemwolke vor dem Maul, 2 Stoesse (1 Emitter)  count, dur, tex
+--   groundmark Boden friert im Kreis, Adern kriechen raus     radius, dur, veins, tex
+--   crack      Zickzack-Riss am Boden von self zu target      dur, linger, segments, amp, width, tex
+--   spikes     schraege Dornen brechen nacheinander entlang   count, dur, rise, minHeight, maxHeight, linger, tex
+--              des letzten `crack` aus, jeder hoeher (Welle)
+--   snowfall   Nachgluehen: Reifschimmer + sinkende Flocken  count, dur, tex
+--              (1 Emitter)
+-- Erweiterte Parameter bestehender Bausteine (v16):
+--   frost  legs = true   Kristalle wachsen von den Fuessen bis zur Huefte
+--          perch = true  kleine Kristalle auf Ohren und Schultern, glint = true
+--                        laesst jede Kante EINMAL weiss aufleuchten
+--   ring   ground = true flacher Ring auf dem Boden unter der Figur; tex
+--
+-- v16 (Seraph-Show) — neue Bausteine:
+--   wings      Lichtfluegel hinter der Figur, Feder fuer Feder  count, span, dur, foldAt, tex, sparkTex
+--              von innen nach aussen; bei foldAt falten und
+--              in Funken zerfallen (1 Emitter, Beiwerk)
+--   halo       Heiligenschein ueber dem Kopf, dreht langsam,    radius, lift, count, dur, tex
+--              folgt der Figur
+--   honeycomb  Wabenmuster laeuft Fuesse -> Kopf, zieht ein,  cols, rows, sweep, pull, hold, tex
+--              warmer Schein bleibt `hold` s an der Figur
+--              (folgt ihr auch beim Anlauf zum Stoss)
+-- Erweiterte Parameter (v16):
+--   ring     lift = n     Ring n Studs ueber der Figur (Wolkenloch), mit tex
+--                        auch von unten sichtbar
+--   pillar   feet = true  Fuss der Saeule unter der Figur; soft = true
+--                        halbdurchsichtig; tex = Bild als Beam (weicher Verlauf)
+--   snowfall noShell = true nur Emitter (z. B. rieselnde Federn); lift, size
+--   alle     second = true Zweitfarbe (color2) statt Hauptfarbe
+--
+-- v16 (Kometen-Show) — neue Bausteine:
+--   shadow  dunkler Kreis am Boden, waechst beschleunigt       from, radius, dur, fadeOut, toArena
+--   comet   Punkt funkelt oben und waechst (`charge`), dann    height, size, charge, fall, cloudY,
+--           faellt der Komet (Kopf, Kern, Schweif, Funken =     tex, tailTex, sparkTex
+--           1 Emitter) auf den Gegner, letzte 30 % langsam;
+--           Wolkenfetzen bei cloudY (Beiwerk)
+--   crater  Glut-Risse im Boden, kuehlen Orange -> Violett ab  radius, count, dur, tex
+--   dust    Sternstaub im Bogen (1 Emitter, Schwerkraft)       count, speed, dur, tex
+-- Erweiterte Parameter (v16):
+--   radius = "tower" | "fence"  Turmspitze bzw. bis zum Arena-Zaun (MapConfig),
+--            gemessen ab der Arena-Mitte (ring, shadow, crater)
+--   ring     toArena = true  Bodenring startet an der Figur, waechst um die
+--            Arena-Mitte (Schockwelle bis zum Zaun)
+--   shards   arc = true      Truemmer fliegen im Bogen und landen am Boden; tex
+--   sky      fade = s        so lange dauert das Einfaerben (Standard 0,35)
+--   cinematic style "chase"  Kamera schraeg hinter dem laufenden `comet`
+--   alle     ownerOnly = true Schritt nur fuer den Besitzer (z. B. Sterne
+--            als Teil seines Nachthimmels)
+--
+-- v16 (Schemen-Show) — neue Bausteine:
+--   silhouette Schatten der Figur richtet sich als flache Tinten-       behind, rise, hold, dissolve,
+--              Silhouette hinter ihr auf, zerfaellt in Rauch           tex, smokeTex
+--              (Tinten-Klon der Figur, Tiefe gestaucht; 1 Emitter)
+--   shades     Pfuetzen rund um die Figur, aus jeder steigt ein       count, distance, pool, rise,
+--              Schatten-Baerchi (Tinten-Klon), loest sich auf        fadeAt, dissolve, tex, smokeTex
+--   vanish     Figur wird blasser (LocalTransparencyModifier, nur     to, fadeIn, back
+--              lokal) und steht bei `back` schlagartig wieder da
+--   silence    der Ton geht ganz aus (nur Besitzer)                   dur
+--   cut        ein duenner weisser Schnitt quer durchs Bild (an der   length, width, draw, tearAt,
+--              Kamera jedes Clients ausgerichtet), reisst auf          angle, tex
+-- Erweiterte Parameter (v16):
+--   shards   tex  Bild auf beiden grossen Flaechen (Schattenfetzen)
+--
+-- v16 (Omega-Show) — neue Bausteine:
+--   omega     Omega-Zeichen Strich fuer Strich. mode "sky": hoch     mode, radius, lift, segments, draw,
+--             ueber der Arena, zur Kamera gedreht, zieht sich bei    pullAt, jerk, burnFor, fade, tex
+--             `pullAt` mit einem Ruck auf die Pfote. mode "brand":
+--             flach am Boden eingebrannt, verblasst.
+--   converge  Lichtpunkte aus vier Himmelsrichtungen (eine Farbe     colors, perSide, from, lift,
+--             je Richtung) fliegen in einen Punkt ueber der Arena    flight, stagger, tex
+--   spotlight Figur leuchtet (Highlight, nur Besitzer)               dur, fill, strength
+--   wipe      Spektrum laeuft als Welle durchs Bild, dahinter        dur, tex
+--             kommt die Farbe zurueck (nur Besitzer)
+-- Erweiterte Parameter (v16):
+--   alle      color = Color3  feste Farbe fuer diesen Schritt
+--   alle      global = true   auch Spieler AUSSERHALB der Zuschauer-
+--             Reichweite sehen diesen Schritt (nur volle Show)
+--   silence   level = 0..1    statt stumm nur leiser (0,15 = ganz leise)
+--   cinematic style "orbitSelf"  langsamer Halbkreis um den eigenen Baerchi
+-- Fuer jeden Schritt:
+--   extra = true  Beiwerk — faellt auf niedriger Grafikstufe weg
+--                 (PARTICLE_BUDGET.EXTRAS_MIN), der Kernmoment bleibt.
+--   tex = "<key>" Bild aus TEXTURES[<Faehigkeit>][key]. Ist keine ID
+--                 eingetragen (0), laeuft der Rueckfall (Neon-Teile,
+--                 Standard-Partikel).
+-- Fuer einen Eintrag:
+--   echo     eigene Schritt-Liste fuer das Echo (ab dem 2. Einsatz im Lauf,
+--            Laenge TIERS[tier].echo). Ohne `echo`: die ersten zwei
+--            Welt-Effekte der Show, verkuerzt.
+--   impactAt Sekunde, in der die Show den Gegner trifft (sonst geschaetzt,
+--            siehe getImpactTime).
+--
 -- Jede Faehigkeit ist eine EIGENE Komposition (andere Bausteine, Reihenfolge,
 -- Formen und Farben). Geprueft: tools/sim/egg_tree_check.lua meldet doppelte
 -- Kompositionen.
@@ -78,6 +172,55 @@ local PARTICLE_BUDGET = {
 	medium = 0.65,  -- 4..6
 	high   = 1.0,   -- 7..10
 	MIN_COUNT = 2,
+	-- v16: unter diesem Faktor fallen Schritte mit `extra = true` und das
+	-- Beiwerk der Bausteine (Adern, Glitzer) weg. Niedrig = 0,35 (Besitzer);
+	-- Zuschauer bekommen x0,6, sehen also nur auf hoher Stufe Beiwerk.
+	EXTRAS_MIN = 0.5,
+}
+
+-- v16: Bilder je Faehigkeit (Asset-IDs). 0 = noch nicht hochgeladen -> der
+-- Baustein nimmt seinen Rueckfall. Die PNGs liegen unter assets/vfx/<faehigkeit>/
+-- (gezeichnet von tools/render_vfx_glacier.py).
+local TEXTURES: { [string]: { [string]: number } } = {
+	GlacierFrost = {
+		breath    = 0,  -- assets/vfx/glacier_frost/breath.png     (breath)
+		veins     = 0,  -- assets/vfx/glacier_frost/veins.png      (groundmark)
+		crack     = 0,  -- assets/vfx/glacier_frost/crack.png      (crack)
+		spike     = 0,  -- assets/vfx/glacier_frost/spike.png      (spikes)
+		frostring = 0,  -- assets/vfx/glacier_frost/frostring.png  (ring)
+		flake     = 0,  -- assets/vfx/glacier_frost/flake.png      (snowfall)
+	},
+	SeraphGrace = {
+		feather   = 0,  -- assets/vfx/seraph_grace/feather.png     (wings, snowfall)
+		halo      = 0,  -- assets/vfx/seraph_grace/halo.png        (halo)
+		comb      = 0,  -- assets/vfx/seraph_grace/comb.png        (honeycomb)
+		column    = 0,  -- assets/vfx/seraph_grace/column.png      (pillar, Beam)
+		cloudrim  = 0,  -- assets/vfx/seraph_grace/cloudrim.png    (ring lift)
+		spark     = 0,  -- assets/vfx/seraph_grace/spark.png       (wings: Funken)
+	},
+	CometImpact = {
+		glow      = 0,  -- assets/vfx/comet_impact/glow.png        (comet: Glut des Kopfs)
+		tail      = 0,  -- assets/vfx/comet_impact/tail.png        (comet: Schweif-Streifen)
+		crater    = 0,  -- assets/vfx/comet_impact/crater.png      (crater: Bodenbild)
+		stardust  = 0,  -- assets/vfx/comet_impact/stardust.png    (dust, comet-Funken)
+		shockring = 0,  -- assets/vfx/comet_impact/shockring.png   (ring)
+		debris    = 0,  -- assets/vfx/comet_impact/debris.png      (shards)
+	},
+	ShadeSlash = {
+		silhouette = 0, -- assets/vfx/shade_slash/silhouette.png   (silhouette)
+		shred      = 0, -- assets/vfx/shade_slash/shred.png        (shards: Schattenfetzen)
+		cut        = 0, -- assets/vfx/shade_slash/cut.png          (cut: Schnittlinie)
+		pool       = 0, -- assets/vfx/shade_slash/pool.png         (shades: Pfuetze)
+		smoke      = 0, -- assets/vfx/shade_slash/smoke.png        (silhouette/shades: Rauch)
+	},
+	OmegaStrike = {
+		omega     = 0,  -- assets/vfx/omega_strike/omega.png       (omega sky: Ω-Ring)
+		spectrum  = 0,  -- assets/vfx/omega_strike/spectrum.png    (wipe: Spektrum-Verlauf)
+		orb       = 0,  -- assets/vfx/omega_strike/orb.png         (converge: Lichtpunkt, je Pfadfarbe eingefaerbt)
+		brand     = 0,  -- assets/vfx/omega_strike/brand.png       (omega brand: Ω-Brandzeichen)
+		shockring = 0,  -- assets/vfx/omega_strike/shockring.png   (ring)
+		column    = 0,  -- assets/vfx/omega_strike/column.png      (pillar: Lichtsaeule, Beam)
+	},
 }
 
 -- ============================================================
@@ -135,6 +278,8 @@ export type SkillFX = {
 	-- Tonhoehe je Slot, damit dieselbe Datei je Faehigkeit anders klingt.
 	pitch    : number?,
 	steps    : { Step },
+	echo     : { Step }?,   -- v16: eigenes Echo (siehe oben)
+	impactAt : number?,     -- v16: Treffer-Sekunde der vollen Show
 }
 
 local C = Color3.fromRGB
@@ -333,16 +478,44 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	GlacierFrost = {
-		tier = 3, duration = 3.2, color = C(170, 230, 255), color2 = C(255, 255, 255),
-		sounds = { charge = "whoosh", strike = "glass" }, pitch = 0.8,
+		-- v16 (Show-Paket, Prompt 1): klar, kalt, unaufhaltsam.
+		-- Aufladen: Atem, Boden friert, Reif-Adern, Kristalle auf Ohren und
+		--   Schultern, Himmel kuehlt zu blassem Blaugrau (nur Besitzer).
+		-- Schlag: Aufstampfen, Zickzack-Riss zum Gegner, Dornen-Welle.
+		-- Einschlag (2,25 s): letzter Dorn trifft, Kristalle bis zur Huefte,
+		--   Zeitlupe, Frostring, danach Reifschimmer und Schneeflocken.
+		-- Farben: Gletscherblau, Eisweiss, tiefes Tuerkis (Dorn-Mix im
+		--   Baustein), reines Weiss auf Kanten und Spitzen.
+		tier = 3, duration = 3.6, color = C(150, 215, 245), color2 = C(235, 250, 255),
+		sounds = { charge = "whoosh", strike = "boom", impact = "glass" }, pitch = 0.8,
+		impactAt = 2.25,
 		steps = {
-			{ t = 0.00, fx = "sky",    tint = C(190, 225, 255), brightness = 0.1, saturation = -0.4, dur = 2.8 },
-			{ t = 0.00, fx = "sound",  slot = "charge" },
-			{ t = 0.00, fx = "ring",   at = "self", radius = 14, dur = 1.2, ice = true },
-			{ t = 0.60, fx = "spiral", at = "target", radius = 8, count = 20, dur = 1.0, snow = true },
-			{ t = 1.50, fx = "frost",  at = "target", count = 18, dur = 1.4 },
-			{ t = 1.50, fx = "hitstop", dur = 0.4 },
-			{ t = 1.50, fx = "sound",  slot = "strike" },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",        tint = C(205, 220, 235), brightness = 0.02, saturation = -0.45, dur = 3.3 },
+			{ t = 0.00, fx = "sound",      slot = "charge" },
+			{ t = 0.00, fx = "breath",     at = "self", count = 10, dur = 1.0, tex = "breath", extra = true },
+			{ t = 0.10, fx = "groundmark", at = "self", radius = 6, dur = 3.2, veins = 7, tex = "veins" },
+			{ t = 0.45, fx = "frost",      at = "self", perch = true, count = 8, dur = 1.6, glint = true, extra = true },
+			-- 2. Schlag (Aufstampfen bei 1,30)
+			{ t = 1.30, fx = "ring",       at = "self", ground = true, radius = 3.5, dur = 0.35, tex = "frostring" },
+			{ t = 1.30, fx = "shake",      power = 0.35, dur = 0.2 },
+			{ t = 1.30, fx = "sound",      slot = "strike" },
+			{ t = 1.35, fx = "crack",      dur = 0.45, linger = 1.9, segments = 7, amp = 0.9, tex = "crack" },
+			{ t = 1.40, fx = "spikes",     count = 7, dur = 0.7, rise = 0.16, minHeight = 1.0, maxHeight = 3.4, linger = 1.6, tex = "spike" },
+			-- 3. Einschlag (letzter Dorn: 1,40 + 0,7 x 6/7 + 0,16 = 2,16 .. 2,25)
+			{ t = 2.25, fx = "frost",      at = "target", legs = true, count = 14, dur = 1.3 },
+			{ t = 2.25, fx = "hitstop",    dur = 0.35 },
+			{ t = 2.25, fx = "sound",      slot = "impact" },
+			{ t = 2.28, fx = "ring",       at = "target", ground = true, radius = 11, dur = 0.9, tex = "frostring" },
+			{ t = 2.45, fx = "snowfall",   at = "target", count = 16, dur = 1.15, tex = "flake", extra = true },
+		},
+		-- Echo (0,55 s): Aufstampfen, Zickzack-Riss, Kristalle am Gegner.
+		echo = {
+			{ t = 0.00, fx = "ring",  at = "self", ground = true, radius = 3, dur = 0.25 },
+			{ t = 0.00, fx = "sound", slot = "strike" },
+			{ t = 0.03, fx = "crack", dur = 0.2, linger = 0.4, segments = 5, amp = 0.7 },
+			{ t = 0.23, fx = "frost", at = "target", legs = true, count = 8, dur = 0.6 },
+			{ t = 0.23, fx = "sound", slot = "impact" },
 		},
 	},
 
@@ -361,16 +534,45 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	SeraphGrace = {
-		tier = 3, duration = 3.4, color = C(255, 245, 190), color2 = C(255, 255, 255),
-		sounds = { charge = "flash", strike = "ping" }, pitch = 1.6,
+		-- v16 (Show-Paket, Prompt 2): warm, feierlich, ruhig.
+		-- Aufladen: Lichtfluegel entfalten sich Feder fuer Feder, Heiligenschein
+		--   aus Honiggold dreht sich ueber dem Kopf, das Licht wird waermer
+		--   (nur Besitzer).
+		-- Schlag: rundes Wolkenloch mit leuchtendem Rand, breite Lichtsaeule
+		--   faellt auf den Baerchi (nicht auf den Gegner), Federn rieseln.
+		-- Einschlag: Wabenmuster laeuft von den Fuessen zum Kopf und zieht ein
+		--   (fertig bei 3,4 s = Show-Ende), warmer Lichtpuls ueber den Boden,
+		--   Fluegel falten sich und zerfallen in Funken.
+		-- HP-Balken: PitArenaService setzt ihn erst im Stoss NACH der Show
+		--   (Show-Ende + CLASH_IMPACT_AT x FIGHT_SKILL_BEAT_SECONDS x Tempo =
+		--   3,4 + 0,28 .. 0,69 s). Deshalb zieht das Muster genau zum Show-Ende
+		--   ein und der warme Schein bleibt `hold` = 1,0 s an der Figur, also
+		--   bis nach dem Balken (Bericht SHOW_SERAPHEN_SEGEN).
+		tier = 3, duration = 3.4, color = C(255, 196, 70), color2 = C(255, 246, 225),
+		sounds = { charge = "whoosh", strike = "ping", impact = "ping" }, pitch = 1.3,
+		impactAt = 3.4,
 		steps = {
-			{ t = 0.00, fx = "sky",    tint = C(255, 248, 210), brightness = 0.2, saturation = 0.1, dur = 3.0 },
-			{ t = 0.00, fx = "sound",  slot = "charge" },
-			{ t = 0.00, fx = "pillar", at = "self", height = 40, width = 7, dur = 2.2, fromSky = true },
-			{ t = 0.50, fx = "rise",   at = "self", count = 30, dur = 1.8 },
-			{ t = 1.20, fx = "ring",   at = "self", radius = 9, dur = 1.0 },
-			{ t = 1.20, fx = "sound",  slot = "strike" },
-			{ t = 1.30, fx = "aura",   at = "self", size = 7, dur = 1.5 },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",       tint = C(255, 236, 205), brightness = 0.08, saturation = 0.15, dur = 3.3 },
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "wings",     at = "self", count = 7, span = 2.6, dur = 3.4, foldAt = 3.05, tex = "feather", sparkTex = "spark" },
+			{ t = 0.30, fx = "halo",      at = "self", radius = 0.9, lift = 0.7, count = 14, dur = 3.0, tex = "halo" },
+			-- 2. Schlag
+			{ t = 1.15, fx = "ring",      at = "self", lift = 26, radius = 5, dur = 2.1, tex = "cloudrim", extra = true },
+			{ t = 1.35, fx = "pillar",    at = "self", fromSky = true, feet = true, soft = true, second = true, height = 26, width = 4.5, dur = 1.5, tex = "column" },
+			{ t = 1.35, fx = "sound",     slot = "strike" },
+			{ t = 1.60, fx = "snowfall",  at = "self", noShell = true, lift = 3, size = 0.45, count = 8, dur = 1.6, tex = "feather", extra = true },
+			-- 3. Einschlag (Waben fertig eingezogen bei 2,55 + 0,5 + 0,35 = 3,40)
+			{ t = 2.55, fx = "honeycomb", at = "self", cols = 9, rows = 6, sweep = 0.5, pull = 0.35, hold = 1.0, tex = "comb" },
+			{ t = 3.30, fx = "ring",      at = "self", ground = true, radius = 14, dur = 0.8 },
+			{ t = 3.35, fx = "sound",     slot = "impact" },
+		},
+		-- Echo (0,55 s): schmale, kurze Lichtsaeule und das einziehende Wabenmuster.
+		echo = {
+			{ t = 0.00, fx = "pillar",    at = "self", fromSky = true, feet = true, soft = true, second = true, height = 18, width = 2.2, dur = 0.45, tex = "column" },
+			{ t = 0.00, fx = "sound",     slot = "strike" },
+			{ t = 0.12, fx = "honeycomb", at = "self", cols = 7, rows = 4, sweep = 0.18, pull = 0.18, hold = 0.9, tex = "comb" },
+			{ t = 0.45, fx = "sound",     slot = "impact" },
 		},
 	},
 
@@ -407,20 +609,49 @@ local FX: { [string]: SkillFX } = {
 	----------------------------------------------------------------------------
 
 	CometImpact = {
-		tier = 4, duration = 4.4, color = C(120, 180, 255), color2 = C(255, 255, 255),
+		-- v16 (Show-Paket, Prompt 3): gewaltig, schnell, triumphal, nicht
+		-- chaotisch — der Komet ist die ganze Zeit klar zu sehen.
+		-- Aufladen: Himmel wird in 1 s zur Nacht, Sterne an (nur Besitzer);
+		--   hoch oben funkelt ein Punkt und waechst; um den Gegner waechst ein
+		--   dunkler Schattenkreis mit.
+		-- Schlag (1,5 s): der Komet faellt, bricht durch die Wolkendecke,
+		--   Funken vom Schweif, Kamera schraeg hinterher; kurz vor dem
+		--   Aufprall Zeitlupe, der Schatten ist so gross wie der Turm.
+		-- Einschlag (2,4 s): weisser Blitz (Besitzer), Krater aus Glut-Rissen,
+		--   Truemmer und Sternstaub im Bogen, Schockwelle bis zum Arena-Zaun,
+		--   Wackeln; der Krater glueht in Orange und Violett aus.
+		-- Turm: alles relativ zu den Kaempfern bzw. zur Arena-Mitte. Alle
+		--   Effekte sind spaetestens bei 4,8 s weg (Show 5,0 s), bevor der
+		--   Turm zur naechsten Stage waechst.
+		tier = 4, duration = 5.0, color = C(255, 150, 60), color2 = C(140, 90, 255),
 		sounds = { charge = "rumble", strike = "rocket", impact = "boom" }, pitch = 0.9,
+		impactAt = 2.4,
 		steps = {
-			{ t = 0.00, fx = "sky",       tint = C(140, 160, 255), brightness = -0.25, saturation = -0.2, dur = 4.0 },
-			{ t = 0.00, fx = "starfield", count = 60, dur = 4.0 },
-			{ t = 0.00, fx = "cinematic", dur = 2.2, style = "up" },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",       tint = C(70, 80, 150), brightness = -0.35, saturation = -0.3, dur = 4.4, fade = 1.0 },
+			{ t = 0.00, fx = "starfield", count = 60, dur = 4.4, ownerOnly = true },
 			{ t = 0.00, fx = "sound",     slot = "charge" },
-			{ t = 0.60, fx = "meteor",    at = "target", size = 5, height = 80, dur = 1.6, tail = true },
-			{ t = 2.20, fx = "flash",     dur = 0.3 },
-			{ t = 2.20, fx = "hitstop",   dur = 0.3 },
-			{ t = 2.25, fx = "wave",      at = "target", radius = 26, dur = 0.8 },
-			{ t = 2.25, fx = "sound",     slot = "impact" },
-			{ t = 2.25, fx = "shake",     power = 1.2, dur = 0.8 },
-			{ t = 2.30, fx = "shards",    at = "target", count = 30, size = 1.0, dur = 1.2, stone = true },
+			{ t = 0.25, fx = "shadow",    at = "target", from = 1.5, radius = "tower", dur = 2.15, fadeOut = 0.3, toArena = true },
+			{ t = 0.30, fx = "comet",     height = 90, size = 3, charge = 1.2, fall = 0.9, cloudY = 45, tex = "glow", tailTex = "tail", sparkTex = "stardust" },
+			-- 2. Schlag (Fall ab 1,5; Zeitlupe die letzten 0,27 s + Bild)
+			{ t = 1.50, fx = "sound",     slot = "strike" },
+			{ t = 1.50, fx = "cinematic", dur = 1.6, style = "chase" },
+			{ t = 2.10, fx = "hitstop",   dur = 0.3 },
+			-- 3. Einschlag
+			{ t = 2.40, fx = "flash",     dur = 0.35 },
+			{ t = 2.40, fx = "sound",     slot = "impact" },
+			{ t = 2.40, fx = "shake",     power = 1.1, dur = 0.6 },
+			{ t = 2.40, fx = "crater",    at = "target", radius = 7, count = 10, dur = 2.4, tex = "crater" },
+			{ t = 2.42, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, tex = "shockring" },
+			{ t = 2.42, fx = "shards",    at = "target", arc = true, count = 16, size = 1.0, dur = 1.1, stone = true, tex = "debris" },
+			{ t = 2.45, fx = "dust",      at = "target", count = 40, speed = 14, dur = 1.2, tex = "stardust", extra = true },
+		},
+		-- Echo (0,65 s): Komet von oben (ohne Nacht und Kamera) und gluehender Krater.
+		echo = {
+			{ t = 0.00, fx = "comet",  height = 40, size = 2.2, charge = 0, fall = 0.3, tex = "glow", tailTex = "tail" },
+			{ t = 0.00, fx = "sound",  slot = "strike" },
+			{ t = 0.30, fx = "crater", at = "target", radius = 5, count = 8, dur = 0.55, tex = "crater" },
+			{ t = 0.30, fx = "sound",  slot = "impact" },
 		},
 	},
 
@@ -460,20 +691,44 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	ShadeSlash = {
-		tier = 4, duration = 4.4, color = C(30, 30, 40), color2 = C(200, 40, 80),
-		sounds = { charge = "whoosh", strike = "slash", impact = "boom" }, pitch = 0.7,
+		-- v16 (Show-Paket, Prompt 4): lautlos, scharf, unheimlich; kein Blut.
+		-- Aufladen: Licht kalt und grau (Besitzer); der Schatten des
+		--   Baerchis richtet sich als flache Tinten-Silhouette hinter ihm auf;
+		--   der Baerchi selbst wird fast durchsichtig (nur lokal).
+		-- Schlag: Silhouette zerfaellt in Rauch; aus drei Schattenpfuetzen um
+		--   den Gegner steigen drei Schatten-Baerchis; 0,3 s Stillstand, der
+		--   Ton geht ganz aus (Besitzer); EIN duenner weisser Schnitt quer
+		--   durchs Bild.
+		-- Einschlag (2,65 s): Schnitt reisst auf, Schattenfetzen flattern weg,
+		--   der Ton kommt mit einem scharfen Hieb zurueck, die Schatten loesen
+		--   sich auf, der echte Baerchi steht schlagartig wieder voll da.
+		-- Finisher-Bonus (violetter Schnitt): der Client erfaehrt ihn nicht,
+		--   siehe Bericht SHOW_SCHATTENHIEB.
+		tier = 4, duration = 4.2, color = C(18, 14, 26), color2 = C(85, 50, 135),
+		sounds = { charge = "ghost", strike = "whoosh", impact = "slash" }, pitch = 0.7,
+		impactAt = 2.65,
 		steps = {
-			{ t = 0.00, fx = "sky",       tint = C(90, 80, 110), brightness = -0.45, saturation = -0.7, dur = 4.0 },
-			{ t = 0.00, fx = "sound",     slot = "charge" },
-			{ t = 0.00, fx = "aura",      at = "self", size = 8, dur = 1.5, dark = true },
-			{ t = 1.20, fx = "cinematic", dur = 1.6, style = "low" },
-			{ t = 1.50, fx = "beam",      width = 0.5, dur = 0.25, slash = true },
-			{ t = 1.50, fx = "sound",     slot = "strike" },
-			{ t = 1.80, fx = "beam",      width = 0.5, dur = 0.25, slash = true, cross = true },
-			{ t = 2.10, fx = "hitstop",   dur = 0.5 },
-			{ t = 2.60, fx = "shards",    at = "target", count = 26, size = 0.7, dur = 1.0 },
-			{ t = 2.60, fx = "sound",     slot = "impact" },
-			{ t = 2.60, fx = "shake",     power = 1.0, dur = 0.5 },
+			-- 1. Aufladen
+			{ t = 0.00, fx = "sky",        tint = C(165, 165, 185), brightness = -0.25, saturation = -0.85, dur = 3.4, fade = 0.6 },
+			{ t = 0.00, fx = "sound",      slot = "charge" },
+			{ t = 0.10, fx = "silhouette", at = "self", behind = 1.4, rise = 1.0, hold = 0.45, dissolve = 0.4, tex = "silhouette", smokeTex = "smoke" },
+			{ t = 0.20, fx = "vanish",     at = "self", to = 0.85, fadeIn = 1.1, back = 2.55 },
+			-- 2. Schlag
+			{ t = 1.55, fx = "shades",     at = "target", count = 3, distance = 3.4, pool = 1.7, rise = 0.5, fadeAt = 1.15, dissolve = 0.35, tex = "pool", smokeTex = "smoke" },
+			{ t = 1.60, fx = "sound",      slot = "strike" },
+			{ t = 2.20, fx = "silence",    dur = 0.45 },
+			{ t = 2.20, fx = "hitstop",    dur = 0.3 },
+			{ t = 2.25, fx = "cut",        at = "target", length = 22, width = 0.12, draw = 0.08, tearAt = 0.4, tex = "cut" },
+			-- 3. Einschlag
+			{ t = 2.65, fx = "sound",      slot = "impact" },
+			{ t = 2.65, fx = "shards",     at = "target", count = 18, size = 0.5, dur = 0.9, tex = "shred" },
+			{ t = 2.65, fx = "shake",      power = 0.4, dur = 0.25 },
+		},
+		-- Echo (0,65 s): nur die Stille (0,15 s) und der weisse Schnitt.
+		echo = {
+			{ t = 0.00, fx = "silence", dur = 0.15 },
+			{ t = 0.02, fx = "cut",     at = "target", length = 16, width = 0.1, draw = 0.05, tearAt = 0.13, tex = "cut" },
+			{ t = 0.15, fx = "sound",   slot = "impact" },
 		},
 	},
 
@@ -571,26 +826,59 @@ local FX: { [string]: SkillFX } = {
 	},
 
 	OmegaStrike = {
-		-- "Ein Moment, den man filmt und teilt": die Arena friert ein, ein
-		-- Farbspektrum laeuft durch, dann EIN Schlag.
-		tier = 4, duration = 6.0, color = C(255, 255, 255), color2 = C(0, 0, 0),
-		sounds = { charge = "bass", strike = "thunder", impact = "boom" }, pitch = 0.45,
+		-- v16 (Show-Paket, Prompt 5): die groesste Show. Erhaben, endgueltig,
+		-- still vor dem Sturm — die Stille ist so wichtig wie der Schlag.
+		-- Aufladen: alle Geraeusche werden leise, die Welt fast schwarz-weiss
+		--   (Besitzer); der Baerchi leuchtet (Highlight) — ganz aus dem
+		--   Filter nehmen kann Roblox ihn nicht. AmbienceController bietet
+		--   kein Anhalten von Wolken/Pollen/Schaum -> nur Farbfilter.
+		-- Sammeln: riesiges Omega am Himmel, Lichtpunkte in den vier
+		--   Pfadfarben fliegen aus allen Himmelsrichtungen hinein; Kamera
+		--   im langsamen Halbkreis um den Baerchi (2,4 s).
+		-- Schlag (3,3 s): das Omega zieht sich mit einem Ruck auf die Pfote.
+		-- Einschlag (3,55 s): Spektrum laeuft durchs Bild, die Farbe kommt
+		--   zurueck; Schockwelle in den vier Pfadfarben bis zum Zaun; schmale
+		--   Lichtsaeule fuer ALLE Spieler (`global`, 1,3 s, nur volle Show =
+		--   hoechstens einmal pro Lauf); Omega brennt sich unter dem Gegner
+		--   ein und verblasst.
+		tier = 4, duration = 5.8, color = C(255, 255, 255), color2 = C(70, 60, 95),
+		sounds = { charge = "bass", strike = "whoosh", impact = "boom" }, pitch = 0.45,
+		impactAt = 3.55,
 		steps = {
-			{ t = 0.00, fx = "sound",     slot = "charge" },
-			{ t = 0.00, fx = "sky",       tint = C(255, 255, 255), brightness = -0.3, saturation = -1.0, dur = 1.8 },
-			{ t = 0.00, fx = "hitstop",   dur = 1.4 },
-			{ t = 0.00, fx = "cinematic", dur = 2.5, style = "orbit" },
-			{ t = 0.20, fx = "starfield", count = 80, dur = 5.6 },
-			{ t = 1.60, fx = "spectrum",  dur = 1.8 },
-			{ t = 1.60, fx = "aura",      at = "self", size = 10, dur = 1.8, rainbow = true },
-			{ t = 3.40, fx = "beam",      width = 5, dur = 0.5 },
-			{ t = 3.40, fx = "flash",     dur = 0.5 },
-			{ t = 3.40, fx = "sound",     slot = "strike" },
-			{ t = 3.50, fx = "pillar",    at = "target", height = 120, width = 10, dur = 1.6, fromSky = true },
-			{ t = 3.50, fx = "wave",      at = "target", radius = 45, dur = 1.2 },
-			{ t = 3.50, fx = "shake",     power = 2.0, dur = 1.2 },
+			-- 1. Aufladen (Stille vor dem Sturm)
+			{ t = 0.00, fx = "silence",   level = 0.15, dur = 3.3 },
+			{ t = 0.00, fx = "sky",       tint = C(255, 255, 255), brightness = -0.08, saturation = -0.92, dur = 5.5, fade = 1.2 },
+			{ t = 0.00, fx = "spotlight", at = "self", dur = 3.6, strength = 0.35 },
+			{ t = 0.15, fx = "sound",     slot = "charge" },
+			-- 2. Sammeln
+			{ t = 1.00, fx = "omega",     mode = "sky", at = "arena", radius = 7, lift = 34, segments = 20, draw = 0.9, pullAt = 2.3, jerk = 0.22, tex = "omega" },
+			{ t = 1.00, fx = "cinematic", dur = 2.4, style = "orbitSelf" },
+			{ t = 1.30, fx = "converge",  colors = { C(255, 200, 60), C(110, 200, 255), C(150, 80, 255), C(235, 235, 255) },
+				perSide = 4, from = 45, lift = 34, flight = 0.9, stagger = 0.25, tex = "orb" },
+			-- 3. Schlag: Ruck auf die Pfote (3,30 .. 3,52)
+			{ t = 3.30, fx = "sound",     slot = "strike" },
+			-- 4. Einschlag
+			{ t = 3.55, fx = "flash",     dur = 0.4 },
 			{ t = 3.55, fx = "sound",     slot = "impact" },
-			{ t = 3.60, fx = "shards",    at = "target", count = 50, size = 1.2, dur = 1.6, rainbow = true },
+			{ t = 3.55, fx = "shake",     power = 0.9, dur = 0.5 },
+			{ t = 3.55, fx = "wipe",      dur = 0.9, tex = "spectrum" },
+			{ t = 3.58, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(255, 200, 60), tex = "shockring" },
+			{ t = 3.66, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(110, 200, 255), tex = "shockring" },
+			{ t = 3.74, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(150, 80, 255), tex = "shockring" },
+			{ t = 3.82, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, color = C(235, 235, 255), tex = "shockring" },
+			{ t = 3.60, fx = "pillar",    at = "arena", feet = true, soft = true, height = 160, width = 1.6, dur = 1.3, tex = "column", global = true },
+			{ t = 3.70, fx = "omega",     mode = "brand", at = "target", radius = 2.2, segments = 14, draw = 0.2, burnFor = 0.5, fade = 1.5, tex = "brand" },
+		},
+		-- Echo (0,65 s): Ruck des Rings auf die Pfote und die Schockwelle —
+		-- ohne Entfaerbung, Kamera und Lichtsaeule.
+		echo = {
+			{ t = 0.00, fx = "omega", mode = "sky", at = "self", radius = 2.5, lift = 6, segments = 12, draw = 0.12, pullAt = 0.16, jerk = 0.16, tex = "omega" },
+			{ t = 0.16, fx = "sound", slot = "strike" },
+			{ t = 0.32, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(255, 200, 60) },
+			{ t = 0.35, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(110, 200, 255) },
+			{ t = 0.38, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(150, 80, 255) },
+			{ t = 0.41, fx = "ring",  at = "target", ground = true, radius = 10, dur = 0.4, color = C(235, 235, 255) },
+			{ t = 0.32, fx = "sound", slot = "impact" },
 		},
 	},
 }
@@ -661,6 +949,7 @@ return {
 	CINEMATIC_CAMERA = CINEMATIC_CAMERA,
 	TIERS            = TIERS,
 	PARTICLE_BUDGET  = PARTICLE_BUDGET,
+	TEXTURES         = TEXTURES,
 	SOUND_LIBRARY    = SOUND_LIBRARY,
 	SOUND            = SOUND,
 	data             = FX,
