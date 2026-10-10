@@ -89,6 +89,22 @@
 --   D:Invoke("snapshot")             -- Spielstand merken (fuer Tests)
 --   D:Invoke("restore")              -- gemerkten Spielstand zurueckschreiben
 --
+-- Welt aufwerten (08.10.2026, nur Optik, setzt workspace-Attribute fuer die
+-- Client-Controller; alle Test-Clients sehen dasselbe):
+--   D:Invoke("worldshots", 1)        -- Kamera auf festen Punkt 1..6 (UI aus), 0 = zurueck
+--   D:Invoke("daytime", 19)          -- Tageslauf auf feste Uhrzeit, "auto" = Zyklus
+--   D:Invoke("pitstate", "soon")     -- Pit-Rahmen: idle | soon | live | auto
+--   D:Invoke("neststate", "boss")    -- Wespen-Nest: calm | boss | auto
+--   D:Invoke("arrival")              -- Ankunft (Blasen + Bienen) erneut abspielen
+--   D:Invoke("fish")                 -- sofort einen Honig-Fisch springen lassen
+--   D:Invoke("islandstage", 4)       -- Insel-Deko Stufe 1..4 zeigen ("auto" = aus dem Fortschritt)
+--   D:Invoke("pondfull")             -- Teich bis zum Rand fuellen (Ueberlauf-Tropfen)
+--   D:Invoke("spectators", "hop")    -- Zuschauer an der eigenen Arena: hop | cheer
+--   D:Invoke("record")               -- Rekord-Moment am eigenen Schau-Turm (Flagge glaenzt, Jubel)
+--   D:Invoke("moment", "hatch", "Cosmic") -- Welt-Moment an alle: hatch <Rarity> | tower <Id> | record | rebirth | mutation <Id>
+--   D:Invoke("moments5")             -- fuenf grosse Momente gleichzeitig (Drosselung pruefen)
+--   (Event-Start und Boss: D:Invoke("pitstate", "live") / D:Invoke("neststate", "boss"))
+--
 -- HBB Paket 0 (Test-Zustaende, erst "snapshot"):
 --   D:Invoke("state", "fresh")       -- neues Konto, Trichter F01–F10 misst
 --   D:Invoke("state", "hatch10")     -- dazu zehn geoeffnete Basis-Eier
@@ -443,6 +459,107 @@ end
 -- v15: Teile auf der eigenen Insel zaehlen (Budget: 250 ohne Baerchi-Figuren)
 commands.parts = function(player, _data)
 	return MapService.countParts(player) or { error = "kein Plot" }
+end
+
+-- Welt aufwerten: Debug-Signale an die Client-Controller (workspace-Attribute,
+-- siehe WorldFXKit.onDebug). Ein Zaehler im Wert sorgt dafuer, dass derselbe
+-- Befehl zweimal hintereinander auch zweimal ausloest.
+local _worldSignal = 0
+local function worldSignal(attribute: string, value: any)
+	_worldSignal += 1
+	workspace:SetAttribute(attribute, if value == nil then tostring(_worldSignal) else value)
+end
+
+commands.worldshots = function(_player, _data, index: any)
+	local n = tonumber(index)
+	if n == nil then
+		local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
+		local names = {}
+		for _, shot in WorldFXConfig.WORLD_SHOTS do table.insert(names, shot.name) end
+		return { hinweis = "worldshots <1..6> (0 = zurueck)", punkte = names }
+	end
+	_worldSignal += 1
+	workspace:SetAttribute("DebugWorldShot", string.format("%d|%d", n, _worldSignal))
+	return { punkt = n }
+end
+
+commands.daytime = function(_player, _data, hour: any)
+	local h = tonumber(hour)
+	workspace:SetAttribute("DebugDayTime", if h then h else -1)
+	return { tageszeit = if h then h else "auto" }
+end
+
+commands.pitstate = function(_player, _data, state: any)
+	local value = tostring(state or "auto")
+	workspace:SetAttribute("DebugPitState", value)
+	return { pit = value }
+end
+
+commands.neststate = function(_player, _data, state: any)
+	local value = tostring(state or "auto")
+	workspace:SetAttribute("DebugNestState", value)
+	return { nest = value }
+end
+
+commands.arrival = function(_player, _data)
+	worldSignal("DebugArrival", nil)
+	return { ankunft = true }
+end
+
+commands.fish = function(_player, _data)
+	worldSignal("DebugFish", nil)
+	return { fisch = true }
+end
+
+-- Paket D: Insel-Stufe am Player-Attribut (wie PlotDisplayService), "auto"
+-- rechnet sie aus dem Spielstand neu.
+commands.islandstage = function(player, data, stage: any)
+	local IslandStage = require(ReplicatedStorage.Modules.IslandStage)
+	local n = tonumber(stage)
+	local value = if n then math.clamp(math.floor(n), 1, IslandStage.MAX)
+		else IslandStage.compute(data.towers and data.towers.records, data.rebirthCount or 0)
+	player:SetAttribute("IslandStage", value)
+	return { stufe = value }
+end
+
+-- Paket D: Teich voll (alle Honig-Lager voll, wie "honey"), damit der Ueberlauf laeuft
+commands.pondfull = function(player, data)
+	local result = commands.honey(player, data)
+	return { teich = "voll", honig = result }
+end
+
+-- Paket E: Zuschauer-Baerchis an der eigenen Arena testen
+commands.spectators = function(player, _data, mode: any)
+	_worldSignal += 1
+	workspace:SetAttribute("DebugSpectators", string.format("%d|%s|%d", player.UserId, tostring(mode or "hop"), _worldSignal))
+	return { zuschauer = tostring(mode or "hop") }
+end
+
+-- Paket G: Welt-Moment wie vom Server erkannt an alle schicken (ohne den
+-- Spielstand zu aendern). Erzwingt "gross", damit man jede Art sieht.
+commands.moment = function(player, _data, kind: any, value: any)
+	local WorldMomentService = require(ServerScriptService.Services.WorldMomentService)
+	local k = tostring(kind or "hatch")
+	local defaults = { hatch = "Cosmic", tower = "II", record = "I", rebirth = "1", mutation = "Galaxy" }
+	local v = if value ~= nil then tostring(value) else defaults[k] or "?"
+	WorldMomentService.announce(player, { kind = k :: any, value = v, number = 42 }, true)
+	return { moment = k, wert = v }
+end
+
+-- Paket G: fuenf grosse Momente auf einmal (Client muss sie nacheinander zeigen)
+commands.moments5 = function(player, _data)
+	local WorldMomentService = require(ServerScriptService.Services.WorldMomentService)
+	for _, m in { { "hatch", "Mythic" }, { "tower", "III" }, { "rebirth", "2" }, { "mutation", "Rainbow" }, { "hatch", "Omega" } } do
+		WorldMomentService.announce(player, { kind = m[1] :: any, value = m[2], number = 2 }, true)
+	end
+	return { momente = 5 }
+end
+
+-- Paket E: Rekord-Moment am eigenen Schau-Turm
+commands.record = function(player, _data)
+	_worldSignal += 1
+	workspace:SetAttribute("DebugRecord", string.format("%d|%d", player.UserId, _worldSignal))
+	return { rekord = true }
 end
 
 -- v15: den aktuellen Spielstand in ein v14-Format zuruckverwandeln (Topf L7,
@@ -1047,6 +1164,12 @@ commands.help = function()
 
 		-- v17
 		"jackpot", "combtheme <themeId|off>", "launch [anzahl]",
+
+		-- Welt aufwerten
+		"worldshots [1..6|0]", "daytime <uhrzeit|auto>", "pitstate <idle|soon|live|auto>",
+		"neststate <calm|boss|auto>", "arrival", "fish",
+		"islandstage <1..4|auto>", "pondfull", "spectators <hop|cheer>", "record",
+		"moment <hatch|tower|record|rebirth|mutation> [wert]", "moments5",
 	}
 end
 

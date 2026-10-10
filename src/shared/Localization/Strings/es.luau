@@ -500,4 +500,13 @@ return {
 	-- HBB Paket 5: Heim-Knopf
 	["err.home_carrying"]    = "¡Primero entrega tus panales!",
 	["err.home_unavailable"] = "Tu parcela no está disponible ahora",
+	-- Welt aufwerten, Paket C: Wegweiser auf der Hauptinsel
+	["world.sign.event"]    = "Evento",
+	["world.sign.merchant"] = "Mercader",
+	["world.sign.board"]    = "Clasificación",
+	["world.sign.home"]     = "Tu isla",
+	["world.sign.free"]     = "Isla libre",
+	["world.sign.island"]   = "Isla de {name}",
+	-- Welt aufwerten, Paket G: Zeile fuer die anderen Spieler
+	["world.moment.hatch"] = "¡{name} consiguió un Baerchi {rarity}!",
 }

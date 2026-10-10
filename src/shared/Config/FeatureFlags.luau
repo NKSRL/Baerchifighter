@@ -71,6 +71,18 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
 	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
 	ENDLESS           = true,
+
+	-- Welt aufwerten (08.10.2026), je Paket ein Schalter. Reine Client-Optik.
+	-- Paket A (Tageslauf) haengt am Schalter AmbienceConfig.DAY_CYCLE.
+	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
+	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
+	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
+	WORLD_D_PLOTS     = true,   -- Insel-Stufen, Teich-Glanz/Ueberlauf, eigene Insel, leere Inseln
+	WORLD_E_ARENA     = true,   -- Steg-Laternen, Torbogen, Zuschauer, Flagge am Schau-Turm
+	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
+	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
+	WORLD_H_SOUND     = true,   -- Klang-Kulisse nach Zonen (laeuft nur mit gepruefter Sound-ID)
+	WORLD_I_ZONES     = true,   -- Licht-Feinschliff nach Zonen (Insel / Arena / Turm)
 }
 
 local FeatureFlags = {}

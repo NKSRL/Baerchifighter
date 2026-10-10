@@ -18,6 +18,13 @@ local AmbienceConfig = {}
 -- Die Atmosphaere macht den Himmel: tiefblau oben, rosa-goldener Horizont.
 -- Das kostet keine einzige Part und keine Textur.
 AmbienceConfig.CLOCK_TIME        = 16.9    -- spaeter Nachmittag, lange weiche Schatten
+
+-- Welt aufwerten, Paket A: langsamer Tageslauf NUR auf dem Client
+-- (DayCycleController, Zahlen in WorldFXConfig.DAY). Pendelt zwischen
+-- goldenem Nachmittag und blauer Stunde, nie Nacht. Aus = fester Himmel wie
+-- bisher (CLOCK_TIME). Der feste Himmel unten bleibt der Startwert, den der
+-- Server setzt; 16,9 Uhr ist ein Punkt im Zyklus (Test day_cycle.test.lua).
+AmbienceConfig.DAY_CYCLE         = true
 AmbienceConfig.BRIGHTNESS        = 2.4
 AmbienceConfig.AMBIENT           = Color3.fromRGB(120, 118, 150)
 AmbienceConfig.OUTDOOR_AMBIENT   = Color3.fromRGB(150, 150, 185)

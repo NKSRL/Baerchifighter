@@ -17,6 +17,9 @@ Geprueft wird pro Deko-Liste:
     5. v15: jeder LOOK (Grund-Deko + Zusaetze aus BUILDING_LOOK_DECOR bzw.
        CombConfig.RECYCLER_LOOK_DECOR) besteht 1.-4. und bleibt im Teile-Budget
        (MapConfig.LOOK_PART_BUDGET).
+    6. Welt aufwerten, Paket D: Insel-Stufen (WorldFXConfig.ISLAND_KINDS je
+       Art, ISLAND_STAGE_ITEMS je Stufe 1..4) bestehen 1.-2. und bleiben im
+       Budget (WorldFXConfig.ISLAND_DECOR_BUDGET).
 
 Aufruf:  python3 tools/check_decor.py      (Exit-Code 1 wenn etwas nicht stimmt)
 """
@@ -28,6 +31,7 @@ from pathlib import Path
 
 MAP_CONFIG = Path(__file__).resolve().parent.parent / "src" / "shared" / "Config" / "MapConfig.luau"
 COMB_CONFIG = Path(__file__).resolve().parent.parent / "src" / "shared" / "Config" / "CombConfig.luau"
+WORLD_FX_CONFIG = Path(__file__).resolve().parent.parent / "src" / "shared" / "Config" / "WorldFXConfig.luau"
 
 # Toleranz in Studs. Rundungsfehler in handgeschriebenen Zahlen sollen nicht
 # als Fehler durchgehen, ein sichtbarer Spalt aber schon.
@@ -209,6 +213,39 @@ def check_list(label, pieces, body_size=None, floating_ok=False):
     return problems
 
 
+def check_island_stages():
+    """Jede Art aus WorldFXConfig.ISLAND_KINDS fuer sich (Boden, Schweben) und
+    die Teile-Summe je Stufe gegen ISLAND_DECOR_BUDGET."""
+    failures = []
+    if not WORLD_FX_CONFIG.exists():
+        return failures
+    source = WORLD_FX_CONFIG.read_text(encoding="utf-8")
+    kinds_block = extract_assigned(source, "WorldFXConfig.ISLAND_KINDS")
+    items_block = extract_assigned(source, "WorldFXConfig.ISLAND_STAGE_ITEMS")
+    budget_m = re.search(r"WorldFXConfig\.ISLAND_DECOR_BUDGET\s*=\s*(\d+)", source)
+    if kinds_block is None or items_block is None or budget_m is None:
+        print("!! Insel-Stufen (ISLAND_KINDS/ISLAND_STAGE_ITEMS/ISLAND_DECOR_BUDGET) nicht gefunden")
+        return ["Insel-Stufen fehlen"]
+    budget = int(budget_m.group(1))
+    kinds = {key: parse_pieces(block) for key, block in split_named_lists(kinds_block).items()}
+    for key, pieces in kinds.items():
+        failures += check_list(f"Insel {key}", pieces)
+    items = re.findall(r'stage\s*=\s*(\d+),\s*kind\s*=\s*"(\w+)"', items_block)
+    for stage in range(1, 5):
+        count = 0
+        for item_stage, kind in items:
+            if int(item_stage) <= stage:
+                if kind not in kinds:
+                    failures.append(f"Insel-Stufe {stage}: unbekannte Art {kind}")
+                    continue
+                count += len(kinds[kind])
+        status = "OK " if count <= budget else "!! "
+        print(f"{status}Insel Stufe {stage}  {count:>2} Teile (Budget {budget})")
+        if count > budget:
+            failures.append(f"Insel-Stufe {stage}: {count} Teile > {budget}")
+    return failures
+
+
 def main():
     source = MAP_CONFIG.read_text(encoding="utf-8")
 
@@ -268,6 +305,9 @@ def main():
             failures += check_list(f"Recycler L{look}", pieces)
             if len(pieces) > budget[look - 1]:
                 failures.append(f"Recycler Look {look}: zu viele Teile")
+
+    # Welt aufwerten, Paket D: Insel-Stufen (Client-Deko am Inselrand)
+    failures += check_island_stages()
 
     failures += check_list("Honigmast", parse_pieces(center_block))
     failures += check_list("Honig-Teich", parse_pieces(pond_block), floating_ok=True)

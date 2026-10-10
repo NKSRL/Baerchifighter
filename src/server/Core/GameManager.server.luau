@@ -41,6 +41,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Welt und Darstellung
 	{ name = "MapService",              module = ServerScriptService.Services.MapService },
 	{ name = "PlotDisplayService",      module = ServerScriptService.Services.PlotDisplayService },
+	-- Welt aufwerten, Paket G: grosse Momente eines Spielers an alle melden
+	{ name = "WorldMomentService",      module = ServerScriptService.Services.WorldMomentService },
 	{ name = "BaerchiAutopilotService", module = ServerScriptService.Services.BaerchiAutopilotService },
 
 	-- Insel, Honig, Eier
