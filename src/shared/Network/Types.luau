@@ -682,6 +682,7 @@ export type FightBeat = {
 	enemyHp : number,    -- HP des Gegners nach dem Zug (0..1)
 	charge  : number,    -- Ladestand der Faehigkeit des Baerchis (0..1)
 	skillId : string?,   -- bei "skill"/"burst"
+	bonus   : boolean?,  -- Finisher/Opener hat gegriffen (nur Optik der Show)
 }
 
 -- Eine bestandene (oder verlorene) Stage innerhalb eines PIT-Laufs.

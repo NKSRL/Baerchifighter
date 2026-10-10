@@ -238,6 +238,12 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 
 		local stageBeats: { Types.FightBeat } = {}
 		for _, entry in result.log do
+			-- Finisher/Opener hat gegriffen: nur fuer die Optik der Show
+			-- (PitArenaService -> SkillFXPlay.bonus).
+			local bonus = false
+			for _, effect in entry.effects or {} do
+				if effect == "finisher" or effect == "opener" then bonus = true end
+			end
 			table.insert(stageBeats, {
 				actor   = entry.actor,
 				kind    = entry.kind,
@@ -245,6 +251,7 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 				enemyHp = math.clamp(entry.defenderHpAfter / enemyMax, 0, 1),
 				charge  = entry.chargeA,
 				skillId = entry.skillId,
+				bonus   = if bonus then true else nil,
 			})
 		end
 		table.insert(beats, stageBeats)

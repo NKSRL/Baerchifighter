@@ -205,6 +205,7 @@ type Ctx = {
 	path       : { Vector3 }?,  -- Zickzack-Linie des letzten `crack`
 	cometHead  : BasePart?,     -- Kopf des laufenden `comet` (Kamera "chase")
 	far        : boolean,       -- Zuschauer ausserhalb SPECTATOR_DISTANCE: nur `global`-Schritte
+	bonus      : boolean,       -- Finisher/Opener hat gegriffen (Server: SkillFXPlay.bonus)
 }
 
 local function at(ctx: Ctx, where: string?): Vector3
@@ -1755,6 +1756,10 @@ end
 -- stehen, dann reisst er auf: zwei Raender weichen auseinander, dazwischen
 -- dunkles Violett.
 --   at, length, width, draw, tearAt, tex (ausgefranste Schnittlinie)
+-- Farbe des Schnitts, wenn der Finisher-Bonus gegriffen hat (helles Violett,
+-- hebt sich vom Tintenschwarz der Show ab).
+local BONUS_VIOLET = Color3.fromRGB(175, 115, 255)
+
 BLOCKS.cut = function(ctx, s)
 	local cam = workspace.CurrentCamera
 	local pos = at(ctx, s.at or "target") + Vector3.new(0, 0.3, 0)
@@ -1779,8 +1784,11 @@ BLOCKS.cut = function(ctx, s)
 	end
 	tween(line, draw, { Size = Vector3.new(w, 0.02, len), CFrame = frame(pos) }, Enum.EasingStyle.Linear)
 	Debris:AddItem(line, tearAt + 0.6)
+	-- Finisher-Bonus (ctx.bonus): der Schnitt reisst violett auf statt weiss.
+	local edgeColor = if ctx.bonus then (s.bonusColor or BONUS_VIOLET) else Color3.new(1, 1, 1)
 	task.delay(tearAt, function()
 		if not line.Parent then return end
+		if ctx.bonus then line.Color = edgeColor end
 		-- dunkler Spalt in der Mitte
 		tween(line, 0.3, { Size = Vector3.new(w * 6, 0.02, len), Color = ctx.fx.color2, Transparency = 1 })
 		for _, d in line:GetChildren() do
@@ -1788,7 +1796,7 @@ BLOCKS.cut = function(ctx, s)
 		end
 		-- zwei weisse Raender weichen auseinander
 		for _, sgn in { 1, -1 } do
-			local edge = newPart(Enum.PartType.Block, Vector3.new(w * 0.6, 0.02, len), Color3.new(1, 1, 1), frame(pos), 0)
+			local edge = newPart(Enum.PartType.Block, Vector3.new(w * 0.6, 0.02, len), edgeColor, frame(pos), 0)
 			tween(edge, 0.35, { CFrame = frame(pos + across * sgn * 0.9), Transparency = 1, Size = Vector3.new(w * 0.3, 0.02, len * 0.85) },
 				Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			Debris:AddItem(edge, 0.45)
@@ -2285,6 +2293,7 @@ export type PlayRequest = {
 	attacker : Model?,     -- die Figur des Baerchis
 	target   : Model?,     -- der Gegner
 	center   : Vector3?,   -- Arena-Mitte (Fallback fuer Positionen)
+	bonus    : boolean?,   -- Finisher/Opener hat gegriffen: Schritte mit `bonus = true` laufen mit
 }
 
 function SkillFXController.play(req: PlayRequest)
@@ -2331,6 +2340,7 @@ function SkillFXController.play(req: PlayRequest)
 		path = nil,
 		cometHead = nil,
 		far = far,
+		bonus = req.bonus == true,
 	}
 
 	-- Schritte abspielen (volle Show oder eigenes Echo), je Schritt EIN
@@ -2340,6 +2350,7 @@ function SkillFXController.play(req: PlayRequest)
 			local block = BLOCKS[step.fx]
 			if block and not (step.extra and not extrasOn(ctx)) and not (step.ownerOnly and not ctx.isOwner)
 				and not (ctx.far and not step.global)
+				and not (step.bonus and not ctx.bonus)
 			then
 				local st = step
 				if echo and step.fx == "sound" then
@@ -2370,7 +2381,7 @@ function SkillFXController.play(req: PlayRequest)
 			local block = BLOCKS[step.fx]
 			if block and step.fx ~= "sound" and step.fx ~= "sky" and step.fx ~= "cinematic"
 				and step.fx ~= "spectrum" and step.fx ~= "hitstop" and step.fx ~= "starfield"
-				and step.fx ~= "flash" and step.fx ~= "shake"
+				and step.fx ~= "flash" and step.fx ~= "shake" and not step.bonus
 			then
 				local short = table.clone(step)
 				short.dur = math.min(step.dur or 0.4, SkillFXConfig.TIERS[fx.tier].echo)

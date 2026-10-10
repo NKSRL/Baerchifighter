@@ -124,6 +124,8 @@
 --   alle      color = Color3  feste Farbe fuer diesen Schritt
 --   alle      global = true   auch Spieler AUSSERHALB der Zuschauer-
 --             Reichweite sehen diesen Schritt (nur volle Show)
+--   alle      bonus = true    Schritt laeuft nur, wenn der Server `bonus`
+--             mitschickt (Finisher/Opener hat gegriffen, SkillFXPlay)
 --   silence   level = 0..1    statt stumm nur leiser (0,15 = ganz leise)
 --   cinematic style "orbitSelf"  langsamer Halbkreis um den eigenen Baerchi
 -- Fuer jeden Schritt:
@@ -543,11 +545,9 @@ local FX: { [string]: SkillFX } = {
 		-- Einschlag: Wabenmuster laeuft von den Fuessen zum Kopf und zieht ein
 		--   (fertig bei 3,4 s = Show-Ende), warmer Lichtpuls ueber den Boden,
 		--   Fluegel falten sich und zerfallen in Funken.
-		-- HP-Balken: PitArenaService setzt ihn erst im Stoss NACH der Show
-		--   (Show-Ende + CLASH_IMPACT_AT x FIGHT_SKILL_BEAT_SECONDS x Tempo =
-		--   3,4 + 0,28 .. 0,69 s). Deshalb zieht das Muster genau zum Show-Ende
-		--   ein und der warme Schein bleibt `hold` = 1,0 s an der Figur, also
-		--   bis nach dem Balken (Bericht SHOW_SERAPHEN_SEGEN).
+		-- HP-Balken: seit 10.10. setzt PitArenaService ihn im Einschlag-
+		--   Moment (impactAt = 3,4 s = Show-Ende), es gibt keinen Stoss danach
+		--   mehr. Der warme Schein bleibt `hold` = 1,0 s an der Figur.
 		tier = 3, duration = 3.4, color = C(255, 196, 70), color2 = C(255, 246, 225),
 		sounds = { charge = "whoosh", strike = "ping", impact = "ping" }, pitch = 1.3,
 		impactAt = 3.4,
@@ -645,6 +645,12 @@ local FX: { [string]: SkillFX } = {
 			{ t = 2.42, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 0.9, tex = "shockring" },
 			{ t = 2.42, fx = "shards",    at = "target", arc = true, count = 16, size = 1.0, dur = 1.1, stone = true, tex = "debris" },
 			{ t = 2.45, fx = "dust",      at = "target", count = 40, speed = 14, dur = 1.2, tex = "stardust", extra = true },
+			-- Opener-Bonus (erster, starker Einschlag; nur mit `bonus` vom
+			-- Server): zweite, violette Schockwelle, staerkeres Wackeln und ein
+			-- Glutring direkt am Gegner.
+			{ t = 2.40, fx = "shake",     power = 0.6, dur = 0.4, bonus = true },
+			{ t = 2.40, fx = "ring",      at = "target", ground = true, radius = 5, dur = 0.45, color = C(255, 220, 140), bonus = true },
+			{ t = 2.55, fx = "ring",      at = "target", ground = true, toArena = true, radius = "fence", dur = 1.1, second = true, bonus = true },
 		},
 		-- Echo (0,65 s): Komet von oben (ohne Nacht und Kamera) und gluehender Krater.
 		echo = {
@@ -652,6 +658,8 @@ local FX: { [string]: SkillFX } = {
 			{ t = 0.00, fx = "sound",  slot = "strike" },
 			{ t = 0.30, fx = "crater", at = "target", radius = 5, count = 8, dur = 0.55, tex = "crater" },
 			{ t = 0.30, fx = "sound",  slot = "impact" },
+			-- Opener-Bonus: violette Schockwelle
+			{ t = 0.30, fx = "ring",   at = "target", ground = true, radius = 9, dur = 0.35, second = true, bonus = true },
 		},
 	},
 
@@ -702,8 +710,8 @@ local FX: { [string]: SkillFX } = {
 		-- Einschlag (2,65 s): Schnitt reisst auf, Schattenfetzen flattern weg,
 		--   der Ton kommt mit einem scharfen Hieb zurueck, die Schatten loesen
 		--   sich auf, der echte Baerchi steht schlagartig wieder voll da.
-		-- Finisher-Bonus (violetter Schnitt): der Client erfaehrt ihn nicht,
-		--   siehe Bericht SHOW_SCHATTENHIEB.
+		-- Finisher-Bonus: kommt als `bonus` vom Server (SkillFXPlay); dann
+		--   reisst der Schnitt violett statt weiss auf (Baustein `cut`).
 		tier = 4, duration = 4.2, color = C(18, 14, 26), color2 = C(85, 50, 135),
 		sounds = { charge = "ghost", strike = "whoosh", impact = "slash" }, pitch = 0.7,
 		impactAt = 2.65,
