@@ -1046,4 +1046,13 @@ return {
 	["ev.bonus.gold"]             = "+{n} GoldGummies",
 	["ev.bonus.mutation"]         = "MUTATION: {mutation}!",
 	["ev.bonus.mutation_weaker"]  = "Mutation roll: {mutation} — weaker than his, nothing changes",
+	-- Welt aufwerten, Paket C: Wegweiser auf der Hauptinsel
+	["world.sign.event"]    = "Event",
+	["world.sign.merchant"] = "Merchant",
+	["world.sign.board"]    = "Leaderboard",
+	["world.sign.home"]     = "Your island",
+	["world.sign.free"]     = "Free island",
+	["world.sign.island"]   = "{name}'s island",
+	-- Welt aufwerten, Paket G: Zeile fuer die anderen Spieler
+	["world.moment.hatch"] = "{name} got a {rarity} Baerchi!",
 }

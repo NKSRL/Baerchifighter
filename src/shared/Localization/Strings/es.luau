@@ -1047,4 +1047,13 @@ return {
 	["ev.bonus.gold"]             = "+{n} GoldGummies",
 	["ev.bonus.mutation"]         = "¡MUTACIÓN: {mutation}!",
 	["ev.bonus.mutation_weaker"]  = "Tirada de mutación: {mutation} — más débil que la suya, no cambia nada",
+	-- Welt aufwerten, Paket C: Wegweiser auf der Hauptinsel
+	["world.sign.event"]    = "Evento",
+	["world.sign.merchant"] = "Mercader",
+	["world.sign.board"]    = "Clasificación",
+	["world.sign.home"]     = "Tu isla",
+	["world.sign.free"]     = "Isla libre",
+	["world.sign.island"]   = "Isla de {name}",
+	-- Welt aufwerten, Paket G: Zeile fuer die anderen Spieler
+	["world.moment.hatch"] = "¡{name} consiguió un Baerchi {rarity}!",
 }

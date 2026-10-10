@@ -11,9 +11,8 @@ Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md`, dann den Beric
 - `luau-compile --null <datei>` (Syntax)
 - `python tools/check_locals.py` (Roblox erlaubt max. 200 lokale Namen pro Modul-Ebene; der luau-CLI meldet das NICHT)
 - `luau tools/luau-tests/guide_steps.test.lua`, `unlock_rules.test.lua`, `boss_tiers.test.lua`
-- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, `ui_texts`
-- `python tools/check_feedback.py` (plus `check_members.py`, `check_consistency.py`, `check_loc.py`, `check_ui.py`, `check_decor.py`); `check_members.py` endet auch bei Funden mit 0, Ausgabe lesen
-- Spieler-Texte: Config-Namen/-Beschreibungen nur über `Localization/Names`, Server-Texte in der Welt (Tafeln, Schilder, Prompts) nur über `Localization/WorldText` mit `Loc.msg` — `check_ui.py` meldet jeden Verstoß
+- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, `day_cycle`, `island_stage`, `world_moments`, `sound_zones`
+- `python tools/check_feedback.py` (plus `check_members.py`, `check_consistency.py`, `check_loc.py`, `check_decor.py`); `check_members.py` endet auch bei Funden mit 0, Ausgabe lesen
 - Sims ohne Node: `python tools/luau-tests/run_local.py tools/sim/<name>.lua` (Exit 1 bei `FAIL`); Pflicht bei Balance-Änderungen: `progression_pacing.lua`, `tower_calibration.lua`
 - Luau-CLI: https://github.com/luau-lang/luau/releases (luau-windows.zip; Linux/Cloud: luau-ubuntu.zip)
 
@@ -22,8 +21,8 @@ Option A: Rojo installieren (`aftman`/Rojo 7.7.0), `rojo serve`, im Studio-Plugi
 ACHTUNG: `src/shared/Assets/BaerchiTemplate.rbxm` fehlt hier – vorher in Studio
 ReplicatedStorage/Assets/BaerchiTemplate per Rechtsklick → „Als Datei speichern“ dorthin sichern, sonst löscht Rojo das Modell.
 Option B: geänderte Skripte von Hand in Studio einfügen.
-Option C (empfohlen, löscht nichts): `python tools/make_update_rbxmx.py [<seit-commit>]` → `updates/HBBUpdate.rbxmx` in Studio importieren, dann `updates/HBBUpdate_Befehl.lua` in die Befehlsleiste. Ersetzt nur den Quelltext geänderter Skripte, legt neue an; Strg+Z macht es rückgängig.
-ACHTUNG Rojo: macht ReplicatedStorage/ServerScriptService/StarterPlayerScripts exakt zum Repo-Stand und löscht alles, was nur in Studio existiert (07.10.: dabei ging ein Studio-Inhalt verloren).
+Option C (empfohlen, ohne Rojo): `python3 tools/make_update_rbxmx.py <commit>` baut `updates/HBBUpdate_seit_<commit>.rbxmx`;
+in Studio *Datei → Roblox-Modell importieren*, dann `tools/einspielen.lua` in die Befehlsleiste (ersetzt nur die Source, legt Neues an, löscht nichts).
 
 Nach Änderungen in Studio: Datei → Auf Roblox speichern.
 

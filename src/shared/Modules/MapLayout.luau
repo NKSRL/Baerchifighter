@@ -169,4 +169,96 @@ function MapLayout.landmarks(): { Landmark }
 	return list
 end
 
+--------------------------------------------------------------------------------
+-- Welt aufwerten (08.10.2026): Inselmitten, offenes Wasser, Wegweiser, Bojen
+--------------------------------------------------------------------------------
+-- Gebraucht von den Client-Controllern (Water/Hub/DayCycle) und von
+-- map_layout.test.lua. Gleiche Formeln wie MapParts (Server), hier ohne
+-- Server-Abhaengigkeit.
+
+-- Mitte der Plot-Insel `slot` (PLATFORM_TOP_Y).
+function MapLayout.plotCenter(slot: number): Vector3
+	local flat = MapConfig.CENTER + MapLayout.outward(slot) * MapConfig.PLOT_RING_RADIUS
+	return Vector3.new(flat.X, MapConfig.PLATFORM_TOP_Y, flat.Z)
+end
+
+-- Abstand der Arena-Mitte zur Weltmitte (wie MapParts.pitCenter).
+function MapLayout.pitRadius(): number
+	return MapConfig.PLOT_RING_RADIUS + MapConfig.PLOT_ISLAND_RADIUS
+		+ MapConfig.ISLAND_GAP + MapConfig.PIT_BASE_RADIUS
+end
+
+-- Mitte der Arena-Insel `slot` (PLATFORM_TOP_Y).
+function MapLayout.pitCenter(slot: number): Vector3
+	local flat = MapConfig.CENTER + MapLayout.outward(slot) * MapLayout.pitRadius()
+	return Vector3.new(flat.X, MapConfig.PLATFORM_TOP_Y, flat.Z)
+end
+
+-- Liegt (x, z) auf offenem Wasser, mit `margin` Studs Abstand zu jeder
+-- Sandkante und jedem Steg? Arena-Inseln und aeussere Stege zaehlen immer als
+-- Land (es koennte ein Spieler kommen). Fuer Fisch und Gluehwuermchen.
+function MapLayout.isOpenWater(x: number, z: number, margin: number): boolean
+	local dx, dz = x - MapConfig.CENTER.X, z - MapConfig.CENTER.Z
+	local r = math.sqrt(dx * dx + dz * dz)
+	if r > MapConfig.WATER_RADIUS - margin then
+		return false
+	end
+	local shore = MapConfig.SHORE_WIDTH + margin
+	if r < MapConfig.PLATFORM_RADIUS + shore then
+		return false
+	end
+	local laneHalf = MapConfig.BRIDGE_WIDTH * 0.5 + margin
+	local pitR = MapLayout.pitRadius()
+	for slot = 1, MapConfig.PLOT_COUNT do
+		local o = MapLayout.outward(slot)
+		local along = dx * o.X + dz * o.Z
+		local across = math.abs(dx * o.Z - dz * o.X)
+		if along > 0 and along < pitR and across <= laneHalf then
+			return false
+		end
+		local plot = MapLayout.plotCenter(slot)
+		if math.sqrt((x - plot.X) ^ 2 + (z - plot.Z) ^ 2) < MapConfig.PLOT_ISLAND_RADIUS + shore then
+			return false
+		end
+		local pit = MapLayout.pitCenter(slot)
+		if math.sqrt((x - pit.X) ^ 2 + (z - pit.Z) ^ 2) < MapConfig.PIT_BASE_RADIUS + shore then
+			return false
+		end
+	end
+	return true
+end
+
+-- Wegweiser: einer je Steg, neben dem Pflasterweg, wo er am Event-Pit
+-- beginnt. `facing` = Richtung nach aussen (zum Plot).
+function MapLayout.signposts(radius: number, sideOffset: number): { { slot: number, position: Vector3, outward: Vector3 } }
+	local list = {}
+	for slot = 1, MapConfig.PLOT_COUNT do
+		local o = MapLayout.outward(slot)
+		local flat = MapConfig.CENTER + o * radius + MapLayout.side(slot) * sideOffset
+		table.insert(list, { slot = slot, position = Vector3.new(flat.X, MapConfig.PLATFORM_TOP_Y, flat.Z), outward = o })
+	end
+	return list
+end
+
+-- Bojen: je eine in der Luecke zwischen zwei Stegen, weit draussen.
+function MapLayout.buoys(radius: number): { Vector3 }
+	local list = {}
+	for slot = 1, MapConfig.PLOT_COUNT do
+		local angle = (slot - 1) * (360 / MapConfig.PLOT_COUNT) + 180 / MapConfig.PLOT_COUNT
+		local p = MapLayout.atAngle(angle, radius)
+		table.insert(list, Vector3.new(p.X, MapConfig.PLATFORM_TOP_Y - MapConfig.WATER_DROP, p.Z))
+	end
+	return list
+end
+
+-- Paket D: Punkt am Rand der Plot-Insel `slot`. `angleDegrees` plot-lokal:
+-- 0 = nach aussen (Arena-Steg), 90 = zur Seite (side), 180 = zur Hauptinsel.
+-- Zweiter Wert: Richtung von dort zur Inselmitte (fuer die Ausrichtung der Deko).
+function MapLayout.islandRimPoint(slot: number, angleDegrees: number, radius: number): (Vector3, Vector3)
+	local a = math.rad(angleDegrees)
+	local dir = MapLayout.outward(slot) * math.cos(a) + MapLayout.side(slot) * math.sin(a)
+	local center = MapLayout.plotCenter(slot)
+	return center + dir * radius, -dir
+end
+
 return MapLayout
