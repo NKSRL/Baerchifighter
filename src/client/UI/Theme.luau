@@ -539,7 +539,9 @@ function Theme.ornate(frame: GuiObject, kind: string, sliceScale: number?): Imag
 	end
 	image.Name   = "Ornate"
 	image.Size   = UDim2.fromScale(1, 1)
-	image.ZIndex = frame.ZIndex
+	-- ZIndexBehavior = Sibling: der Rahmen ist ein Geschwister von Titel und
+	-- Inhalt und muss UNTER ihnen liegen.
+	image.ZIndex = 0
 	if kind ~= "tile" then
 		frame.BackgroundTransparency = 1
 		if stroke then stroke.Enabled = false end
@@ -590,27 +592,24 @@ function Theme.sealButton(name: string, parent: Instance, text: string): TextBut
 	image.Name     = "Seal"
 	image.Position = UDim2.new(0, -4, 0, -3)
 	image.Size     = UDim2.new(1, 8, 1, 10)
-	image.ZIndex   = button.ZIndex
+	image.ZIndex   = 0
 
 	local label = Theme.label("SealText", button, text)
 	label.Size           = UDim2.new(1, -16, 1, -4)
 	label.Position       = UDim2.fromOffset(8, 1)
 	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.ZIndex         = button.ZIndex
+	label.ZIndex         = 2
 	Theme.outlineText(label, 2)
 	button.TextTransparency = 1
 
 	local function sync()
 		label.Text   = button.Text
-		label.ZIndex = button.ZIndex
-		image.ZIndex = button.ZIndex
 		image.ImageColor3 = if button.Active then Color3.new(1, 1, 1) else Color3.fromRGB(130, 124, 120)
 		label.TextTransparency = if button.Active then 0 else 0.35
 		button.TextTransparency = 1
 	end
 	button:GetPropertyChangedSignal("Text"):Connect(sync)
 	button:GetPropertyChangedSignal("Active"):Connect(sync)
-	button:GetPropertyChangedSignal("ZIndex"):Connect(sync)
 	button:GetPropertyChangedSignal("TextTransparency"):Connect(function()
 		if button.TextTransparency ~= 1 then sync() end
 	end)

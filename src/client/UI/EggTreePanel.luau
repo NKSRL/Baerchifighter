@@ -340,7 +340,9 @@ local function buildEdge(layers: { [string]: Frame }, edge: Layout.Edge)
 		glow.Name = "Glow"
 		glow.AnchorPoint = Vector2.new(0.5, 0.5)
 		glow.Position = UDim2.fromOffset(cx, cy)
-		glow.Size = UDim2.fromOffset(len + w * 0.6, w * (if edge.trunk then 1.4 else 0.7))
+		-- Ohne Ueberlappung: halbtransparente Stuecke wuerden an den Stoessen
+		-- doppelt hell und der Lichtstreifen saehe gestrichelt aus.
+		glow.Size = UDim2.fromOffset(len + 1, w * (if edge.trunk then 1.4 else 0.7))
 		glow.Rotation = rot
 		glow.BorderSizePixel = 0
 		glow.Parent = if edge.trunk then layers.trunkGlow else layers.glows
@@ -963,8 +965,8 @@ local function buildDetail(detail: ScrollingFrame, data: Types.PlayerDataUpdate)
 
 	-- Kopf: grosses Ei auf Sockel, Name, Pfad, Zustand
 	local top = addRow(detail, nextOrder(), 104)
-	local egg = EggIcon.make(top, eggId, 92, nil, { idle = true, pedestal = true })
-	egg.Position = UDim2.fromOffset(4, 2)
+	local egg = EggIcon.make(top, eggId, 76, nil, { idle = true, pedestal = true })
+	egg.Position = UDim2.fromOffset(10, 0)
 	local title = Theme.label("Title", top, eggName(eggId))
 	title.Position = UDim2.fromOffset(90, 4)
 	title.Size = UDim2.new(1, -92, 0, 28)
@@ -1300,7 +1302,7 @@ function EggTreePanel.init(screenGui: ScreenGui)
 
 	zoomButton(vp, "+", 10, function() setZoom(_zoom * 1.25) end)
 	zoomButton(vp, "−", 54, function() setZoom(_zoom / 1.25) end)
-	zoomButton(vp, "⤢", 98, resetView)
+	zoomButton(vp, "↺", 98, resetView)
 
 	-- Detail-Karte
 	local host = Theme.panel("Detail", body, Theme.COLORS.forest)

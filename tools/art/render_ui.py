@@ -600,8 +600,8 @@ def render_bg(out):
     col = g.mix(g.mul(g.mul(g.smooth(leaves, 0.45, 0.6), top), 0.55), col, bl.srgb((22, 40, 30)))
     # Bokeh-Lichter
     d, c = g.voronoi(g.comb(g.mul(nx, 3.0), 0.0, g.mul(nz, 3.0)), 1.0)
-    bok = g.mul(g.smooth(d, 0.22, 0.12), g.smooth(g.bw(c), 0.62, 0.7))
-    col = g.mix(g.mul(bok, 0.22), col, bl.srgb((255, 200, 110)))
+    bok = g.mul(g.smooth(d, 0.13, 0.07), g.smooth(g.bw(c), 0.62, 0.7))
+    col = g.mix(g.mul(bok, 0.12), col, bl.srgb((255, 200, 110)))
     # Vignette
     vig = g.smooth(g.math("SQRT", g.add(g.mul(nx, nx), g.mul(g.sub(nz, 1.0), g.sub(nz, 1.0)))), 1.0, 1.9)
     col = g.mix(g.mul(vig, 0.6), col, bl.srgb((12, 8, 8)))

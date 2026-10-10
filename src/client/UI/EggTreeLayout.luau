@@ -49,6 +49,7 @@ local FORK_LEFT: Point  = { x = 642, y = 572 }
 local FORK_RIGHT: Point = { x = 858, y = 572 }
 local CROWN: Point      = { x = 750, y = 600 }
 local ROOT_RIGHT: Point = { x = 862, y = 1072 }
+local TRUNK_FOOT: Point = { x = 752, y = 1040 }
 
 EggTreeLayout.NODES = {
 	BasicEgg         = { x = 606,  y = 1040 },
@@ -79,7 +80,7 @@ EggTreeLayout.NODES = {
 } :: { [string]: Point }
 
 EggTreeLayout.EDGES = {
-	{ from = "BasicEgg",  to = "SugarEgg",  path = "Stamm", bend = 0, width = 30, trunk = true },
+	{ from = "BasicEgg",  to = "SugarEgg",  path = "Stamm", start = TRUNK_FOOT, bend = 6, width = 30, trunk = true },
 
 	{ from = "SugarEgg",  to = "GoldenEgg",   path = "Gold", start = FORK_LEFT, bend = -26, width = 28 },
 	{ from = "GoldenEgg", to = "PlatinumEgg", path = "Gold", bend = 22,  width = 24 },

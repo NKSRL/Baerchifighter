@@ -332,7 +332,7 @@ function EggIcon.make(parent: Instance, eggId: string, height: number, z: number
 	body.AnchorPoint            = Vector2.new(0.5, 0)
 	body.Position               = UDim2.fromScale(0.5, 0)
 	body.Size                   = UDim2.fromOffset(height, height)
-	body.ZIndex                 = layer
+	body.ZIndex                 = layer + 1   -- ueber Kranz, Halo und Sockel
 	body.Parent                 = root
 
 	local flash: ImageLabel? = nil
@@ -350,11 +350,11 @@ function EggIcon.make(parent: Instance, eggId: string, height: number, z: number
 		image.Parent                 = body
 
 		if effects and look.glow then
-			local _, g = maskOverlay(body, "Shimmer", glowColor, layer, 0.22, 0.45)
+			local _, g = maskOverlay(body, "Shimmer", glowColor, layer + 1, 0.22, 0.45)
 			shimmer = g
 		end
 		if options.idle then
-			local f, g = maskOverlay(body, "Flash", Color3.new(1, 1, 1), layer, 0.12, 0.85)
+			local f, g = maskOverlay(body, "Flash", Color3.new(1, 1, 1), layer + 2, 0.12, 0.85)
 			if f then f.Visible = false end
 			flash, flashG = f, g
 		end
