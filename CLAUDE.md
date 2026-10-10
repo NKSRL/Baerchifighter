@@ -21,6 +21,8 @@ Option A: Rojo installieren (`aftman`/Rojo 7.7.0), `rojo serve`, im Studio-Plugi
 ACHTUNG: `src/shared/Assets/BaerchiTemplate.rbxm` fehlt hier – vorher in Studio
 ReplicatedStorage/Assets/BaerchiTemplate per Rechtsklick → „Als Datei speichern“ dorthin sichern, sonst löscht Rojo das Modell.
 Option B: geänderte Skripte von Hand in Studio einfügen.
+Option C (empfohlen, ohne Rojo): `python3 tools/make_update_rbxmx.py <commit>` baut `updates/HBBUpdate_seit_<commit>.rbxmx`;
+in Studio *Datei → Roblox-Modell importieren*, dann `tools/einspielen.lua` in die Befehlsleiste (ersetzt nur die Source, legt Neues an, löscht nichts).
 
 Nach Änderungen in Studio: Datei → Auf Roblox speichern.
 
