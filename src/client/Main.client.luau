@@ -70,6 +70,7 @@ local GuideController    = require(Controllers:WaitForChild("GuideController"))
 local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
 local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
 local AreaSignController    = require(Controllers:WaitForChild("AreaSignController"))    -- Sammel-Update 3.8
+local TerminalController    = require(Controllers:WaitForChild("TerminalController"))    -- 08.10. Tower-Terminal
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
@@ -80,6 +81,7 @@ local BaerchiPanel     = require(UI:WaitForChild("BaerchiPanel"))
 local BaerchiInventory = require(UI:WaitForChild("BaerchiInventory"))
 local HatchPanel       = require(UI:WaitForChild("HatchPanel"))
 local CombatPanel      = require(UI:WaitForChild("CombatPanel"))
+local TowerPanel       = require(UI:WaitForChild("TowerPanel"))     -- 08.10. Paket D
 local BuildingPanel    = require(UI:WaitForChild("BuildingPanel"))
 local FusionPanel      = require(UI:WaitForChild("FusionPanel"))
 local CharmPanel       = require(UI:WaitForChild("CharmPanel"))
@@ -94,6 +96,7 @@ local LeaderboardPanel = require(UI:WaitForChild("LeaderboardPanel"))
 local ProfilePanel     = require(UI:WaitForChild("ProfilePanel"))
 local DailyBonusPanel  = require(UI:WaitForChild("DailyBonusPanel"))
 local Feedback         = require(UI:WaitForChild("Feedback"))
+local UpgradeFX        = require(UI:WaitForChild("UpgradeFX"))   -- 08.10. Paket G
 local Moment           = require(UI:WaitForChild("Moment"))
 local ReturnSummary    = require(UI:WaitForChild("ReturnSummary"))
 local HomeButton       = require(UI:WaitForChild("HomeButton"))
@@ -135,6 +138,7 @@ BaerchiPanel.init(screenGui)
 BaerchiInventory.init(screenGui)
 HatchPanel.init(screenGui)
 CombatPanel.init(screenGui)
+TowerPanel.init(screenGui)         -- 08.10. Paket D (nur mit TOWER_PANEL_V2)
 BuildingPanel.init(screenGui)
 FusionPanel.init(screenGui)
 -- Nach BaerchiPanel: die Detailkarte oeffnet dieses Panel ueber den
@@ -162,6 +166,7 @@ MenuBar.init(screenGui)
 -- und MenuBar (Ziele der Icons), vor ResultFeed (der Offline-Bericht des
 -- Joins kommt sonst an, bevor die Karte bereit ist).
 Feedback.init(screenGui)
+UpgradeFX.init()                -- 08.10. Paket G: Erfolgs-Moment beim Ausbau
 Moment.init(screenGui)
 ReturnSummary.init(screenGui)
 -- HBB Paket 5: Heim-Knopf (erscheint nur weit weg vom eigenen Plot)
@@ -182,6 +187,7 @@ WorldController.init()
 EggTimerController.init()
 IncubatorController.init()   -- Sammel-Update Paket 8
 AreaSignController.init()    -- Sammel-Update Paket 3.8
+TerminalController.init()    -- 08.10. Tower-Terminal an der Bruecke
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
 -- v15: Waben im Event-Pit und Recycler (braucht Toast, ClientState und die Welt)

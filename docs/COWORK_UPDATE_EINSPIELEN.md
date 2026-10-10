@@ -1,8 +1,8 @@
 # Auftrag für Claude Cowork: UI-Update in Roblox Studio einspielen (ohne Rojo)
 
-> **ZURÜCKGEZOGEN (08.10.):** Studio enthält Code, der nicht im Repo ist
-> (Inkubator). Diese Update-Datei überschreibt Studio-Fassungen. Erst
-> `docs/COWORK_STUDIO_EXPORT.md` ausführen; danach gibt es eine neue Datei.
+> **Neu (08.10., zweite Fassung):** Diese Update-Datei ist gegen deinen
+> Studio-Stand vom 08.10. gebaut (`studio_export/`), enthält Inkubator & Co.
+> und überschreibt keine Studio-Arbeit mehr. Sie ersetzt **48** Skripte.
 
 Du steuerst meinen Windows-PC. Ziel: die neuen Skripte aus dem Git-Branch
 `claude/trusting-albattani-or20rj` in meinen Roblox-Studio-Ort „Grow a Baerchi“
@@ -74,11 +74,15 @@ Prüfen: Im Ordner gibt es jetzt `updates\HBBUpdate.rbxmx` und
 2. Den kompletten Inhalt von `updates\HBBUpdate_Befehl.lua` (eine lange Zeile)
    in die Befehlsleiste kopieren und **Enter** drücken.
 3. Im Ausgabe-Fenster muss am Ende stehen:
-   `HBBUpdate: 51 Skripte ersetzt, … neu angelegt, nichts geloescht`
-   (die Summe aus „ersetzt“ + „neu angelegt“ ist 51; neu angelegt werden
-   mindestens `Names`, `WorldText`, `TouchSafeArea`).
+   `HBBUpdate: 45 Skripte ersetzt, 3 neu angelegt, nichts geloescht`
+   (Summe 48; neu angelegt werden `Names`, `WorldText`, `TouchSafeArea`).
+   **Den Befehl nur EINMAL ausführen** und keine eigenen Skripte zum
+   Verschieben benutzen — beim ersten Versuch entstanden so die Meldungen
+   „The Parent property … is locked“.
 4. Der Ordner `HBBUpdate` im Workspace ist danach verschwunden.
-5. Gelbe Warnungen `HBBUpdate: andere Skript-Art …` oder rote Fehler: **anhalten
+5. Erwartete Log-Zeilen beim Start: `IncubatorService: Initialisiert`,
+   `IncubatorPanel: Initialisiert`, `MapService: Welt gebaut`.
+6. Gelbe Warnungen `HBBUpdate: andere Skript-Art …` oder rote Fehler: **anhalten
    und mir den genauen Text schicken.** (Rückgängig: Strg+Z.)
 
 ## Schritt 5 – Testen (ohne zu speichern)

@@ -260,11 +260,16 @@ export type TowerId = "I" | "II" | "III" | "Final" | "Endless"   -- Endless: HBB
 --                (derselbe Grund wie bei Baerchi.charms).
 --   highestTower hoechster je erreichte Tower (Look des Turms, Abzeichen)
 --   selected     der Tower, in den der Fight-Knopf schickt
+--   unlocked     v17 (08.10.): freigeschaltete Tower. Tower N+1 geht auf,
+--                sobald Tower N geschafft ist (TowerConfig.UNLOCK_AFTER);
+--                die Migration traegt ein, was vorher per Rebirth offen war
+--                (Bestandsschutz). Tower I steht immer drin.
 export type TowerState = {
 	records      : { [string]: number },
 	claimed      : { [string]: { [string]: boolean } },
 	highestTower : string,
 	selected     : string,
+	unlocked     : { [string]: boolean },
 	endlessWeek  : { week: number, best: number }?, -- Paket 9: beste Endless-Stage der Woche
 }
 
@@ -1026,7 +1031,10 @@ local function createDefaultPlayerData(): PlayerData
 		-- specialClaimed (besondere Meilensteine). EINE gemeinsame Migration;
 		-- sie legt nur an und saeet stageBest aus towerProgress, fasst keine
 		-- Waehrung an.
-		version    = 16,  -- v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v17 (08.10., Tower-Terminal): towers.unlocked. Die Migration RECHNET
+		-- die alte Rebirth-Regel in Freischaltungen um (Bestandsschutz) und
+		-- darf das nur einmal — deshalb Sprung.
+		version    = 17,  -- v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -1106,6 +1114,7 @@ local function createDefaultPlayerData(): PlayerData
 			claimed      = {},
 			highestTower = "I",
 			selected     = "I",
+			unlocked     = { I = true },   -- v17
 		},
 
 		daily = {

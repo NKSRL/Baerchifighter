@@ -25,6 +25,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestUpgradeBuilding = 0.50,
 	-- v15: Tower waehlen (reines Umschalten) und Login-Bonus (zahlt aus).
 	RequestSelectTower     = 0.30,
+	RequestBuyGamepass     = 2.00,   -- 08.10. Paket C: Kauf-Dialog oeffnen
 	RequestClaimDailyBonus = 1.00,
 	RequestUpgradeRecycler = 0.50,   -- v15: Waben-Recycler
 	RequestFuseBaerchis    = 1.00,

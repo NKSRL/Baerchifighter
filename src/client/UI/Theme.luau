@@ -599,6 +599,87 @@ function Theme.dialogBody(root: Frame): Frame
 end
 
 --------------------------------------------------------------------------------
+-- Theme.v2 — Tokens des neuen Looks (08.10., Paket D)
+--------------------------------------------------------------------------------
+-- Nur UI/Kit (und Panels, die Kit benutzen) lesen diese Tabelle. Alles oben
+-- (COLORS, panel, button, dialog ...) bleibt unveraendert: die alten Panels
+-- sehen genauso aus wie vorher. Wer die Palette tauschen will, aendert NUR
+-- die Werte hier — kein Kit-Baustein hat eine eigene Farbe oder Zahl.
+--
+-- Richtung: warm und freundlich (Honig-Amber, Baerchi-Braun, Gummi-Pink,
+-- Himmelblau), helle Creme-Flaechen mit dicker schokobrauner Kontur, Knoepfe
+-- mit 3D-Kante und Glanz. Masse in Oberflaechen-Einheiten (die globale
+-- UiScale vergroessert auf grossen Bildschirmen, 1080p ~ x1,27). 8er-Raster.
+-- Kontraste (WCAG, gerechnet im Bericht): ink auf surface 11,6:1, inkSoft auf
+-- card 6,5:1; weisse Knopfschrift traegt immer eine 3-px-Kontur (ink).
+Theme.v2 = {
+	color = {
+		-- Flaechen
+		surface     = Color3.fromRGB(255, 244, 220),   -- Panel-Koerper (Creme)
+		surfaceDeep = Color3.fromRGB(246, 226, 190),   -- Verlauf unten
+		card        = Color3.fromRGB(255, 252, 243),   -- Karte
+		cardLocked  = Color3.fromRGB(236, 226, 210),   -- gesperrte Karte
+		sunk        = Color3.fromRGB(240, 222, 190),   -- Balken-Spur, Chips
+		shadow      = Color3.fromRGB( 59,  34,  18),   -- Schlagschatten
+
+		-- Schrift und Kontur
+		ink         = Color3.fromRGB( 74,  44,  23),   -- Text (Schokolade)
+		inkSoft     = Color3.fromRGB(122,  84,  53),   -- Nebentext
+		outline     = Color3.fromRGB( 59,  34,  18),   -- dicke Kontur
+		white       = Color3.fromRGB(255, 255, 255),
+
+		-- Marke
+		honey       = Color3.fromRGB(255, 182,  39),
+		honeyTop    = Color3.fromRGB(255, 214, 100),
+		honeyBottom = Color3.fromRGB(255, 152,  24),
+		bear        = Color3.fromRGB(156,  98,  51),
+		gummy       = Color3.fromRGB(255,  92, 154),
+		gummyDeep   = Color3.fromRGB(214,  51, 120),
+		sky         = Color3.fromRGB( 76, 195, 255),
+		skyDeep     = Color3.fromRGB( 22, 120, 190),
+
+		-- Knopf-Arten
+		go          = Color3.fromRGB( 72, 196,  70),   -- Primaer (Gratis-Start)
+		goTop       = Color3.fromRGB(120, 230, 100),
+		goEdge      = Color3.fromRGB( 30, 128,  44),   -- 3D-Kante unten
+		quiet       = Color3.fromRGB(255, 248, 232),   -- Sekundaer (Skip): Creme
+		quietEdge   = Color3.fromRGB(214, 190, 150),
+		gold        = Color3.fromRGB(255, 222, 128),   -- Premium (Pass): ruhiges Gold
+		goldTop     = Color3.fromRGB(255, 243, 200),
+		goldEdge    = Color3.fromRGB(206, 150,  30),
+		choose      = Color3.fromRGB( 76, 195, 255),   -- "Waehlen" auf der Karte
+		chooseEdge  = Color3.fromRGB( 22, 120, 190),
+
+		-- Zustaende
+		active      = Color3.fromRGB(255, 196,  40),   -- "AKTIV"-Band
+		new         = Color3.fromRGB(255,  92, 154),   -- "NEU"-Abzeichen
+		lock        = Color3.fromRGB(150, 132, 112),
+		progress    = Color3.fromRGB( 72, 196,  70),
+	},
+	radius = { panel = 26, card = 18, button = 16, chip = 999, badge = 14 },
+	stroke = { panel = 4, card = 3, button = 3, text = 3, textSmall = 2 },
+	space  = { xs = 4, s = 8, m = 16, l = 24, xl = 32 },
+	text   = {
+		font      = Enum.Font.FredokaOne,
+		title     = 40,
+		cardTitle = 26,
+		number    = 30,
+		body      = 18,
+		small     = 15,   -- nie kleiner (1080p: ~19 px)
+		button    = 26,
+	},
+	motion = {
+		open      = 0.32,   -- Panel springt auf (Back)
+		stagger   = 0.05,   -- Karten nacheinander
+		cardIn    = 0.28,
+		press     = 0.10,
+		pulse     = 1.6,    -- Sekunden je Puls (nur der Gratis-Start)
+		glimmer   = 2.6,    -- Glanz ueber freie neue Karten
+		confetti  = 1.2,
+	},
+}
+
+--------------------------------------------------------------------------------
 -- Formatierung
 --------------------------------------------------------------------------------
 

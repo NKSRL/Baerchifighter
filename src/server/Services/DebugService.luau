@@ -178,6 +178,7 @@ local CombRecyclerService       = require(ServerScriptService.Services.CombRecyc
 -- v15 (Tower, Angeben, Login-Bonus)
 local TowerConfig               = require(ReplicatedStorage.Config.TowerConfig)
 local TowerService              = require(ServerScriptService.Services.TowerService)
+local GamepassService           = require(ServerScriptService.Services.GamepassService)   -- 08.10. Paket C
 local LeaderboardService        = require(ServerScriptService.Services.LeaderboardService)
 local LoginBonusService         = require(ServerScriptService.Services.LoginBonusService)
 local PlayerMigration           = require(ServerScriptService.Util.PlayerMigration)
@@ -446,9 +447,20 @@ commands.tower = function(player, data, towerId: any, stage: any)
 	PlayerService.markDirty(player)
 	task.spawn(PetModeService.request, player, "Fight", choice :: any)
 	return {
-		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id, data.towers.records),
+		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id, data.towers.records, data.towers.unlocked),
 		gegnerStage1 = TowerConfig.getEnemyStats(id, start),
 	}
+end
+
+-- 08.10. (Paket C): Gamepass-Besitz fuer diese Sitzung erzwingen.
+-- D:Invoke("pass", "on")  /  ("pass", "off")  /  ("pass", "reset") = wieder Roblox
+-- Optional mit Key: D:Invoke("pass", "on", "SKIP_PASS")
+commands.pass = function(player, _data, mode: any, key: any)
+	local passKey = tostring(key or "SKIP_PASS")
+	local m = tostring(mode or "on")
+	local value: boolean? = if m == "on" then true elseif m == "off" then false else nil
+	GamepassService.debugSet(player, passKey, value)
+	return { pass = passKey, besitz = GamepassService.owns(player, passKey) }
 end
 
 -- v15: Tower-Rekord direkt setzen (Meilensteine bis dorthin werden ausgezahlt)
@@ -465,7 +477,7 @@ end
 commands.rebirthcap = function(_player, data)
 	local caps: { [string]: number } = {}
 	for _, def in TowerConfig.TOWERS do
-		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id, data.towers.records)
+		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id, data.towers.records, data.towers.unlocked)
 	end
 	local capTower, capStage = TowerConfig.getCap(data.rebirthCount)
 	return { rebirths = data.rebirthCount, deckelTower = capTower, deckelStage = capStage, proTower = caps }
@@ -1218,6 +1230,7 @@ commands.help = function()
 
 		-- v15 (Tower/Gebaeude/Angeben/Login-Bonus)
 		"tower <I|II|III|Final> <stage>", "towerrecord <id> <stage>", "rebirthcap",
+		"pass <on|off|reset> [KEY]  (08.10.: Gamepass Gratis-Skip testen)",
 		"dailyshift <tage>", "lbflush", "parts", "v14save",
 
 		-- v17

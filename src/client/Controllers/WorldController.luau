@@ -59,6 +59,8 @@ local Remotes      = require(ReplicatedStorage.Network.Remotes)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 
+local FeedbackConfig = require(ReplicatedStorage.Config.FeedbackConfig)
+
 local Theme        = require(script.Parent.Parent.UI.Theme)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local BaerchiPanel = require(script.Parent.Parent.UI.BaerchiPanel)
@@ -214,17 +216,23 @@ end
 --------------------------------------------------------------------------------
 -- HUD_ROW_V2: Honig-Brunnen ohne Fenster
 --------------------------------------------------------------------------------
--- Wunsch Projektinhaber 05.10.: Am Brunnen ploppt nichts mehr auf. E (kurz
--- halten) baut direkt aus, und ueber dem Brunnen steht nur ein Schild mit
--- Level und Preis des naechsten Ausbaus. Verbessern geht nur noch vor Ort
--- (keine Kachel mehr). Der Server prueft wie immer selbst (IslandService).
+-- Wunsch Projektinhaber 05.10.: Am Brunnen ploppt nichts mehr auf. E baut
+-- direkt aus, und ueber dem Brunnen steht nur ein Schild mit Level und Preis
+-- des naechsten Ausbaus. Verbessern geht nur noch vor Ort (keine Kachel
+-- mehr). Der Server prueft wie immer selbst (IslandService).
+--
+-- 08.10. (Paket G): EIN Druck auf E (Antippen am Handy) statt Halten. Gegen
+-- Doppelkauf sperrt sich der Prompt danach kurz (FeedbackConfig.UPGRADE_FX.
+-- PROMPT_LOCK); der Server bleibt massgeblich (Kosten, Level-Cap,
+-- RateLimiter). Den Erfolgs-Effekt zeigt UI/UpgradeFX, sobald der Server den
+-- Ausbau gebucht hat.
 
 local POND_SIGN_NAME   = "PondLevelSign"
-local POND_PROMPT_HOLD = 0.4
+local POND_PROMPT_HOLD = 0
 local POND_SIGN_HEIGHT = 9
 local POND_SIGN_DISTANCE = 90
 
-type PondView = { part: BasePart, prompt: ProximityPrompt, level: TextLabel, cost: TextLabel, lastLevel: number }
+type PondView = { part: BasePart, prompt: ProximityPrompt, level: TextLabel, cost: TextLabel, lastLevel: number, locked: boolean }
 local _ponds: { PondView } = {}
 
 local function pondState(buildingId: string): (number, any?)
@@ -252,8 +260,15 @@ local function writePond(view: PondView)
 			and data.goldGummies >= (cost.costGoldGummies or 0)
 		view.cost.Text = "⬆ " .. costText(cost)
 		view.cost.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.text
-		view.prompt.ActionText = Loc.t("ui.building.prompt_upgrade")
-		view.prompt.Enabled = true
+		-- Preis steht im Prompt; reicht es nicht, steht dort, wie viel fehlt
+		-- (der Standard-Prompt laesst sich nicht ausgrauen). Druecken geht
+		-- trotzdem: der Server lehnt mit der bekannten Meldung ab.
+		view.prompt.ActionText = if affordable
+			then Loc.t("ui.upgrade.prompt_buy", { cost = Theme.formatNumber(cost.costGummies or 0) })
+			else Loc.t("ui.upgrade.prompt_need", { missing = Theme.formatNumber(math.max(0, (cost.costGummies or 0) - (if data then data.gummies else 0))) })
+		if not view.locked then
+			view.prompt.Enabled = true
+		end
 	else
 		view.cost.Text = Loc.t("ui.recycler.maxed")
 		view.cost.TextColor3 = Theme.COLORS.goldGummy
@@ -315,11 +330,18 @@ local function attachPond(part: BasePart)
 	prompt.RequiresLineOfSight   = false
 	prompt.Parent                = part
 	local buildingId = part.Name
+	local view: PondView = { part = part, prompt = prompt, level = level, cost = cost, lastLevel = 0, locked = false }
 	prompt.Triggered:Connect(function()
+		if view.locked then return end
+		view.locked = true
+		prompt.Enabled = false
 		Remotes.RequestUpgradeBuilding:FireServer(buildingId)
+		task.delay(FeedbackConfig.UPGRADE_FX.PROMPT_LOCK, function()
+			view.locked = false
+			if prompt.Parent then writePond(view) end
+		end)
 	end)
 
-	local view: PondView = { part = part, prompt = prompt, level = level, cost = cost, lastLevel = 0 }
 	table.insert(_ponds, view)
 	part.Destroying:Connect(function()
 		local index = table.find(_ponds, view)
@@ -471,7 +493,9 @@ local function hookOwnedPart(instance: BasePart)
 			attachPond(instance)
 			return
 		end
-		addPrompt(instance, "OpenPanel", Loc.t("ui.building.prompt_upgrade"), Loc.name("building." .. buildingId .. ".name", buildingId), Enum.KeyCode.E, function()
+		addPrompt(instance, "OpenPanel", function()
+			return Loc.t("ui.building.prompt_upgrade"), Loc.name("building." .. buildingId .. ".name", buildingId)
+		end, Enum.KeyCode.E, function()
 			PanelManager.open(PanelManager.buildingPanelName(buildingId))
 		end)
 	end

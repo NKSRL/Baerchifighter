@@ -28,6 +28,7 @@ local CombConfig = require(ReplicatedStorage.Config.CombConfig)
 local MapConfig  = require(ReplicatedStorage.Config.MapConfig)
 local Remotes    = require(ReplicatedStorage.Network.Remotes)
 local Loc        = require(ReplicatedStorage.Localization.Loc)
+local FeedbackConfig = require(ReplicatedStorage.Config.FeedbackConfig)
 
 local Theme       = require(script.Parent.Parent.UI.Theme)
 local Toast       = require(script.Parent.Parent.UI.Toast)
@@ -44,7 +45,9 @@ local WORLD_FOLDER_NAME = "EventPitCombs"
 local OWNER_ATTRIBUTE   = "PlotOwner"
 local PROMPT_NAME       = "UpgradeRecycler"
 local PROMPT_DISTANCE   = 14
-local PROMPT_HOLD       = 0.4
+-- 08.10. (Paket G): ein Druck statt Halten; gegen Doppelkauf sperrt sich der
+-- Prompt danach kurz (FeedbackConfig.UPGRADE_FX.PROMPT_LOCK).
+local PROMPT_HOLD       = 0
 
 -- Wippen und Drehen der Waben im Pit (rein optisch, nur auf diesem Client)
 local BOB_HEIGHT = 0.32
@@ -149,6 +152,8 @@ local function costText(level: number): string
 	return Loc.t("ui.recycler.upgrade", { cost = text })
 end
 
+local _locked: { [ProximityPrompt]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
 local function writePrompt(prompt: ProximityPrompt)
 	local data = ClientState.get()
 	local level = if data then data.island.recycler.level else 1
@@ -159,8 +164,14 @@ local function writePrompt(prompt: ProximityPrompt)
 		prompt.ActionText = Loc.t("ui.recycler.maxed")
 		prompt.Enabled    = false
 	else
-		prompt.ActionText = costText(level)
-		prompt.Enabled    = true
+		-- Reicht es nicht, steht im Prompt, wie viel fehlt (ausgrauen kann der
+		-- Standard-Prompt nicht); der Server lehnt einen Druck dann ab.
+		local cost = CombConfig.getUpgradeCost(level + 1)
+		local missing = if cost and data then cost.gummies - data.gummies else 0
+		prompt.ActionText = if missing > 0
+			then Loc.t("ui.upgrade.prompt_need", { missing = Theme.formatNumber(missing) })
+			else costText(level)
+		prompt.Enabled    = not _locked[prompt]
 	end
 end
 
@@ -178,7 +189,14 @@ local function attachPrompt(body: BasePart)
 	prompt.Parent                = body
 
 	prompt.Triggered:Connect(function()
+		if _locked[prompt] then return end
+		_locked[prompt] = true
+		prompt.Enabled = false
 		Remotes.RequestUpgradeRecycler:FireServer()
+		task.delay(FeedbackConfig.UPGRADE_FX.PROMPT_LOCK, function()
+			_locked[prompt] = nil
+			if prompt.Parent then writePrompt(prompt) end
+		end)
 	end)
 
 	table.insert(_prompts, prompt)
@@ -372,7 +390,8 @@ function CombController.init(screenGui: ScreenGui)
 		Notify.emit("recycler_upgraded", function()
 			Toast.success(Loc.t("msg.recycler_upgraded", { level = level }))
 		end, function()
-			Feedback.gain("upgrade", level)
+			-- Paket G: den Moment zeigt UI/UpgradeFX am Recycler selbst
+			-- (aus dem Datenstand) — hier kein zweites "⬆" ueber dem Spieler.
 		end)
 	end)
 

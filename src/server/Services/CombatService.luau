@@ -63,6 +63,7 @@ local EconomyService  = require(ServerScriptService.Services.EconomyService)
 local PitArenaService = require(ServerScriptService.Services.PitArenaService)
 local TowerService    = require(ServerScriptService.Services.TowerService)
 local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
+local GamepassService = require(ServerScriptService.Services.GamepassService)  -- 08.10. Paket C
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local CombatService = {}
@@ -102,7 +103,9 @@ end
 
 -- Startstage und Kosten fuer eine Fortsetzungs-Wahl. nil = Wahl ungueltig
 -- (kein letzter Lauf in diesem Tower).
-function CombatService.getResumeOffer(data: Types.PlayerData, towerId: string, choice: ResumeChoice): (number?, number)
+-- `hasPass` (08.10.): Gamepass Gratis-Skip -> Kosten 0 (nur der Server fragt
+-- GamepassService; ein gefaelschter Client aendert daran nichts).
+function CombatService.getResumeOffer(data: Types.PlayerData, towerId: string, choice: ResumeChoice, hasPass: boolean?): (number?, number)
 	if choice == "Fresh" then
 		return 1, 0
 	end
@@ -118,7 +121,7 @@ function CombatService.getResumeOffer(data: Types.PlayerData, towerId: string, c
 
 	local def = TowerConfig.get(towerId)
 	startStage = math.clamp(startStage, 1, if def then def.stages else 1)
-	return startStage, TowerConfig.getResumeCost(towerId, startStage, data.rebirthMult)
+	return startStage, TowerConfig.getResumeCost(towerId, startStage, data.rebirthMult, hasPass)
 end
 
 -- Startet einen Tower-Lauf. Gibt true zurueck, wenn er losgeht — sonst hat
@@ -178,7 +181,8 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 	-- unmoeglich (der Lauf gehoert zur Insel), sicher ist sicher.
 	local capStage = TowerService.getStageCap(data, towerId)
 
-	local startStage, cost = CombatService.getResumeOffer(data, towerId, choice or "Fresh")
+	local startStage, cost = CombatService.getResumeOffer(data, towerId, choice or "Fresh",
+		GamepassService.owns(player, "SKIP_PASS"))
 	if not startStage then
 		fail(player, Loc.msg("err.combat_no_last_run"))
 		return false

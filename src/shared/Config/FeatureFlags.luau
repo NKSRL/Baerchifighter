@@ -108,6 +108,15 @@ local FLAGS: { [string]: boolean } = {
 	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
 	WORLD_H_SOUND     = true,   -- Klang-Kulisse nach Zonen (laeuft nur mit gepruefter Sound-ID)
 	WORLD_I_ZONES     = true,   -- Licht-Feinschliff nach Zonen (Insel / Arena / Turm)
+
+	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
+	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
+	-- begrenzt dann nichts mehr. Aus = alte Regel (STAGE_CAP_BY_REBIRTH).
+	TOWER_UNLOCK_BY_CLEAR = true,
+	-- 08.10.: Tower-Terminal an der Bruecke (Paket B2)
+	TOWER_TERMINAL    = true,
+	-- 08.10.: neues Tower-Panel im Look Theme.v2 (Paket D); aus = altes CombatPanel
+	TOWER_PANEL_V2    = true,
 }
 
 local FeatureFlags = {}
