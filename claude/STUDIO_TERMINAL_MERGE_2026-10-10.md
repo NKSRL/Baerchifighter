@@ -1,0 +1,101 @@
+# Studio-Terminal-Merge (10.10.2026)
+
+Branch `studio-terminal-merge-2026-10-10` = `origin/studio-welt-merge-2026-10-10`
++ `origin/claude/tower-terminal-ui-2026-10-08` (Basis e6268b6).
+
+## Was gemacht ist
+
+| Punkt | Stand |
+|---|---|
+| Merge | Erledigt, Konflikte wie erwartet (PlotDisplayService 4, check_decor 2, FeatureFlags, de/en/fr/es je 1). Überall bleiben **beide Seiten** erhalten: Signatur `stage` (Insel-Stufe) **und** `terminal`, beide Abgleiche in `update` und `onPlayerReady`; Schalter WORLD_B..I **und** TOWER_UNLOCK_BY_CLEAR/TOWER_TERMINAL/TOWER_PANEL_V2; Texte world.* **und** ui.tower2/ui.terminal/ui.upgrade; check_decor: Regel 6 = Insel-Stufen, Teich-Flächen wird Regel 7. |
+| 2. Assets.rbxm | Die Fassung aus `sicherung-arbeitsstand-2026-10-10` ist die **neuere** und ist übernommen. Beleg: Im Studio-Export vom 08.10. (`studio_export/Studio_Stand_2026-10-08.rbxlx`) stehen alle 10 Mesh-IDs der Sicherungs-Fassung unter `ReplicatedStorage.Assets.BaerchiTemplate`; die Mesh-IDs der Terminal-Fassung (Repo-Stand vom 05.10.) gibt es dort nur noch unter `ServerStorage.BaerchiTemplate_ALT_2026-10-05`. |
+| 3. Types v17 | Geplant und vorbereitet (siehe unten). |
+| 4. Prüfungen | Alle gelaufen, nichts ist schlechter geworden (Tabelle unten). |
+| 5. Update-Datei | `updates/HBBUpdate_Terminal_2026-10-10.rbxmx`, 39 Skripte, gebaut gegen `origin/studio-welt-merge-2026-10-10`. Der Einspiel-Befehl macht jetzt selbst ein Backup. |
+| 1. Sounds | **Offen.** Die 9 IDs gibt es nur in Studio. Weder ein Branch noch eine Update-Datei enthält sie, und aus der Cloud-Sitzung komme ich nicht an Studio heran. |
+| 5. Einspielen/Play-Test | **Offen**, nur in Studio möglich. Die Prüfliste steht unten. |
+
+## 1. Sounds aus Studio holen (bitte einmal ausführen)
+
+In Studio in die Befehlsleiste kopieren und die Ausgabe hier einfügen:
+
+```lua
+local src = game.ReplicatedStorage.Config.WorldFXConfig.Source
+local a = string.find(src, "WorldFXConfig.SOUNDS = {", 1, true)
+local b = string.find(src, "} :: { [string]: string }", a, true)
+print(string.sub(src, a, b + 24))
+```
+
+Danach trage ich den Block in `src/shared/Config/WorldFXConfig.luau` ein. Bis dahin gilt:
+Die Update-Datei enthält WorldFXConfig **nicht** (der Terminal-Branch ändert sie nicht),
+deshalb bleiben die Sounds in Studio beim Einspielen erhalten. **Nicht** `make_update_rbxmx.py`
+mit einer älteren Basis (z. B. e6268b6) laufen lassen, solange die IDs nicht im Repo
+stehen. Sonst überschreibt das Update die Sounds mit leeren Strings.
+
+## 3. Types-Wechsel v16 → v17
+
+- Studio-Types ist heute e6268b6 (v16) + `FightBeat.bonus`. Das ist zeichengleich mit
+  `studio-welt-merge` (geprüft am Studio-Export, Unterschied nur der Zeilenumbruch am Ende).
+  Der Merge-Stand hat `bonus` **und** `towers.unlocked`/`version = 17`.
+- **Diese vier müssen zusammen kommen**, sie sind alle in derselben Update-Datei:
+  `Types`, `PlayerMigration`, `TowerConfig`, `TowerService`.
+  Grund: Die Migration setzt am Ende `data.version = Types.default.version`. Läuft die neue
+  Migration mit altem Types (v16), bleibt die Version auf 16. Dann wird bei jedem Join die
+  alte Rebirth-Regel neu in `unlocked` eingetragen, und die Regel „Freischaltung durch Schaffen“
+  greift nie richtig.
+- Migration: `towers.unlocked` wird angelegt, Tower I steht immer drin. Was nach der alten
+  Regel (Rebirth-Deckel) offen war oder einen Rekord hat, bleibt offen (Bestandsschutz). Das
+  läuft nur einmal (`version < 17`), Währung wird nicht angefasst. Ein Speicherstand v17, der
+  von altem Code geladen wird, verliert nichts: Das Feld bleibt erhalten, die Version fällt
+  auf 16, und beim nächsten v17-Laden kommen nur Freischaltungen dazu.
+- Tests: `tower_unlock.test.lua` deckt v16 → v17 ab (R4 behält III, Rekord in Final hält
+  Final offen, zweiter Durchlauf ändert nichts, Rebirth nach v17 öffnet nichts) und ist **grün**.
+  `migration.test.lua` gibt es nur am Heim-PC (Node). Er lief hier **nicht**. Bitte dort
+  laufen lassen, der Fall ist im Terminal-Bericht beschrieben.
+- Backup: `tools/einspielen.lua` legt vor dem Ersetzen eine Kopie **jedes** ersetzten
+  Skripts unter `ServerStorage.Backup_vor_HBBUpdate_<Datum_Uhrzeit>` ab (gleiche
+  Ordnerstruktur, Skripte ausgeschaltet). Darin liegt dann auch die alte Types-Fassung.
+  Lokal mit einer Studio-Attrappe getestet: Types v16 → v17, Kopie v16 liegt im Backup.
+
+## 4. Prüfungen (Merge-Stand im Vergleich zu beiden Eltern)
+
+| Prüfung | welt-merge | terminal | **Merge** |
+|---|---|---|---|
+| luau-compile (alle geänderten) | – | – | ok |
+| check_consistency/decor/feedback/loc/locals/members | ok | ok | ok (MapConfig 192/200 lokale Namen) |
+| check_ui | T2 1 (`WorldFXConfig:691` „5 Arena mit Turm“) | ok | T2 1 (unverändert aus welt-merge, Kameranamen für Entwickler) |
+| guide_steps | **rot** (2) | grün | **grün** |
+| unlock_rules | rot: Veteran 19/17 | rot: Veteran | rot: Veteran (unverändert) |
+| boss_tiers | grün | grün | grün |
+| migration_hbb | rot: C4 20/17 | rot: C4 | rot: C4 (unverändert) |
+| übrige 15 run_local-Tests (inkl. tower_unlock, sound_zones, world_moments, island_stage, day_cycle) | grün | grün | grün |
+| tower_calibration + weitere Sims | ok | ok | ok |
+| progression_pacing | 1 FAIL (Rebirth 1) | 5 FAIL | 5 FAIL = wie terminal |
+
+`progression_pacing` hat im Merge dieselben 5 FAIL wie der Terminal-Branch: Look 4/5 zu früh,
+Rebirth 1 und die Endless-Ziele. Das ist die bekannte Balance-Folge von „Freischaltung durch
+Schaffen“ (`docs/TOWER_TERMINAL_UI_UMGESETZT_2026-10-08.md`, Abschnitt B, offene
+Entscheidung 3) und kommt nicht vom Merge.
+
+## 5. Einspielen und Play-Test (in Studio, noch offen)
+
+1. Datei → Speichern unter … als `.rbxl`-Sicherung (zusätzlich zum Skript-Backup).
+2. Datei → Roblox-Modell importieren → `updates/HBBUpdate_Terminal_2026-10-10.rbxmx`.
+3. `tools/einspielen.lua` komplett in die Befehlsleiste, Enter. Erwartet werden 39 Skripte
+   (ersetzt + neu). „neu:“ sollte für diese 8 kommen: TerminalController, Kit, TowerPanel,
+   UpgradeFX, GamepassService, TerminalBuilder, GamepassConfig, SoundConfig. Dazu die Zeile
+   mit dem Backup-Ordner.
+4. Play. Zu prüfen:
+   - Terminal an der Brücke sichtbar (Bildschirm, Lampe), Prompt „Tower wählen“.
+   - Tower-Panel öffnet über das Terminal und über den Tower-Namen in der Pet-Leiste.
+   - Welt-Effekte laufen. Im Output müssen stehen: `[DayCycle] an`, `[Water] aktiv`, `[Hub] …`,
+     `[PlotLife]`, `[ArenaLife]`, `[Life]`, `[WorldMoments]`, `[ZoneLight]`, Server
+     `[WorldMomentService] Initialisiert`.
+   - Shows (Kometeneinschlag, Gletscherhauch, Schattenhieb, Seraphen-Segen, Omega-Schlag) mit
+     Treffer im Einschlag-Moment.
+   - Klang-Kulisse hörbar: Im Output muss `[Soundscape] aktiv | Schleifen mit ID: …` stehen,
+     **nicht** „still“.
+   - Insel-Stufen: Das Attribut `IslandStage` steht am Player.
+   - Output ohne rote Fehler. Danach Datei → Auf Roblox speichern.
+5. Zurück: die Skripte aus `ServerStorage.Backup_vor_HBBUpdate_…` an ihre Plätze ziehen
+   (oder die `.rbxl`-Sicherung öffnen).
