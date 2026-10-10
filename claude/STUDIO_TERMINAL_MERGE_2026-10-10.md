@@ -12,25 +12,17 @@ Branch `studio-terminal-merge-2026-10-10` = `origin/studio-welt-merge-2026-10-10
 | 3. Types v17 | Geplant und vorbereitet (siehe unten). |
 | 4. Prüfungen | Alle gelaufen, nichts ist schlechter geworden (Tabelle unten). |
 | 5. Update-Datei | `updates/HBBUpdate_Terminal_2026-10-10.rbxmx`, 39 Skripte, gebaut gegen `origin/studio-welt-merge-2026-10-10`. Der Einspiel-Befehl macht jetzt selbst ein Backup. |
-| 1. Sounds | **Offen.** Die 9 IDs gibt es nur in Studio. Weder ein Branch noch eine Update-Datei enthält sie, und aus der Cloud-Sitzung komme ich nicht an Studio heran. |
+| 1. Sounds | Erledigt (Nachtrag): die 9 IDs aus Studio (Pro Sound Effects, am 10.10. geprüft) stehen jetzt in `WorldFXConfig.SOUNDS`, Text 1:1 aus der Studio-Ausgabe. |
 | 5. Einspielen/Play-Test | **Offen**, nur in Studio möglich. Die Prüfliste steht unten. |
 
-## 1. Sounds aus Studio holen (bitte einmal ausführen)
+## 1. Sounds
 
-In Studio in die Befehlsleiste kopieren und die Ausgabe hier einfügen:
-
-```lua
-local src = game.ReplicatedStorage.Config.WorldFXConfig.Source
-local a = string.find(src, "WorldFXConfig.SOUNDS = {", 1, true)
-local b = string.find(src, "} :: { [string]: string }", a, true)
-print(string.sub(src, a, b + 24))
-```
-
-Danach trage ich den Block in `src/shared/Config/WorldFXConfig.luau` ein. Bis dahin gilt:
-Die Update-Datei enthält WorldFXConfig **nicht** (der Terminal-Branch ändert sie nicht),
-deshalb bleiben die Sounds in Studio beim Einspielen erhalten. **Nicht** `make_update_rbxmx.py`
-mit einer älteren Basis (z. B. e6268b6) laufen lassen, solange die IDs nicht im Repo
-stehen. Sonst überschreibt das Update die Sounds mit leeren Strings.
+Nachtrag 10.10.: Der SOUNDS-Block wurde 1:1 aus Studio übernommen (waspHum, waves, gull,
+meadow, crickets, drip, crowd, wind, bell). Repo und Studio sind damit gleich. Die
+Update-Datei enthält WorldFXConfig weiterhin nicht, weil sie nicht nötig ist. Ab jetzt
+kann `make_update_rbxmx.py` auch mit einer älteren Basis gebaut werden, ohne dass die
+Sounds verloren gehen. Nach dem Nachtrag sind sound_zones, world_moments, day_cycle,
+island_stage und alle check_* weiterhin grün (check_ui wie vorher: T2 1).
 
 ## 3. Types-Wechsel v16 → v17
 

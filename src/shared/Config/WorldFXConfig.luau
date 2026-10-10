@@ -622,17 +622,19 @@ WorldFXConfig.MOMENTS = {
 -- Klaenge: nur IDs, die in Studio geprueft sind. Leer = kein Klang (die
 -- Sound-Pakete H und der Wespen-Summton warten auf eine geprufte ID).
 WorldFXConfig.SOUNDS = {
-	waspHum  = "",
+	waspHum  = "rbxassetid://9112881890",   -- Pro Sound Effects "Sylph 1" (Bienenschwarm, Loop 36 s), 10.10. in Studio geladen
 	-- Paket H: Klang-Kulisse (Schleifen). Leer = still. Jede ID vorher in
 	-- Studio abspielen und pruefen (Toolbox, kostenlos, oder eingebaut).
-	waves    = "",   -- Ufer: leise Wellen
-	gull     = "",   -- Ufer: ab und zu eine Moewe (Einzelklang, kein Loop)
-	meadow   = "",   -- Wiese tags: Bienensummen + Voegel
-	crickets = "",   -- Wiese in der blauen Stunde: Grillen
-	drip     = "",   -- Honigmast: leises Tropfen
-	crowd    = "",   -- Event-Pit: Stimmengewirr, nur wenn ein Event laeuft
-	wind     = "",   -- Arena und hoch oben auf dem Turm
-	bell     = "",   -- Paket G: Glocke beim Event-Start (Einzelklang)
+	-- Alle IDs: Pro Sound Effects (Creator Store, frei), am 10.10.2026 in
+	-- Studio geladen und geprueft (IsLoaded, Laenge in Klammern).
+	waves    = "rbxassetid://9120570887",   -- Ufer: "Water Lap Active 2", kleine Wellen + ferne Voegel (28 s)
+	gull     = "rbxassetid://9118858259",   -- Ufer: "Seagull Squawks 3", Einzelklang (3,5 s)
+	meadow   = "rbxassetid://9113444360",   -- Wiese tags: "Birds Park 2", Voegel + Insektensummen (57 s)
+	crickets = "rbxassetid://9112764040",   -- blaue Stunde: "Crickets Canyon 1", Grillen, Loop (36 s)
+	drip     = "rbxassetid://9126190860",   -- Honigmast: "Water Drips Into Filled Bowl" (14 s)
+	crowd    = "rbxassetid://9112766533",   -- Event-Pit: "Crowd Outdoor 2", Stimmengewirr, Loop (36 s)
+	wind     = "rbxassetid://9114057104",   -- Arena/Turm: "Desert Wind Light Gusts 1" (37 s)
+	bell     = "rbxassetid://9113584742",   -- Event-Start: "Brass Hand Bell 1", Einzelklang (6,6 s)
 } :: { [string]: string }
 -- Immer unter den Kampf-Sounds (Besitzer 0,35, Zuschauer 0,12).
 WorldFXConfig.SOUND_VOLUME = {
