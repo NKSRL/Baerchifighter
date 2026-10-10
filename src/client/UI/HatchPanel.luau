@@ -32,7 +32,7 @@ local ClientState    = require(script.Parent.Parent.Controllers.ClientState)
 local HatchPanel = {}
 
 local PANEL_NAME = "Hatch"
-local EGG_HEIGHT = 84
+local EGG_HEIGHT = 92
 
 local _root: Frame?              = nil
 local _scroller: ScrollingFrame? = nil
@@ -73,33 +73,40 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	local card = Theme.panel("Egg_" .. eggType, parent, Theme.COLORS.panel)
 	card.Size        = UDim2.new(1, -8, 0, EGG_HEIGHT)
 	card.LayoutOrder = order
+	-- Bilderbuch-Rahmen (frames/frame_card); ohne Bild Waldgruen mit Honigrand
+	Theme.ornate(card, "card", 0.4)
 
-	-- Das Ei links in Farbe und Muster seines Pfads (EggIcon), damit man die
-	-- Sorte ohne Lesen erkennt — genau so liegt es auch auf dem Plot.
-	local icon = EggIcon.make(card, eggType, 62, 3)
-	icon.AnchorPoint = Vector2.new(0, 0.5)
-	icon.Position    = UDim2.new(0, 10, 0.5, 0)
+	-- Das Ei links auf einem kleinen Sockel, in Farbe und Muster seines Pfads
+	-- (EggIcon), damit man die Sorte ohne Lesen erkennt. Es wackelt ab und
+	-- zu, wie ein Ei, das gleich schluepfen will.
+	local icon = EggIcon.make(card, eggType, 58, 3, { idle = true, pedestal = true })
+	icon.Position = UDim2.fromOffset(16, 7)
 
 	local name = Theme.label("Name", card, Loc.name("egg." .. eggType .. ".name", def.displayName))
-	name.Position = UDim2.new(0, 68, 0, 8)
-	name.Size     = UDim2.new(1, -200, 0, 22)
+	name.Position = UDim2.new(0, 76, 0, 12)
+	name.Size     = UDim2.new(1, -212, 0, 22)
+	name.TextColor3 = def.color:Lerp(Color3.new(1, 1, 1), 0.3)
+	Theme.outlineText(name, 2)
 
 	-- v14: ein noch gesperrtes Ei im Lager ist ein Sprung-Ei aus einem Event.
 	local data = ClientState.get()
 	local locked = data ~= nil and not EggTree.isUnlocked(data.eggTree, eggType)
-	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else def.description)
-	desc.Position = UDim2.new(0, 68, 0, 32)
-	desc.Size     = UDim2.new(1, -200, 0, 40)
+	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else Loc.name("egg." .. eggType .. ".desc", def.description))
+	desc.Position = UDim2.new(0, 76, 0, 36)
+	desc.Size     = UDim2.new(1, -212, 0, 44)
+	desc.TextColor3 = Theme.COLORS.cream
 
 	local count = Theme.label("Count", card, "x" .. stock)
-	count.Position       = UDim2.new(1, -128, 0, 8)
+	count.Position       = UDim2.new(1, -136, 0, 10)
 	count.Size           = UDim2.new(0, 116, 0, 22)
 	count.TextXAlignment = Enum.TextXAlignment.Right
-	count.TextColor3     = Theme.COLORS.good
+	count.TextColor3     = Theme.COLORS.honey
+	Theme.outlineText(count, 2)
 
-	local button = Theme.bigButton("Open", card, "Oeffnen", Theme.COLORS.accent)
-	button.Position = UDim2.new(1, -128, 0, 38)
-	button.Size     = UDim2.new(0, 116, 0, 32)
+	-- "Oeffnen" als Honigtropfen-Siegel
+	local button = Theme.sealButton("Open", card, Loc.t("ui.tree.open"))
+	button.Position = UDim2.new(1, -138, 0, 40)
+	button.Size     = UDim2.new(0, 120, 0, 36)
 
 	button.Activated:Connect(function()
 		-- Animation zuerst: der Klick soll sich sofort anfuehlen. Was
@@ -138,8 +145,7 @@ function HatchPanel.refresh()
 	end
 
 	if shown == 0 then
-		local empty = Theme.bodyText("Empty", scroller,
-			"Keine Eier im Lager.\nDein ausgeruesteter Baerchi legt welche auf deinem Plot — einfach einsammeln.")
+		local empty = Theme.bodyText("Empty", scroller, Loc.t("ui.hatch.empty"))
 		empty.Size        = UDim2.new(1, -8, 0, 60)
 		empty.LayoutOrder = 1
 	end
@@ -177,7 +183,7 @@ function HatchPanel.init(screenGui: ScreenGui)
 	)
 	_root = root
 
-	local header = Theme.dialogHeader(root, "Eier", function()
+	local header = Theme.dialogHeader(root, Loc.t("ui.menu.eggs"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 
@@ -191,9 +197,13 @@ function HatchPanel.init(screenGui: ScreenGui)
 	end)
 	Loc.onChanged(function()
 		treeButton.Text = Loc.t("ui.menu.tree")
+		header.Text = Loc.t("ui.menu.eggs")
+		HatchPanel.refresh()
 	end)
 
 	local body     = Theme.dialogBody(root)
+	-- Bilderbuch-Rahmen wie der Ei-Baum (Theme.ornateDialog)
+	Theme.ornateDialog(root)
 	local scroller = Theme.scroller("List", body)
 	scroller.Size = UDim2.fromScale(1, 1)
 	_scroller = scroller

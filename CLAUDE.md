@@ -11,10 +11,15 @@ Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md`, dann den Beric
 - `luau-compile --null <datei>` (Syntax)
 - `python tools/check_locals.py` (Roblox erlaubt max. 200 lokale Namen pro Modul-Ebene; der luau-CLI meldet das NICHT)
 - `luau tools/luau-tests/guide_steps.test.lua`, `unlock_rules.test.lua`, `boss_tiers.test.lua`
-- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`
+- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, `egg_tree_layout`
 - `python tools/check_feedback.py` (plus `check_members.py`, `check_consistency.py`, `check_loc.py`, `check_decor.py`); `check_members.py` endet auch bei Funden mit 0, Ausgabe lesen
 - Sims ohne Node: `python tools/luau-tests/run_local.py tools/sim/<name>.lua` (Exit 1 bei `FAIL`); Pflicht bei Balance-Änderungen: `progression_pacing.lua`, `tower_calibration.lua`
 - Luau-CLI: https://github.com/luau-lang/luau/releases (luau-windows.zip; Linux/Cloud: luau-ubuntu.zip)
+
+## UI-Bilder (Ei-Menü, Ei-Baum)
+- In Blender gezeichnet: `tools/art/render_eggs.py`, `tools/art/render_ui.py` (Blender als `pip install bpy`), Ausgabe `assets/ui/`
+- Vorschau ohne Studio: `python tools/art/preview_ui.py` → `docs/preview_ei_ui/`
+- IDs in `src/client/UI/Icons.luau` (`UI_IDS`); Einbauen/Hochladen: `docs/HBB_COWORK_EI_UI_PROMPT.md`
 
 ## In Studio bringen (kein Rojo auf dem Laptop)
 Option A: Rojo installieren (`aftman`/Rojo 7.7.0), `rojo serve`, im Studio-Plugin verbinden.

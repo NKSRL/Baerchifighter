@@ -19,6 +19,7 @@ local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local Types         = require(ReplicatedStorage.Network.Types)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local RarityBandConfig = require(ReplicatedStorage.Config.RarityBandConfig)  -- HBB Paket 4
+local Icons            = require(script.Parent.Icons)
 
 local Theme = {}
 
@@ -57,6 +58,15 @@ Theme.COLORS = {
 
 	-- Ausgegrauter Button (siehe Theme.setEnabled)
 	disabled   = Color3.fromRGB( 84,  80, 104),
+
+	-- Bilderbuch-Palette fuer Ei-Menue und Ei-Baum (passend zu den
+	-- Blender-Texturen in assets/ui, tools/art/render_ui.py)
+	honey      = Color3.fromRGB(255, 186,  52),
+	honeyDeep  = Color3.fromRGB(214, 128,  24),
+	cream      = Color3.fromRGB(255, 244, 220),
+	forest     = Color3.fromRGB( 36,  74,  50),
+	walnut     = Color3.fromRGB( 92,  58,  36),
+	walnutDeep = Color3.fromRGB( 52,  32,  22),
 }
 
 Theme.FONT      = Enum.Font.FredokaOne
@@ -503,6 +513,108 @@ function Theme.dialogBody(root: Frame): Frame
 	body.Position = UDim2.new(0, 14, 0, 48)
 	body.Size     = UDim2.new(1, -28, 1, -62)
 	return body
+end
+
+--------------------------------------------------------------------------------
+-- Verzierte Rahmen (Ei-Menue, Ei-Baum, Infokarte)
+--------------------------------------------------------------------------------
+
+-- Legt den 9-Slice-Rahmen `kind` ("panel" | "card" | "tile") ueber `frame`.
+-- "panel" und "card" bringen ihre Fuellung mit (Hintergrund wird
+-- durchsichtig), "tile" ist nur ein Zierrand ueber der vorhandenen Farbe.
+--
+-- Ohne hochgeladenes Bild bleibt die Flaeche ein normales Theme.panel, nur in
+-- den Farben der Bilderbuch-Palette — bedienbar und im selben Ton.
+function Theme.ornate(frame: GuiObject, kind: string, sliceScale: number?): ImageLabel?
+	local stroke = frame:FindFirstChildOfClass("UIStroke")
+	local image = Icons.uiImage(frame, "frames/frame_" .. kind, sliceScale)
+	if not image then
+		if stroke then stroke.Color = Theme.COLORS.honeyDeep end
+		if kind == "panel" then
+			frame.BackgroundColor3 = Theme.COLORS.walnutDeep
+		elseif kind == "card" then
+			frame.BackgroundColor3 = Theme.COLORS.forest
+		end
+		return nil
+	end
+	image.Name   = "Ornate"
+	image.Size   = UDim2.fromScale(1, 1)
+	-- ZIndexBehavior = Sibling: der Rahmen ist ein Geschwister von Titel und
+	-- Inhalt und muss UNTER ihnen liegen.
+	image.ZIndex = 0
+	if kind ~= "tile" then
+		frame.BackgroundTransparency = 1
+		if stroke then stroke.Enabled = false end
+	end
+	return image
+end
+
+-- Dialog (Theme.dialog + dialogHeader + dialogBody) im verzierten Rahmen:
+-- Titelband in Honig statt Lila, Kopf und Inhalt ruecken vom Zierrand weg.
+function Theme.ornateDialog(root: Frame)
+	local image = Theme.ornate(root, "panel", 0.5)
+	local band = root:FindFirstChild("TitleBand")
+	if band and band:IsA("Frame") then
+		band.BackgroundColor3 = Theme.COLORS.honeyDeep
+		Theme.gradient(band, Color3.fromRGB(255, 236, 200), Color3.fromRGB(200, 150, 110))
+	end
+	if not image then return end
+	local header = root:FindFirstChild("Header")
+	local body = root:FindFirstChild("Body")
+	if band and band:IsA("GuiObject") then
+		band.Position = UDim2.new(0, 18, 0, 15)
+		band.Size     = UDim2.new(1, -36, 0, 40)
+	end
+	if header and header:IsA("GuiObject") then
+		header.Position = UDim2.new(0, 26, 0, 20)
+		header.Size     = UDim2.new(1, -52, 0, 30)
+	end
+	if body and body:IsA("GuiObject") then
+		body.Position = UDim2.new(0, 22, 0, 62)
+		body.Size     = UDim2.new(1, -44, 1, -82)
+	end
+end
+
+-- Grosser Aktionsknopf als Honigtropfen-Siegel ("Oeffnen"). Ohne Bild ein
+-- honigfarbener bigButton. Die Beschriftung bleibt button.Text (ein
+-- Kind-Label spiegelt sie ueber das Siegelbild), damit Aufrufer und
+-- Theme.setEnabled wie gewohnt arbeiten.
+function Theme.sealButton(name: string, parent: Instance, text: string): TextButton
+	local button = Theme.bigButton(name, parent, text, Theme.COLORS.honey)
+	local image = Icons.uiImage(button, "frames/seal", 0.42)
+	if not image then return button end
+
+	button.BackgroundTransparency = 1
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then stroke.Enabled = false end
+	local shine = button:FindFirstChild("Shine")
+	if shine then shine:Destroy() end
+	image.Name     = "Seal"
+	image.Position = UDim2.new(0, -4, 0, -3)
+	image.Size     = UDim2.new(1, 8, 1, 10)
+	image.ZIndex   = 0
+
+	local label = Theme.label("SealText", button, text)
+	label.Size           = UDim2.new(1, -16, 1, -4)
+	label.Position       = UDim2.fromOffset(8, 1)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.ZIndex         = 2
+	Theme.outlineText(label, 2)
+	button.TextTransparency = 1
+
+	local function sync()
+		label.Text   = button.Text
+		image.ImageColor3 = if button.Active then Color3.new(1, 1, 1) else Color3.fromRGB(130, 124, 120)
+		label.TextTransparency = if button.Active then 0 else 0.35
+		button.TextTransparency = 1
+	end
+	button:GetPropertyChangedSignal("Text"):Connect(sync)
+	button:GetPropertyChangedSignal("Active"):Connect(sync)
+	button:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+		if button.TextTransparency ~= 1 then sync() end
+	end)
+	sync()
+	return button
 end
 
 --------------------------------------------------------------------------------
