@@ -427,10 +427,7 @@ local function fill(baerchi: Types.Baerchi)
 	-- Verwertungs-Wert, damit man vor dem Verwerten weiss was es bringt.
 	-- Feste Quote seit v4 (kein Recycler-Gebaeude mehr).
 	if _valueLabel then
-		local value = math.floor(
-			EconomyConfig.getBaerchiBaseValue(baerchi.rarity, baerchi.level)
-			* EconomyConfig.RECYCLE_RETURN
-		)
+		local value = EconomyConfig.getRecycleValue(baerchi.rarity, baerchi.level)
 		_valueLabel.Text = Loc.t("ui.baerchi.recycle_value", { n = value })
 	end
 
