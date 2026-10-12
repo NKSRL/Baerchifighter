@@ -48,6 +48,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local Names            = require(ReplicatedStorage.Localization.Names)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
@@ -74,6 +75,7 @@ local BUILDINGS: { { id: Types.BuildingId } } = {
 -- Alles, was ein einzelnes Menue zum Aktualisieren braucht.
 type Menu = {
 	root       : Frame,
+	title      : TextLabel,
 	levelBadge : TextLabel,
 	subLabel   : TextLabel,
 	honeyFill  : Frame,
@@ -93,12 +95,7 @@ local _menus: { [string]: Menu } = {}
 --------------------------------------------------------------------------------
 
 local function displayName(buildingId: string): string
-	local key = "building." .. buildingId .. ".name"
-	if Loc.has(key) then
-		return Loc.t(key)
-	end
-	local config = MapConfig.BUILDING_OFFSETS[buildingId]
-	return if config then config.displayName else buildingId
+	return Names.building(buildingId)
 end
 
 -- v15: Meilenstein-Faehigkeiten als eine Zeile ("Lv.10 Auto-Abnahme ✓ ·
@@ -119,13 +116,13 @@ local function priceText(costGummies: number, costGoldGummies: number): string
 	local parts: { string } = {}
 
 	if costGummies > 0 then
-		table.insert(parts, Theme.formatNumber(costGummies) .. " Gummies")
+		table.insert(parts, Loc.t("event.bonus.gummies", { n = costGummies }))
 	end
 	if costGoldGummies > 0 then
-		table.insert(parts, Theme.formatNumber(costGoldGummies) .. " GoldGummies")
+		table.insert(parts, Loc.t("event.bonus.gold", { n = costGoldGummies }))
 	end
 	if #parts == 0 then
-		return "kostenlos"
+		return Loc.t("ui.common.free")
 	end
 
 	return table.concat(parts, " + ")
@@ -193,18 +190,16 @@ local function buildMenu(
 	titleLabel.Size       = UDim2.new(1, -118, 0, 30)
 	titleLabel.TextColor3 = Theme.COLORS.outline
 
-	local subLabel = Theme.sectionLabel("Sub", header, "Stufe 1 von 10", Theme.shade(accent, -0.45))
+	local subLabel = Theme.sectionLabel("Sub", header, "", Theme.shade(accent, -0.45))
 	subLabel.Position = UDim2.new(0, 72, 0, 42)
 	subLabel.Size     = UDim2.new(1, -118, 0, 20)
 
-	local close = Theme.button("Close", header, "X", Theme.shade(accent, -0.30))
+	-- Gemeinsamer Schliessen-Knopf (grosse Trefferflaeche), oben rechts im Kopf
+	local close = Theme.closeButton(header, function()
+		PanelManager.close(panelName)
+	end, Theme.shade(accent, -0.30))
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position    = UDim2.new(1, -10, 0, 10)
-	close.Size        = UDim2.new(0, 32, 0, 28)
-	close.TextColor3  = Theme.COLORS.text
-	close.Activated:Connect(function()
-		PanelManager.close(panelName)
-	end)
 
 	--------------------------------------------------------------------------
 	-- Inhalt
@@ -288,6 +283,7 @@ local function buildMenu(
 
 	return {
 		root       = root,
+		title      = titleLabel,
 		levelBadge = levelBadge,
 		subLabel   = subLabel,
 		honeyFill  = honeyBar.fill,
@@ -403,6 +399,14 @@ function BuildingPanel.init(screenGui: ScreenGui)
 	end
 
 	ClientState.onChanged(function()
+		BuildingPanel.refresh()
+	end)
+	-- Sprachwechsel: Titel und alle Zeilen der offenen Menues neu beschriften
+	Loc.onChanged(function()
+		for _, entry in BUILDINGS do
+			local menu = _menus[PanelManager.buildingPanelName(entry.id)]
+			if menu then menu.title.Text = displayName(entry.id) end
+		end
 		BuildingPanel.refresh()
 	end)
 

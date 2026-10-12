@@ -52,6 +52,8 @@ local CLASSES: { [string]: Class } = {
 	incubator          = "ICON",    -- Paket 8: Ei in den Inkubator gelegt / beschleunigt
 	comb_delivered     = "ICON",
 	recycler_upgraded  = "ICON",
+	tower_unlocked     = "MOMENT",  -- 08.10.: neuer Tower frei (Tower-Terminal)
+	terminal_locked    = "TOAST",   -- 08.10.: Terminal noch gesperrt (Hinweis statt Panel)
 	tower_result       = "ICON",
 	promotion          = "ICON",
 	egg_collected      = "ICON",
@@ -90,6 +92,23 @@ FeedbackConfig.MOMENT_VOLUME  = 0.4
 -- gesammelt, bevor die Karte erscheint.
 FeedbackConfig.RETURN_COLLECT_SECONDS = 1.2
 FeedbackConfig.RETURN_SHOW_SECONDS    = 6
+
+-- 08.10. (Paket G): Erfolgs-Effekt nach einem BESTAETIGTEN Ausbau
+-- (UI/UpgradeFX). Alles zusammen bleibt unter 1,2 s.
+FeedbackConfig.UPGRADE_FX = {
+	POP_SECONDS      = 0.32,   -- Aufspringen und Zurueckfedern des Gebaeudes
+	POP_SCALE        = 1.12,   -- groesster Faktor beim Aufspringen
+	POP_SCALE_BIG    = 1.18,   -- dasselbe beim Look-Wechsel
+	SPARKS           = 14,     -- Funken (EIN Emitter, einmal ausgeloest)
+	SPARKS_BIG       = 34,
+	SPARK_LIFETIME   = 0.9,
+	NUMBER_SECONDS   = 1.15,   -- schwebende Zahl "Level 7 ➜ 8"
+	NUMBER_RISE      = 5,      -- Studs
+	NUMBER_SIZE      = Vector2.new(260, 64),   -- px
+	NUMBER_SIZE_BIG  = Vector2.new(360, 110),
+	LOOK_WAIT        = 1.0,    -- so lange auf den Neubau beim Look-Wechsel warten
+	PROMPT_LOCK      = 0.4,    -- Prompt nach einem Druck kurz sperren (kein Doppelkauf)
+}
 
 function FeedbackConfig.classOf(key: string): Class?
 	return CLASSES[key]

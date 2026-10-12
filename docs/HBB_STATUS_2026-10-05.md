@@ -24,6 +24,9 @@ Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredle
 - Alle Prüfungen grün: Syntax (alle `.luau`), 5 Luau-Tests (neu: `gold_rules.test.lua`), alle Sims, `check_feedback/members/consistency/loc/decor`.
 - Studio-Einspielung offen: geänderte Skripte seit dem Laptop-Export siehe `git diff a85f360 --stat -- src`.
 
+## Welt aufwerten (09.10.2026, Cloud-Sitzung)
+Alle Pakete 0, A–J umgesetzt (A Tageslauf, B Wasser, C Hauptinsel, D Plot-Inseln, E Stege/Arena, F Leben, G Welt-Momente, H Klang-Kulisse, I Licht nach Zonen), Optik nur auf dem Client. Schalter `AmbienceConfig.DAY_CYCLE`, `WORLD_B_WATER` … `WORLD_I_ZONES`. Server: kein Teil neu, nur Attribut `IslandStage` und die Meldung `WorldMoment` (`WorldMomentService`). Sound- und Textur-IDs fehlen (laufen mit Rückfall bzw. still). Nicht in Studio getestet; Prüfliste Paket J im Bericht `claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md`.
+
 ## Wo der Code liegt
 - Laptop: `Dokumente\Neuer Ordner\RBL` (Git-Repo, Tag `pre-ui-v2` = Stand vor HBB).
 - Studio-Einspielung: `Dokumente\Neuer Ordner\HBBUpdate_P1-P7.rbxmx` über *Datei → Roblox-Modell importieren*, dann den Einspiel-Befehl in der Befehlsleiste (verteilt die Skripte an ihre Plätze).
@@ -31,11 +34,3 @@ Rückmeldungen umgesetzt: `docs/HBB_PLAYTEST_FIXES_2026-10-05.md`. Stock/Veredle
 
 ## Zusammenführen mit dem Heim-Repo
 Nur `src/`, `tools/check_feedback.py`, `tools/luau-tests/*` und `docs/` übernehmen. `default.project.json` ist rekonstruiert – die vom Heim-PC behalten. Danach dort alle Prüfwerkzeuge laufen lassen und in `migration.test.lua` die Fälle `uiSeen` und `stats.totalEventsCompleted` ergänzen.
-
-## Sammel-Update 05.10.2026 (Cloud)
-Alle Pakete 1–8 aus `OPUS_PROMPT_SAMMEL_UPDATE_2026-10-05.md` umgesetzt, außer 6.3 (Entwurf zur Freigabe: `docs/SAMMEL_6_3_EIKAUF_ENTWURF_2026-10-05.md`) und 8.2 Option 2 (Radius erst nach Bildschirmfoto).
-Bericht: `docs/SAMMEL_UPDATE_UMGESETZT_2026-10-05.md`. **Datenversion 16.** Neue Schalter: `INCUBATOR`, `INDEX_REWARDS`, `PIT_BRAWL`, `AREA_SIGNS`.
-Neue Tests: `rebirth_rules`, `migration_v16`, `incubator` (run_local). In Studio nicht getestet.
-
-## HUD, Inkubator mit Bärchi, UFO-Wiederkehr (Cloud, 05.10.2026)
-Auf dem Sammel-Update aufgesetzt. Bericht: `docs/HBB_HUD_INKUBATOR_UFO_2026-10-05.md`. Neue Schalter: `HUD_ROW_V2` (Brunnen nur vor Ort mit Level-Schild, Zeile ⚙ · Quests · Shop, größere Kacheln), `INCUBATOR_BREED` (Bärchi brütet Eier, Eier gehen wieder sofort auf), `UFO_REJOIN` (mehrmals ins UFO, danach 60 s halbes Level). Alle Prüfungen grün, in Studio nicht getestet.

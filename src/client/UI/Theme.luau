@@ -19,6 +19,7 @@ local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local Types         = require(ReplicatedStorage.Network.Types)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local RarityBandConfig = require(ReplicatedStorage.Config.RarityBandConfig)  -- HBB Paket 4
+local Icons            = require(script.Parent.Icons)
 
 local Theme = {}
 
@@ -57,6 +58,15 @@ Theme.COLORS = {
 
 	-- Ausgegrauter Button (siehe Theme.setEnabled)
 	disabled   = Color3.fromRGB( 84,  80, 104),
+
+	-- Bilderbuch-Palette fuer Ei-Menue und Ei-Baum (passend zu den
+	-- Blender-Texturen in assets/ui, tools/art/render_ui.py)
+	honey      = Color3.fromRGB(255, 186,  52),
+	honeyDeep  = Color3.fromRGB(214, 128,  24),
+	cream      = Color3.fromRGB(255, 244, 220),
+	forest     = Color3.fromRGB( 36,  74,  50),
+	walnut     = Color3.fromRGB( 92,  58,  36),
+	walnutDeep = Color3.fromRGB( 52,  32,  22),
 }
 
 Theme.FONT      = Enum.Font.FredokaOne
@@ -444,8 +454,27 @@ end
 -- Dialoge
 --------------------------------------------------------------------------------
 
+-- Ein Dialog laesst mindestens so viel vom Bildschirm frei (Anteil, je Achse).
+local DIALOG_SCREEN_FILL = 0.94
+
+-- Name des UIScale, mit dem ein Dialog auf kleine Bildschirme passt (siehe
+-- Theme.dialog und Theme.dialogScale).
+local FIT_SCALE_NAME = "FitScale"
+
+-- Schliessen-Knopf (Sammel-Update 2.1: 44x40) plus eine unsichtbare
+-- Trefferflaeche 56x56 darum — auf dem Handy trifft ein Daumen sonst leicht
+-- daneben (Richtwert 44 pt).
+local CLOSE_HIT = 56
+
 -- Zentriertes Panel, standardmaessig unsichtbar. Groesse in Scale, damit es
 -- auf Handy und Monitor passt; die Constraints halten es lesbar.
+--
+-- UI-Qualitaet Schritt 2: die Mindestgroesse (minSize) war auf kleinen
+-- Bildschirmen groesser als der Bildschirm selbst — ein Handy quer hat ohne
+-- Topbar rund 350 px Hoehe, Charms/Bestenliste/Kampf brauchen 420. Kopfzeile
+-- und Schliessen-X lagen dann ausserhalb. Jetzt verkleinert ein UIScale
+-- (FitScale) den GANZEN Dialog gleichmaessig, bis er passt: das Layout bleibt
+-- wie gebaut, nur kleiner. Auf normalen Bildschirmen ist der Faktor 1.
 function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: Vector2, maxSize: Vector2): Frame
 	local root = Theme.panel(name, parent, Theme.COLORS.panelDeep)
 	root.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -459,20 +488,83 @@ function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: V
 	constraint.MaxSize = maxSize
 	constraint.Parent  = root
 
+	local fit = Instance.new("UIScale")
+	fit.Name   = FIT_SCALE_NAME
+	fit.Parent = root
+
+	if parent:IsA("LayerCollector") then
+		local screen = parent :: LayerCollector
+		local function refit()
+			-- AbsoluteSize sind echte Pixel; die globale UiScale (>= 1) rechnet
+			-- sie in Oberflaechen-Einheiten um, in denen minSize gemeint ist.
+			local global = screen:FindFirstChild("GlobalScale")
+			local globalScale = if global and global:IsA("UIScale") then math.max(global.Scale, 0.01) else 1
+			local room = screen.AbsoluteSize / globalScale * DIALOG_SCREEN_FILL
+			if room.X <= 0 or room.Y <= 0 then return end
+			fit.Scale = math.min(1, room.X / minSize.X, room.Y / minSize.Y)
+		end
+		screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
+		-- Die globale UiScale kann nach dem Dialog angelegt werden (Main) und
+		-- aendert sich mit der Fenstergroesse.
+		screen.ChildAdded:Connect(function(child)
+			if child.Name == "GlobalScale" and child:IsA("UIScale") then
+				child:GetPropertyChangedSignal("Scale"):Connect(refit)
+				refit()
+			end
+		end)
+		local global = screen:FindFirstChild("GlobalScale")
+		if global and global:IsA("UIScale") then
+			global:GetPropertyChangedSignal("Scale"):Connect(refit)
+		end
+		refit()
+	end
+
 	return root
+end
+
+-- Gesamter Verkleinerungsfaktor der Dialoge, in denen `gui` steckt (1 = keiner).
+-- Fuer Code, der AbsolutePosition/AbsoluteSize in eine Position INNERHALB eines
+-- Dialogs zurueckrechnet (IndexView): erst UiScale.toGui, dann durch diesen Wert.
+function Theme.dialogScale(gui: Instance): number
+	local factor = 1
+	local node: Instance? = gui
+	while node do
+		local fit = node:FindFirstChild(FIT_SCALE_NAME)
+		if fit and fit:IsA("UIScale") then
+			factor *= fit.Scale
+		end
+		node = node.Parent
+	end
+	return factor
 end
 
 -- Sammel-Update 2.1: der eine Schliessen-Knopf fuer alle Fenster (oben
 -- rechts, gross genug zum Tippen). Fenster ohne dialogHeader (Baerchi-Karte)
--- setzen ihn direkt.
-function Theme.closeButton(parent: Instance, onClose: () -> ()): TextButton
-	local close = Theme.button("Close", parent, "X", Theme.COLORS.bad)
+-- setzen ihn direkt. `color` optional (Gebaeude-Menue: Ton seiner Farbe).
+-- UI-Qualitaet: dazu eine unsichtbare Trefferflaeche (CLOSE_HIT) als Kind —
+-- sie liegt ueber dem Knopf (ZIndexBehavior.Sibling) und nimmt jeden Klick in
+-- ihrem Bereich an, auch knapp neben dem sichtbaren X.
+function Theme.closeButton(parent: Instance, onClose: () -> (), color: Color3?): TextButton
+	local close = Theme.button("Close", parent, "X", color or Theme.COLORS.bad)
 	close.AnchorPoint = Vector2.new(1, 0.5)
 	close.Position    = UDim2.new(1, 4, 0.5, 0)
 	close.Size        = UDim2.new(0, 44, 0, 40)
 	close.TextColor3  = Theme.COLORS.text
 	close.ZIndex      = math.max(close.ZIndex, 12)
 	close.Activated:Connect(onClose)
+
+	local hit = Instance.new("TextButton")
+	hit.Name                   = "CloseHit"
+	hit.AnchorPoint            = Vector2.new(0.5, 0.5)
+	hit.Position               = UDim2.fromScale(0.5, 0.5)
+	hit.Size                   = UDim2.fromOffset(CLOSE_HIT, CLOSE_HIT)
+	hit.BackgroundTransparency = 1
+	hit.Text                   = ""
+	hit.AutoButtonColor        = false
+	hit.ZIndex                 = close.ZIndex
+	hit.Parent                 = close
+	hit.Activated:Connect(onClose)
+
 	return close
 end
 
@@ -514,6 +606,189 @@ function Theme.dialogBody(root: Frame): Frame
 	body.Position = UDim2.new(0, 14, 0, 48)
 	body.Size     = UDim2.new(1, -28, 1, -62)
 	return body
+end
+
+--------------------------------------------------------------------------------
+-- Theme.v2 — Tokens des neuen Looks (08.10., Paket D)
+--------------------------------------------------------------------------------
+-- Nur UI/Kit (und Panels, die Kit benutzen) lesen diese Tabelle. Alles oben
+-- (COLORS, panel, button, dialog ...) bleibt unveraendert: die alten Panels
+-- sehen genauso aus wie vorher. Wer die Palette tauschen will, aendert NUR
+-- die Werte hier — kein Kit-Baustein hat eine eigene Farbe oder Zahl.
+--
+-- Richtung: warm und freundlich (Honig-Amber, Baerchi-Braun, Gummi-Pink,
+-- Himmelblau), helle Creme-Flaechen mit dicker schokobrauner Kontur, Knoepfe
+-- mit 3D-Kante und Glanz. Masse in Oberflaechen-Einheiten (die globale
+-- UiScale vergroessert auf grossen Bildschirmen, 1080p ~ x1,27). 8er-Raster.
+-- Kontraste (WCAG, gerechnet im Bericht): ink auf surface 11,6:1, inkSoft auf
+-- card 6,5:1; weisse Knopfschrift traegt immer eine 3-px-Kontur (ink).
+Theme.v2 = {
+	color = {
+		-- Flaechen
+		surface     = Color3.fromRGB(255, 244, 220),   -- Panel-Koerper (Creme)
+		surfaceDeep = Color3.fromRGB(246, 226, 190),   -- Verlauf unten
+		card        = Color3.fromRGB(255, 252, 243),   -- Karte
+		cardLocked  = Color3.fromRGB(236, 226, 210),   -- gesperrte Karte
+		sunk        = Color3.fromRGB(240, 222, 190),   -- Balken-Spur, Chips
+		shadow      = Color3.fromRGB( 59,  34,  18),   -- Schlagschatten
+
+		-- Schrift und Kontur
+		ink         = Color3.fromRGB( 74,  44,  23),   -- Text (Schokolade)
+		inkSoft     = Color3.fromRGB(122,  84,  53),   -- Nebentext
+		outline     = Color3.fromRGB( 59,  34,  18),   -- dicke Kontur
+		white       = Color3.fromRGB(255, 255, 255),
+
+		-- Marke
+		honey       = Color3.fromRGB(255, 182,  39),
+		honeyTop    = Color3.fromRGB(255, 214, 100),
+		honeyBottom = Color3.fromRGB(255, 152,  24),
+		bear        = Color3.fromRGB(156,  98,  51),
+		gummy       = Color3.fromRGB(255,  92, 154),
+		gummyDeep   = Color3.fromRGB(214,  51, 120),
+		sky         = Color3.fromRGB( 76, 195, 255),
+		skyDeep     = Color3.fromRGB( 22, 120, 190),
+
+		-- Knopf-Arten
+		go          = Color3.fromRGB( 72, 196,  70),   -- Primaer (Gratis-Start)
+		goTop       = Color3.fromRGB(120, 230, 100),
+		goEdge      = Color3.fromRGB( 30, 128,  44),   -- 3D-Kante unten
+		quiet       = Color3.fromRGB(255, 248, 232),   -- Sekundaer (Skip): Creme
+		quietEdge   = Color3.fromRGB(214, 190, 150),
+		gold        = Color3.fromRGB(255, 222, 128),   -- Premium (Pass): ruhiges Gold
+		goldTop     = Color3.fromRGB(255, 243, 200),
+		goldEdge    = Color3.fromRGB(206, 150,  30),
+		choose      = Color3.fromRGB( 76, 195, 255),   -- "Waehlen" auf der Karte
+		chooseEdge  = Color3.fromRGB( 22, 120, 190),
+
+		-- Zustaende
+		active      = Color3.fromRGB(255, 196,  40),   -- "AKTIV"-Band
+		new         = Color3.fromRGB(255,  92, 154),   -- "NEU"-Abzeichen
+		lock        = Color3.fromRGB(150, 132, 112),
+		progress    = Color3.fromRGB( 72, 196,  70),
+	},
+	radius = { panel = 26, card = 18, button = 16, chip = 999, badge = 14 },
+	stroke = { panel = 4, card = 3, button = 3, text = 3, textSmall = 2 },
+	space  = { xs = 4, s = 8, m = 16, l = 24, xl = 32 },
+	text   = {
+		font      = Enum.Font.FredokaOne,
+		title     = 40,
+		cardTitle = 26,
+		number    = 30,
+		body      = 18,
+		small     = 15,   -- nie kleiner (1080p: ~19 px)
+		button    = 26,
+	},
+	motion = {
+		open      = 0.32,   -- Panel springt auf (Back)
+		stagger   = 0.05,   -- Karten nacheinander
+		cardIn    = 0.28,
+		press     = 0.10,
+		pulse     = 1.6,    -- Sekunden je Puls (nur der Gratis-Start)
+		glimmer   = 2.6,    -- Glanz ueber freie neue Karten
+		confetti  = 1.2,
+	},
+}
+
+--------------------------------------------------------------------------------
+-- Verzierte Rahmen (Ei-Menue, Ei-Baum, Infokarte)
+--------------------------------------------------------------------------------
+
+-- Legt den 9-Slice-Rahmen `kind` ("panel" | "card" | "tile") ueber `frame`.
+-- "panel" und "card" bringen ihre Fuellung mit (Hintergrund wird
+-- durchsichtig), "tile" ist nur ein Zierrand ueber der vorhandenen Farbe.
+--
+-- Ohne hochgeladenes Bild bleibt die Flaeche ein normales Theme.panel, nur in
+-- den Farben der Bilderbuch-Palette — bedienbar und im selben Ton.
+function Theme.ornate(frame: GuiObject, kind: string, sliceScale: number?): ImageLabel?
+	local stroke = frame:FindFirstChildOfClass("UIStroke")
+	local image = Icons.uiImage(frame, "frames/frame_" .. kind, sliceScale)
+	if not image then
+		if stroke then stroke.Color = Theme.COLORS.honeyDeep end
+		if kind == "panel" then
+			frame.BackgroundColor3 = Theme.COLORS.walnutDeep
+		elseif kind == "card" then
+			frame.BackgroundColor3 = Theme.COLORS.forest
+		end
+		return nil
+	end
+	image.Name   = "Ornate"
+	image.Size   = UDim2.fromScale(1, 1)
+	-- ZIndexBehavior = Sibling: der Rahmen ist ein Geschwister von Titel und
+	-- Inhalt und muss UNTER ihnen liegen.
+	image.ZIndex = 0
+	if kind ~= "tile" then
+		frame.BackgroundTransparency = 1
+		if stroke then stroke.Enabled = false end
+	end
+	return image
+end
+
+-- Dialog (Theme.dialog + dialogHeader + dialogBody) im verzierten Rahmen:
+-- Titelband in Honig statt Lila, Kopf und Inhalt ruecken vom Zierrand weg.
+function Theme.ornateDialog(root: Frame)
+	local image = Theme.ornate(root, "panel", 0.5)
+	local band = root:FindFirstChild("TitleBand")
+	if band and band:IsA("Frame") then
+		band.BackgroundColor3 = Theme.COLORS.honeyDeep
+		Theme.gradient(band, Color3.fromRGB(255, 236, 200), Color3.fromRGB(200, 150, 110))
+	end
+	if not image then return end
+	local header = root:FindFirstChild("Header")
+	local body = root:FindFirstChild("Body")
+	if band and band:IsA("GuiObject") then
+		band.Position = UDim2.new(0, 18, 0, 15)
+		band.Size     = UDim2.new(1, -36, 0, 40)
+	end
+	if header and header:IsA("GuiObject") then
+		header.Position = UDim2.new(0, 26, 0, 20)
+		header.Size     = UDim2.new(1, -52, 0, 30)
+	end
+	if body and body:IsA("GuiObject") then
+		body.Position = UDim2.new(0, 22, 0, 62)
+		body.Size     = UDim2.new(1, -44, 1, -82)
+	end
+end
+
+-- Grosser Aktionsknopf als Honigtropfen-Siegel ("Oeffnen"). Ohne Bild ein
+-- honigfarbener bigButton. Die Beschriftung bleibt button.Text (ein
+-- Kind-Label spiegelt sie ueber das Siegelbild), damit Aufrufer und
+-- Theme.setEnabled wie gewohnt arbeiten.
+function Theme.sealButton(name: string, parent: Instance, text: string): TextButton
+	local button = Theme.bigButton(name, parent, text, Theme.COLORS.honey)
+	local image = Icons.uiImage(button, "frames/seal", 0.42)
+	if not image then return button end
+
+	button.BackgroundTransparency = 1
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then stroke.Enabled = false end
+	local shine = button:FindFirstChild("Shine")
+	if shine then shine:Destroy() end
+	image.Name     = "Seal"
+	image.Position = UDim2.new(0, -4, 0, -3)
+	image.Size     = UDim2.new(1, 8, 1, 10)
+	image.ZIndex   = 0
+
+	local label = Theme.label("SealText", button, text)
+	label.Size           = UDim2.new(1, -16, 1, -4)
+	label.Position       = UDim2.fromOffset(8, 1)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.ZIndex         = 2
+	Theme.outlineText(label, 2)
+	button.TextTransparency = 1
+
+	local function sync()
+		label.Text   = button.Text
+		image.ImageColor3 = if button.Active then Color3.new(1, 1, 1) else Color3.fromRGB(130, 124, 120)
+		label.TextTransparency = if button.Active then 0 else 0.35
+		button.TextTransparency = 1
+	end
+	button:GetPropertyChangedSignal("Text"):Connect(sync)
+	button:GetPropertyChangedSignal("Active"):Connect(sync)
+	button:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+		if button.TextTransparency ~= 1 then sync() end
+	end)
+	sync()
+	return button
 end
 
 --------------------------------------------------------------------------------

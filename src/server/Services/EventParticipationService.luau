@@ -173,10 +173,6 @@ local function fail(player: Player, action: string, reason: Types.LocMsg | strin
 	Remotes.ActionFailed:FireClient(player, action, reason)
 end
 
-local function notifyPresence(player: Player, atEvent: boolean, baerchiUid: string?)
-	Remotes.EventPresenceChanged:FireClient(player, atEvent, baerchiUid)
-end
-
 local function footPosOf(model: Model): Vector3
 	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
@@ -330,7 +326,6 @@ function EventParticipationService.sendToEvent(player: Player): boolean
 			}
 
 			playEventMotion(figure)
-			notifyPresence(player, true, uid)
 
 			print("[EventParticipationService]", player.Name, "| am Event:", uid)
 		end)
@@ -348,7 +343,6 @@ function EventParticipationService.sendToEvent(player: Player): boolean
 		-- sonst bliebe der Spieler dauerhaft blockiert.
 		if not _present[player] then
 			ActivityLock.release(player, LOCK_HOLDER)
-			notifyPresence(player, false, nil)
 		end
 	end)
 
@@ -391,14 +385,12 @@ function EventParticipationService.recall(player: Player): boolean
 	if not figure then
 		_present[player] = nil
 		ActivityLock.release(player, LOCK_HOLDER)
-		notifyPresence(player, false, nil)
 		return true
 	end
 
 	_walking[player]  = true
 	_walkDir[player]  = "back"
 	_present[player]  = nil
-	notifyPresence(player, false, presence.baerchiUid)
 
 	task.spawn(function()
 		local ok, err = pcall(function()
@@ -496,7 +488,7 @@ end
 -- Zahlt den Zusatz-Ertrag eines Events aus (EventConfig.EventDef.bonus).
 --
 -- Gibt zurueck:
---   1. einen fertigen Anzeigetext ("+1x Goldenes Ei"), oder nil wenn es
+--   1. eine Nachricht (LocMsg, "+1x Goldenes Ei"), oder nil wenn es
 --      nichts zu melden gibt (Event ohne Bonus, oder Mutations-Wurf daneben),
 --   2. die neue Mutation, falls dieses Event dem Baerchi eine verschafft hat.
 --
@@ -645,7 +637,7 @@ end
 -- v17: Zusatz-Belohnungen eines Handler-Ergebnisses (Boss): Gummies,
 -- Wabeneinheiten, zweites Ei, Rarity-Up-Wurf. Waehrungen ueber
 -- EconomyService, Waben ueber CombRecyclerService, nie direkt.
--- Gibt (Meldungen als LocMsg, Text des zweiten Eis, neue Rarity) zurueck.
+-- Gibt (Meldungen als LocMsg, Meldung des zweiten Eis, neue Rarity) zurueck.
 local function awardExtras(
 	player: Player,
 	data: Types.PlayerData,
@@ -834,9 +826,10 @@ local function onEventEnded(finished: EventConfig.EventDef)
 			)
 		end
 
-		local statText = "keine Stat-Stufe (nur das UFO gibt welche)"
+		-- Nur Server-Log (kein Spieler sieht das)
+		local statText = "no stat level"
 		if key then
-			statText = string.format("%s Stufe %d/%d", key, gain.newLevel, gain.cap)
+			statText = string.format("%s %d/%d", key, gain.newLevel, gain.cap)
 		end
 
 		print(
@@ -968,9 +961,6 @@ local function finishHome(presence: any)
 	end
 
 	ActivityLock.release(player, LOCK_HOLDER)
-	if player.Parent ~= nil then
-		notifyPresence(player, false, nil)
-	end
 end
 
 -- UFO-Belohnung beim Absetzen: +1 auf alle Stats (begrenzt durch STAT_CAP)
@@ -1263,10 +1253,6 @@ local function tick()
 		if lost then
 			_present[player] = nil
 			ActivityLock.release(player, LOCK_HOLDER)
-
-			if player.Parent ~= nil then
-				notifyPresence(player, false, nil)
-			end
 		end
 	end
 end

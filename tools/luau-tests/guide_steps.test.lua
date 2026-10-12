@@ -33,17 +33,18 @@ v.island.eggStock.BasicEgg = 2
 check("Baerchi da -> fight", GuideSteps.current(v), "fight")
 
 v.island.towerProgress = { I = 3 }
--- Sammel-Update 3.5: Waben -> Gebaeude -> Event
+-- Sammel-Update 3.5 (Studio-Stand): nach dem Kampf erst Waben, dann
+-- verbessern, dann Event (Test 08.10. an die Kette angepasst)
 check("gekaempft, keine Eier -> combs", GuideSteps.current(v), "combs")
+v.stats.totalCombsDelivered = 1
+check("Waben abgegeben -> upgrade", GuideSteps.current(v), "upgrade")
+v.island.recycler = { level = 2 }
+check("verbessert -> event", GuideSteps.current(v), "event")
 
 v.island.laidEggs = { { uid = "e1" } }
 check("gelegtes Ei -> collect", GuideSteps.current(v), "collect")
 
 v.island.laidEggs = {}
-v.stats.totalCombsDelivered = 2
-check("Waben abgegeben -> upgrade", GuideSteps.current(v), "upgrade")
-v.island.buildings = { HoneyPond = { level = 2 } }
-check("Gebaeude verbessert -> event", GuideSteps.current(v), "event")
 v.stats.totalEventsCompleted = 1
 check("Event geschafft -> fertig", GuideSteps.current(v), nil)
 
@@ -82,8 +83,7 @@ check("Rekord zaehlt als Kampf", GuideSteps.current(rec), "combs")
 
 -- Monotonie: eine wachsende Folge darf nie zu einem frueheren Schritt zurueck
 -- "collect" ist ein Einschub zwischen Kampf und Event: gleicher Rang wie "event"
--- Sammel-Update 3.5: combs/upgrade liegen zwischen Kampf und Event
-local order = { hatch = 1, merchant = 1, fight = 2, collect = 3, combs = 3, upgrade = 4, event = 5 }
+local order = { hatch = 1, merchant = 1, fight = 2, collect = 3, combs = 3, upgrade = 3, event = 3, tower = 4 }
 local seq = fresh()
 local last = 0
 local states = {
@@ -92,8 +92,6 @@ local states = {
 	function(s) s.island.towerProgress = { I = 1 } end,
 	function(s) s.island.laidEggs = { {} } end,
 	function(s) s.island.laidEggs = {} end,
-	function(s) s.stats.totalCombsDelivered = 1 end,
-	function(s) s.island.buildings = { HoneyPond = { level = 2 } } end,
 	function(s) s.stats.totalEventsCompleted = 1 end,
 }
 local monotone = true
@@ -105,6 +103,29 @@ for _, apply in states do
 	last = rank
 end
 check("Monotonie", monotone, true)
+
+-- 08.10.: Schritt "tower" (Terminal, Tower wechseln)
+local tw = fresh()
+tw.island.baerchis = { a = {} }
+tw.island.towerProgress = { I = 30 }
+tw.stats.totalEventsCompleted = 1
+tw.towers = { records = { I = 12 }, selected = "I", unlocked = { I = true } }
+check("Tower I nicht geschafft -> kein tower", GuideSteps.current(tw), nil)
+tw.towers.records.I = 30
+tw.towers.unlocked.II = true
+check("Tower I geschafft -> tower", GuideSteps.current(tw), "tower")
+tw.quests.chainDone = 9
+check("tower auch nach >= 4 Ketten-Quests", GuideSteps.current(tw), "tower")
+tw.towers.selected = "II"
+check("gewechselt -> fertig", GuideSteps.current(tw), nil)
+tw.towers.selected = "I"
+tw.towers.records.II = 3
+check("zurueck auf I, aber in II gekaempft -> fertig", GuideSteps.current(tw), nil)
+local twv = fresh()
+twv.rebirthCount = 1
+twv.island.baerchis = { a = {} }
+twv.towers = { records = { I = 30 }, selected = "I", unlocked = { I = true, II = true } }
+check("Veteran mit Rebirth -> keine Fuehrung", GuideSteps.current(twv), nil)
 
 if failures > 0 then
 	error(failures .. " Test(s) fehlgeschlagen")

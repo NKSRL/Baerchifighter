@@ -39,6 +39,8 @@ local TweenService      = game:GetService("TweenService")
 local Types         = require(ReplicatedStorage.Network.Types)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
+local Loc           = require(ReplicatedStorage.Localization.Loc)
+local Names         = require(ReplicatedStorage.Localization.Names)
 
 local BaerchiMesh   = require(ReplicatedStorage.Modules.BaerchiMesh)   -- Sammel-Update 2.2: Baerchi gross zeigen
 local Loc           = require(ReplicatedStorage.Localization.Loc)
@@ -218,7 +220,7 @@ local function buildScene(screenGui: ScreenGui, eggType: Types.EggType): Scene
 	cracks.ZIndex                 = 54
 	cracks.Parent                 = egg
 
-	local label = Theme.label("Hint", stage, if eggDef then eggDef.displayName else tostring(eggType))
+	local label = Theme.label("Hint", stage, Names.egg(tostring(eggType)))
 	label.AnchorPoint    = Vector2.new(0.5, 0)
 	label.Position       = UDim2.new(0.5, 0, 0.48, EGG_SIZE.Y * 0.5 + 18)
 	label.Size           = UDim2.fromOffset(320, 30)
@@ -414,7 +416,7 @@ local function buildReveal(scene: Scene, result: Types.HatchResult): Frame
 	end
 
 	local title = (if mutation then Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)):upper() .. "  " else "")
-		.. Loc.name("baerchi." .. baerchi.configId .. ".name", if def then def.displayName else baerchi.configId)
+		.. Names.baerchi(baerchi.configId)
 	local base = 34 + MODEL_VIEW_HEIGHT
 	local titleLabel = cardLabel("Title", title, base + 2, 34, color)
 	Theme.outlineText(titleLabel)

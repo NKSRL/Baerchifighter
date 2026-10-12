@@ -21,6 +21,7 @@ local Workspace         = game:GetService("Workspace")
 local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
 local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local IncubatorRules  = require(ReplicatedStorage.Modules.IncubatorRules)
@@ -54,7 +55,7 @@ end
 
 local function eggName(eggType: string): string
 	local def = EggConfig.data[eggType :: Types.EggType]
-	return Loc.name("egg." .. eggType .. ".name", if def then def.displayName else eggType)
+	return Names.egg(eggType)
 end
 
 local function breedOn(): boolean
@@ -152,7 +153,7 @@ end
 
 local function baerchiName(baerchi: any): string
 	local def = BaerchiConfig.getById(baerchi.configId)
-	return Loc.name("baerchi." .. baerchi.configId .. ".name", if def then def.displayName else baerchi.configId)
+	return Names.baerchi(baerchi.configId)
 end
 
 -- Kurze Chancen-Zeile: "Basis-Ei 60% · Zucker-Ei 30% · ..."

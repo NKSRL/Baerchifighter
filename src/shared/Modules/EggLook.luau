@@ -54,6 +54,7 @@ local PATH_ACCENT: { [string]: Color3 } = {
 local GLOW_FROM_TIER = 6
 
 local DEFAULT_COLOR = Color3.fromRGB(238, 232, 214)
+local WARM_DARK     = Color3.fromRGB(96, 56, 36)
 
 local function luminance(c: Color3): number
 	return c.R * 0.299 + c.G * 0.587 + c.B * 0.114
@@ -68,7 +69,10 @@ local function deriveAccent(base: Color3, path: string): Color3
 		return base:Lerp(Color3.new(1, 1, 1), 0.65)
 	end
 	if luminance(base) > 0.62 then
-		return base:Lerp(Color3.new(0, 0, 0), 0.28)
+		-- Warm abdunkeln (Nussbraun statt Schwarz): graue Punkte auf dem
+		-- Basis-Ei sahen schmutzig aus. tools/art/render_eggs.py rechnet
+		-- dieselbe Regel fuer die Ei-Bilder.
+		return base:Lerp(WARM_DARK, 0.38)
 	end
 	return base:Lerp(Color3.new(1, 1, 1), 0.5)
 end

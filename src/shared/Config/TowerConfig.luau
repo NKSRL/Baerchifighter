@@ -29,7 +29,18 @@
 -- TOWER_GEBAEUDE_ANGEBEN_UMGESETZT).
 --
 -- ============================================================
--- DER DECKEL PRO REBIRTH (weich)
+-- FREISCHALTEN DURCH SCHAFFEN (08.10., FeatureFlags.TOWER_UNLOCK_BY_CLEAR)
+-- ============================================================
+-- Tower N+1 ist offen, sobald Tower N geschafft ist (Rekord >= seine
+-- Stage-Zahl): II nach I/30, III nach II/45, Final nach III/60, Endless nach
+-- Final/100 (UNLOCK_AFTER). Gespeichert in towers.unlocked (traegt die
+-- Freischalt-Meldung und den Bestandsschutz); offen ist auch, wo schon ein
+-- Rekord steht. Mit dem Schalter begrenzt der Deckel pro Rebirth (unten)
+-- NICHTS mehr: jeder offene Tower zahlt seine volle Stage-Zahl. Er bleibt nur
+-- noch als Altregel fuer die Migration (Bestandsschutz) und ohne Schalter.
+--
+-- ============================================================
+-- DER DECKEL PRO REBIRTH (weich) — nur noch ohne TOWER_UNLOCK_BY_CLEAR
 -- ============================================================
 -- Jeder Rebirth oeffnet ein Stage-Fenster (STAGE_CAP_BY_REBIRTH). Kaempfen darf
 -- man darueber hinaus, aber Stage-Gummies, Meilensteine und Rekorde zaehlen nur
@@ -143,6 +154,14 @@ end
 TowerConfig.TOWERS = TOWERS
 TowerConfig.FIRST_TOWER = "I" :: Types.TowerId
 
+-- 08.10.: welcher Tower geschafft sein muss, damit dieser aufgeht.
+TowerConfig.UNLOCK_AFTER = {
+	II      = "I",
+	III     = "II",
+	Final   = "III",
+	Endless = "Final",
+} :: { [string]: string }
+
 function TowerConfig.get(towerId: string): TowerDef?
 	return BY_ID[towerId]
 end
@@ -251,10 +270,90 @@ function TowerConfig.isEndlessOpen(records: { [string]: number }?): boolean
 	return BY_ID.Endless ~= nil and records ~= nil and (records.Final or 0) >= finalDef.stages
 end
 
+-- 08.10.: Ist `towerId` nach der Regel "vorherigen Tower geschafft" offen?
+-- `unlocked` = towers.unlocked (gespeichert, Bestandsschutz); ein Rekord im
+-- Tower selbst haelt ihn ebenfalls offen (migrierte Staende, siehe Briefing).
+function TowerConfig.isUnlockedByClear(towerId: string, records: { [string]: number }?, unlocked: { [string]: boolean }?): boolean
+	if not BY_ID[towerId] then return false end
+	if towerId == TowerConfig.FIRST_TOWER then return true end
+	if unlocked and unlocked[towerId] == true then return true end
+	if records and (records[towerId] or 0) > 0 then return true end
+	local prev = TowerConfig.UNLOCK_AFTER[towerId]
+	local prevDef = if prev then BY_ID[prev] else nil
+	return prevDef ~= nil and records ~= nil and (records[prevDef.id] or 0) >= prevDef.stages
+end
+
+-- 08.10.: Fortschritt zur Freischaltung fuer die gesperrte Karte und das
+-- Terminal: (vorheriger Tower, Rekord dort, noetige Stage). nil = kein
+-- Vorgaenger (Tower I).
+function TowerConfig.getUnlockProgress(towerId: string, records: { [string]: number }?): (string?, number, number)
+	local prev = TowerConfig.UNLOCK_AFTER[towerId]
+	local prevDef = if prev then BY_ID[prev] else nil
+	if not prevDef then return nil, 0, 0 end
+	return prevDef.id, math.min(if records then records[prevDef.id] or 0 else 0, prevDef.stages), prevDef.stages
+end
+
+-- 08.10.: Tower, die DURCH diesen Rekord neu aufgehen (fuer TowerUnlocked).
+function TowerConfig.unlocksAfterClear(towerId: string, record: number): { string }
+	local def = BY_ID[towerId]
+	local result: { string } = {}
+	if not def or record < def.stages then return result end
+	for _, other in TOWERS do
+		if TowerConfig.UNLOCK_AFTER[other.id] == towerId then
+			table.insert(result, other.id)
+		end
+	end
+	return result
+end
+
+-- 08.10.: "NEU" — frei, aber noch nie darin gekaempft und nicht gewaehlt.
+-- Rein aus den Daten, kein eigenes Feld: das Abzeichen verschwindet von
+-- selbst mit dem ersten Lauf dort.
+function TowerConfig.isNew(towerId: string, towers: { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?): boolean
+	if not towers or towerId == TowerConfig.FIRST_TOWER then return false end
+	if towers.selected == towerId or (towers.records[towerId] or 0) > 0 then return false end
+	return towers.unlocked ~= nil and towers.unlocked[towerId] == true
+end
+
+-- 08.10.: Zustand des Tower-Terminals an der Bruecke.
+--   "locked"  noch kein Tower ausser I frei (Tower I nicht geschafft)
+--   "ready"   ein neuer Tower wartet (isNew) — gruen blinkend, "!"
+--   "normal"  ruhig, zeigt den gewaehlten Tower
+function TowerConfig.terminalState(towers: { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?): string
+	if not towers then return "locked" end
+	local anyOpen = false
+	for _, def in TOWERS do
+		if def.id ~= TowerConfig.FIRST_TOWER and TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
+			anyOpen = true
+			if TowerConfig.isNew(def.id, towers) then
+				return "ready"
+			end
+		end
+	end
+	return if anyOpen then "normal" else "locked"
+end
+
+local function unlockByClear(): boolean
+	return FeatureFlags.isOn("TOWER_UNLOCK_BY_CLEAR")
+end
+
 -- Deckel in DIESEM Tower: volle Stage-Zahl fuer Tower unter dem Deckel-Tower,
 -- der Deckel selbst fuer den Deckel-Tower, 0 fuer noch geschlossene Tower.
 -- `records` (Tower-Rekorde) braucht nur Endless: offen ab Final 100.
-function TowerConfig.getStageCap(rebirthCount: number, towerId: string, records: { [string]: number }?): number
+-- 08.10.: mit TOWER_UNLOCK_BY_CLEAR ist der Deckel jedes OFFENEN Towers seine
+-- volle Stage-Zahl (offen = isUnlockedByClear mit `unlocked`).
+function TowerConfig.getStageCap(rebirthCount: number, towerId: string, records: { [string]: number }?, unlocked: { [string]: boolean }?): number
+	local def = BY_ID[towerId]
+	if not def then return 0 end
+	if unlockByClear() then
+		return if TowerConfig.isUnlockedByClear(towerId, records, unlocked) then def.stages else 0
+	end
+	return TowerConfig.getLegacyStageCap(rebirthCount, towerId, records)
+end
+
+-- Die alte Regel (Deckel pro Rebirth). Bleibt fuer die Migration: wer vor dem
+-- 08.10. einen Tower per Rebirth offen hatte, behaelt ihn (towers.unlocked).
+function TowerConfig.getLegacyStageCap(rebirthCount: number, towerId: string, records: { [string]: number }?): number
 	local def = BY_ID[towerId]
 	if not def then return 0 end
 	if towerId == "Endless" then
@@ -267,14 +366,14 @@ function TowerConfig.getStageCap(rebirthCount: number, towerId: string, records:
 	return 0
 end
 
-function TowerConfig.isOpen(rebirthCount: number, towerId: string, records: { [string]: number }?): boolean
-	return TowerConfig.getStageCap(rebirthCount, towerId, records) > 0
+function TowerConfig.isOpen(rebirthCount: number, towerId: string, records: { [string]: number }?, unlocked: { [string]: boolean }?): boolean
+	return TowerConfig.getStageCap(rebirthCount, towerId, records, unlocked) > 0
 end
 
 -- Ab welchem Rebirth ein Tower offen ist (fuer die gesperrte Karte im UI).
 function TowerConfig.getOpeningRebirth(towerId: string): number
 	for n = 0, FINAL_CAP.fromRebirth do
-		if TowerConfig.isOpen(n, towerId) then return n end
+		if TowerConfig.getLegacyStageCap(n, towerId) > 0 then return n end
 	end
 	return FINAL_CAP.fromRebirth
 end
@@ -284,13 +383,15 @@ end
 function TowerConfig.isCapLimiting(rebirthCount: number, towerId: string): boolean
 	local def = BY_ID[towerId]
 	if not def then return false end
+	-- 08.10.: ohne Deckel gibt es keinen Rebirth-Hinweis am Deckel
+	if unlockByClear() then return false end
 	local capTower = TowerConfig.getCap(rebirthCount)
 	if capTower ~= towerId then return false end
 	-- Final bei 100 oder Tower III bei 60: es gibt nichts mehr hinter dem Deckel,
 	-- was ein Rebirth oeffnen wuerde — ausser beim letzten Stand der Tabelle.
 	local nextTower, nextStage = TowerConfig.getCap(rebirthCount + 1)
 	return TowerConfig.getIndex(nextTower) > def.index
-		or nextStage > TowerConfig.getStageCap(rebirthCount, towerId)
+		or nextStage > TowerConfig.getLegacyStageCap(rebirthCount, towerId)
 end
 
 --------------------------------------------------------------------------------
@@ -498,8 +599,10 @@ function TowerConfig.getResumePercentStage(reachedStage: number): number
 	return math.max(1, math.floor(TowerConfig.RESUME_PERCENT * reachedStage))
 end
 
-function TowerConfig.getResumeCost(towerId: string, startStage: number, rebirthMult: number): number
-	if startStage <= 1 then return 0 end
+-- 08.10. (Paket C): `hasPass` = Gamepass "Gratis-Skip" (GamepassService,
+-- serverseitig geprueft) -> der Einstieg kostet immer 0.
+function TowerConfig.getResumeCost(towerId: string, startStage: number, rebirthMult: number, hasPass: boolean?): number
+	if startStage <= 1 or hasPass == true then return 0 end
 	local skipped = TowerConfig.sumStageRewards(towerId, 1, startStage - 1)
 	return math.floor(TowerConfig.RESUME_COST_FACTOR * skipped * math.max(rebirthMult, 1))
 end

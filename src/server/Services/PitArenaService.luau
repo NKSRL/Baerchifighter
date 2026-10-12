@@ -71,6 +71,7 @@ local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
 local BaerchiMesh = require(ReplicatedStorage.Modules.BaerchiMesh)
 local FightTimeline = require(ReplicatedStorage.Modules.FightTimeline)
 local Types       = require(ReplicatedStorage.Network.Types)
+local Loc         = require(ReplicatedStorage.Localization.Loc)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
 
 local PlayerService   = require(ServerScriptService.Services.PlayerService)
@@ -204,9 +205,11 @@ end
 -- MapService; hier wird nur entschieden WAS draufsteht, weil nur dieser
 -- Service den Verlauf des Laufs kennt.
 -- v15: "Tower II · Stage 23"
-local function stageTitle(towerId: string?, stage: number): string
+-- Tafel-Texte sind Nachrichten (LocMsg): die Tafel sieht jeder Spieler auf
+-- der Plattform, und jeder liest sie in seiner Sprache (MapService/WorldText).
+local function stageTitle(towerId: string?, stage: number): Types.LocMsg
 	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
-	return string.format("Tower %s  ·  Stage %d", def.numeral, stage)
+	return Loc.msg("ui.pitboard.stage", { tower = Loc.msg("ui.petbar.tower", { n = def.numeral }), stage = stage })
 end
 
 local function showStage(player: Player, towerId: string?, stage: Types.PitStageResult, cleared: number)
@@ -231,9 +234,9 @@ local function showSummary(player: Player, run: Types.PitRunResult)
 	MapService.setPitBanner(
 		player,
 		if won
-			then string.format("✔ %d Stages", run.stagesCleared)
-			else "✖ 0 Stages",
-		string.format("%d Gummies", run.gummiesWon),
+			then Loc.msg("fmt.append", { a = "✔", b = Loc.msg("ui.pitboard.won", { n = run.stagesCleared }) })
+			else Loc.msg("fmt.append", { a = "✖", b = Loc.msg("ui.pitboard.none") }),
+		Loc.msg("event.bonus.gummies", { n = run.gummiesWon }),
 		if won then MapConfig.PIT_BANNER_WIN else MapConfig.PIT_BANNER_LOSS
 	)
 end
@@ -735,8 +738,14 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 							task.wait(MapConfig.FIGHT_BEAT_SECONDS * tempo)
 						end
 					else
-						-- Faehigkeit: Leiste leuchtet voll auf, die Show laeuft,
-						-- dann der wuchtige Stoss.
+						-- Faehigkeit mit Show (v15.1): die Show IST der Angriff.
+						-- Leisten, Treffer-Blitz und Rueckstoss des Gegners
+						-- kommen im Einschlag-Moment der Show
+						-- (SkillFXConfig.getImpactTime), danach gibt es keinen
+						-- zweiten Stoss mehr. Gesamtdauer wie in
+						-- tools/sim/fight_timeline.lua:
+						-- max(Show-Ende, Einschlag + Zugdauer).
+						local showPlayed = false
 						if isSkill and isSelf then
 							FightBars.setCharge(chargeFill, 1, 0.1)
 							local showId = beat.skillId or fxSkillId
@@ -744,6 +753,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 								-- Paket 4.3: im Schnelldurchlauf nur das kurze Echo
 								local full = not fxShownFull and fast <= 1
 								fxShownFull = true
+								local scale = if full then 1 else tempo
 								Remotes.SkillFXPlay:FireAllClients({
 									owner    = player.UserId,
 									skillId  = showId,
@@ -751,14 +761,35 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 									attacker = figure,
 									target   = enemy,
 									center   = (stageSelfPos + stageEnemyPos) / 2,
+									-- Finisher/Opener hat gegriffen (Client: violetter
+									-- Schnitt, staerkerer Komet). Nur Optik.
+									bonus    = beat.bonus == true,
 								})
-								task.wait(SkillFXConfig.getDuration(showId, full) * (if full then 1 else tempo))
+								local showSeconds   = SkillFXConfig.getDuration(showId, full) * scale
+								local impactSeconds = math.min(SkillFXConfig.getImpactTime(showId, full) * scale, showSeconds)
+								task.wait(impactSeconds)
 								if not stillValid(player, token, figure, fighters) then return end
+
+								local recoilSeconds = FightTimeline.beatSeconds(beat) * tempo
+								if enemy and enemy.Parent ~= nil then
+									onImpact()
+									FigureFX.recoil(enemy, stageEnemyPos, stageSelfPos,
+										MapConfig.FIGHT_SKILL_KNOCKBACK, MapConfig.FIGHT_HOP_HEIGHT * 1.6, recoilSeconds)
+								else
+									onImpact()
+									task.wait(recoilSeconds)
+								end
+								local rest = showSeconds - impactSeconds - recoilSeconds
+								if rest > 0 then task.wait(rest) end
+								if not stillValid(player, token, figure, fighters) then return end
+								showPlayed = true
 							end
 						end
 
 						local seconds = FightTimeline.beatSeconds(beat) * tempo
-						if attacker then
+						if showPlayed then
+							-- Treffer kam schon in der Show (siehe oben).
+						elseif attacker then
 							FigureFX.clash(attacker, target, attackerHome, targetHome, {
 								seconds   = seconds,
 								gap       = MapConfig.FIGHT_CONTACT_GAP,

@@ -150,6 +150,19 @@ local function cloneAndPrepare(template: Model, furColor: Color3?): Model
 		end
 	end
 
+	-- Blickrichtung (10.10.2026): Alle Lauf- und Kampf-Bewegungen drehen die
+	-- Figur ueber ihren Pivot (FigurePlacement/FigureWalker: -Z = vorwaerts).
+	-- Liegt die Schnauze eines importierten Modells hinter dem Pivot (+Z),
+	-- liefe jede Figur rueckwaerts. Dann den Pivot um 180 Grad drehen —
+	-- die Teile selbst bleiben, wo sie sind.
+	local face = model:FindFirstChild("snout", true) or model:FindFirstChild("nose", true)
+	local primary = model.PrimaryPart
+	if face and face:IsA("BasePart") and primary then
+		if model:GetPivot():PointToObjectSpace(face.Position).Z > 0 then
+			primary.PivotOffset = primary.PivotOffset * CFrame.Angles(0, math.pi, 0)
+		end
+	end
+
 	return model
 end
 

@@ -33,6 +33,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 
 local EventConfig = require(ReplicatedStorage.Config.EventConfig)
+local Loc         = require(ReplicatedStorage.Localization.Loc)
+local Names       = require(ReplicatedStorage.Localization.Names)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)  -- HBB Paket 6
 local MapConfig    = require(ReplicatedStorage.Config.MapConfig)
 local Remotes      = require(ReplicatedStorage.Network.Remotes)
@@ -145,7 +147,7 @@ local function startEvent()
 
 	broadcastPhase()
 
-	print("[EventService] Event gestartet:", def.displayName, "|", EventConfig.describeReward(def))
+	print("[EventService] Event gestartet:", def.displayName, "|", Loc.resolve(EventConfig.describeReward(def)))
 
 	for _, callback in _onEventStarted do
 		local ok, err = pcall(callback, def)
@@ -203,9 +205,10 @@ local function tick()
 	-- ein Spieler seinen Baerchi rechtzeitig hinschicken, wenn genau dieses
 	-- Event den Stat bringt, den er braucht.
 	if _active then
+		-- Tafel-Texte als Nachrichten: jeder Spieler liest sie in seiner Sprache.
 		MapService.setEventBanner(
 			-- Sammel-Update 2.4: die Tafel sehen alle — Zeichen statt Woerter
-			string.format("%s  •  LIVE", _active.displayName),
+			Loc.msg("ui.eventboard.live", { event = Names.msg.event(_active.id) }),
 			string.format("⏱ %s", formatCountdown(remaining)),
 			_active.bannerColor,
 			EventConfig.describeReward(_active)
@@ -214,7 +217,7 @@ local function tick()
 		local upcoming = EventConfig.EVENTS[_nextIndex]
 
 		MapService.setEventBanner(
-			string.format("⏭ %s", upcoming.displayName),
+			Loc.msg("fmt.append", { a = "⏭", b = Names.msg.event(upcoming.id) }),
 			string.format("⏱ %s", formatCountdown(remaining)),
 			MapConfig.EVENT_PIT_BANNER_IDLE_COLOR,
 			EventConfig.describeReward(upcoming)

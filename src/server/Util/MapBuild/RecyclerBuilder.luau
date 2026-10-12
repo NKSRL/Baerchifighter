@@ -22,6 +22,8 @@ local CombConfig = require(ReplicatedStorage.Config.CombConfig)
 local MapConfig  = require(ReplicatedStorage.Config.MapConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types      = require(ReplicatedStorage.Network.Types)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 
@@ -52,7 +54,9 @@ function RecyclerBuilder.writeState(body: BasePart, recycler: Types.RecyclerData
 
 	local title = sign:FindFirstChild("Title")
 	if title and title:IsA("TextLabel") then
-		title.Text = string.format("%s  Lv.%d", CombConfig.RECYCLER_NAME, recycler.level)
+		WorldText.set(title, Loc.msg("ui.world.sign_level", {
+			name = Loc.msg("ui.recycler.name"), level = recycler.level,
+		}))
 	end
 
 	local stock = sign:FindFirstChild("Stock")

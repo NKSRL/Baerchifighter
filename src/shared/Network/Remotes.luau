@@ -119,13 +119,6 @@ local CharmRollResultReceived = getOrCreateEvent("CharmRollResultReceived")
 -- Args: EventStatGain
 local EventStatGained = getOrCreateEvent("EventStatGained")
 
--- Der ausgeruestete Baerchi ist am Event angekommen bzw. wieder zuhause.
--- Reiner Anzeige-Zustand fuer den "Zum Event"-Knopf — die Wahrheit darueber,
--- wer am Event steht, liegt ausschliesslich serverseitig
--- (EventParticipationService), dieser Event teilt sie nur mit.
--- Args: atEvent: boolean, baerchiUid: string?
-local EventPresenceChanged = getOrCreateEvent("EventPresenceChanged")
-
 -- Der Event-Zyklus hat die Phase gewechselt: ein Event hat begonnen oder ist
 -- vorbei. Geht an ALLE Spieler (der Zyklus ist fuer alle derselbe) und beim
 -- Join zusaetzlich einmal gezielt an den neuen Spieler.
@@ -194,6 +187,9 @@ local EventHazardHit = getOrCreateEvent("EventHazardHit")
 -- v15 (Tower): ein Tower-Meilenstein wurde ausgezahlt (Toast).
 -- Args: Types.TowerMilestoneReward
 local TowerMilestoneReceived = getOrCreateEvent("TowerMilestoneReceived")
+-- 08.10.: ein Tower ist durch Schaffen des vorherigen frei geworden
+-- (Server → Client, Argument: TowerId). Feier-Moment + "NEU"-Abzeichen.
+local TowerUnlocked = getOrCreateEvent("TowerUnlocked")
 
 -- v15: Login-Bonus ausgezahlt (Toast). Args: Types.DailyBonusResult
 local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
@@ -202,6 +198,11 @@ local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
 local EggTreeUnlocked        = getOrCreateEvent("EggTreeUnlocked")        -- S->C (Types.EggUnlockResult)
 local EggPressResultReceived = getOrCreateEvent("EggPressResultReceived") -- S->C (Types.EggPressResult)
 local SkillFXPlay            = getOrCreateEvent("SkillFXPlay")            -- S->C (alle Clients, siehe PitArenaService)
+-- Welt aufwerten, Paket G: ein grosser Moment eines Spielers, an ALLE Clients.
+-- Der Server sagt nur WAS passiert ist; wie es aussieht entscheidet der Client
+-- (WorldMomentController). Args: { userId, kind, value, number?, big }
+-- (kind: "hatch" | "tower" | "record" | "rebirth" | "mutation", siehe Modules/WorldMoments)
+local WorldMoment            = getOrCreateEvent("WorldMoment")            -- S->C (alle Clients, siehe WorldMomentService)
 local RequestPressEggs       = getOrCreateEvent("RequestPressEggs")       -- C->S (eggType, path?)
 local RequestUseBlueprint    = getOrCreateEvent("RequestUseBlueprint")    -- C->S (eggType)
 
@@ -236,6 +237,9 @@ local RequestUpgradeBuilding = getOrCreateEvent("RequestUpgradeBuilding")
 -- der Tower beim aktuellen Rebirth offen ist (TowerConfig.isOpen).
 -- Args: towerId: string
 local RequestSelectTower = getOrCreateEvent("RequestSelectTower")
+-- 08.10. (Paket C): Kauf-Dialog fuer einen Gamepass (Argument: Pass-Key aus
+-- GamepassConfig). Der Server prueft Id und Besitz.
+local RequestBuyGamepass = getOrCreateEvent("RequestBuyGamepass")
 
 -- v15: taeglichen Login-Bonus abholen. Der Server prueft UTC-Tag,
 -- Gnadenfrist und doppelte Abholung (Modules/LoginBonusCalc).
@@ -270,12 +274,6 @@ local RequestRollCharms = getOrCreateEvent("RequestRollCharms")
 -- Spieler will einen Charm-Slot gegen erneutes Wuerfeln sperren/freigeben
 -- Args: baerchiUid: string, slot: number
 local RequestToggleCharmLock = getOrCreateEvent("RequestToggleCharmLock")
-
--- Spieler sammelt ein gelegtes Ei auf, das in der Welt liegt.
--- Args: eggUid: string  (Types.LaidEgg.uid — NICHT die Position: die aendert
---       sich nicht, aber eine uid ist eindeutig auch dann noch, wenn zwei Eier
---       uebereinander liegen.)
-local RequestCollectEgg = getOrCreateEvent("RequestCollectEgg")
 
 -- Spieler sammelt ALLE herumliegenden Eier auf einmal auf.
 -- Args: (keine)
@@ -377,7 +375,6 @@ return {
 	PromotionResultReceived = PromotionResultReceived,
 	CharmRollResultReceived = CharmRollResultReceived,
 	EventStatGained         = EventStatGained,
-	EventPresenceChanged    = EventPresenceChanged,
 	EventPhaseChanged       = EventPhaseChanged,
 	EggCollectedReceived    = EggCollectedReceived,
 	OfflineEggReportReceived = OfflineEggReportReceived,
@@ -391,11 +388,13 @@ return {
 	EventHazardHit        = EventHazardHit,
 
 	TowerMilestoneReceived = TowerMilestoneReceived,
+	TowerUnlocked          = TowerUnlocked,
 	DailyBonusReceived     = DailyBonusReceived,
 
 	EggTreeUnlocked        = EggTreeUnlocked,
 	EggPressResultReceived = EggPressResultReceived,
 	SkillFXPlay            = SkillFXPlay,
+	WorldMoment            = WorldMoment,
 	RequestPressEggs       = RequestPressEggs,
 	RequestUseBlueprint    = RequestUseBlueprint,
 
@@ -405,6 +404,7 @@ return {
 	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,
 	RequestSelectTower     = RequestSelectTower,
+	RequestBuyGamepass     = RequestBuyGamepass,
 	RequestClaimDailyBonus = RequestClaimDailyBonus,
 	RequestUpgradeRecycler = RequestUpgradeRecycler,
 	RequestFuseBaerchis    = RequestFuseBaerchis,
@@ -416,7 +416,6 @@ return {
 	RequestPromoteBaerchi  = RequestPromoteBaerchi,
 	RequestRollCharms      = RequestRollCharms,
 	RequestToggleCharmLock = RequestToggleCharmLock,
-	RequestCollectEgg      = RequestCollectEgg,
 	RequestCollectAllEggs  = RequestCollectAllEggs,
 	RequestLogUiEvent      = RequestLogUiEvent,
 	RequestMarkUiSeen      = RequestMarkUiSeen,

@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local Names            = require(ReplicatedStorage.Localization.Names)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
@@ -218,7 +219,7 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 	local name = Theme.label("Name", row,
 		(if equipped then "\u{2605} " else "")
 		.. (if mutation then BaerchiConfig.getMutationBadge(mutation) .. " " else "")
-		.. Loc.name("baerchi." .. baerchi.configId .. ".name", def and def.displayName or baerchi.configId))
+		.. Names.baerchi(baerchi.configId))
 	name.Position = UDim2.new(0, 22, 0, 5)
 	name.Size     = UDim2.new(1, -120, 0, 21)
 
@@ -268,7 +269,7 @@ local function updateFooter()
 
 		if baerchi then
 			local def = BaerchiConfig.getById(baerchi.configId)
-			label.Text       = string.format("%s  Lv.%d", Loc.name("baerchi." .. baerchi.configId .. ".name", def and def.displayName or baerchi.configId), baerchi.level)
+			label.Text       = string.format("%s  Lv.%d", Names.baerchi(baerchi.configId), baerchi.level)
 			label.TextColor3  = Theme.rarityColor(baerchi.rarity)
 		else
 			label.Text       = Loc.t("ui.fusion.slot_empty", { n = slot })
@@ -421,7 +422,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		Vector2.new(520, 580)
 	)
 	_root  = root
-	_title = Theme.dialogHeader(root, "Baerchis", function()
+	_title = Theme.dialogHeader(root, Loc.t("ui.menu.baerchis"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 
@@ -555,6 +556,12 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		else
 			_dirty = true
 		end
+	end)
+
+	-- Sprachwechsel: Zeilen, Titel und Fusions-Leiste neu beschriften
+	Loc.onChanged(function()
+		_dirty = true
+		BaerchiInventory.refresh()
 	end)
 
 	print("[BaerchiInventory] Initialisiert")

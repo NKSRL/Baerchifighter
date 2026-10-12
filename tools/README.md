@@ -25,6 +25,7 @@ Aus dem Projektordner:
     python tools/check_members.py
     python tools/check_consistency.py
     python tools/check_loc.py
+    python tools/check_ui.py
     python tools/check_decor.py
 
 Alle Befehle enden mit Exit-Code 0, wenn alles in Ordnung ist, und mit 1 bei
@@ -49,10 +50,7 @@ selbst ist durch Attrappen ersetzt. Details: `luau-tests/README.md`.
 | `sim/pit_balance.lua` | Tabelle: erreichbare Stages je Rarity und Tower (keine Prüfung) |
 | `sim/tower_calibration.lua` | Zielwerte der Tower (L1 Common ~3 Stages, Omega max Final 70–100, 100 Stages < 50 ms) |
 | `sim/progression_pacing.lua` | Pacing-Ziele (Look 2–6, Rebirth 1, Final 100 nicht vor Woche 8) für 30/90/240 min pro Tag |
-| `sim/egg_tree_sim.lua` | Tabelle: Spieltage bis zur Freischaltung je Knoten (keine Prüfung; rechnet die Rebirth-Gates noch mit den alten Gummy-Kosten) |
-| `luau-tests/rebirth_rules.test.lua` | Sammel-Update 4.1: Rebirth nach Stage, Bedingung in offenem Tower, steigt nie ab |
-| `luau-tests/migration_v16.test.lua` | Spielstand v15 → v16 (stageBest, Inkubator, indexClaimed, specialClaimed), keine Währung angefasst |
-| `luau-tests/incubator.test.lua` | Inkubator-Zeitrechnung inkl. Offline, Plätze, Sofort-Öffnen; Index-Belohnungen |
+| `sim/egg_tree_sim.lua` | Tabelle: Spieltage bis zur Freischaltung je Knoten (keine Prüfung) |
 
 Die Typprüfung (`--!strict`) machen diese Tests nicht, das bleibt Studio.
 
@@ -79,6 +77,31 @@ das nicht, weil die Configs einfache Tabellen zurückgeben.
 
 Hat jede Sprache alle Schlüssel, stimmen die `{platzhalter}`, gibt es jeden im
 Code verwendeten Schlüssel? `--todo` listet Texte, die noch fest im Code stehen.
+
+## `check_ui.py` — Qualitäts-Tor für Spieler-Texte und Menüs
+
+Zerlegt den Code in Tokens und weiß deshalb, wo ein String landet (statt
+anhand von Signalwörtern zu raten wie `check_loc --todo`). Jede Regel ist ein
+Fehler:
+
+| Regel | findet |
+|---|---|
+| T1 | fester Text in einer Anzeige (`.Text =`, `Theme.label/button/…`, Toast, Prompt-Texte, `Icons.make`-Ersatztext, Tabellenfelder wie `label =`) — auch über Hilfsfunktionen, deren Parameter in einer Anzeige landen (`section("…")`, `EventKit.setLabel`, `MapService.setPitBanner`, lokale Aliase) |
+| T2 | Text mit Wörtern ohne `Loc` (Client) bzw. deutscher Text (Server/Shared) außerhalb von Logs |
+| T3 | `.displayName` / `.description` / `.drawback` / `.shortName` direkt gelesen statt über `Localization/Names` |
+| T4 | Config-Eintrag (Bärchi, Ei, Skill, Event, Charm) ohne seine Loc-Schlüssel |
+| T5 | `Loc.t/tn/msg/bind`-Aufruf übergibt nicht alle `{platzhalter}` des Textes |
+| P1 | Panel ohne `Theme.dialog`-Hülle |
+| P2 | `ScrollingFrame` ohne `Theme.scroller` |
+| P3 | Schließen-Knopf ohne `Theme.closeButton` (große Trefferfläche) |
+
+Bewusste Ausnahme: Kommentar `-- ui-ok: <Grund>` am Zeilenende (ohne Grund
+zählt sie nicht).
+
+`luau-tests/ui_texts.test.lua` ergänzt das zur Laufzeit: alle Namen,
+Beschreibungen, Event-Belohnungen, Charm-/Gebäude-Effekte und verschachtelte
+Server-Nachrichten in de/en/fr/es — kein `[schlüssel]`, kein `{platzhalter}`,
+kein vergessener deutscher Text.
 
 ## `check_decor.py` — Geometrie der Gebäude
 

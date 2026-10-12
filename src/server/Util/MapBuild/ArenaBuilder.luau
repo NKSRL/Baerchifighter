@@ -21,6 +21,8 @@ local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
+local Types     = require(ReplicatedStorage.Network.Types)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local ArenaBuilder = {}
 
@@ -213,7 +215,7 @@ end
 export type ShowcaseView = {
 	look   : string,   -- Schluessel in MapConfig.TOWER_LOOKS
 	floors : number,   -- 1 .. TowerConfig.SHOWCASE_MAX_FLOORS
-	title  : string,   -- Schild: "Name · Tower III · 42"
+	title  : string | Types.LocMsg,   -- Schild: "Name · Tower III · 42" (Nachricht, siehe WorldText)
 	color  : Color3,
 }
 
@@ -287,7 +289,7 @@ function ArenaBuilder.buildShowcase(plotModel: Model, slot: number, view: Showca
 	sign.Parent      = anchor
 
 	local title = MapParts.newTextLabel("Title", sign, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0))
-	title.Text       = view.title
+	WorldText.set(title, view.title)
 	title.TextColor3 = view.color
 
 	container.Parent = plotModel

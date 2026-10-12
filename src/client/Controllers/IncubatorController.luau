@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
 local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 
@@ -181,7 +182,7 @@ end
 
 local function eggName(eggType: string): string
 	local def = EggConfig.data[eggType :: any]
-	return Loc.name("egg." .. eggType .. ".name", if def then def.displayName else eggType)
+	return Names.egg(eggType)
 end
 
 -- Chancen dieses Baerchis, nach dem tatsaechlich gebrueteten Ei zusammengefasst.
@@ -219,7 +220,7 @@ local function updateBreed(view: BreedView, now: number)
 	if key ~= view.key then
 		view.key = key
 		local def = BaerchiConfig.getById(baerchi.configId)
-		local name = Loc.name("baerchi." .. baerchi.configId .. ".name", if def then def.displayName else baerchi.configId)
+		local name = Names.baerchi(baerchi.configId)
 		view.title.Text = string.format("%s · %s", name, Loc.name("rarity." .. baerchi.rarity, baerchi.rarity))
 		view.title.TextColor3 = BaerchiConfig.getRarityColor(baerchi.rarity)
 		view.odds.Text = oddsText(baerchi, data.eggTree)

@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types           = require(ReplicatedStorage.Network.Types)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local Names           = require(ReplicatedStorage.Localization.Names)
 local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local IndexCalculator = require(ReplicatedStorage.Modules.IndexCalculator)
@@ -138,7 +139,7 @@ local function showPopup(configId: string, anchor: GuiObject)
 	local color = Theme.rarityColor(def.rarity)
 
 	local title = Theme.label("Title", popup,
-		if found then Loc.name("baerchi." .. configId .. ".name", def.displayName) else Loc.t("ui.index.unknown"))
+		if found then Names.baerchi(configId) else Loc.t("ui.index.unknown"))
 	title.Position = UDim2.new(0, 10, 0, 6)
 	title.Size     = UDim2.new(1, -20, 0, 22)
 
@@ -203,10 +204,13 @@ local function showPopup(configId: string, anchor: GuiObject)
 	popup.Size = UDim2.new(0, POP_W, 0, y + 10)
 
 	-- Neben die Kachel setzen und im Dialog halten.
-	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale)
-	local hostPos  = UiScale.toGui(host.AbsolutePosition)
-	local hostSize = UiScale.toGui(host.AbsoluteSize)
-	local aPos, aSize = UiScale.toGui(anchor.AbsolutePosition), UiScale.toGui(anchor.AbsoluteSize)
+	-- Bildschirm-Pixel -> Oberflaechen-Einheiten (globale UiScale), dann in die
+	-- Einheiten INNERHALB des Dialogs (Theme.dialogScale: auf kleinen
+	-- Bildschirmen ist der ganze Dialog verkleinert).
+	local inner    = math.max(Theme.dialogScale(host), 0.01)
+	local hostPos  = UiScale.toGui(host.AbsolutePosition) / inner
+	local hostSize = UiScale.toGui(host.AbsoluteSize) / inner
+	local aPos, aSize = UiScale.toGui(anchor.AbsolutePosition) / inner, UiScale.toGui(anchor.AbsoluteSize) / inner
 
 	local x = aPos.X - hostPos.X + aSize.X + 6
 	if x + POP_W > hostSize.X then
@@ -258,7 +262,7 @@ local function buildTile(parent: Instance, order: number, drop: IndexCalculator.
 	end
 
 	local name = Theme.label("Name", tile,
-		if found then Loc.name("baerchi." .. drop.configId .. ".name", def.displayName) else Loc.t("ui.index.unknown"))
+		if found then Names.baerchi(drop.configId) else Loc.t("ui.index.unknown"))
 	name.Position       = UDim2.new(0, 3, 0, VIEW + 7)
 	name.Size           = UDim2.new(1, -6, 0, 14)
 	name.TextXAlignment = Enum.TextXAlignment.Center

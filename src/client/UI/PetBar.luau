@@ -27,9 +27,12 @@ local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local Loc              = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 2.4
+local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
 
 local Theme           = require(script.Parent.Theme)
+local PanelManager = require(script.Parent.PanelManager)   -- 08.10.: Tower-Name oeffnet das Tower-Panel
 local UiScale         = require(script.Parent.UiScale)
+local TouchSafeArea   = require(script.Parent.TouchSafeArea)
 local Icons           = require(script.Parent.Icons)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
 local FightStartPrompt = require(script.Parent.FightStartPrompt)
@@ -100,7 +103,7 @@ local function eventLine(): string
 	local remaining = _phaseEndsAt - os.clock()
 	if _eventId then
 		local def = EventConfig.getById(_eventId)
-		return string.format("%s  %s", Loc.name("event." .. _eventId .. ".name", if def then def.displayName else _eventId), clock(remaining))
+		return string.format("%s  %s", Names.event(_eventId), clock(remaining))
 	end
 	if _nextEventId then
 		return Loc.t("ui.petbar.next_event", { t = clock(remaining) })
@@ -218,10 +221,13 @@ local function refresh()
 	local hasPet = hpRatio ~= nil
 
 	-- --------------------------------------------------------------- Event
+	local eventTitle = Loc.t("ui.petbar.event")
+	local recall     = Loc.t("ui.petbar.recall")
+	local waiting    = Loc.t("ui.petbar.waiting")
 	if not hasPet then
-		paint(event, "Event", Loc.t("ui.petbar.no_pet"), "disabled")
+		paint(event, eventTitle, Loc.t("ui.petbar.no_pet"), "disabled")
 	elseif _abducting then
-		paint(event, "Event", Loc.t("ui.petbar.abducted"), "disabled")
+		paint(event, eventTitle, Loc.t("ui.petbar.abducted"), "disabled")
 	elseif _state == "ToEvent" then
 		paint(event, Loc.t("ui.petbar.recall"), Loc.t("ui.petbar.walking_there") .. " • " .. eventLine(), "active")
 	elseif _state == "AtEvent" then
@@ -229,33 +235,34 @@ local function refresh()
 	elseif _pending == "Event" then
 		paint(event, Loc.t("ui.petbar.waiting"), Loc.t("ui.petbar.switch_hint"), "waiting")
 	elseif _state == "Returning" and _from == "Event" then
-		paint(event, "Event", Loc.t("ui.petbar.coming_home"), "normal")
+		paint(event, eventTitle, Loc.t("ui.petbar.coming_home"), "normal")
 	elseif FeatureFlags.isOn("EVENT_V2_TIMER") then
 		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
 		-- keine Woerter.
 		setEventIcon(event, _eventId or _nextEventId)
 		paint(event, clock(_phaseEndsAt - os.clock()), bossLine(), "normal")
 	else
-		paint(event, "Event", eventLine(), "normal")
+		paint(event, eventTitle, eventLine(), "normal")
 	end
 
 	-- --------------------------------------------------------------- Fight
 	local hpText = if hpRatio then string.format("HP %d%%  •  %s", math.floor(hpRatio * 100 + 0.5), towerLabel(selectedTower)) else ""
 
+	local fightTitle = Loc.t("ui.petbar.fight")
 	if not hasPet then
-		paint(fight, "Fight", Loc.t("ui.petbar.no_pet"), "disabled")
+		paint(fight, fightTitle, Loc.t("ui.petbar.no_pet"), "disabled")
 	elseif _state == "ToPit" then
 		paint(fight, Loc.t("ui.petbar.recall"), Loc.t("ui.petbar.walking_pit"), "active")
 	elseif _state == "InPit" then
-		paint(fight, Loc.t("ui.petbar.recall"), if _stage then towerLabel(_tower or selectedTower) .. " · Stage " .. _stage else towerLabel(_tower or selectedTower), "active")
+		paint(fight, Loc.t("ui.petbar.recall"), if _stage then Loc.t("ui.petbar.in_pit_stage", { tower = towerLabel(_tower or selectedTower), stage = _stage }) else towerLabel(_tower or selectedTower), "active")
 	elseif _pending == "Fight" then
 		paint(fight, Loc.t("ui.petbar.waiting"), Loc.t("ui.petbar.switch_hint_pit"), "waiting")
 	elseif _state == "Returning" and _from == "Fight" then
-		paint(fight, "Fight", Loc.t("ui.petbar.coming_home"), "normal")
+		paint(fight, fightTitle, Loc.t("ui.petbar.coming_home"), "normal")
 	elseif (hpRatio or 0) <= 0 then
-		paint(fight, "Fight", Loc.t("ui.petbar.exhausted"), "disabled")
+		paint(fight, fightTitle, Loc.t("ui.petbar.exhausted"), "disabled")
 	else
-		paint(fight, "Fight", hpText, "normal")
+		paint(fight, fightTitle, hpText, "normal")
 	end
 end
 
@@ -321,6 +328,11 @@ end
 -- HBB Paket 2: Anker fuer die Fuehrung (GuideController)
 --------------------------------------------------------------------------------
 
+-- 08.10.: letzter Zustand vom Server ("Home", "ToPit", "InPit", ...)
+function PetBar.getState(): string
+	return _state
+end
+
 function PetBar.getButton(mode: string): GuiObject?
 	local view = if mode == "Fight" then _fight elseif mode == "Event" then _event else nil
 	return if view then view.button else nil
@@ -344,7 +356,8 @@ local function buildButton(parent: Instance, name: string, color: Color3, order:
 	icon.Size        = UDim2.fromOffset(60, 60)
 	icon.ZIndex      = 4
 
-	local title = Theme.label("Title", button, name)
+	-- Beschriftung setzt refresh() (in der Spielersprache); `name` ist nur der Instanz-Name
+	local title = Theme.label("Title", button, "")
 	title.Position       = UDim2.new(0, 64, 0, 6)
 	title.Size           = UDim2.new(1, -72, 0, 30)
 	title.TextXAlignment = Enum.TextXAlignment.Center
@@ -376,15 +389,25 @@ function PetBar.init(screenGui: ScreenGui)
 	bar.Size        = UDim2.fromOffset(BUTTON_WIDTH * 2 + GAP, BUTTON_HEIGHT)
 	bar.ZIndex      = 5
 
-	-- Auf schmalen Bildschirmen (Handy) mitskalieren statt ueber den Rand
+	-- Auf schmalen Bildschirmen (Handy) mitskalieren statt ueber den Rand.
+	-- Playtest 07.10.: auf Touch-Geraeten ausserdem raus aus der Zone des
+	-- Bewegungs-Sticks und weg vom Sprung-Knopf (TouchSafeArea) — sonst
+	-- loeste, wer laufen wollte, den Event-Knopf aus.
 	local scale = Instance.new("UIScale")
 	scale.Parent = bar
+	local barWidth = BUTTON_WIDTH * 2 + GAP
 	local function rescale()
-		local width = UiScale.toGui(screenGui.AbsoluteSize.X)
-		scale.Scale = math.clamp((width - 32) / (BUTTON_WIDTH * 2 + GAP), 0.6, 1)
+		local zone = TouchSafeArea.zone(screenGui)
+		if zone then
+			bar.Position = UDim2.new(0, zone.center, 1, -14)
+			scale.Scale  = math.clamp(zone.width / barWidth, 0.5, 1)
+		else
+			local width = UiScale.toGui(screenGui.AbsoluteSize.X)
+			bar.Position = UDim2.new(0.5, 0, 1, -14)
+			scale.Scale  = math.clamp((width - 32) / barWidth, 0.6, 1)
+		end
 	end
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
-	rescale()
+	TouchSafeArea.watch(screenGui, rescale)
 
 	local layout = Theme.listLayout(bar, GAP, true)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -411,6 +434,26 @@ function PetBar.init(screenGui: ScreenGui)
 		refresh()
 	end)
 	FightStartPrompt.init(screenGui, bar)
+
+	-- 08.10. (Tower-Terminal): Antippen des Tower-Namens unter "Kampf"
+	-- ("HP 100% · Tower I") oeffnet das Tower-Panel — derselbe Weg wie am
+	-- Terminal, nur kuerzer. Eine unsichtbare Flaeche ueber der Unterzeile.
+	local towerTap = Instance.new("TextButton")
+	towerTap.Name = "TowerTap"
+	towerTap.BackgroundTransparency = 1
+	towerTap.Text = ""
+	towerTap.AnchorPoint = Vector2.new(1, 1)
+	towerTap.Position = UDim2.new(1, 0, 1, 0)
+	towerTap.Size = UDim2.new(1, -64, 0, 30)
+	towerTap.ZIndex = 7
+	towerTap.Parent = _fight.button
+	towerTap.Activated:Connect(function()
+		if _state == "ToPit" or _state == "InPit" then
+			onFightClicked()   -- waehrend des Kampfs bleibt es der Zurueckholen-Knopf
+			return
+		end
+		PanelManager.open(PanelManager.ARENA_PANEL)
+	end)
 
 	PitResumeDialog.init(screenGui)
 
@@ -441,6 +484,7 @@ function PetBar.init(screenGui: ScreenGui)
 	end)
 
 	ClientState.onChanged(refresh)
+	Loc.onChanged(function() refresh() end)
 
 	-- Restzeit des Events jede Sekunde nachziehen
 	local accumulator = 0

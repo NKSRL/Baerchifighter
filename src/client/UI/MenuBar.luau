@@ -30,9 +30,11 @@ local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local Workspace        = game:GetService("Workspace")
 
 local Theme        = require(script.Parent.Theme)
+local TouchSafeArea = require(script.Parent.TouchSafeArea)
 local UiScale      = require(script.Parent.UiScale)
 local PanelManager = require(script.Parent.PanelManager)
 local Icons        = require(script.Parent.Icons)
+local EggIcon      = require(script.Parent.EggIcon)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local Unlock       = require(script.Parent.Unlock)
 
@@ -183,9 +185,19 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	button.TextColor3  = Theme.COLORS.outline
 	Theme.gradient(button, Theme.shade(entry.color, 0.34), Theme.shade(entry.color, -0.16))
 
-	-- Bild-Icon gross in die Kachel. Ohne Asset bleibt das Text-Kuerzel stehen.
-	local hasImage = Icons.has(entry.icon)
-	if hasImage then
+	-- Eier-Kachel im Bilderbuch-Stil wie Ei-Fenster und Ei-Baum: Zierrahmen
+	-- und das gezeichnete Basis-Ei auf einem Sockel. Erst wenn die Bilder
+	-- hochgeladen sind (Icons.luau); bis dahin die normale Kachel.
+	local storybook = entry.panel == "Hatch" and EggIcon.imageId("BasicEgg") ~= nil
+	local hasImage = storybook or Icons.has(entry.icon)
+	if storybook then
+		button.Text = ""
+		Theme.gradient(button, Theme.COLORS.cream, Theme.shade(Theme.COLORS.honey, -0.05))
+		Theme.ornate(button, "tile", 0.3)
+		local egg = EggIcon.make(button, "BasicEgg", 38, 3, { idle = true, pedestal = true })
+		egg.AnchorPoint = Vector2.new(0.5, 0)
+		egg.Position    = UDim2.new(0.5, 0, 0, 2)
+	elseif hasImage then
 		button.Text = ""
 		local icon = Icons.make(button, entry.icon)
 		icon.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -292,19 +304,43 @@ function MenuBar.init(screenGui: ScreenGui)
 	root.Position = UDim2.new(0.988, 0, 0, 108)
 	root.Size     = UDim2.new(0, WIDTH, 0, height)
 
-	local layout = Theme.listLayout(root, GAP)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	-- Raster statt Liste: eine Spalte wie bisher, auf Touch-Geraeten bei Bedarf
+	-- zwei (siehe rescale). Unsichtbare Kacheln (Unlock) ueberspringt es.
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize              = UDim2.fromOffset(WIDTH, slot)
+	grid.CellPadding           = UDim2.fromOffset(GAP, GAP)
+	grid.FillDirection         = Enum.FillDirection.Horizontal
+	grid.FillDirectionMaxCells = 1
+	grid.HorizontalAlignment   = Enum.HorizontalAlignment.Right
+	grid.SortOrder             = Enum.SortOrder.LayoutOrder
+	grid.Parent                = root
 
 	-- Auf niedrigen Fenstern (Handy quer, kleines Studio-Fenster) schrumpfen,
 	-- damit die Leiste nicht ueber den unteren Rand ragt.
+	--
+	-- Playtest 07.10.: auf Touch-Geraeten endet die Leiste ueber dem
+	-- Sprung-Knopf (unten rechts), sonst oeffnete ein Sprung ein Menue. Wuerden
+	-- die Kacheln dafuer in einer Spalte zu klein zum Antippen (< 70 %), werden
+	-- es zwei Spalten.
+	local MIN_TOUCH_SCALE = 0.7
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
 	local function rescale()
-		local room = UiScale.toGui(screenGui.AbsoluteSize.Y) - 108 - 12
-		scale.Scale = math.clamp(room / height, 0.55, 1)
+		local bottom = TouchSafeArea.rightBottomReserve(screenGui, 12)
+		local room = UiScale.toGui(screenGui.AbsoluteSize.Y) - 108 - bottom
+
+		local columns = 1
+		if TouchSafeArea.isTouch() and room / height < MIN_TOUCH_SCALE then
+			columns = 2
+		end
+		local rows = math.ceil(#entries / columns)
+		local gridHeight = rows * slot + (rows - 1) * GAP
+
+		grid.FillDirectionMaxCells = columns
+		root.Size   = UDim2.fromOffset(columns * WIDTH + (columns - 1) * GAP, gridHeight)
+		scale.Scale = math.clamp(room / gridHeight, 0.4, 1)
 	end
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
-	rescale()
+	TouchSafeArea.watch(screenGui, rescale)
 
 	for order, entry in entries do
 		table.insert(_tiles, buildTile(root, order, entry))

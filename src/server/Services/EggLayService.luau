@@ -445,14 +445,9 @@ function EggLayService.init()
 	-- Einsammeln per Beruehrung: MapService baut an jedem gelegten Ei einen
 	-- Touched-Handler, kennt aber EggLayService nicht (Ringschluss-Gefahr,
 	-- siehe MapService._eggCollectHandler). Deshalb haengt sich hier die
-	-- eigentliche Sammel-Funktion ein — derselbe Weg fuehrt seit jeher zum
-	-- Klick-Remote unten, nur der Ausloeser ist jetzt Beruehren statt Klicken.
+	-- eigentliche Sammel-Funktion ein. (Das fruehere Klick-Remote
+	-- RequestCollectEgg ist seit dem Beruehren-Weg entfallen, 12.10.2026.)
 	MapService.setEggCollectHandler(function(player: Player, eggUid: string)
-		EggLayService.collect(player, eggUid)
-	end)
-
-	RateLimiter.connect(Remotes.RequestCollectEgg, "RequestCollectEgg", function(player, eggUid: any)
-		if typeof(eggUid) ~= "string" then return end
 		EggLayService.collect(player, eggUid)
 	end)
 

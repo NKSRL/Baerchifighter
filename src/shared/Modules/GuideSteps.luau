@@ -23,7 +23,12 @@
 -- Sammel-Update 05.10. (Paket 3.5): Einsteiger-Kette Ei oeffnen -> kaempfen ->
 -- Waben holen und im Recycler abgeben -> Gebaeude verbessern -> Event. Jeder
 -- Schritt bekommt im Client einen Satz, was er bringt ("guide.<step>").
-export type Step = "hatch" | "fight" | "collect" | "merchant" | "combs" | "upgrade" | "event"
+--
+-- 08.10. (Tower-Terminal): nach dem ersten Schaffen von Tower I der Schritt
+-- "tower": zum Terminal an der Bruecke, dort zur Karte von Tower II. Fertig,
+-- sobald ein anderer Tower gewaehlt ist oder dort schon gekaempft wurde.
+-- Ausnahme von der Veteranen-Regel (siehe towerSwitchPending).
+export type Step = "hatch" | "fight" | "collect" | "merchant" | "combs" | "upgrade" | "event" | "tower"
 
 -- Nur die Felder, die hier gelesen werden. PlayerDataUpdate (Client) und
 -- PlayerData (Server) passen beide hinein.
@@ -37,7 +42,7 @@ export type View = {
 		buildings     : { [string]: { level: number } }?,   -- Sammel-Update 3.5
 		recycler      : { level: number }?,
 	},
-	towers : { records: { [string]: number } }?,
+	towers : { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?,
 	quests : { chainDone: number }?,
 	stats  : { totalEventsCompleted: number?, totalCombsDelivered: number? }?,
 	gummies : number?,
@@ -94,8 +99,31 @@ function GuideSteps.eventsDone(view: View): number
 	return if stats then (stats.totalEventsCompleted or 0) else 0
 end
 
+-- 08.10.: Tower II ist frei (Tower I geschafft), aber der Spieler hat noch
+-- nie gewechselt: weiter in Tower I gewaehlt und in keinem anderen Tower
+-- gekaempft. Nur ohne Rebirth.
+--
+-- Bewusst VOR der Veteranen-Regel "4 Ketten-Quests": die ist nach fuenf
+-- gewonnenen Kaempfen erfuellt, also lange bevor jemand Tower I schafft —
+-- mit ihr saehe diesen Schritt praktisch niemand. Sie schuetzt alte Konten
+-- vor der Einfuehrung; das Umstellen ist dagegen fuer jeden neu (Annahme,
+-- im Bericht). Die Rebirth-Regel gilt weiter.
+function GuideSteps.towerSwitchPending(view: View): boolean
+	if (view.rebirthCount or 0) > 0 then return false end
+	local towers = view.towers
+	if not towers or not towers.unlocked or towers.unlocked.II ~= true then return false end
+	if (towers.selected or "I") ~= "I" then return false end
+	for towerId, record in towers.records do
+		if towerId ~= "I" and record > 0 then return false end
+	end
+	return true
+end
+
 -- Der aktuelle Schritt oder nil (fertig bzw. kein neuer Spieler).
 function GuideSteps.current(view: View, options: Options?): Step?
+	if GuideSteps.towerSwitchPending(view) then
+		return "tower"
+	end
 	if GuideSteps.isVeteran(view) then
 		return nil
 	end

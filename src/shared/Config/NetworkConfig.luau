@@ -25,6 +25,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestUpgradeBuilding = 0.50,
 	-- v15: Tower waehlen (reines Umschalten) und Login-Bonus (zahlt aus).
 	RequestSelectTower     = 0.30,
+	RequestBuyGamepass     = 2.00,   -- 08.10. Paket C: Kauf-Dialog oeffnen
 	RequestClaimDailyBonus = 1.00,
 	RequestUpgradeRecycler = 0.50,   -- v15: Waben-Recycler
 	RequestFuseBaerchis    = 1.00,
@@ -47,11 +48,6 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- Reines Umschalten eines Schlosses, kostet nichts — darf schnell gehen.
 	RequestToggleCharmLock = 0.15,
 
-
-	-- Eier einsammeln ist die haeufigste Weltaktion ueberhaupt: bis zu zwoelf
-	-- liegen gleichzeitig herum, und man klickt sie nacheinander weg. Deshalb
-	-- so kurz wie das Fuettern.
-	RequestCollectEgg      = 0.15,
 
 	-- Alle auf einmal: eine Anfrage statt zwoelf, darf entsprechend traeger sein.
 	RequestCollectAllEggs  = 0.50,

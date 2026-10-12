@@ -80,7 +80,7 @@ local function show()
 	-- Uhr gibt es nicht als Bild; das Kuerzel ist sprachneutral.
 	addRow(list, 1, "", "⏱", Loc.formatDuration(report.seconds))
 	if report.eggs > 0 then
-		addRow(list, 2, "egg", "EI", "+" .. Loc.formatNumber(report.eggs))
+		addRow(list, 2, "egg", "🥚", "+" .. Loc.formatNumber(report.eggs))
 	end
 	if report.honey > 0 then
 		addRow(list, 3, "honey", "H", "+" .. Loc.formatNumber(report.honey))

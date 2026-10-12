@@ -32,6 +32,8 @@ local Theme       = require(UI:WaitForChild("Theme"))
 local UiScale     = require(UI:WaitForChild("UiScale"))
 local MenuBar     = require(UI:WaitForChild("MenuBar"))
 local PetBar      = require(UI:WaitForChild("PetBar"))
+local TowerPanel  = require(UI:WaitForChild("TowerPanel"))          -- 08.10. Schritt "tower"
+local TerminalController = require(script.Parent.TerminalController)
 local ClientState = require(script.Parent.ClientState)
 
 local GuideController = {}
@@ -79,6 +81,10 @@ local function uiTarget(step: string): GuiObject?
 		return PetBar.getButton("Fight")
 	elseif step == "event" then
 		return PetBar.getButton("Event")
+	elseif step == "tower" then
+		-- 08.10.: im offenen Tower-Panel der Waehlen-Knopf von Tower II;
+		-- sonst zeigt der Strahl zum Terminal (worldTarget)
+		return TowerPanel.getGuideTarget()
 	elseif step == "upgrade" then
 		-- HUD_ROW_V2: keine Kachel mehr, der Strahl zeigt zum Brunnen (worldTarget)
 		if FeatureFlags.isOn("HUD_ROW_V2") then return nil end
@@ -160,6 +166,10 @@ local function ownHoneyBuilding(): BasePart?
 end
 
 local function worldTarget(step: string): BasePart?
+	if step == "tower" then
+		if TowerPanel.isOpen() then return nil end
+		return TerminalController.getOwnScreen()
+	end
 	if step == "upgrade" and FeatureFlags.isOn("HUD_ROW_V2") then
 		return ownHoneyBuilding()
 	elseif step == "collect" then

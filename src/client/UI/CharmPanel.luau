@@ -37,6 +37,8 @@ local Toast        = require(script.Parent.Toast)
 local Notify       = require(script.Parent.Notify)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
+local Loc          = require(ReplicatedStorage.Localization.Loc)
+local Names        = require(ReplicatedStorage.Localization.Names)
 
 local CharmPanel = {}
 
@@ -102,13 +104,11 @@ local function fill(baerchi: Types.Baerchi)
 	local promotion = baerchi.promotionLevel or 0
 
 	if _titleLabel then
-		local def = BaerchiConfig.getById(baerchi.configId)
-		_titleLabel.Text = string.format(
-			"%s  —  Promotion %d/%d",
-			if def then def.displayName else baerchi.configId,
-			promotion,
-			PromotionConfig.MAX_PROMOTION
-		)
+		_titleLabel.Text = Loc.t("ui.charm.title_baerchi", {
+			name = Names.baerchi(baerchi.configId),
+			p    = promotion,
+			max  = PromotionConfig.MAX_PROMOTION,
+		})
 	end
 
 	for _, widget in _slots do
@@ -226,7 +226,7 @@ function CharmPanel.init(screenGui: ScreenGui)
 	)
 	_root = root
 
-	_titleLabel = Theme.dialogHeader(root, "Battle Charms", function()
+	_titleLabel = Theme.dialogHeader(root, Loc.t("ui.card.section_charms"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 
@@ -273,7 +273,8 @@ function CharmPanel.init(screenGui: ScreenGui)
 		lockDot.ZIndex      = 3
 		Theme.corner(lockDot, 8)
 
-		local lockText = Theme.label("Text", lockDot, "L")
+		local lockText = Theme.label("Text", lockDot, "")
+		Loc.bind(lockText, "ui.charm.lock_letter")
 		lockText.Size           = UDim2.fromScale(1, 1)
 		lockText.TextXAlignment = Enum.TextXAlignment.Center
 		lockText.TextScaled     = false
@@ -352,7 +353,8 @@ function CharmPanel.init(screenGui: ScreenGui)
 		Remotes.RequestRollCharms:FireServer(uid, 1)
 	end)
 
-	local auto = Theme.button("AutoRoll", footer, "Auto (" .. CharmConfig.AUTO_ROLL_COUNT .. "x)", Theme.COLORS.goldGummy)
+	local auto = Theme.button("AutoRoll", footer, "", Theme.COLORS.goldGummy)
+	Loc.bind(auto, "ui.charm.auto_roll", { n = CharmConfig.AUTO_ROLL_COUNT })
 	auto.AnchorPoint = Vector2.new(1, 0)
 	auto.Position    = UDim2.new(1, 0, 0, 52)
 	auto.Size        = UDim2.new(0.5, -4, 0, 34)
@@ -371,16 +373,16 @@ function CharmPanel.init(screenGui: ScreenGui)
 	ClientState.onChanged(function()
 		CharmPanel.refresh()
 	end)
+	Loc.onChanged(function()
+		CharmPanel.refresh()
+	end)
 
 	Remotes.CharmRollResultReceived.OnClientEvent:Connect(function(result: any)
 		if typeof(result) ~= "table" then return end
 		local typed = result :: Types.CharmRollResult
 
 		Notify.emit("charm_roll", function()
-			Toast.success(string.format(
-				"%d Wurf/Wuerfe  —  %s GoldGummies",
-				typed.rolls, Theme.formatNumber(typed.goldGummiesSpent)
-			))
+			Toast.success(Loc.tn("msg.charm_rolled", typed.rolls, { gold = typed.goldGummiesSpent }))
 		end)
 
 		CharmPanel.refresh()

@@ -19,6 +19,7 @@ local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local Loc          = require(ReplicatedStorage.Localization.Loc)
 
 local Theme = require(script.Parent.Theme)
+local TouchSafeArea = require(script.Parent.TouchSafeArea)
 
 local HomeButton = {}
 
@@ -32,8 +33,39 @@ function HomeButton.init(screenGui: ScreenGui)
 	local button = Theme.bigButton("HomeButton", screenGui, Loc.t("ui.home.button"), Theme.COLORS.good)
 	Loc.bind(button, "ui.home.button")
 	button.AnchorPoint = Vector2.new(0, 1)
-	button.Position    = UDim2.new(0, 16, 1, -16)
 	button.Size        = UDim2.fromOffset(SIZE.X, SIZE.Y)
+
+	-- Am PC unten links. Auf Touch-Geraeten liegt dort der Bewegungs-Stick
+	-- (Playtest 07.10.) — dann im freien Streifen (TouchSafeArea) ueber der
+	-- Pet-Leiste. Die Leiste wird erst nach diesem Knopf gebaut (Main),
+	-- deshalb wird sie hier gesucht statt vorausgesetzt.
+	local function barHeight(): number
+		local bar = screenGui:FindFirstChild("PetBar")
+		if not (bar and bar:IsA("GuiObject")) then return 68 end
+		local barScale = bar:FindFirstChildOfClass("UIScale")
+		return bar.Size.Y.Offset * (if barScale then barScale.Scale else 1)
+	end
+	local function place()
+		local zone = TouchSafeArea.zone(screenGui)
+		if zone then
+			button.Position = UDim2.new(0, zone.left, 1, -(14 + barHeight() + 10))
+		else
+			button.Position = UDim2.new(0, 16, 1, -16)
+		end
+	end
+	TouchSafeArea.watch(screenGui, place)
+	local function hookBar(child: Instance)
+		if child.Name ~= "PetBar" then return end
+		local barScale = child:FindFirstChildOfClass("UIScale")
+		if barScale then barScale:GetPropertyChangedSignal("Scale"):Connect(place) end
+		place()
+	end
+	screenGui.ChildAdded:Connect(function(child)
+		-- Der UIScale der Leiste kommt direkt nach ihr; einen Frame warten
+		task.defer(hookBar, child)
+	end)
+	local existing = screenGui:FindFirstChild("PetBar")
+	if existing then hookBar(existing) end
 	button.Visible     = false
 	button.ZIndex      = 5
 	button.Activated:Connect(function()

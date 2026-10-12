@@ -49,13 +49,14 @@ local function legacyV15()
 end
 
 local default = Types.createDefaultPlayerData()
-check("Default: Version 16", default.version, 16)
+-- Seit 08.10. ist die Datenversion 17 (Tower-Terminal); v16 muss nur erreicht sein.
+check("Default: Version >= 16", default.version >= 16, true)
 check("Default: 6 Start-Eier (Paket 6.4)", default.island.eggStock.BasicEgg, 6)
 check("Default: stageBest leer", next(default.island.stageBest), nil)
 check("Default: Inkubator Level 1", default.island.incubator.level, 1)
 
 local out = PlayerMigration.applyDefaults(legacyV15())
-check("v16: Version", out.version, 16)
+check("v16: Version >= 16", out.version >= 16, true)
 check("v16: stageBest I = 22 (betreten 23)", out.island.stageBest.I, 22)
 check("v16: stageBest II nicht gesaeet (betreten 1 = nichts geschafft)", out.island.stageBest.II, nil)
 check("v16: Inkubator angelegt", typeof(out.island.incubator), "table")

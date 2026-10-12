@@ -2,8 +2,8 @@
 -- python tools/luau-tests/run_local.py tools/luau-tests/rebirth_rules.test.lua
 --
 -- 1. Erster Rebirth: Tower I Stage 30, und der Deckel von R0 reicht bis dorthin.
--- 2. Die Bedingung liegt fuer JEDEN Rebirth in einem offenen Tower (sonst ist
---    sie nie erreichbar) und steigt nie (Aequivalenz), bis Final 100 echt.
+-- 2. Die Bedingung liegt fuer JEDEN Rebirth in einem erreichbaren Tower (sonst
+--    ist sie nie erreichbar; seit 08.10. oeffnen Tower durch Schaffen) und steigt nie (Aequivalenz), bis Final 100 echt.
 -- 3. isRebirthReady: zaehlt nur dieses Leben (stageBest), ueber die
 --    Aequivalenz auch in hoeheren Towern; Rekorde allein reichen nicht.
 -- 4. Kein Gummy-Preis mehr: RebirthService fragt getRebirthCost nicht ab
@@ -31,8 +31,13 @@ local lastEq = 0
 for n = 0, 40 do
 	local records = if n >= TowerConfig.REBIRTH_AFTER_FINAL.fromRebirth then endlessRecords else nil
 	local towerId, stage = TowerConfig.getRebirthRequirement(n, records)
-	local cap = TowerConfig.getStageCap(n, towerId, records)
-	check(string.format("R%d: Bedingung %s/%d liegt in offenem Tower", n, towerId, stage), cap > 0, cap)
+	-- Seit 08.10. (TOWER_UNLOCK_BY_CLEAR) oeffnet jeder Tower durch Schaffen
+	-- des vorigen, nicht per Rebirth: dann zaehlt nur, dass die Stage im Tower
+	-- liegt (Deckel eines offenen Towers = volle Stage-Zahl).
+	local cap = if FeatureFlags.isOn("TOWER_UNLOCK_BY_CLEAR")
+		then TowerConfig.getStageCap(n, towerId, records, { [towerId] = true })
+		else TowerConfig.getStageCap(n, towerId, records)
+	check(string.format("R%d: Bedingung %s/%d liegt in erreichbarem Tower", n, towerId, stage), cap >= stage, cap)
 	local eq = TowerConfig.getEquivalent(towerId, stage)
 	check(string.format("R%d: Bedingung faellt nicht (%.1f >= %.1f)", n, eq, lastEq), eq >= lastEq - 1e-6)
 	if n >= 1 and n <= 14 and n ~= 6 then
