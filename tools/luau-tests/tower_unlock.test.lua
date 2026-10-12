@@ -125,6 +125,32 @@ if term then
 end
 
 -- 5. Skip-Kosten (Paket C) -------------------------------------------------
+-- 6. 12.10.: Freischaltung pro Leben (TOWER_UNLOCK_PER_LIFE) --------------
+local perLifeBefore = FLAGS.TOWER_UNLOCK_PER_LIFE
+FLAGS.TOWER_UNLOCK_PER_LIFE = true
+local towersAfter = { records = { I = 30, II = 45 }, selected = "I", unlocked = { I = true } }
+local lifeFresh = { stageBest = {} }
+local lr = TowerConfig.unlockRecords(towersAfter, lifeFresh)
+check("pro Leben: nach Rebirth zaehlt stageBest, nicht der Rekord", lr.I == nil)
+check("pro Leben: II zu direkt nach dem Rebirth", not TowerConfig.isOpen(1, "II", lr, towersAfter.unlocked))
+check("pro Leben: Terminal wieder gesperrt", TowerConfig.terminalState(towersAfter, lr) == "locked")
+local lifeCleared = { stageBest = { I = 30 } }
+local lr2 = TowerConfig.unlockRecords(towersAfter, lifeCleared)
+check("pro Leben: I/30 in diesem Leben oeffnet II", TowerConfig.isOpen(1, "II", lr2, towersAfter.unlocked))
+check("pro Leben: III bleibt zu", not TowerConfig.isOpen(1, "III", lr2, towersAfter.unlocked))
+local _, have, need = TowerConfig.getUnlockProgress("II", TowerConfig.unlockRecords(towersAfter, { stageBest = { I = 7 } }))
+check("pro Leben: Fortschritt 7/30", have == 7 and need == 30, tostring(have) .. "/" .. tostring(need))
+-- Migration nach v17: Rekorde oeffnen nichts wieder
+local lifeData = PlayerMigration.applyDefaults(v16(0, { I = 30 })) :: any
+lifeData.rebirthCount = 1
+lifeData.towers.unlocked = { I = true }
+lifeData.island.stageBest = {}
+lifeData = PlayerMigration.applyDefaults(lifeData) :: any
+check("pro Leben: Join nach Rebirth oeffnet II nicht ueber den Rekord", lifeData.towers.unlocked.II ~= true)
+FLAGS.TOWER_UNLOCK_PER_LIFE = false
+check("Schalter aus: Rekorde zaehlen", TowerConfig.unlockRecords(towersAfter, lifeFresh).I == 30)
+FLAGS.TOWER_UNLOCK_PER_LIFE = perLifeBefore
+
 check("Skip kostet ohne Pass", TowerConfig.getResumeCost("I", 20, 1, false) > 0)
 check("Skip kostet 0 mit Pass", TowerConfig.getResumeCost("I", 20, 1, true) == 0)
 check("Stage 1 immer 0", TowerConfig.getResumeCost("II", 1, 3, false) == 0)

@@ -82,6 +82,11 @@ if A.running then __remote("PetModeChanged").OnClientEvent:Fire("InPit", nil, { 
 
 local PanelManager = R(UI .. "PanelManager")
 if A.panel then PanelManager.open("Combat") end
+-- 12.10.: das Feld am Fight-Knopf (Gratis-Start / bezahlter Einstieg)
+if A.fightPrompt then
+	local FightStartPrompt = R(UI .. "FightStartPrompt")
+	FightStartPrompt.open(function() end)
+end
 
 __flushTasks()
 local rs = game:GetService("RunService")
@@ -108,6 +113,12 @@ if A.leak then
 	print(string.format("@@LEAK@@ vorher=%d nachher=%d animationen=%d", before, count(), Kit.activeAnimations()))
 	PanelManager.open("Combat")
 	__flushTasks()
+end
+
+-- die Attrappe fuehrt task.delay sofort aus: das Feld waere schon wieder zu
+if A.fightPrompt then
+	local prompt = screenGui:FindFirstChild("FightStartPrompt")
+	if prompt then prompt.Visible = true end
 end
 
 print("@@JSON@@" .. __dumpTree(screenGui))

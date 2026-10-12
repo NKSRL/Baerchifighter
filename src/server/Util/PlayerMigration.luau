@@ -470,7 +470,13 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	for _, def in TowerConfig.TOWERS do
 		local wasOpen = (data.version or 0) < 17
 			and TowerConfig.getLegacyStageCap(rebirths, def.id, towers.records) > 0
-		if wasOpen or TowerConfig.isUnlockedByClear(def.id, towers.records, nil) then
+		-- 12.10.: mit TOWER_UNLOCK_PER_LIFE oeffnet nach v17 nur, was in DIESEM
+		-- Leben geschafft ist (sonst oeffnete jeder Join die Tower nach einem
+		-- Rebirth ueber die Rekorde wieder). Der einmalige Bestandsschutz
+		-- v16 -> v17 zaehlt weiter die Rekorde.
+		local progress = if (data.version or 0) < 17 then towers.records
+			else TowerConfig.unlockRecords(towers, (data :: any).island)
+		if wasOpen or TowerConfig.isUnlockedByClear(def.id, progress, nil) then
 			unlocked[def.id] = true
 		end
 	end

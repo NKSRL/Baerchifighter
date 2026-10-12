@@ -158,7 +158,15 @@ local function writePrompt(prompt: ProximityPrompt)
 	local data = ClientState.get()
 	local level = if data then data.island.recycler.level else 1
 
-	prompt.ObjectText = string.format("%s  Lv.%d", Loc.t("ui.recycler.name"), level)
+	-- 12.10.: der Recycler zeigt seinen Geld-Multiplikator, im Prompt auch
+	-- den naechsten ("Recycler  ×12 ➡ ×17")
+	if CombConfig.INSTANT_PAYOUT then
+		local nextText = if level < CombConfig.RECYCLER_MAX_LEVEL
+			then "  ➡ " .. CombConfig.formatMultiplier(level + 1) else ""
+		prompt.ObjectText = string.format("%s  %s%s", Loc.t("ui.recycler.name"), CombConfig.formatMultiplier(level), nextText)
+	else
+		prompt.ObjectText = string.format("%s  Lv.%d", Loc.t("ui.recycler.name"), level)
+	end
 
 	if level >= CombConfig.RECYCLER_MAX_LEVEL then
 		prompt.ActionText = Loc.t("ui.recycler.maxed")

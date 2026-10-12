@@ -71,6 +71,7 @@ local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintContr
 local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
 local AreaSignController    = require(Controllers:WaitForChild("AreaSignController"))    -- Sammel-Update 3.8
 local TerminalController    = require(Controllers:WaitForChild("TerminalController"))    -- 08.10. Tower-Terminal
+local TowerFlightController = require(Controllers:WaitForChild("TowerFlightController")) -- 12.10. Flugfeld am Kampf-Turm
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
@@ -188,6 +189,7 @@ EggTimerController.init()
 IncubatorController.init()   -- Sammel-Update Paket 8
 AreaSignController.init()    -- Sammel-Update Paket 3.8
 TerminalController.init()    -- 08.10. Tower-Terminal an der Bruecke
+TowerFlightController.init() -- 12.10. Flugfeld auf den Kampf-Turm
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
 -- v15: Waben im Event-Pit und Recycler (braucht Toast, ClientState und die Welt)

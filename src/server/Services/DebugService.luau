@@ -447,7 +447,7 @@ commands.tower = function(player, data, towerId: any, stage: any)
 	PlayerService.markDirty(player)
 	task.spawn(PetModeService.request, player, "Fight", choice :: any)
 	return {
-		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id, data.towers.records, data.towers.unlocked),
+		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked),
 		gegnerStage1 = TowerConfig.getEnemyStats(id, start),
 	}
 end
@@ -477,7 +477,7 @@ end
 commands.rebirthcap = function(_player, data)
 	local caps: { [string]: number } = {}
 	for _, def in TowerConfig.TOWERS do
-		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id, data.towers.records, data.towers.unlocked)
+		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked)
 	end
 	local capTower, capStage = TowerConfig.getCap(data.rebirthCount)
 	return { rebirths = data.rebirthCount, deckelTower = capTower, deckelStage = capStage, proTower = caps }

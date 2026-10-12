@@ -52,14 +52,29 @@ function RecyclerBuilder.writeState(body: BasePart, recycler: Types.RecyclerData
 	local sign = body:FindFirstChild("Sign")
 	if not sign or not sign:IsA("BillboardGui") then return end
 
+	-- 12.10. (Playtest): das Schild zeigt IMMER nur den Geld-Multiplikator
+	-- ("×12", sprachneutral) — sonst nichts. Ausgezahlt wird sofort, eine
+	-- Warteschlange gibt es nicht mehr (CombConfig.INSTANT_PAYOUT).
 	local title = sign:FindFirstChild("Title")
+	local stock = sign:FindFirstChild("Stock")
+	if CombConfig.INSTANT_PAYOUT then
+		if title and title:IsA("TextLabel") then
+			WorldText.set(title, CombConfig.formatMultiplier(recycler.level))
+			title.TextColor3 = CombConfig.LAMP_ACTIVE_COLOR
+			title.Size = UDim2.fromScale(1, 1)   -- die ganze Schildflaeche
+		end
+		if stock and stock:IsA("TextLabel") then
+			stock.Visible = false
+		end
+		return
+	end
+
 	if title and title:IsA("TextLabel") then
 		WorldText.set(title, Loc.msg("ui.world.sign_level", {
 			name = Loc.msg("ui.recycler.name"), level = recycler.level,
 		}))
 	end
 
-	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
 		if recycler.queued > 0 then
 			stock.Text = string.format("⬡ %d", recycler.queued)   -- sprachneutral (2.4)

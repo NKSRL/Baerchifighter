@@ -228,14 +228,47 @@ function MapLayout.isOpenWater(x: number, z: number, margin: number): boolean
 	return true
 end
 
+-- Wegweiser: Ziel des dritten Arms — Haendler oder die naechste Bestenliste,
+-- was naeher ist. (Position, Loc-Schluessel)
+function MapLayout.signpostSideTarget(from: Vector3): (Vector3, string)
+	local m = EggConfig.MERCHANT_V2
+	local best = MapLayout.atAngle(m.angleDegrees, m.radius)
+	local bestDist = (best - from).Magnitude
+	local key = "world.sign.merchant"
+	for _, b in MapLayout.leaderboardBoards() do
+		local p = MapLayout.atAngle(b.angleDegrees, MapConfig.LEADERBOARD_BOARD.radius)
+		local d = (p - from).Magnitude
+		if d < bestDist then
+			best, bestDist, key = p, d, "world.sign.board"
+		end
+	end
+	return best, key
+end
+
 -- Wegweiser: einer je Steg, neben dem Pflasterweg, wo er am Event-Pit
--- beginnt. `facing` = Richtung nach aussen (zum Plot).
-function MapLayout.signposts(radius: number, sideOffset: number): { { slot: number, position: Vector3, outward: Vector3 } }
+-- beginnt. `outward` = Richtung nach aussen (zum Plot), `sideDir` = Richtung
+-- des dritten Arms (waagerecht, Einheitsvektor).
+-- 12.10.: die Schilder haengen aussen am Pfahl und ragen in Zeigerichtung
+-- weg. Der Pfahl steht deshalb auf der Seite des Wegs, zu der der dritte Arm
+-- zeigt — sonst ragte dieser Arm quer ueber das Pflaster.
+function MapLayout.signposts(radius: number, sideOffset: number): { { slot: number, position: Vector3, outward: Vector3, sideDir: Vector3, sideKey: string } }
 	local list = {}
 	for slot = 1, MapConfig.PLOT_COUNT do
 		local o = MapLayout.outward(slot)
-		local flat = MapConfig.CENTER + o * radius + MapLayout.side(slot) * sideOffset
-		table.insert(list, { slot = slot, position = Vector3.new(flat.X, MapConfig.PLATFORM_TOP_Y, flat.Z), outward = o })
+		local side = MapLayout.side(slot)
+		local function place(sign: number): (Vector3, Vector3, string)
+			local flat = MapConfig.CENTER + o * radius + side * (sign * sideOffset)
+			local position = Vector3.new(flat.X, MapConfig.PLATFORM_TOP_Y, flat.Z)
+			local target, key = MapLayout.signpostSideTarget(position)
+			local d = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
+			local dir = if d.Magnitude > 1e-3 then d.Unit else side * sign
+			return position, dir, key
+		end
+		local position, dir, key = place(1)
+		if dir.X * side.X + dir.Z * side.Z < 0 then
+			position, dir, key = place(-1)
+		end
+		table.insert(list, { slot = slot, position = position, outward = o, sideDir = dir, sideKey = key })
 	end
 	return list
 end

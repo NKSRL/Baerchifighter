@@ -217,7 +217,9 @@ function HatchPanel.init(screenGui: ScreenGui)
 	-- v14: Knopf zum Ei-Baum (Presse, Freischaltung, Drop-Vorschau)
 	local treeButton = Theme.button("TreeButton", header.Parent :: Instance, Loc.t("ui.menu.tree"), Theme.COLORS.growth)
 	treeButton.AnchorPoint = Vector2.new(1, 0.5)
-	treeButton.Position = UDim2.new(1, -40, 0.5, 0)
+	-- 12.10. (Playtest): klebte direkt am X (X: 44 breit, ragt 4 hinaus,
+	-- Trefferflaeche 56). Jetzt 12 Luft bis zur Trefferflaeche des X.
+	treeButton.Position = UDim2.new(1, -58, 0.5, 0)
 	treeButton.Size = UDim2.new(0, 92, 0, 26)
 	treeButton.Activated:Connect(function()
 		PanelManager.open("EggTree")

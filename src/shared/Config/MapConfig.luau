@@ -748,9 +748,13 @@ local POND_STAND_GAP = 3.2
 -- vorher 0.9 dick mit Oberkante 0.06 — 0.84 steckten im Boden, von der
 -- Seite sah man nur eine Kante im Gras. Jetzt 0.2: der Fuss sinkt 0.2 ein,
 -- das liest das Auge als "steht auf dem Brett".
-local POND_PLANK_SIZE   = Vector3.new(8.4, 0.2, 2.4)
+-- 12.10. (Playtest, Bild "Bruecke im Sand"): Oberkante 0.2 lag GENAU auf
+-- der Sandkante (POND_RIM_TOP 0.2), die innere Bohle reicht 1.1 Studs auf
+-- den Rand — zwei gleich hohe Flaechen, Z-Fighting. Jetzt 0.32 dick:
+-- 0.12 ueber dem Sand, der Fuss sinkt weiter kaum sichtbar ein.
+local POND_PLANK_SIZE   = Vector3.new(8.4, 0.32, 2.4)
 local POND_PLANK_GAP    = 0.2    -- Fuge zwischen den beiden Bohlen
-local POND_PLANK_TOP    = 0.2    -- Oberkante ueber dem Beet (= Dicke: liegt auf)
+local POND_PLANK_TOP    = 0.32   -- Oberkante ueber dem Beet (= Dicke: liegt auf)
 local POND_PLANK_COLORS: { Color3 } = {
 	Color3.fromRGB(168, 118, 70),
 	Color3.fromRGB(138,  94,  55),

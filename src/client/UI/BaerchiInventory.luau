@@ -284,7 +284,19 @@ local function updateFooter()
 
 	local modeButton = _modeButton
 	if modeButton then
-		modeButton.Text = Loc.t(if _fusionMode then "ui.fusion.mode_on" else "ui.fusion.mode_off")
+		if FeatureFlags.isOn("FUSION_INVENTORY_TOGGLE") then
+			modeButton.Text = Loc.t(if _fusionMode then "ui.fusion.mode_on" else "ui.fusion.mode_off")
+		else
+			-- 12.10.: Fusion startet nur von der Baerchi-Karte; hier nur Abbrechen
+			modeButton.Visible = _fusionMode
+			modeButton.Text = Loc.t("ui.common.cancel")
+		end
+	end
+	local hint = _hint
+	if hint then
+		local shifted = modeButton ~= nil and modeButton.Visible
+		hint.Position = UDim2.new(0, if shifted then 140 else 0, 0, 0)
+		hint.Size     = UDim2.new(1, if shifted then -140 else 0, 1, 0)
 	end
 
 	local hint = _hint
@@ -403,6 +415,11 @@ end
 local function closeInternal()
 	local root = _root
 	if root then root.Visible = false end
+	-- 12.10.: eine offene Fusions-Auswahl endet mit dem Fenster
+	if not FeatureFlags.isOn("FUSION_INVENTORY_TOGGLE") then
+		_fusionMode = false
+		table.clear(_selection)
+	end
 	IndexView.setVisible(false)
 end
 

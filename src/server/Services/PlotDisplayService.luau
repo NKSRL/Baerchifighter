@@ -220,18 +220,21 @@ end
 -- 08.10.: Tower-Terminal — Zustand, gewaehlter Tower, Rekord, Fortschritt.
 local function terminalView(data: Types.PlayerData): { state: string, tower: string, record: number, nextTower: string, newTower: string, progress: number, needed: number }
 	local towers = data.towers
+	-- 12.10.: Freischaltung pro Leben (TOWER_UNLOCK_PER_LIFE) — nach einem
+	-- Rebirth zeigt das Terminal wieder "Schaffe Tower I x/30".
+	local progressRecords = TowerConfig.unlockRecords(towers, data.island)
 	local nextTower, newTower = "", ""
 	for _, def in TowerConfig.TOWERS do
 		if newTower == "" and TowerConfig.isNew(def.id, towers) then
 			newTower = def.id
 		end
-		if nextTower == "" and not TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
+		if nextTower == "" and not TowerConfig.isUnlockedByClear(def.id, progressRecords, towers.unlocked) then
 			nextTower = def.id
 		end
 	end
-	local _, progress, needed = TowerConfig.getUnlockProgress(nextTower, towers.records)
+	local _, progress, needed = TowerConfig.getUnlockProgress(nextTower, progressRecords)
 	return {
-		state     = TowerConfig.terminalState(towers),
+		state     = TowerConfig.terminalState(towers, progressRecords),
 		tower     = towers.selected,
 		record    = towers.records[towers.selected] or 0,
 		nextTower = nextTower,

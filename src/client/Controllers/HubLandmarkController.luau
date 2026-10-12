@@ -24,7 +24,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 
 local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
-local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
 local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
@@ -209,7 +208,7 @@ local function buildBoard(parent: Instance, center: Vector3, dir: Vector3, color
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = face
 		gui.PixelsPerStud = 40
-		gui.LightInfluence = 1
+		gui.LightInfluence = 0   -- 12.10.: Schrift bleibt auch nachts hell
 		gui.Parent = board
 		local label = Instance.new("TextLabel")
 		label.BackgroundTransparency = 1
@@ -218,6 +217,8 @@ local function buildBoard(parent: Instance, center: Vector3, dir: Vector3, color
 		label.Font = Enum.Font.FredokaOne
 		label.TextScaled = true
 		label.TextColor3 = cfg.TEXT_COLOR
+		label.TextStrokeColor3 = cfg.TEXT_STROKE
+		label.TextStrokeTransparency = 0
 		label.Parent = gui
 		table.insert(labels, label)
 	end
@@ -272,52 +273,33 @@ local function refreshIslandLabels()
 	end
 end
 
--- Ziel, auf das der dritte Arm zeigt: Haendler oder naechste Bestenliste.
-local function sideTarget(from: Vector3): (Vector3, string)
-	local m = EggConfig.MERCHANT_V2
-	local best = MapLayout.atAngle(m.angleDegrees, m.radius)
-	local bestDist = (best - from).Magnitude
-	local key = "world.sign.merchant"
-	for _, b in MapLayout.leaderboardBoards() do
-		local p = MapLayout.atAngle(b.angleDegrees, MapConfig.LEADERBOARD_BOARD.radius)
-		local d = (p - from).Magnitude
-		if d < bestDist then
-			best, bestDist, key = p, d, "world.sign.board"
-		end
-	end
-	return best, key
-end
-
-local function flatDir(from: Vector3, to: Vector3): Vector3
-	local d = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
-	return if d.Magnitude > 1e-3 then d.Unit else Vector3.new(1, 0, 0)
-end
-
 local function buildSignposts(folder: Instance)
 	local cfg = WorldFXConfig.SIGNPOST
 	for _, spot in MapLayout.signposts(cfg.RADIUS, cfg.SIDE) do
 		local group = WorldFXKit.folder("Signpost_" .. spot.slot, folder)
 		local base = spot.position
-		WorldFXKit.pole("Post", group, base, cfg.POST_HEIGHT, 0.55, cfg.WOOD_DARK, Enum.Material.Wood)
+		WorldFXKit.pole("Post", group, base, cfg.POST_HEIGHT, cfg.POST_DIAMETER, cfg.WOOD_DARK, Enum.Material.Wood)
 
-		local function at(level: number): Vector3
-			return base + Vector3.new(0, cfg.POST_HEIGHT - 0.9 - level * cfg.BOARD_GAP, 0)
+		-- Mitte eines Schilds, das in `dir` zeigt: inneres Ende aussen am
+		-- Pfahl, das Brett ragt in Zeigerichtung vom Pfahl weg.
+		local reach = cfg.POST_DIAMETER * 0.5 + cfg.BOARD_POST_GAP + cfg.BOARD_SIZE.X * 0.5
+		local function at(level: number, dir: Vector3): Vector3
+			return base + dir * reach + Vector3.new(0, cfg.POST_HEIGHT - 0.9 - level * cfg.BOARD_GAP, 0)
 		end
 
 		-- 1: zur eigenen bzw. dieser Plot-Insel (nach aussen)
-		local f1, b1 = buildBoard(group, at(0), spot.outward, cfg.WOOD)
+		local f1, b1 = buildBoard(group, at(0, spot.outward), spot.outward, cfg.WOOD)
 		f1.Name, b1.Name = "Front", "Back"
 		table.insert(_islandLabels, { label = f1, slot = spot.slot })
 		table.insert(_islandLabels, { label = b1, slot = spot.slot })
 
 		-- 2: zum Event (zur Mitte)
-		local f2, b2 = buildBoard(group, at(1), -spot.outward, cfg.WOOD)
+		local f2, b2 = buildBoard(group, at(1, -spot.outward), -spot.outward, cfg.WOOD)
 		bindArrow(f2, b2, "world.sign.event")
 
 		-- 3: Haendler oder Bestenliste, was naeher ist
-		local target, key = sideTarget(base)
-		local f3, b3 = buildBoard(group, at(2), flatDir(base, target), cfg.WOOD)
-		bindArrow(f3, b3, key)
+		local f3, b3 = buildBoard(group, at(2, spot.sideDir), spot.sideDir, cfg.WOOD)
+		bindArrow(f3, b3, spot.sideKey)
 
 		WorldFXKit.cullGroup(group, base, cfg.SHOW_DISTANCE)
 	end

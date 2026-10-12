@@ -36,6 +36,8 @@ local RateLimiter    = require(ServerScriptService.Util.RateLimiter)
 
 local CombRecyclerService = {}
 
+local payQueueNow: (Player, Types.PlayerData) -> number
+
 --------------------------------------------------------------------------------
 -- Verrechnung
 --------------------------------------------------------------------------------
@@ -47,6 +49,9 @@ local CombRecyclerService = {}
 -- wuerde die Zeit davor mit dem neuen Wert gerechnet (z.B. eine halbe Stunde
 -- Leerlauf, die ploetzlich "Arbeit" waere, sobald eine Abgabe kommt).
 local function settle(player: Player, data: Types.PlayerData): number
+	if CombConfig.INSTANT_PAYOUT then
+		return payQueueNow(player, data)
+	end
 	local recycler = data.island.recycler
 	local now = os.time()
 
@@ -76,6 +81,21 @@ local function settle(player: Player, data: Types.PlayerData): number
 	return done
 end
 
+-- 12.10.: zahlt die ganze Warteschlange auf einmal aus (INSTANT_PAYOUT).
+-- Auch fuer Altstaende: wer noch Waben in der Schlange hat, bekommt sie
+-- beim naechsten Join bzw. Takt sofort.
+payQueueNow = function(player: Player, data: Types.PlayerData): number
+	local recycler = data.island.recycler
+	local units = math.max(0, math.floor(recycler.queued))
+	recycler.queued   = 0
+	recycler.progress = 0
+	recycler.lastProcessedAt = os.time()
+	if units > 0 then
+		EconomyService.awardGummies(player, units * CombConfig.getPayPerUnit(recycler.level))
+	end
+	return units
+end
+
 --------------------------------------------------------------------------------
 -- Oeffentliche API
 --------------------------------------------------------------------------------
@@ -92,6 +112,12 @@ function CombRecyclerService.deposit(player: Player, units: number): boolean
 
 	local recycler = data.island.recycler
 	recycler.queued += math.floor(units)
+
+	-- 12.10.: sofort auszahlen (CombConfig.INSTANT_PAYOUT) — die Waben
+	-- werden bei der Abgabe in Gummies verwandelt, nicht nach und nach.
+	if CombConfig.INSTANT_PAYOUT then
+		payQueueNow(player, data)
+	end
 
 	PlayerService.markDirty(player)
 	return true

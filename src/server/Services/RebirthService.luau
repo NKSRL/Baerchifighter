@@ -43,6 +43,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)   -- 12.10.: Tower pro Leben
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)   -- Paket 4.1: Rebirth nach Stage
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
@@ -151,6 +152,15 @@ function RebirthService.rebirth(player: Player)
 		freshIsland.incubator.breeders = oldIncubator.breeders or {}
 	end
 	data.island = freshIsland
+
+	-- 12.10. (TOWER_UNLOCK_PER_LIFE): die Tower-Freischaltung gilt pro Leben.
+	-- Der Baerchi faellt auf Level 1 — er beginnt wieder in Tower I und
+	-- schaltet II, III ... durch erneutes Schaffen frei (TowerService).
+	-- Rekorde und Meilensteine bleiben.
+	if FeatureFlags.isOn("TOWER_UNLOCK_PER_LIFE") then
+		data.towers.unlocked = { [TowerConfig.FIRST_TOWER] = true }
+		data.towers.selected = TowerConfig.FIRST_TOWER
+	end
 
 	-- Progression hochzaehlen
 	data.rebirthCount += 1

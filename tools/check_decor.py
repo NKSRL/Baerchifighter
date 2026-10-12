@@ -277,6 +277,11 @@ def check_pond_surfaces(source, base_lists, look_block):
     # Bohlen: Oberkante POND_PLANK_TOP, Dicke = Size.Y
     if plank_top - plank[1] < -EPS:
         problems.append(f"Bohle: steckt {plank[1] - plank_top:.2f} Studs im Beet")
+    # 12.10.: die Bohlen liegen teils auf der Sandkante — gleich hohe
+    # Oberkanten flimmern (Z-Fighting), mindestens 0.05 Abstand
+    rim_top = _number(source, "POND_RIM_TOP")
+    if rim_top is not None and abs(plank_top - rim_top) < 0.05:
+        problems.append(f"Bohle: Oberkante {plank_top:.2f} = Sandkante {rim_top:.2f} (flimmert)")
     # Pflock: STEHENDER Zylinder (CFrame.Angles(0, 0, 90) richtet die
     # X-Achse senkrecht), Laenge = Size.X, Mittelpunkt = POND_PEG_LIFT x Laenge
     peg_bottom = peg[0] * peg_lift - peg[0] * 0.5

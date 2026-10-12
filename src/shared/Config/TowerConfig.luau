@@ -270,6 +270,19 @@ function TowerConfig.isEndlessOpen(records: { [string]: number }?): boolean
 	return BY_ID.Endless ~= nil and records ~= nil and (records.Final or 0) >= finalDef.stages
 end
 
+-- 12.10.: Welche Stages zaehlen fuer die Freischaltung? Mit
+-- TOWER_UNLOCK_PER_LIFE die beste Stage DIESES Lebens (island.stageBest, ein
+-- Rebirth setzt sie zurueck), sonst die Rekorde (bleiben fuer immer). Alle
+-- Aufrufer von isUnlockedByClear/isOpen/getStageCap/getUnlockProgress reichen
+-- diese Tabelle als `records` durch — Rekorde selbst (Bestenliste,
+-- Meilensteine, "NEU") bleiben unberuehrt.
+function TowerConfig.unlockRecords(towers: { records: { [string]: number } }?, island: { stageBest: { [string]: number }? }?): { [string]: number }
+	if FeatureFlags.isOn("TOWER_UNLOCK_PER_LIFE") then
+		return (island and island.stageBest) or {}
+	end
+	return (towers and towers.records) or {}
+end
+
 -- 08.10.: Ist `towerId` nach der Regel "vorherigen Tower geschafft" offen?
 -- `unlocked` = towers.unlocked (gespeichert, Bestandsschutz); ein Rekord im
 -- Tower selbst haelt ihn ebenfalls offen (migrierte Staende, siehe Briefing).
@@ -319,11 +332,13 @@ end
 --   "locked"  noch kein Tower ausser I frei (Tower I nicht geschafft)
 --   "ready"   ein neuer Tower wartet (isNew) — gruen blinkend, "!"
 --   "normal"  ruhig, zeigt den gewaehlten Tower
-function TowerConfig.terminalState(towers: { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?): string
+-- `records` (12.10.): Stages fuer die Freischaltung (unlockRecords); fehlt
+-- es, gelten die Rekorde.
+function TowerConfig.terminalState(towers: { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?, records: { [string]: number }?): string
 	if not towers then return "locked" end
 	local anyOpen = false
 	for _, def in TOWERS do
-		if def.id ~= TowerConfig.FIRST_TOWER and TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
+		if def.id ~= TowerConfig.FIRST_TOWER and TowerConfig.isUnlockedByClear(def.id, records or towers.records, towers.unlocked) then
 			anyOpen = true
 			if TowerConfig.isNew(def.id, towers) then
 				return "ready"

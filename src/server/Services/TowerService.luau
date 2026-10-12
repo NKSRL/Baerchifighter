@@ -57,7 +57,7 @@ end
 -- Deckel in diesem Tower (0 = Tower noch zu). 08.10.: mit
 -- TOWER_UNLOCK_BY_CLEAR die volle Stage-Zahl jedes freigeschalteten Towers.
 function TowerService.getStageCap(data: Types.PlayerData, towerId: string): number
-	local cap = TowerConfig.getStageCap(data.rebirthCount, towerId, data.towers.records, data.towers.unlocked)
+	local cap = TowerConfig.getStageCap(data.rebirthCount, towerId, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked)
 	if cap <= 0 and _debugOpen[data] then
 		local def = TowerConfig.get(towerId)
 		return if def then def.stages else 0
@@ -69,13 +69,13 @@ end
 -- der hoechste offene.
 function TowerService.getSelected(data: Types.PlayerData): string
 	local selected = data.towers.selected
-	if TowerConfig.isOpen(data.rebirthCount, selected, data.towers.records, data.towers.unlocked) or (_debugOpen[data] and TowerConfig.isValidId(selected)) then
+	if TowerConfig.isOpen(data.rebirthCount, selected, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked) or (_debugOpen[data] and TowerConfig.isValidId(selected)) then
 		return selected
 	end
 	-- Sonst der hoechste offene Tower (Tower I ist immer offen)
 	local best = TowerConfig.FIRST_TOWER :: string
 	for _, def in TowerConfig.TOWERS do
-		if TowerConfig.isOpen(data.rebirthCount, def.id, data.towers.records, data.towers.unlocked) then
+		if TowerConfig.isOpen(data.rebirthCount, def.id, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked) then
 			best = def.id
 		end
 	end
@@ -93,7 +93,9 @@ local function applyUnlocks(player: Player, data: Types.PlayerData, towerId: str
 	if not FeatureFlags.isOn("TOWER_UNLOCK_BY_CLEAR") then return end
 	local towers = data.towers
 	if typeof(towers.unlocked) ~= "table" then towers.unlocked = {} end
-	for _, nextId in TowerConfig.unlocksAfterClear(towerId, towers.records[towerId] or 0) do
+	-- 12.10.: mit TOWER_UNLOCK_PER_LIFE zaehlt die beste Stage dieses Lebens
+	local progress = TowerConfig.unlockRecords(towers, data.island)
+	for _, nextId in TowerConfig.unlocksAfterClear(towerId, progress[towerId] or 0) do
 		if towers.unlocked[nextId] ~= true then
 			towers.unlocked[nextId] = true
 			if announce then
@@ -216,8 +218,10 @@ function TowerService.recordRun(player: Player, data: Types.PlayerData, towerId:
 			data.towers.highestTower = towerId
 		end
 		grantMilestonesUpTo(player, data, towerId, counted)
-		applyUnlocks(player, data, towerId, true)
 	end
+	-- 12.10.: nach einem Rebirth oeffnet das erneute Schaffen den naechsten
+	-- Tower wieder, auch ohne neuen Rekord (bereits offene meldet es nicht).
+	applyUnlocks(player, data, towerId, true)
 
 	-- Paket 9: beste Endless-Stage dieser Woche (Wochen-Bestenliste).
 	if towerId == "Endless" then
@@ -246,12 +250,12 @@ function TowerService.select(player: Player, towerId: string)
 		fail(player, Loc.msg("err.tower_unknown"))
 		return
 	end
-	if not TowerConfig.isOpen(data.rebirthCount, towerId, data.towers.records, data.towers.unlocked)
+	if not TowerConfig.isOpen(data.rebirthCount, towerId, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked)
 		and not _debugOpen[data] then
 		if towerId == "Endless" then
 			fail(player, Loc.msg("err.tower_locked_endless"))
 		elseif FeatureFlags.isOn("TOWER_UNLOCK_BY_CLEAR") then
-			local prev, _, needed = TowerConfig.getUnlockProgress(towerId, data.towers.records)
+			local prev, _, needed = TowerConfig.getUnlockProgress(towerId, TowerConfig.unlockRecords(data.towers, data.island))
 			fail(player, Loc.msg("err.tower_locked_clear", {
 				tower = Loc.msg("tower." .. (prev or TowerConfig.FIRST_TOWER) .. ".name"),
 				stages = needed,

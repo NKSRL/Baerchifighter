@@ -122,6 +122,7 @@ WorldFXConfig.MIN_QUALITY = {
 	eventBell     = 0,   -- G: Event-Start am Honigmast (Krone blinkt, Bienen ziehen los)
 	soundscape    = 0,   -- H: Klang-Kulisse (still ohne gepruefte IDs)
 	zoneLight     = 0,   -- I: Kontrast/Saettigung in der Arena, klare Luft hoch oben
+	towerFlight   = 0,   -- 12.10.: Flugfeld auf den Kampf-Turm (Spielfunktion, ueberall an)
 }
 
 --------------------------------------------------------------------------------
@@ -352,7 +353,15 @@ WorldFXConfig.SIGNPOST = {
 	BOARD_GAP    = 1.9,
 	WOOD         = Color3.fromRGB(176, 122, 72),
 	WOOD_DARK    = Color3.fromRGB(120, 80, 44),
-	TEXT_COLOR   = Color3.fromRGB(70, 44, 24),
+	-- 12.10. (Playtest): helle Schrift mit dunkler Kontur statt Dunkelbraun
+	-- auf Holz — war vor allem abends kaum zu lesen.
+	TEXT_COLOR   = Color3.fromRGB(255, 248, 228),
+	TEXT_STROKE  = Color3.fromRGB(52, 30, 14),
+	POST_DIAMETER = 0.55,
+	-- 12.10.: die Schilder haengen AUSSEN am Pfahl (inneres Ende am Pfahl,
+	-- zeigen von ihm weg) statt mittig darauf — sonst verdeckt der Pfahl die
+	-- Schrift. Kleiner Spalt, damit Pfahl und Brett nicht flimmern.
+	BOARD_POST_GAP = 0.05,
 	HOME_COLOR   = Color3.fromRGB(255, 214, 110),   -- Schild "Deine Insel"
 	SHOW_DISTANCE = 160,
 }
@@ -692,6 +701,30 @@ WorldFXConfig.WORLD_SHOTS = {
 	{ name = "4 Steg zur Arena",          fov = 70 },
 	{ name = "5 Arena mit Turm",          fov = 65 },
 	{ name = "6 Rand → Horizont",         fov = 70 },
+}
+
+--------------------------------------------------------------------------------
+-- 12.10.: FLUGFELD AM KAMPF-TURM (TowerFlightController, nur Client)
+--------------------------------------------------------------------------------
+-- Playtest: "man kann den Turm nicht hochfliegen". Waechst der Turm im Lauf,
+-- steht der Spieler unten und sieht nur Ringe. Am Arena-Rand (Steg-Seite,
+-- neben dem Laufweg) liegt deshalb ein leuchtendes Feld: wer darauf tritt,
+-- fliegt im Bogen auf die Turm-Spitze. Nur an der EIGENEN Arena, nur wenn
+-- der Turm steht (Server-Attribut PitPlatform.TowerTopY).
+-- Positionen arena-lokal: along = Richtung nach aussen (von der Weltmitte),
+-- across = quer (MapLayout.side), 0 = Arena-Mitte.
+WorldFXConfig.TOWER_FLIGHT = {
+	PAD_ALONG     = -28,     -- auf dem Sockelrand zwischen Steg und Kampfflaeche (Radius 26..30)
+	PAD_ACROSS    = -4.5,    -- neben dem Laufweg des Baerchis (X = 0)
+	PAD_RADIUS    = 2.2,
+	LAND_ALONG    = -19,     -- Landepunkt auf der Spitze (Kaempfer stehen quer bei +-9)
+	LAND_ACROSS   = -4.5,
+	APEX_EXTRA    = 6,       -- so hoch ueber der Spitze liegt der Scheitel
+	MIN_LEVEL     = 1,       -- ab dieser Etage ist das Feld aktiv
+	COOLDOWN      = 1.2,     -- Sekunden bis zum naechsten Start
+	COLOR_ON      = Color3.fromRGB(255, 214, 90),
+	COLOR_OFF     = Color3.fromRGB(150, 130, 100),
+	SHOW_DISTANCE = 200,
 }
 
 return WorldFXConfig

@@ -854,6 +854,11 @@ function MapService.setPitTowerLevel(player: Player, level: number)
 		end
 	end
 
+	-- 12.10.: Hoehe fuer das Flugfeld am Arena-Rand (TowerFlightController):
+	-- der Client schiesst den eigenen Charakter auf die Turm-Spitze.
+	container:SetAttribute("TowerLevel", wanted)
+	container:SetAttribute("TowerTopY", MapService.getPitTowerFloorY(wanted))
+
 	local anchor = container:FindFirstChild("PitBannerAnchor")
 	if anchor and anchor:IsA("BasePart") then
 		local topY = MapConfig.PLATFORM_TOP_Y

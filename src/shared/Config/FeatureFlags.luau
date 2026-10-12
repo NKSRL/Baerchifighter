@@ -113,6 +113,16 @@ local FLAGS: { [string]: boolean } = {
 	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
 	-- begrenzt dann nichts mehr. Aus = alte Regel (STAGE_CAP_BY_REBIRTH).
 	TOWER_UNLOCK_BY_CLEAR = true,
+	-- 12.10. (Playtest): die Freischaltung gilt pro LEBEN. Ein Rebirth setzt
+	-- sie zurueck (towers.unlocked = { I }), gezaehlt wird die beste Stage
+	-- dieses Lebens (island.stageBest), nicht der Rekord. Sonst kaempft ein
+	-- Level-1-Baerchi direkt nach dem Rebirth in Tower II. Aus = Rekorde
+	-- oeffnen fuer immer (Stand 08.10.).
+	TOWER_UNLOCK_PER_LIFE = true,
+	-- 12.10. (Playtest): Fusion vorerst nur von der Karte des einzelnen
+	-- Baerchis ("Staerker machen"). Aus = kein "Fusion: an/aus"-Knopf in der
+	-- Sammlung; waehrend einer Fusions-Auswahl steht dort "Abbrechen".
+	FUSION_INVENTORY_TOGGLE = false,
 	-- 08.10.: Tower-Terminal an der Bruecke (Paket B2)
 	TOWER_TERMINAL    = true,
 	-- 08.10.: neues Tower-Panel im Look Theme.v2 (Paket D); aus = altes CombatPanel

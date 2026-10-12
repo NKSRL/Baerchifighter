@@ -189,9 +189,15 @@ end
 -- Sammel-Update 4.1: was der Baerchi in diesem Leben in jedem offenen Tower
 -- schaffen wuerde (der Spieler kann jeden waehlen; die Rebirth-Bedingung
 -- zaehlt ueber die Aequivalenz in jedem Tower).
+-- 12.10. (TOWER_UNLOCK_PER_LIFE): offen ist, was in DIESEM Leben geschafft
+-- ist (lifeBest), nicht der Rekord — wie TowerConfig.unlockRecords im Spiel.
+local function unlockRec(p)
+	return TowerConfig.unlockRecords({ records = p.records }, { stageBest = p.lifeBest })
+end
+
 local function trackLifeBest(p)
 	for _, def in TowerConfig.TOWERS do
-		if TowerConfig.getStageCap(p.rebirths, def.id, p.records) > 0 then
+		if TowerConfig.getStageCap(p.rebirths, def.id, unlockRec(p)) > 0 then
 			local cleared = reach(p, def.id)
 			if cleared > (p.lifeBest[def.id] or 0) then
 				p.lifeBest[def.id] = cleared
@@ -208,14 +214,15 @@ local function doRun(p)
 	local bestId, bestGain, bestCleared, bestCap = nil, -1, 0, 0
 	local capTowerId, capStageNow = TowerConfig.getCap(p.rebirths)
 	local capReach = reach(p, capTowerId)
-	if capReach > (p.records[capTowerId] or 0) and (p.records[capTowerId] or 0) < capStageNow then
+	if TowerConfig.getStageCap(p.rebirths, capTowerId, unlockRec(p)) > 0
+		and capReach > (p.records[capTowerId] or 0) and (p.records[capTowerId] or 0) < capStageNow then
 		local paid = math.min(capReach, capStageNow)
 		bestId, bestGain, bestCleared, bestCap = capTowerId, TowerConfig.sumStageRewards(capTowerId, 1, paid), capReach, capStageNow
 	end
 	for _, def in (if bestId then {} else TowerConfig.TOWERS) do
 		-- 08.10.: Rekorde mitgeben (TOWER_UNLOCK_BY_CLEAR: offen = vorherigen
 		-- Tower geschafft, Deckel = volle Stage-Zahl)
-		local cap = TowerConfig.getStageCap(p.rebirths, def.id, p.records)
+		local cap = TowerConfig.getStageCap(p.rebirths, def.id, unlockRec(p))
 		if cap > 0 then
 			local cleared = reach(p, def.id)
 			local paid = math.min(cleared, cap)
