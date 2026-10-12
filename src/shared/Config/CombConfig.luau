@@ -29,8 +29,8 @@
 -- gespeichert (IslandData.recycler).
 --
 -- BALANCE-HINWEIS: ein voller Stapel (MAX_CARRY) bringt auf Recycler-Level 1
--- etwa 75 Gummies, auf Level 10 etwa 6.000, auf Level 60 rund 1,4 Mio (vor dem
--- Rebirth-Multiplikator). Zum Vergleich: Tower I zahlt auf Stage 1 10 Gummies
+-- 250 Gummies, auf Level 10 etwa 20.000, auf Level 60 rund 5,7 Mio (vor dem
+-- Rebirth-Multiplikator; 12.10.: Grundwert 10 x Multiplikator, sofort). Zum Vergleich: Tower I zahlt auf Stage 1 10 Gummies
 -- (TowerConfig). Die Ausbaukosten kommen aus EconomyConfig.HONEY_UPGRADE_COSTS,
 -- dieselbe Kurve wie bei den Honig-Gebaeuden (v15: Level 1-60).
 
@@ -385,13 +385,49 @@ function CombConfig.clampLevel(level: number): number
 	return math.clamp(math.floor(level), 1, CombConfig.RECYCLER_MAX_LEVEL)
 end
 
--- Gummies pro Wabeneinheit auf diesem Level, vor dem Rebirth-Multiplikator.
-function CombConfig.getPayPerUnit(level: number): number
-	local clamped = CombConfig.clampLevel(level)
+-- 12.10. (Playtest "Recycler viel zu schwach, soll nur einen
+-- Geldmultiplikator zeigen"): Jede Wabeneinheit hat einen GRUNDWERT, das
+-- Recycler-Level ist ein MULTIPLIKATOR darauf. Die Kurve bleibt die alte
+-- (PAY_PER_UNIT / PAY_GROWTH, geteilt durch den alten Level-1-Wert 3),
+-- der Grundwert steigt von 3 auf BASE_PAY_PER_UNIT: alles x3,3. ANNAHME —
+-- progression_pacing.lua rechnet den Recycler nicht mit; im Playtest pruefen.
+CombConfig.BASE_PAY_PER_UNIT = 10
+
+-- Auszahlung SOFORT bei der Abgabe statt nach und nach (Warteschlange,
+-- getSpeed). Aus = alter Ablauf ueber Zeitmarke.
+CombConfig.INSTANT_PAYOUT = true
+
+local function legacyPay(clamped: number): number
 	local fixed = CombConfig.PAY_PER_UNIT[clamped]
 	if fixed then return fixed end
 	local last = CombConfig.PAY_PER_UNIT[10] or 1
-	return math.floor(last * CombConfig.PAY_GROWTH ^ (clamped - 10) + 0.5)
+	return last * CombConfig.PAY_GROWTH ^ (clamped - 10)
+end
+
+-- Multiplikator auf den Grundwert bei diesem Level (Level 1 = x1). Unter 10
+-- auf eine Nachkommastelle, darueber ganze Zahlen — so steht er auch am Schild.
+function CombConfig.getMultiplier(level: number): number
+	local clamped = CombConfig.clampLevel(level)
+	local raw = legacyPay(clamped) / (CombConfig.PAY_PER_UNIT[1] or 1)
+	if raw < 10 then
+		return math.floor(raw * 10 + 0.5) / 10
+	end
+	return math.floor(raw + 0.5)
+end
+
+-- Gummies pro Wabeneinheit auf diesem Level, vor dem Rebirth-Multiplikator:
+-- Grundwert x Multiplikator.
+function CombConfig.getPayPerUnit(level: number): number
+	return math.floor(CombConfig.BASE_PAY_PER_UNIT * CombConfig.getMultiplier(level) + 0.5)
+end
+
+-- Anzeige "x12" / "x2,5" (sprachneutral, Komma nur bei Nachkommastelle).
+function CombConfig.formatMultiplier(level: number): string
+	local m = CombConfig.getMultiplier(level)
+	if m >= 1e6 then return (string.format("×%.1fM", m / 1e6):gsub("%.0M", "M")) end
+	if m >= 1e4 then return string.format("×%dK", math.floor(m / 1000 + 0.5)) end
+	if m == math.floor(m) then return string.format("×%d", m) end
+	return (string.format("×%.1f", m):gsub("%.", ","))
 end
 
 -- Wabeneinheiten pro Sekunde: linear Level 1 -> 10, danach linear 10 -> 60.

@@ -102,6 +102,50 @@ local function arenaBobPerStud(): number
 	return MapConfig.WALK_BOB_PER_STUD * MapConfig.WALK_SPEED / arenaWalkSpeed()
 end
 
+-- 12.10. (Playtest "laeuft durch die Bruecke, keine guten Laufwege"): der
+-- Weg Plot <-> Arena als Kette von Fusspunkten statt einer Geraden. Vorher
+-- lief der Baerchi schraeg zum seitlichen Kampfplatz — am Arena-Ende durch
+-- das Gelaender — und hielt dabei die Beet-Hoehe (2 Studs ueber dem Steg,
+-- auf dem Rueckweg durch das Beet). Jetzt: zur Beet-Kante, hinunter auf die
+-- Wiese, mittig ueber den Steg (plot-lokal X = 0), in die Arena, zum Platz.
+-- Plot-lokal: +Z = nach aussen (Steg, Arena), Y = Hoehe ueber der Plattform.
+local function laneLocalPoints(): { Vector3 }
+	local beetTop  = MapConfig.PLOT_SIZE.Y
+	local beetEdge = MapConfig.PLOT_SIZE.Z * 0.5
+	local deckY    = -MapConfig.BRIDGE_SINK
+	local bridgeIn  = MapConfig.PLOT_ISLAND_RADIUS - 1
+	local bridgeOut = MapConfig.PLOT_ISLAND_RADIUS + MapConfig.ISLAND_GAP + 1
+	return {
+		Vector3.new(0, beetTop, beetEdge - 0.6),   -- Beet-Kante
+		Vector3.new(0, 0, beetEdge + 1.6),         -- unten auf der Wiese
+		Vector3.new(0, deckY, bridgeIn),           -- Steg-Anfang (Mitte)
+		Vector3.new(0, deckY, bridgeOut),          -- Steg-Ende
+		Vector3.new(0, 0, bridgeOut + 3),          -- in der Arena
+	}
+end
+
+-- Fusspunkte von `from` nach `to` (Welt). Nimmt nur die Wegpunkte, die
+-- zwischen beiden liegen (der Weg ist in Z monoton) — so geht es auch von
+-- einem Zwischenstand aus (Zurueckholen auf dem Hinweg) richtig weiter.
+local function arenaRoute(plotCFrame: CFrame, from: Vector3, to: Vector3): { Vector3 }
+	local fromZ = plotCFrame:PointToObjectSpace(from).Z
+	local toZ   = plotCFrame:PointToObjectSpace(to).Z
+	local route = { from }
+	local lane = laneLocalPoints()
+	local outwards = toZ > fromZ
+	local first, last, step = 1, #lane, 1
+	if not outwards then first, last, step = #lane, 1, -1 end
+	for i = first, last, step do
+		local z = lane[i].Z
+		local between = if outwards then (z > fromZ + 0.5 and z < toZ - 0.5) else (z < fromZ - 0.5 and z > toZ + 0.5)
+		if between then
+			table.insert(route, plotCFrame:PointToWorldSpace(lane[i]))
+		end
+	end
+	table.insert(route, to)
+	return route
+end
+
 -- Laufende Wiedergabe pro Spieler. Startet ein neuer Lauf, wird der alte
 -- Token ungueltig und die alte Schleife beendet sich beim naechsten Schritt.
 local _runToken: { [Player]: number } = {}
@@ -480,6 +524,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 
 	-- Die beiden Kaempfer stehen sich quer zur Bruecke gegenueber, damit man
 	-- sie beim Herueberlaufen von der Seite sieht statt hintereinander.
+	local laneFrame: CFrame = plotCFrame   -- 12.10.: fuer die Laufwege (arenaRoute)
 	local side     = plotCFrame.RightVector
 	local selfPos  = center - side * MapConfig.FIGHT_SPACING
 	local enemyPos = center + side * MapConfig.FIGHT_SPACING
@@ -504,7 +549,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			-- Baerchi an der Plattform angekommen ist, nicht durch einen
 			-- Teleport. FigureWalker haelt den Fusspunkt waehrenddessen exakt
 			-- auf Plot-/Bruecken-Hoehe.
-			FigureWalker.walk(figure, homeFoot, selfPos, {
+			FigureWalker.walkPath(figure, arenaRoute(laneFrame, homeFoot, selfPos), {
 				speed       = arenaWalkSpeed(),
 				bobPerStud  = arenaBobPerStud(),
 				isCancelled = function()
@@ -523,7 +568,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				sendResult(player, token)
 				setPhase(player, token, "Returning", nil)
 				local here = FigurePlacement.footOf(figure)
-				FigureWalker.walk(figure, here, homeFoot, {
+				FigureWalker.walkPath(figure, arenaRoute(laneFrame, here, homeFoot), {
 					speed       = arenaWalkSpeed(),
 					bobPerStud  = arenaBobPerStud(),
 					isCancelled = function() return not stillValid(player, token, figure, fighters) end,
@@ -893,7 +938,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 					finalSelfPos = selfPos
 				end
 
-				FigureWalker.walk(figure, finalSelfPos, homeFoot, {
+				FigureWalker.walkPath(figure, arenaRoute(laneFrame, finalSelfPos, homeFoot), {
 					speed       = arenaWalkSpeed(),
 					bobPerStud  = arenaBobPerStud(),
 					isCancelled = function() return not stillValid(player, token, figure, fighters) end,

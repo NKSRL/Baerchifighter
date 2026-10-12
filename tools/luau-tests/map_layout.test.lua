@@ -123,9 +123,18 @@ for _, s in MapLayout.signposts(sp.RADIUS, sp.SIDE) do
 	local across = math.abs(p.X * o.Z - p.Z * o.X)
 	local name = "Wegweiser " .. s.slot
 	check(name .. " neben dem Pflaster", across - 0.5 > AmbienceConfig.PATH_WIDTH * 0.5, string.format("%.2f", across))
-	-- die Schilder sind am Pfosten mittig, ein halbes Schild darf nicht ueber den Weg ragen
-	check(name .. " Schilder ragen nicht ueber den Weg",
-		across - sp.BOARD_SIZE.X * 0.5 > AmbienceConfig.PATH_WIDTH * 0.5, string.format("%.2f", across - sp.BOARD_SIZE.X * 0.5))
+	-- 12.10.: die Schilder haengen aussen am Pfahl und ragen in Zeigerichtung
+	-- weg; keins darf ueber das Pflaster ragen (der dritte Arm zeigt vom Weg weg)
+	local reach = sp.POST_DIAMETER * 0.5 + sp.BOARD_POST_GAP + sp.BOARD_SIZE.X
+	for _, dir in { s.outward, -s.outward, s.sideDir } do
+		local tip = p + dir * reach
+		local tipAcross = math.abs(tip.X * o.Z - tip.Z * o.X)
+		check(name .. " Schild ragt nicht ueber den Weg",
+			tipAcross > AmbienceConfig.PATH_WIDTH * 0.5, string.format("%.2f", tipAcross))
+	end
+	local sd = MapLayout.side(s.slot)
+	local postSide = (p.X * sd.X + p.Z * sd.Z) - 0   -- Vorzeichen: Seite des Wegs
+	check(name .. " dritter Arm zeigt vom Weg weg", (s.sideDir.X * sd.X + s.sideDir.Z * sd.Z) * postSide >= 0)
 	local r = math.sqrt(p.X ^ 2 + p.Z ^ 2)
 	check(name .. " ausserhalb von Pit + Rahmen", r - 3 > pf.POLE_RADIUS, string.format("%.1f", r))
 	for slot = 1, MapConfig.PLOT_COUNT do

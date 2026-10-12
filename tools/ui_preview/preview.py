@@ -136,20 +136,22 @@ def main():
     ap.add_argument("--old", action="store_true")
     ap.add_argument("--hud", action="store_true")
     ap.add_argument("--leak", action="store_true")
+    ap.add_argument("--fight-prompt", action="store_true")   # 12.10.: Feld am Fight-Knopf statt Panel
     ap.add_argument("--name", default=None)
     a = ap.parse_args()
     trees = []
     for size in a.sizes.split(","):
         w, h = (int(x) for x in size.lower().split("x"))
         args = {"width": w, "height": h, "lang": a.lang, "scenario": a.scenario, "pass": a.pass_,
-                "passReady": a.pass_ready, "v2": not a.old, "panel": True, "hud": a.hud,
+                "passReady": a.pass_ready, "v2": not a.old, "panel": not a.fight_prompt, "hud": a.hud or a.fight_prompt,
+                "fightPrompt": a.fight_prompt,
                 "running": a.running, "leak": a.leak}
         tree, logs = run_tree(args)
         for line in logs:
             if line.strip() and ("Fehler" in line or "driver" in line or "warn" in line or "@@LEAK@@" in line):
                 print(line)
         trees.append(((w, h, f"{w}x{h}"), tree))
-    name = a.name or ("old" if a.old else "v2") + f"_{a.scenario}_{a.lang}" + ("_pass" if a.pass_ else "")
+    name = a.name or ("fight" if a.fight_prompt else "old" if a.old else "v2") + f"_{a.scenario}_{a.lang}" + ("_pass" if a.pass_ else "")
     for path in render(trees, a.out, name):
         print(path)
 

@@ -130,7 +130,7 @@ end
 local function cardState(def: TowerConfig.TowerDef, data: Types.PlayerDataUpdate): string
 	local towers = data.towers
 	if not towers then return if def.id == TowerConfig.FIRST_TOWER then "active" else "locked" end
-	local open = TowerConfig.isOpen(data.rebirthCount, def.id, towers.records, (towers :: any).unlocked)
+	local open = TowerConfig.isOpen(data.rebirthCount, def.id, TowerConfig.unlockRecords(towers, data.island), (towers :: any).unlocked)
 	if not open then return "locked" end
 	if towers.selected == def.id then return "active" end
 	if TowerConfig.isNew(def.id, towers :: any) then return "new" end
@@ -304,7 +304,7 @@ local function refreshCard(view: CardView, data: Types.PlayerDataUpdate)
 
 	-- Gesperrt: gedaempft, aber lesbar
 	if locked then
-		local prev, have, need = TowerConfig.getUnlockProgress(def.id, if towers then towers.records else nil)
+		local prev, have, need = TowerConfig.getUnlockProgress(def.id, TowerConfig.unlockRecords(towers, data.island))
 		local lockText = view.lockChip:FindFirstChild("Text") :: TextLabel
 		lockText.Text = if prev
 			then Loc.t("ui.tower2.unlock_by", { tower = towerName(prev) })
@@ -349,8 +349,8 @@ local function refreshStatus(data: Types.PlayerDataUpdate)
 	-- Naechste Freischaltung
 	local nextText = Loc.t("ui.tower2.status_all_open")
 	for _, other in TowerConfig.TOWERS do
-		if not TowerConfig.isOpen(data.rebirthCount, other.id, if towers then towers.records else nil, if towers then (towers :: any).unlocked else nil) then
-			local prev, have, need = TowerConfig.getUnlockProgress(other.id, if towers then towers.records else nil)
+		if not TowerConfig.isOpen(data.rebirthCount, other.id, TowerConfig.unlockRecords(towers, data.island), if towers then (towers :: any).unlocked else nil) then
+			local prev, have, need = TowerConfig.getUnlockProgress(other.id, TowerConfig.unlockRecords(towers, data.island))
 			if prev then
 				nextText = Loc.t("ui.tower2.status_next", { tower = towerName(other.id), have = have, need = need })
 			end
