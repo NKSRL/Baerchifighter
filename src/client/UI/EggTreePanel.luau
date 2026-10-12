@@ -43,6 +43,7 @@ local Players           = game:GetService("Players")
 local Types           = require(ReplicatedStorage.Network.Types)
 local Remotes         = require(ReplicatedStorage.Network.Remotes)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local Names           = require(ReplicatedStorage.Localization.Names)
 local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local EggTree         = require(ReplicatedStorage.Modules.EggTree)
@@ -145,7 +146,7 @@ local _dropCache: { [string]: { any } } = {}
 
 local function eggName(eggId: string): string
 	local def = EggConfig.data[eggId :: Types.EggType]
-	return Loc.name("egg." .. eggId .. ".name", def and def.displayName or eggId)
+	return Names.egg(eggId)
 end
 
 local function rarityName(rarity: string): string
@@ -1080,7 +1081,7 @@ local function buildDetail(detail: ScrollingFrame, data: Types.PlayerDataUpdate)
 		if bdef then
 			local row = addRow(detail, nextOrder(), 20)
 			local known = data.discovered and data.discovered[drop.configId]
-			local name = if known then Loc.name("baerchi." .. drop.configId .. ".name", bdef.displayName) else "???"
+			local name = if known then Names.baerchi(drop.configId) else "???"
 			local pct = drop.chance * 100
 			local pctText = if pct >= 10 then Loc.formatNumber(math.round(pct)) .. "%" else Loc.formatDecimal(pct, 1) .. "%"
 			local l = Theme.bodyText("Drop", row, string.format("%s  •  %s  •  %s", pctText, name, rarityName(bdef.rarity)))
@@ -1280,7 +1281,7 @@ function EggTreePanel.init(screenGui: ScreenGui)
 	_viewport = vp
 	buildBackground(vp)
 
-	local canvas = Instance.new("ScrollingFrame")
+	local canvas = Instance.new("ScrollingFrame") -- ui-ok: 2D-Leinwand (XY), Theme.scroller kann nur Y
 	canvas.Name = "Canvas"
 	canvas.BackgroundTransparency = 1
 	canvas.BorderSizePixel = 0

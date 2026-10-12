@@ -21,6 +21,9 @@ local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiMesh      = require(ReplicatedStorage.Modules.BaerchiMesh)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Names     = require(ReplicatedStorage.Localization.Names)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local FigureFX         = require(ServerScriptService.Util.FigureFX)
 
@@ -37,9 +40,9 @@ function FigureBuilder.writeFigureState(model: Model, rawHp: number, maxHp: numb
 
 	local label = model:FindFirstChild("Health", true)
 	if label and label:IsA("TextLabel") then
-		label.Text = if exhausted
-			then "erschoepft"
-			else string.format("%d / %d HP", hp, maxHp)
+		WorldText.set(label, if exhausted
+			then Loc.msg("ui.world.exhausted")
+			else string.format("%d / %d HP", hp, maxHp))
 
 		label.TextColor3 = if exhausted
 			then Color3.fromRGB(255, 120, 120)
@@ -95,7 +98,6 @@ end
 -- wird diese eine Figur uebersprungen, der Rest des Plots baut sich normal.
 function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerchi, footPos: Vector3, facing: CFrame): Model?
 	local color = BaerchiConfig.getRarityColor(baerchi.rarity)
-	local def   = BaerchiConfig.getById(baerchi.configId)
 
 	-- Ein MUTIERTER Baerchi (seit v11, ersetzt das fruehere binaere Inverted)
 	-- bekommt die Farbe seiner Mutations-Stufe und leuchtet (siehe
@@ -226,36 +228,45 @@ function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerc
 	-- Kommentar-Kopf dort).
 	local labelAnchor = (model:FindFirstChild("head", true) :: BasePart?) or model.PrimaryPart
 	if labelAnchor then
+		-- Sammel-Update 1.4 ("Naechstes Ei in: ist im Baerchi und braucht mehr
+		-- Space"): breiter und hoeher (laengere Texte auf Franzoesisch/
+		-- Spanisch), und der Abstand kommt aus der echten Oberkante der Figur
+		-- (welt-ausgerichtet) statt aus der am body gedrehten Bounding-Box —
+		-- das Schild sitzt damit immer UEBER dem Kopf, nie darin.
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name        = "Label"
-		billboard.Size        = UDim2.fromScale(6, 3.0)
-		billboard.StudsOffset = Vector3.new(0, BaerchiMesh.getHeight(model) * 0.55 + 0.6, 0)
+		billboard.Size        = UDim2.fromScale(MapConfig.FIGURE_LABEL.width, MapConfig.FIGURE_LABEL.height)
+		local _, topY = BaerchiMesh.worldBoundsY(model)
+		local anchorY = labelAnchor.Position.Y
+		local aboveHead = if topY then math.max(0, (topY :: number) - anchorY) else BaerchiMesh.getHeight(model) * 0.55
+		billboard.StudsOffset = Vector3.new(0, aboveHead + MapConfig.FIGURE_LABEL.height * 0.5 + MapConfig.FIGURE_LABEL.gap, 0)
 		billboard.AlwaysOnTop = false
 		billboard.MaxDistance = MapConfig.BAERCHI_CLICK_DISTANCE
 		billboard.Adornee     = labelAnchor
 		billboard.Parent      = labelAnchor
 
-		local name = MapParts.newTextLabel("Name", billboard, UDim2.fromScale(1, 0.36), UDim2.fromScale(0, 0))
-		name.Text = string.format(
-			"%s%s  Lv.%d",
-			-- Das Namensschild ist die zweite Stelle, an der eine Mutation
-			-- auffaellt (die erste ist die leuchtende Mutations-Farbe der
-			-- Figur selbst). Beides zusammen, weil die Farbe allein bei einer
-			-- Rarity mit ungewohnter Palette nicht eindeutig genug waere —
-			-- und weil ein Spieler lesen koennen soll, WELCHE der acht Stufen
-			-- es genau ist (die Farbe allein verraet das nicht zuverlaessig).
-			if baerchi.mutation then BaerchiConfig.getMutationBadge(baerchi.mutation) .. " " else "",
-			def and def.displayName or baerchi.configId,
-			baerchi.level
-		)
+		local name = MapParts.newTextLabel("Name", billboard, UDim2.fromScale(1, 0.34), UDim2.fromScale(0, 0))
+		-- Das Namensschild ist die zweite Stelle, an der eine Mutation
+		-- auffaellt (die erste ist die leuchtende Mutations-Farbe der
+		-- Figur selbst). Beides zusammen, weil die Farbe allein bei einer
+		-- Rarity mit ungewohnter Palette nicht eindeutig genug waere —
+		-- und weil ein Spieler lesen koennen soll, WELCHE der acht Stufen
+		-- es genau ist (die Farbe allein verraet das nicht zuverlaessig).
+		-- Als Nachricht: jeder Spieler liest den Namen in seiner Sprache (WorldText)
+		WorldText.set(name, Loc.msg("ui.world.figure_name", {
+			badge = if baerchi.mutation then BaerchiConfig.getMutationBadge(baerchi.mutation) .. " " else "",
+			name  = Names.msg.baerchi(baerchi.configId),
+			level = baerchi.level,
+		}))
 
 		if baerchi.mutation then
 			name.TextColor3 = BaerchiConfig.getMutationColor(baerchi.mutation)
 		end
 
-		MapParts.newTextLabel("Health", billboard, UDim2.fromScale(1, 0.32), UDim2.fromScale(0, 0.36))
+		MapParts.newTextLabel("Health", billboard, UDim2.fromScale(1, 0.28), UDim2.fromScale(0, 0.34))
 
-		local eggTimer = MapParts.newTextLabel("EggTimer", billboard, UDim2.fromScale(1, 0.32), UDim2.fromScale(0, 0.68))
+		-- Ei-Timer bekommt die groesste Zeile: er ist der laengste Text.
+		local eggTimer = MapParts.newTextLabel("EggTimer", billboard, UDim2.fromScale(1, 0.38), UDim2.fromScale(0, 0.62))
 		eggTimer.TextColor3 = Color3.fromRGB(255, 224, 140)   -- Ei-Gold, passend zur HUD-Farbwelt
 		eggTimer.Text        = ""   -- EggTimerController fuellt das im ersten Tick
 	end

@@ -454,8 +454,27 @@ end
 -- Dialoge
 --------------------------------------------------------------------------------
 
+-- Ein Dialog laesst mindestens so viel vom Bildschirm frei (Anteil, je Achse).
+local DIALOG_SCREEN_FILL = 0.94
+
+-- Name des UIScale, mit dem ein Dialog auf kleine Bildschirme passt (siehe
+-- Theme.dialog und Theme.dialogScale).
+local FIT_SCALE_NAME = "FitScale"
+
+-- Schliessen-Knopf (Sammel-Update 2.1: 44x40) plus eine unsichtbare
+-- Trefferflaeche 56x56 darum — auf dem Handy trifft ein Daumen sonst leicht
+-- daneben (Richtwert 44 pt).
+local CLOSE_HIT = 56
+
 -- Zentriertes Panel, standardmaessig unsichtbar. Groesse in Scale, damit es
 -- auf Handy und Monitor passt; die Constraints halten es lesbar.
+--
+-- UI-Qualitaet Schritt 2: die Mindestgroesse (minSize) war auf kleinen
+-- Bildschirmen groesser als der Bildschirm selbst — ein Handy quer hat ohne
+-- Topbar rund 350 px Hoehe, Charms/Bestenliste/Kampf brauchen 420. Kopfzeile
+-- und Schliessen-X lagen dann ausserhalb. Jetzt verkleinert ein UIScale
+-- (FitScale) den GANZEN Dialog gleichmaessig, bis er passt: das Layout bleibt
+-- wie gebaut, nur kleiner. Auf normalen Bildschirmen ist der Faktor 1.
 function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: Vector2, maxSize: Vector2): Frame
 	local root = Theme.panel(name, parent, Theme.COLORS.panelDeep)
 	root.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -469,7 +488,84 @@ function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: V
 	constraint.MaxSize = maxSize
 	constraint.Parent  = root
 
+	local fit = Instance.new("UIScale")
+	fit.Name   = FIT_SCALE_NAME
+	fit.Parent = root
+
+	if parent:IsA("LayerCollector") then
+		local screen = parent :: LayerCollector
+		local function refit()
+			-- AbsoluteSize sind echte Pixel; die globale UiScale (>= 1) rechnet
+			-- sie in Oberflaechen-Einheiten um, in denen minSize gemeint ist.
+			local global = screen:FindFirstChild("GlobalScale")
+			local globalScale = if global and global:IsA("UIScale") then math.max(global.Scale, 0.01) else 1
+			local room = screen.AbsoluteSize / globalScale * DIALOG_SCREEN_FILL
+			if room.X <= 0 or room.Y <= 0 then return end
+			fit.Scale = math.min(1, room.X / minSize.X, room.Y / minSize.Y)
+		end
+		screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
+		-- Die globale UiScale kann nach dem Dialog angelegt werden (Main) und
+		-- aendert sich mit der Fenstergroesse.
+		screen.ChildAdded:Connect(function(child)
+			if child.Name == "GlobalScale" and child:IsA("UIScale") then
+				child:GetPropertyChangedSignal("Scale"):Connect(refit)
+				refit()
+			end
+		end)
+		local global = screen:FindFirstChild("GlobalScale")
+		if global and global:IsA("UIScale") then
+			global:GetPropertyChangedSignal("Scale"):Connect(refit)
+		end
+		refit()
+	end
+
 	return root
+end
+
+-- Gesamter Verkleinerungsfaktor der Dialoge, in denen `gui` steckt (1 = keiner).
+-- Fuer Code, der AbsolutePosition/AbsoluteSize in eine Position INNERHALB eines
+-- Dialogs zurueckrechnet (IndexView): erst UiScale.toGui, dann durch diesen Wert.
+function Theme.dialogScale(gui: Instance): number
+	local factor = 1
+	local node: Instance? = gui
+	while node do
+		local fit = node:FindFirstChild(FIT_SCALE_NAME)
+		if fit and fit:IsA("UIScale") then
+			factor *= fit.Scale
+		end
+		node = node.Parent
+	end
+	return factor
+end
+
+-- Sammel-Update 2.1: der eine Schliessen-Knopf fuer alle Fenster (oben
+-- rechts, gross genug zum Tippen). Fenster ohne dialogHeader (Baerchi-Karte)
+-- setzen ihn direkt. `color` optional (Gebaeude-Menue: Ton seiner Farbe).
+-- UI-Qualitaet: dazu eine unsichtbare Trefferflaeche (CLOSE_HIT) als Kind —
+-- sie liegt ueber dem Knopf (ZIndexBehavior.Sibling) und nimmt jeden Klick in
+-- ihrem Bereich an, auch knapp neben dem sichtbaren X.
+function Theme.closeButton(parent: Instance, onClose: () -> (), color: Color3?): TextButton
+	local close = Theme.button("Close", parent, "X", color or Theme.COLORS.bad)
+	close.AnchorPoint = Vector2.new(1, 0.5)
+	close.Position    = UDim2.new(1, 4, 0.5, 0)
+	close.Size        = UDim2.new(0, 44, 0, 40)
+	close.TextColor3  = Theme.COLORS.text
+	close.ZIndex      = math.max(close.ZIndex, 12)
+	close.Activated:Connect(onClose)
+
+	local hit = Instance.new("TextButton")
+	hit.Name                   = "CloseHit"
+	hit.AnchorPoint            = Vector2.new(0.5, 0.5)
+	hit.Position               = UDim2.fromScale(0.5, 0.5)
+	hit.Size                   = UDim2.fromOffset(CLOSE_HIT, CLOSE_HIT)
+	hit.BackgroundTransparency = 1
+	hit.Text                   = ""
+	hit.AutoButtonColor        = false
+	hit.ZIndex                 = close.ZIndex
+	hit.Parent                 = close
+	hit.Activated:Connect(onClose)
+
+	return close
 end
 
 -- Kopfzeile eines Dialogs: Titel links, Schliessen-Kreuz rechts.
@@ -494,15 +590,12 @@ function Theme.dialogHeader(root: Frame, title: string, onClose: () -> ()): Text
 	header.Size     = UDim2.new(1, -28, 0, 30)
 
 	local label = Theme.label("Title", header, title)
-	label.Size = UDim2.new(1, -44, 1, 0)
+	label.Size = UDim2.new(1, -52, 1, 0)
 	Theme.outlineText(label, 2)
 
-	local close = Theme.button("Close", header, "X", Theme.COLORS.bad)
-	close.AnchorPoint = Vector2.new(1, 0.5)
-	close.Position    = UDim2.new(1, 0, 0.5, 0)
-	close.Size        = UDim2.new(0, 34, 0, 30)
-	close.TextColor3  = Theme.COLORS.text
-	close.Activated:Connect(onClose)
+	-- Sammel-Update 2.1: groesserer X-Knopf (Tippflaeche ~44 px, Apple/
+	-- Google-Empfehlung) — er ragt bewusst etwas ueber die Kopfzeile hinaus.
+	Theme.closeButton(header, onClose)
 
 	return label
 end
@@ -514,6 +607,87 @@ function Theme.dialogBody(root: Frame): Frame
 	body.Size     = UDim2.new(1, -28, 1, -62)
 	return body
 end
+
+--------------------------------------------------------------------------------
+-- Theme.v2 — Tokens des neuen Looks (08.10., Paket D)
+--------------------------------------------------------------------------------
+-- Nur UI/Kit (und Panels, die Kit benutzen) lesen diese Tabelle. Alles oben
+-- (COLORS, panel, button, dialog ...) bleibt unveraendert: die alten Panels
+-- sehen genauso aus wie vorher. Wer die Palette tauschen will, aendert NUR
+-- die Werte hier — kein Kit-Baustein hat eine eigene Farbe oder Zahl.
+--
+-- Richtung: warm und freundlich (Honig-Amber, Baerchi-Braun, Gummi-Pink,
+-- Himmelblau), helle Creme-Flaechen mit dicker schokobrauner Kontur, Knoepfe
+-- mit 3D-Kante und Glanz. Masse in Oberflaechen-Einheiten (die globale
+-- UiScale vergroessert auf grossen Bildschirmen, 1080p ~ x1,27). 8er-Raster.
+-- Kontraste (WCAG, gerechnet im Bericht): ink auf surface 11,6:1, inkSoft auf
+-- card 6,5:1; weisse Knopfschrift traegt immer eine 3-px-Kontur (ink).
+Theme.v2 = {
+	color = {
+		-- Flaechen
+		surface     = Color3.fromRGB(255, 244, 220),   -- Panel-Koerper (Creme)
+		surfaceDeep = Color3.fromRGB(246, 226, 190),   -- Verlauf unten
+		card        = Color3.fromRGB(255, 252, 243),   -- Karte
+		cardLocked  = Color3.fromRGB(236, 226, 210),   -- gesperrte Karte
+		sunk        = Color3.fromRGB(240, 222, 190),   -- Balken-Spur, Chips
+		shadow      = Color3.fromRGB( 59,  34,  18),   -- Schlagschatten
+
+		-- Schrift und Kontur
+		ink         = Color3.fromRGB( 74,  44,  23),   -- Text (Schokolade)
+		inkSoft     = Color3.fromRGB(122,  84,  53),   -- Nebentext
+		outline     = Color3.fromRGB( 59,  34,  18),   -- dicke Kontur
+		white       = Color3.fromRGB(255, 255, 255),
+
+		-- Marke
+		honey       = Color3.fromRGB(255, 182,  39),
+		honeyTop    = Color3.fromRGB(255, 214, 100),
+		honeyBottom = Color3.fromRGB(255, 152,  24),
+		bear        = Color3.fromRGB(156,  98,  51),
+		gummy       = Color3.fromRGB(255,  92, 154),
+		gummyDeep   = Color3.fromRGB(214,  51, 120),
+		sky         = Color3.fromRGB( 76, 195, 255),
+		skyDeep     = Color3.fromRGB( 22, 120, 190),
+
+		-- Knopf-Arten
+		go          = Color3.fromRGB( 72, 196,  70),   -- Primaer (Gratis-Start)
+		goTop       = Color3.fromRGB(120, 230, 100),
+		goEdge      = Color3.fromRGB( 30, 128,  44),   -- 3D-Kante unten
+		quiet       = Color3.fromRGB(255, 248, 232),   -- Sekundaer (Skip): Creme
+		quietEdge   = Color3.fromRGB(214, 190, 150),
+		gold        = Color3.fromRGB(255, 222, 128),   -- Premium (Pass): ruhiges Gold
+		goldTop     = Color3.fromRGB(255, 243, 200),
+		goldEdge    = Color3.fromRGB(206, 150,  30),
+		choose      = Color3.fromRGB( 76, 195, 255),   -- "Waehlen" auf der Karte
+		chooseEdge  = Color3.fromRGB( 22, 120, 190),
+
+		-- Zustaende
+		active      = Color3.fromRGB(255, 196,  40),   -- "AKTIV"-Band
+		new         = Color3.fromRGB(255,  92, 154),   -- "NEU"-Abzeichen
+		lock        = Color3.fromRGB(150, 132, 112),
+		progress    = Color3.fromRGB( 72, 196,  70),
+	},
+	radius = { panel = 26, card = 18, button = 16, chip = 999, badge = 14 },
+	stroke = { panel = 4, card = 3, button = 3, text = 3, textSmall = 2 },
+	space  = { xs = 4, s = 8, m = 16, l = 24, xl = 32 },
+	text   = {
+		font      = Enum.Font.FredokaOne,
+		title     = 40,
+		cardTitle = 26,
+		number    = 30,
+		body      = 18,
+		small     = 15,   -- nie kleiner (1080p: ~19 px)
+		button    = 26,
+	},
+	motion = {
+		open      = 0.32,   -- Panel springt auf (Back)
+		stagger   = 0.05,   -- Karten nacheinander
+		cardIn    = 0.28,
+		press     = 0.10,
+		pulse     = 1.6,    -- Sekunden je Puls (nur der Gratis-Start)
+		glimmer   = 2.6,    -- Glanz ueber freie neue Karten
+		confetti  = 1.2,
+	},
+}
 
 --------------------------------------------------------------------------------
 -- Verzierte Rahmen (Ei-Menue, Ei-Baum, Infokarte)

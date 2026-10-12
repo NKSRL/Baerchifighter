@@ -21,6 +21,9 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Names     = require(ReplicatedStorage.Localization.Names)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 
@@ -139,12 +142,12 @@ function PlotBuilder.buildPlotSign(plotModel: Model, slot: number, ownerName: st
 end
 
 -- v15: Tower-Symbol unter dem Besitzernamen ("◆ III · 42"). Billig, nur Text.
-function PlotBuilder.writeOwnerBadge(plotModel: Model, text: string, color: Color3)
+function PlotBuilder.writeOwnerBadge(plotModel: Model, text: string | Types.LocMsg, color: Color3)
 	local board = plotModel:FindFirstChild("SignBoard")
 	local surface = board and board:FindFirstChild("SignText")
 	local badge = surface and surface:FindFirstChild("TowerBadge")
 	if badge and badge:IsA("TextLabel") then
-		badge.Text       = text
+		WorldText.set(badge, text)
 		badge.TextColor3 = color
 	end
 end
@@ -309,12 +312,14 @@ function PlotBuilder.writeBuildingState(part: BasePart, buildingData: Types.Buil
 
 	local title = sign:FindFirstChild("Title")
 	if title and title:IsA("TextLabel") then
-		title.Text = string.format("%s  Lv.%d", config.displayName, buildingData.level)
+		WorldText.set(title, Loc.msg("ui.world.sign_level", {
+			name = Names.msg.building(buildingData.id), level = buildingData.level,
+		}))
 	end
 
 	local stock = sign:FindFirstChild("Stock")
 	if stock and stock:IsA("TextLabel") then
-		stock.Text = string.format("Honig %d / %d", honey, capacity)
+		stock.Text = string.format("🍯 %d / %d", honey, capacity)   -- sprachneutral (2.4)
 
 		-- Volles Lager faellt farblich auf: dann steht die Produktion und es
 		-- wird Zeit, zurueckzukommen und zu fuettern.
@@ -406,6 +411,14 @@ function PlotBuilder.buildBuilding(plotModel: Model, slot: number, buildingData:
 	-- Koerpergroesse: sonst haengt das Schild nach jeder Formaenderung falsch.
 	-- StudsOffset zaehlt ab der MITTE der Part, deshalb die Halbierung.
 	local topOfDecor = math.max(MapParts.decorHeight(decor), config.size.Y)
+
+	-- Sammel-Update 2.6 ("UI von Honig-Sumpf weg"): der Honig-Teich bekommt
+	-- kein Schild — der Baerchi isst dort von selbst (Autopilot), Text und
+	-- Zahlen braucht dort niemand. writeBuildingState kommt ohne Schild aus.
+	if buildingData.id == "HoneyPond" then
+		PlotBuilder.writeBuildingState(part, buildingData, pool)
+		return
+	end
 
 	local sign = Instance.new("BillboardGui")
 	sign.Name         = "Sign"

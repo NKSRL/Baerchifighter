@@ -45,6 +45,7 @@ local WaspQueenEvent  = require(ServerScriptService.Util.WaspQueenEvent)
 local CombService     = require(ServerScriptService.Services.CombService)
 local EventMotion     = require(ReplicatedStorage.Modules.EventMotion)
 local Loc             = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 
 local EventHandlers = {}
 
@@ -196,6 +197,11 @@ local function duel(api: Api, a: Part, b: Part, seconds: number): (Part, Part)
 	local startedAt = os.clock()
 	task.spawn(function()
 		while os.clock() - startedAt < seconds - DUEL_END_MARGIN_SECONDS and api.running() do
+			-- Sammel-Update 1.1: eine entfuehrte Figur gehoert dem UFO, kein
+			-- Ausfallschritt darf sie zurueckreissen.
+			if a.abducting or b.abducting then
+				break
+			end
 			if a.figure and b.figure and a.figure.Parent and b.figure.Parent then
 				pcall(FigureFX.attackLunge, a.figure, b.figure:GetPivot().Position, DUEL_LUNGE_DISTANCE, DUEL_LUNGE_SECONDS)
 				task.wait(DUEL_LUNGE_GAP_SECONDS)
@@ -247,6 +253,7 @@ type UfoState = {
 
 function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	local cfg    = EventConfig.UFO
+	local REJOIN = FeatureFlags.isOn("UFO_REJOIN")
 	local center = api.center
 	local ringR  = api.radius * cfg.BEAM_RADIUS_FACTOR
 	local hoverY = center.Y + UFO_HOVER_HEIGHT
@@ -328,14 +335,28 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	local function abduct(part: Part, st: UfoState)
 		st.abducting     = true
 		part.abducting   = true
-		taken[part.player] = true
-		setLabel(part, "ENTFUEHRT!")
+		part.abductedAt  = os.clock()
+		-- UFO_REJOIN: nicht mehr sperren — wer abgesetzt wurde, darf wieder her,
+		-- ist dann aber geschwaecht (api.weaken beim Absetzen).
+		if not REJOIN then
+			taken[part.player] = true
+		end
+		setLabel(part, "🛸!")
+
+		-- Sammel-Update 1.1 ("Baerchi bleibt bei UFO stehen"): verliert der
+		-- Service die Teilnahme mitten in der Entfuehrung (Rebirth, Neubau,
+		-- Kampf nimmt das Schloss, Waechter hat abgebrochen), gehoert die Figur
+		-- jemand anderem. Dann sofort aufhoeren, sie zu bewegen — sonst ziehen
+		-- zwei Stellen an derselben Figur und sie bleibt irgendwo haengen.
+		local function lost(): boolean
+			return not api.stillHere(part)
+		end
 
 		task.spawn(function()
 			local ok, err = pcall(function()
 				local figure = part.figure
 				local player = part.player
-				api.toast(player, "UFO: Dein Baerchi wird entfuehrt!")
+				api.toast(player, Loc.msg("msg.ufo.abducted"))
 
 				local startFoot = api.footOf(figure)
 				local here      = ringCenterAt(Workspace:GetServerTimeNow())
@@ -345,18 +366,22 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				-- 1) hochgezogen
 				FigureFX.stopIdle(figure)
 				moveFoot(figure, startFoot, ufoFoot, UFO_LIFT_SECONDS, math.pi * 2 * UFO_LIFT_TURNS)
+				if lost() then return end
 
 				-- 2) Transport zum Plot des Spielers
 				local plotPos = api.plotPosition(player)
 				local overPlot = (plotPos or ufoFoot) + Vector3.new(0, UFO_TRANSPORT_HEIGHT, 0)
-				setLabel(part, "Transport...")
+				setLabel(part, "🛸 ...")
 				moveFoot(figure, ufoFoot, overPlot, UFO_TRANSPORT_SECONDS, math.pi * 2 * UFO_TRANSPORT_TURNS)
+				if lost() then return end
 
 				-- 3) Wartezeit ueber dem Plot
 				local waitStart = os.clock()
 				while os.clock() - waitStart < cfg.ABDUCT_WAIT_SECONDS do
+					if lost() or figure.Parent == nil then return end
 					local left = math.ceil(cfg.ABDUCT_WAIT_SECONDS - (os.clock() - waitStart))
-					setLabel(part, string.format("Landung in %ds", left))
+					-- Sprachneutral (Sammel-Update 2.4): Symbol + Zahl statt Text
+					setLabel(part, string.format("🛸 %ds", left))
 					local hovered = os.clock() - waitStart
 					FigurePlacement.place(
 						figure,
@@ -368,16 +393,24 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 
 				-- 4) Absetzen auf dem Plot
 				setLabel(part, nil)
+				if lost() then return end
 				local homeFoot = part.homeFoot
 				moveFoot(figure, overPlot, homeFoot + Vector3.new(0, UFO_DROP_HEIGHT, 0), UFO_DROP_SECONDS, 0)
 				api.finishHome(part)
 				api.ufoReward(part)
+				if REJOIN then
+					api.weaken(part, cfg.DROP_WEAKEN_SECONDS)
+				end
 			end)
 
 			if not ok then
 				warn("[EventHandlers.Ufo] Entfuehrung fehlgeschlagen:", err)
 				pcall(setLabel, part, nil)
 				pcall(api.finishHome, part)
+			elseif lost() then
+				-- Abgebrochen: Label weg, Schloss und Figur hat schon der neue
+				-- Halter (EventParticipationService.tick hat geraeumt).
+				pcall(setLabel, part, nil)
 			end
 		end)
 	end
@@ -387,8 +420,8 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 		sb.fightUntil = now + cfg.FIGHT_SECONDS
 		fightPause    = now + cfg.FIGHT_SECONDS
 		a.cancelWalk, b.cancelWalk = true, true
-		setLabel(a, "KAMPF!")
-		setLabel(b, "KAMPF!")
+		setLabel(a, "⚔")
+		setLabel(b, "⚔")
 
 		task.spawn(function()
 			local ok, err = pcall(function()
@@ -398,8 +431,8 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				-- Verlierer: aus dem Ring gedraengt, beginnt von vorne.
 				sl.progress  = 0
 				sl.coolUntil = os.clock() + cfg.LOSER_COOLDOWN_SECONDS
-				api.toast(loser.player, "Kampf verloren - Beam-Fortschritt zurueckgesetzt")
-				api.toast(winner.player, "Kampf gewonnen!")
+				api.toast(loser.player, Loc.msg("msg.ufo.fight_lost"))
+				api.toast(winner.player, Loc.msg("msg.ufo.fight_won"))
 				setLabel(winner, nil)
 				setLabel(loser, nil)
 
@@ -422,7 +455,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 			setLabel(part, nil)
 		end
 		for _, part in api.participants() do
-			api.toast(part.player, "UFO: Der Beam wurde zurueckgesetzt - alle Countdowns beginnen von vorne")
+			api.toast(part.player, Loc.msg("msg.ufo.beam_reset"))
 		end
 		setBeam(false)
 		task.delay(cfg.BEAM_REOPEN_SECONDS, function()
@@ -434,9 +467,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	end
 
 	for _, part in api.participants() do
-		api.toast(part.player, string.format(
-			"UFO: Geh in den Strahl! %ds Beam-Fortschritt bis zur Entfuehrung", cfg.BEAM_REQUIRED_SECONDS
-		))
+		api.toast(part.player, Loc.msg("msg.ufo.start", { s = cfg.BEAM_REQUIRED_SECONDS }))
 	end
 	api.announce(Loc.msg("msg.ufo.patrol"), "info")
 
@@ -457,6 +488,16 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 
 				for _, part in parts do
 					local st = stateOf(part)
+					-- Sammel-Update 1.1: Wer in diesem UFO schon entfuehrt war und
+					-- erneut hergeschickt wurde, wurde frueher hier nur
+					-- uebersprungen und stand bis zum Event-Ende eingefroren im
+					-- Pit. Jetzt geht er mit einem Hinweis wieder heim.
+					if taken[part.player] and not st.abducting and not part.busy and not st.moving then
+						st.moving = true
+						api.toast(part.player, Loc.msg("msg.ufo.already_taken"))
+						api.recall(part.player)
+						continue
+					end
 					if st.abducting or taken[part.player] then
 						continue
 					end
@@ -763,8 +804,8 @@ function EventHandlers.HotEgg(api: Api, def: EventConfig.EventDef): Session
 					Color = HOT_EGG_FIRE_COLOR, SecondaryColor = HOT_EGG_FIRE_COLOR_2,
 				}, root)
 			end
-			setLabel(part, "HEISSES EI!")
-			api.toast(part.player, "Du hast das heisse Ei! Gib es per Beruehrung weiter.")
+			setLabel(part, "🔥🥚")
+			api.toast(part.player, Loc.msg("msg.hotegg.holder"))
 		end
 	end
 
@@ -956,7 +997,7 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 					if up and t > kingTime then
 						king, kingTime = part, t
 					end
-					setLabel(part, string.format("%ds oben", math.floor(seconds[part.player] or 0)))
+					setLabel(part, string.format("⛰ %ds", math.floor(seconds[part.player] or 0)))
 				end
 
 				for _, part in parts do
@@ -1010,8 +1051,8 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 									local ok2, err2 = pcall(function()
 										local winner, loser = duel(api, a, b, cfg.DUEL_SECONDS)
 										coolUntil[loser] = os.clock() + cfg.LOSER_COOLDOWN_SECONDS
-										api.toast(loser.player, "Vom Huegel gestossen!")
-										api.toast(winner.player, "Du haeltst den Huegel!")
+										api.toast(loser.player, Loc.msg("msg.hill.pushed"))
+										api.toast(winner.player, Loc.msg("msg.hill.holding"))
 										api.walkTo(loser, loser.standFoot)
 									end)
 									if not ok2 then
@@ -1082,7 +1123,7 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 		local player  = part.player
 
 		finds[player] = finds[player] or 0
-		api.toast(player, string.format("Schatzgraeber: %d Fundstellen - Vorsicht, Bomben!", sites))
+		api.toast(player, Loc.msg("msg.dig.start", { n = sites }))
 
 		for i = 1, sites do
 			if not running or not api.stillHere(part) then return end
@@ -1101,7 +1142,7 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 			end
 
 			-- graben
-			setLabel(part, string.format("Graebt %d/%d", i, sites))
+			setLabel(part, string.format("⛏ %d/%d", i, sites))
 			pcall(FigureFX.idleBob, part.figure, DIG_BOB)
 			local t0 = os.clock()
 			while os.clock() - t0 < digTime do
@@ -1126,18 +1167,18 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 				finds[player] = 0
 				bombed[player] = true
 				setLabel(part, nil)
-				api.toast(player, "BOMBE! Dein Baerchi ist besiegt - die Beute ist weg")
+				api.toast(player, Loc.msg("msg.dig.bomb"))
 				api.recall(player)
 				return
 			end
 
 			finds[player] += 1
 			pcall(FigureFX.burstAt, pos + Vector3.new(0, FIND_BURST_LIFT, 0), FIND_COLOR, folder, FIND_BURST_COUNT)
-			api.toast(player, string.format("Fund! (%d)", finds[player]))
+			api.toast(player, Loc.msg("msg.dig.find", { n = finds[player] }))
 		end
 
 		setLabel(part, nil)
-		api.toast(player, string.format("Alle Fundstellen geleert: %d Funde", finds[player]))
+		api.toast(player, Loc.msg("msg.dig.done", { n = finds[player] }))
 		if api.walkTo(part, part.standFoot) and running and api.stillHere(part) then
 			pcall(FigureFX.idleBob, part.figure, DIG_BOB)
 		end

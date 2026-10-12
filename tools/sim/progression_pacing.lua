@@ -197,7 +197,9 @@ local function doRun(p)
 		bestId, bestGain, bestCleared, bestCap = capTowerId, TowerConfig.sumStageRewards(capTowerId, 1, paid), capReach, capStageNow
 	end
 	for _, def in (if bestId then {} else TowerConfig.TOWERS) do
-		local cap = TowerConfig.getStageCap(p.rebirths, def.id)
+		-- 08.10.: Rekorde mitgeben (TOWER_UNLOCK_BY_CLEAR: offen = vorherigen
+		-- Tower geschafft, Deckel = volle Stage-Zahl)
+		local cap = TowerConfig.getStageCap(p.rebirths, def.id, p.records)
 		if cap > 0 then
 			local cleared = reach(p, def.id)
 			local paid = math.min(cleared, cap)

@@ -71,12 +71,14 @@ local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
 local BaerchiMesh = require(ReplicatedStorage.Modules.BaerchiMesh)
 local FightTimeline = require(ReplicatedStorage.Modules.FightTimeline)
 local Types       = require(ReplicatedStorage.Network.Types)
+local Loc         = require(ReplicatedStorage.Localization.Loc)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
 
 local PlayerService   = require(ServerScriptService.Services.PlayerService)
 local MapService      = require(ServerScriptService.Services.MapService)
 local FigureWalker    = require(ServerScriptService.Util.FigureWalker)
 local FigurePlacement = require(ServerScriptService.Util.FigurePlacement)
+local RateLimiter     = require(ServerScriptService.Util.RateLimiter)   -- Paket 4.3
 local FigureFX        = require(ServerScriptService.Util.FigureFX)
 local ActivityLock    = require(ServerScriptService.Util.ActivityLock)
 local FightBars       = require(ServerScriptService.Util.FightBars)
@@ -142,6 +144,18 @@ local _active: { [Player]: Active } = {}
 type Home = { model: Model, pivot: CFrame, homeFoot: Vector3 }
 local _home: { [Player]: Home } = {}
 
+-- Sammel-Update 05.10. (Paket 4.3, "schnell den Tower hochfliegen"): Tempo
+-- der Wiedergabe je Spieler (1, 2, 4 oder 0 = "Ergebnis sofort"). Die
+-- Abrechnung aendert sich NICHT: sie steht ohnehin fest, bevor die Wiedergabe
+-- beginnt, und wird am Ende ausgezahlt — schneller abspielen heisst nur
+-- schneller ankommen. Gilt ab der naechsten Stage, gemerkt fuer die Sitzung.
+local VALID_SPEEDS: { [number]: number } = { [1] = 1, [2] = 2, [4] = 4, [0] = 40 }
+local _speed: { [Player]: number } = {}
+
+local function speedFactor(player: Player): number
+	return VALID_SPEEDS[_speed[player] or 1] or 1
+end
+
 --------------------------------------------------------------------------------
 -- Hilfen
 --------------------------------------------------------------------------------
@@ -191,18 +205,22 @@ end
 -- MapService; hier wird nur entschieden WAS draufsteht, weil nur dieser
 -- Service den Verlauf des Laufs kennt.
 -- v15: "Tower II · Stage 23"
-local function stageTitle(towerId: string?, stage: number): string
+-- Tafel-Texte sind Nachrichten (LocMsg): die Tafel sieht jeder Spieler auf
+-- der Plattform, und jeder liest sie in seiner Sprache (MapService/WorldText).
+local function stageTitle(towerId: string?, stage: number): Types.LocMsg
 	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
-	return string.format("Tower %s  ·  Stage %d", def.numeral, stage)
+	return Loc.msg("ui.pitboard.stage", { tower = Loc.msg("ui.petbar.tower", { n = def.numeral }), stage = stage })
 end
 
 local function showStage(player: Player, towerId: string?, stage: Types.PitStageResult, cleared: number)
 	MapService.setPitBanner(
 		player,
 		stageTitle(towerId, stage.stage),
+		-- Sammel-Update 2.4: die Tafel sehen alle Spieler, jeder in seiner
+		-- Sprache — deshalb Symbole und Zahlen statt deutscher Woerter.
 		if cleared > 0
-			then string.format("%d geschafft", cleared)
-			else "erster Gegner",
+			then string.format("✔ %d", cleared)
+			else "⚔ 1",
 		MapConfig.PIT_BANNER_RUNNING
 	)
 end
@@ -216,9 +234,9 @@ local function showSummary(player: Player, run: Types.PitRunResult)
 	MapService.setPitBanner(
 		player,
 		if won
-			then string.format("%d Stages geschafft", run.stagesCleared)
-			else "Keine Stage geschafft",
-		string.format("%d Gummies", run.gummiesWon),
+			then Loc.msg("fmt.append", { a = "✔", b = Loc.msg("ui.pitboard.won", { n = run.stagesCleared }) })
+			else Loc.msg("fmt.append", { a = "✖", b = Loc.msg("ui.pitboard.none") }),
+		Loc.msg("event.bonus.gummies", { n = run.gummiesWon }),
 		if won then MapConfig.PIT_BANNER_WIN else MapConfig.PIT_BANNER_LOSS
 	)
 end
@@ -442,8 +460,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 	-- selbst auf ihre Ruhelage zurueck.
 	FigureFX.stopIdle(figure)
 
-	local homeBox, homeSize = figure:GetBoundingBox()
-	local homeFoot = Vector3.new(homeBox.Position.X, homeBox.Position.Y - homeSize.Y * 0.5, homeBox.Position.Z)
+	local homeFoot = FigurePlacement.footOf(figure)   -- Sammel-Update 1.2
 	_home[player] = { model = figure, pivot = figure:GetPivot(), homeFoot = homeFoot }
 
 	local maxHp = math.max(1, run.maxHp)
@@ -505,8 +522,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			if recallWanted(player, token) then
 				sendResult(player, token)
 				setPhase(player, token, "Returning", nil)
-				local box, size = figure:GetBoundingBox()
-				local here = Vector3.new(box.Position.X, box.Position.Y - size.Y * 0.5, box.Position.Z)
+				local here = FigurePlacement.footOf(figure)
 				FigureWalker.walk(figure, here, homeFoot, {
 					speed       = arenaWalkSpeed(),
 					bobPerStud  = arenaBobPerStud(),
@@ -572,7 +588,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				MapService.setPitBanner(
 					player,
 					stageTitle(run.towerId, run.startStage or 1),
-					"Der Turm waechst …",
+					"⬆ …",
 					MapConfig.PIT_BANNER_RUNNING
 				)
 
@@ -680,7 +696,8 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				end
 
 				local plan = FightTimeline.plan(stageBeats, #run.stages, stage.won)
-				local tempo = plan.tempo
+				local fast  = speedFactor(player)   -- Paket 4.3
+				local tempo = plan.tempo / fast
 
 				-- Kurz stehen bleiben, damit man den neuen Gegner sieht.
 				task.wait(MapConfig.FIGHT_ENEMY_INTRO_SECONDS * tempo)
@@ -721,14 +738,22 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 							task.wait(MapConfig.FIGHT_BEAT_SECONDS * tempo)
 						end
 					else
-						-- Faehigkeit: Leiste leuchtet voll auf, die Show laeuft,
-						-- dann der wuchtige Stoss.
+						-- Faehigkeit mit Show (v15.1): die Show IST der Angriff.
+						-- Leisten, Treffer-Blitz und Rueckstoss des Gegners
+						-- kommen im Einschlag-Moment der Show
+						-- (SkillFXConfig.getImpactTime), danach gibt es keinen
+						-- zweiten Stoss mehr. Gesamtdauer wie in
+						-- tools/sim/fight_timeline.lua:
+						-- max(Show-Ende, Einschlag + Zugdauer).
+						local showPlayed = false
 						if isSkill and isSelf then
 							FightBars.setCharge(chargeFill, 1, 0.1)
 							local showId = beat.skillId or fxSkillId
 							if showId then
-								local full = not fxShownFull
+								-- Paket 4.3: im Schnelldurchlauf nur das kurze Echo
+								local full = not fxShownFull and fast <= 1
 								fxShownFull = true
+								local scale = if full then 1 else tempo
 								Remotes.SkillFXPlay:FireAllClients({
 									owner    = player.UserId,
 									skillId  = showId,
@@ -736,14 +761,35 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 									attacker = figure,
 									target   = enemy,
 									center   = (stageSelfPos + stageEnemyPos) / 2,
+									-- Finisher/Opener hat gegriffen (Client: violetter
+									-- Schnitt, staerkerer Komet). Nur Optik.
+									bonus    = beat.bonus == true,
 								})
-								task.wait(SkillFXConfig.getDuration(showId, full) * (if full then 1 else tempo))
+								local showSeconds   = SkillFXConfig.getDuration(showId, full) * scale
+								local impactSeconds = math.min(SkillFXConfig.getImpactTime(showId, full) * scale, showSeconds)
+								task.wait(impactSeconds)
 								if not stillValid(player, token, figure, fighters) then return end
+
+								local recoilSeconds = FightTimeline.beatSeconds(beat) * tempo
+								if enemy and enemy.Parent ~= nil then
+									onImpact()
+									FigureFX.recoil(enemy, stageEnemyPos, stageSelfPos,
+										MapConfig.FIGHT_SKILL_KNOCKBACK, MapConfig.FIGHT_HOP_HEIGHT * 1.6, recoilSeconds)
+								else
+									onImpact()
+									task.wait(recoilSeconds)
+								end
+								local rest = showSeconds - impactSeconds - recoilSeconds
+								if rest > 0 then task.wait(rest) end
+								if not stillValid(player, token, figure, fighters) then return end
+								showPlayed = true
 							end
 						end
 
 						local seconds = FightTimeline.beatSeconds(beat) * tempo
-						if attacker then
+						if showPlayed then
+							-- Treffer kam schon in der Show (siehe oben).
+						elseif attacker then
 							FigureFX.clash(attacker, target, attackerHome, targetHome, {
 								seconds   = seconds,
 								gap       = MapConfig.FIGHT_CONTACT_GAP,
@@ -985,6 +1031,13 @@ function PitArenaService.init()
 		_runToken[player] = nil
 		_home[player]     = nil
 		_active[player]   = nil
+		_speed[player]    = nil
+	end)
+
+	-- Paket 4.3: Tempo-Knopf der Pet-Leiste (PetBar).
+	RateLimiter.connect(Remotes.RequestPitSpeed, "RequestPitSpeed", function(player, speed: any)
+		if typeof(speed) ~= "number" or VALID_SPEEDS[speed] == nil then return end
+		_speed[player] = speed
 	end)
 
 	-- v12: geht der Spieler mitten im Lauf, wird VOR dem Speichern

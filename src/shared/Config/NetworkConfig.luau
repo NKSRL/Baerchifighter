@@ -25,6 +25,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestUpgradeBuilding = 0.50,
 	-- v15: Tower waehlen (reines Umschalten) und Login-Bonus (zahlt aus).
 	RequestSelectTower     = 0.30,
+	RequestBuyGamepass     = 2.00,   -- 08.10. Paket C: Kauf-Dialog oeffnen
 	RequestClaimDailyBonus = 1.00,
 	RequestUpgradeRecycler = 0.50,   -- v15: Waben-Recycler
 	RequestFuseBaerchis    = 1.00,
@@ -74,6 +75,15 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- HBB Paket 5: Heim-Knopf. Teleport — nicht im Sekundentakt.
 	RequestGoHome          = 3.00,
 	RequestClaimFreeGrab   = 1.00,   -- HBB Paket 10
+
+	-- Sammel-Update 05.10.
+	RequestPitSpeed          = 0.25,   -- 4.3: nur ein Schalter, keine Spielwerte
+	RequestClaimIndexReward  = 0.50,   -- 7: Auszahlung, einmalig je Belohnung
+	RequestIncubatorStart    = 0.30,   -- 8: mehrere Plaetze schnell hintereinander belegen
+	RequestIncubatorCollect  = 0.30,
+	RequestIncubatorSpeedUp  = 0.50,   -- kostet GoldGummies
+	RequestUpgradeIncubator  = 0.50,   -- kostet Gummies (wie Recycler)
+	RequestIncubatorBaerchi  = 0.30,   -- Baerchi hinein/heraus (INCUBATOR_BREED)
 
 	-- v15: Bestenliste und Inspektor. Der Server antwortet aus dem Cache bzw.
 	-- aus dem Speicher; die Bremse schuetzt nur vor Spam.

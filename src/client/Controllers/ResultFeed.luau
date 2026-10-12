@@ -118,6 +118,55 @@ function ResultFeed.init()
 		end)
 	end)
 
+	-- Sammel-Update 05.10. (Paket 7): Index-Belohnung abgeholt
+	Remotes.IndexRewardReceived.OnClientEvent:Connect(function(result: any)
+		if typeof(result) ~= "table" or typeof(result.rewardId) ~= "string" then return end
+		local typed = result :: Types.IndexRewardResult
+		local parts: { string } = {}
+		if typed.eggs > 0 and typed.eggType then
+			table.insert(parts, string.format("+%d %s", typed.eggs, Loc.name("egg." .. typed.eggType .. ".name", typed.eggType)))
+		end
+		if typed.gummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.gummies) .. " Gummies") end
+		if typed.goldGummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.goldGummies) .. " GoldGummies") end
+		if typed.blueprints > 0 then table.insert(parts, Loc.t("ui.index_reward.blueprint", { n = typed.blueprints })) end
+		if typed.incubatorSlots > 0 then table.insert(parts, Loc.t("ui.index_reward.slot", { n = typed.incubatorSlots })) end
+		Notify.emit("index_reward", function()
+			Toast.success(Loc.t("msg.index_reward", { text = table.concat(parts, "  ·  ") }))
+		end, function()
+			Moment.show("milestone", Theme.COLORS.goldGummy, "ui.moment.milestone")
+		end)
+	end)
+
+	-- Sammel-Update 05.10. (Paket 6.2): besonderer Meilenstein (Ascensions-Eier)
+	Remotes.SpecialMilestoneReceived.OnClientEvent:Connect(function(result: any)
+		if typeof(result) ~= "table" or typeof(result.id) ~= "string" then return end
+		local typed = result :: Types.SpecialMilestoneResult
+		local n, eggType = 0, "AscensionEgg"
+		for _, entry in typed.eggs do
+			n += entry.count
+			eggType = entry.eggType
+		end
+		Notify.emit("special_milestone", function()
+			Toast.success(Loc.t("msg.special_milestone", {
+				name = Loc.t("milestone." .. typed.id),
+				n    = n,
+				egg  = Loc.name("egg." .. eggType .. ".name", eggType),
+			}))
+		end, function()
+			Moment.show("milestone", Theme.COLORS.goldGummy, "ui.moment.milestone")
+		end)
+	end)
+
+	-- Sammel-Update 05.10. (Paket 8): Inkubator — kurze Bestaetigung beim Einlegen
+	Remotes.IncubatorChanged.OnClientEvent:Connect(function(info: any)
+		if typeof(info) ~= "table" then return end
+		if info.kind == "start" or info.kind == "speedup" or info.kind == "upgrade" then
+			Notify.emit("incubator", function()
+				Toast.info(Loc.t("msg.incubator." .. tostring(info.kind)))
+			end)
+		end
+	end)
+
 	print("[ResultFeed] Initialisiert")
 end
 

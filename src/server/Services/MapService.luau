@@ -51,6 +51,8 @@ local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local CombConfig = require(ReplicatedStorage.Config.CombConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types     = require(ReplicatedStorage.Network.Types)
+local WorldText = require(ReplicatedStorage.Localization.WorldText)
+local Loc       = require(ReplicatedStorage.Localization.Loc)
 
 local ActivityLock = require(ServerScriptService.Util.ActivityLock)
 local FigureFX     = require(ServerScriptService.Util.FigureFX)
@@ -63,7 +65,10 @@ local PondBuilder    = require(MapBuild.PondBuilder)
 local ArenaBuilder   = require(MapBuild.ArenaBuilder)
 local FigureBuilder  = require(MapBuild.FigureBuilder)
 local LaidEggBuilder = require(MapBuild.LaidEggBuilder)
+local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local RecyclerBuilder = require(MapBuild.RecyclerBuilder)
+local IncubatorBuilder = require(MapBuild.IncubatorBuilder)   -- Sammel-Update Paket 8
+local TerminalBuilder  = require(MapBuild.TerminalBuilder)    -- 08.10. Tower-Terminal
 
 --------------------------------------------------------------------------------
 -- Interner Zustand
@@ -99,12 +104,16 @@ local _islandDataProvider: ((Player) -> Types.IslandData?)? = nil
 -- IslandData) — PlotDisplayService setzt beides; gemerkt wird es hier, damit
 -- ein Neuaufbau des Plots (Rebirth) Turm und Symbol sofort wieder mitbaut.
 local _showcase: { [Player]: ArenaBuilder.ShowcaseView } = {}
+-- Sammel-Update Paket 8: Platz-Zahl des Inkubators (siehe setIncubatorSlotProvider)
+local _incubatorSlots: (Player) -> number = function(_player: Player): number return 1 end
 type Badge = { text: string, color: Color3 }
 local _badge: { [Player]: Badge } = {}
 local _crown: { [Player]: boolean } = {}   -- Paket 9: Top 10 der Endless-Woche
+-- 08.10.: zuletzt gesetzter Terminal-Zustand (Neuaufbau nach Rebirth baut ihn mit)
+local _terminal: { [Player]: TerminalBuilder.TerminalView } = {}
 
-local function badgeText(player: Player, text: string): string
-	return if _crown[player] then "♛ " .. text else text
+local function badgeText(player: Player, text: string | Types.LocMsg): string | Types.LocMsg
+	return if _crown[player] then Loc.msg("fmt.append", { a = "♛", b = text }) else text
 end
 
 --------------------------------------------------------------------------------
@@ -122,6 +131,15 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	ArenaBuilder.buildPit(plotModel, slot)
 	PondBuilder.buildPond(plotModel, slot, islandData)
 	RecyclerBuilder.build(plotModel, slot, islandData.recycler)
+	-- Sammel-Update Paket 8: Inkubator (Plaetze liefert der Daten-Lieferant,
+	-- weil sie auch an Rebirths und Index haengen, die nicht in der Insel stehen).
+	if FeatureFlags.isOn("INCUBATOR") and islandData.incubator then
+		IncubatorBuilder.build(plotModel, slot, islandData.incubator, _incubatorSlots(owner), islandData.baerchis)
+	end
+	-- 08.10.: Tower-Terminal am Stegbeginn (Zustand nur als Attribute)
+	if FeatureFlags.isOn("TOWER_TERMINAL") then
+		TerminalBuilder.build(plotModel, slot, _terminal[owner])
+	end
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
 
@@ -205,6 +223,7 @@ function MapService.despawnIsland(player: Player)
 	_showcase[player] = nil
 	_badge[player] = nil
 	_crown[player] = nil
+	_terminal[player] = nil
 
 	local model = _plotModels[player]
 	if model then
@@ -242,7 +261,7 @@ function MapService.updateTowerShowcase(player: Player, view: ArenaBuilder.Showc
 end
 
 -- v15: Tower-Symbol unter dem Namen auf dem Plot-Schild ("◆ III · 42").
-function MapService.setOwnerBadge(player: Player, text: string, color: Color3)
+function MapService.setOwnerBadge(player: Player, text: string | Types.LocMsg, color: Color3)
 	_badge[player] = { text = text, color = color }
 	local model = _plotModels[player]
 	if model then
@@ -505,6 +524,46 @@ function MapService.updateBuildingSigns(player: Player, islandData: Types.Island
 	MapService.updatePondFill(player, islandData)
 end
 
+-- Sammel-Update Paket 8: Inkubator-Stand schreiben (Eier, Zeitmarken,
+-- verfuegbare Plaetze). Billig; fehlt das Modell, wird es gebaut.
+function MapService.updateIncubator(player: Player, islandData: Types.IslandData, slotCount: number)
+	if not FeatureFlags.isOn("INCUBATOR") or not islandData.incubator then return end
+	local model = _plotModels[player]
+	local slot  = _playerSlot[player]
+	if not model or not slot then return end
+	local existing = model:FindFirstChild(IncubatorConfig.MODEL_NAME)
+	if existing and existing:IsA("Model") then
+		IncubatorBuilder.writeState(existing, islandData.incubator, slotCount, islandData.baerchis)
+	else
+		IncubatorBuilder.build(model, slot, islandData.incubator, slotCount, islandData.baerchis)
+	end
+end
+
+-- INCUBATOR_BREED: das Inkubator-Modell auf dem Plot des Spielers (Ort der
+-- gebrueteten Eier), oder nil.
+function MapService.getIncubatorModel(player: Player): Model?
+	local model = _plotModels[player]
+	local found = if model then model:FindFirstChild(IncubatorConfig.MODEL_NAME) else nil
+	return if found and found:IsA("Model") then found else nil
+end
+
+-- Liefert die Platz-Zahl des Inkubators (setzt PlotDisplayService, weil sie
+-- auch an Rebirths und Index-Belohnungen haengt).
+function MapService.setIncubatorSlotProvider(provider: (Player) -> number)
+	_incubatorSlots = provider
+end
+
+-- 08.10.: Zustand des Tower-Terminals (Attribute, kein Neubau). Aufrufer ist
+-- PlotDisplayService bei geaenderter Signatur.
+function MapService.updateTerminal(player: Player, view: TerminalBuilder.TerminalView)
+	_terminal[player] = view
+	local model = _plotModels[player]
+	local terminal = if model then model:FindFirstChild(TerminalBuilder.MODEL_NAME) else nil
+	if terminal and terminal:IsA("Model") then
+		TerminalBuilder.writeState(terminal, view)
+	end
+end
+
 -- Schreibt Level, Warteschlange und Lampe des Waben-Recyclers neu.
 -- Billig — der Weg fuer jede Aenderung der Warteschlange.
 function MapService.updateRecycler(player: Player, islandData: Types.IslandData)
@@ -539,19 +598,21 @@ end
 -- Die Anzeigetafel ueber der Arena beschriften und einblenden.
 -- Aufgerufen von PitArenaService waehrend einer Wiedergabe; MapService kennt
 -- den Kampfverlauf nicht und entscheidet deshalb nichts ueber den Inhalt.
-function MapService.setPitBanner(player: Player, title: string, subtitle: string, color: Color3)
+-- Titel und Untertitel duerfen Nachrichten (LocMsg) sein: die Tafel sieht
+-- jeder Spieler, und jeder liest sie in seiner Sprache (siehe WorldText).
+function MapService.setPitBanner(player: Player, title: string | Types.LocMsg, subtitle: string | Types.LocMsg, color: Color3)
 	local banner = findPitBanner(player)
 	if not banner then return end
 
 	local titleLabel = banner:FindFirstChild("Title")
 	if titleLabel and titleLabel:IsA("TextLabel") then
-		titleLabel.Text       = title
+		WorldText.set(titleLabel, title)
 		titleLabel.TextColor3 = color
 	end
 
 	local subLabel = banner:FindFirstChild("Sub")
 	if subLabel and subLabel:IsA("TextLabel") then
-		subLabel.Text = subtitle
+		WorldText.set(subLabel, subtitle)
 	end
 
 	banner.Enabled = true
@@ -626,7 +687,7 @@ end
 -- setPitBanner blendet das hier NICHT ein/aus — die Tafel steht permanent
 -- (siehe buildEventPit): sie zeigt entweder den Countdown bis zum naechsten
 -- Event oder Name + Restzeit des laufenden.
-function MapService.setEventBanner(title: string, subtitle: string, color: Color3, reward: string?)
+function MapService.setEventBanner(title: string | Types.LocMsg, subtitle: string | Types.LocMsg, color: Color3, reward: (string | Types.LocMsg)?)
 	local container = findEventPitContainer()
 	if not container then return end
 
@@ -638,18 +699,18 @@ function MapService.setEventBanner(title: string, subtitle: string, color: Color
 
 	local titleLabel = banner:FindFirstChild("Title")
 	if titleLabel and titleLabel:IsA("TextLabel") then
-		titleLabel.Text       = title
+		WorldText.set(titleLabel, title)
 		titleLabel.TextColor3 = color
 	end
 
 	local subLabel = banner:FindFirstChild("Sub")
 	if subLabel and subLabel:IsA("TextLabel") then
-		subLabel.Text = subtitle
+		WorldText.set(subLabel, subtitle)
 	end
 
 	local rewardLabel = banner:FindFirstChild("Reward")
 	if rewardLabel and rewardLabel:IsA("TextLabel") then
-		rewardLabel.Text = reward or ""
+		WorldText.set(rewardLabel, reward or "")
 	end
 end
 

@@ -20,7 +20,15 @@
 -- Keine requires: das Modul laeuft unveraendert im Luau-Test
 -- (tools/luau-tests/guide_steps.test.lua).
 
-export type Step = "hatch" | "fight" | "collect" | "merchant" | "event"
+-- Sammel-Update 05.10. (Paket 3.5): Einsteiger-Kette Ei oeffnen -> kaempfen ->
+-- Waben holen und im Recycler abgeben -> Gebaeude verbessern -> Event. Jeder
+-- Schritt bekommt im Client einen Satz, was er bringt ("guide.<step>").
+--
+-- 08.10. (Tower-Terminal): nach dem ersten Schaffen von Tower I der Schritt
+-- "tower": zum Terminal an der Bruecke, dort zur Karte von Tower II. Fertig,
+-- sobald ein anderer Tower gewaehlt ist oder dort schon gekaempft wurde.
+-- Ausnahme von der Veteranen-Regel (siehe towerSwitchPending).
+export type Step = "hatch" | "fight" | "collect" | "merchant" | "combs" | "upgrade" | "event" | "tower"
 
 -- Nur die Felder, die hier gelesen werden. PlayerDataUpdate (Client) und
 -- PlayerData (Server) passen beide hinein.
@@ -31,10 +39,12 @@ export type View = {
 		eggStock      : { [string]: number },
 		laidEggs      : { any },
 		towerProgress : { [string]: number }?,
+		buildings     : { [string]: { level: number } }?,   -- Sammel-Update 3.5
+		recycler      : { level: number }?,
 	},
-	towers : { records: { [string]: number } }?,
+	towers : { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?,
 	quests : { chainDone: number }?,
-	stats  : { totalEventsCompleted: number? }?,
+	stats  : { totalEventsCompleted: number?, totalCombsDelivered: number? }?,
 	gummies : number?,
 }
 
@@ -74,13 +84,46 @@ function GuideSteps.hasFought(view: View): boolean
 	return not isEmpty(view.island.towerProgress)
 end
 
+-- Sammel-Update 3.5: irgendein Gebaeude (oder der Recycler) ueber Level 1.
+function GuideSteps.hasUpgraded(view: View): boolean
+	local recycler = view.island.recycler
+	if recycler and (recycler.level or 1) > 1 then return true end
+	for _, building in view.island.buildings or {} do
+		if (building.level or 1) > 1 then return true end
+	end
+	return false
+end
+
 function GuideSteps.eventsDone(view: View): number
 	local stats = view.stats
 	return if stats then (stats.totalEventsCompleted or 0) else 0
 end
 
+-- 08.10.: Tower II ist frei (Tower I geschafft), aber der Spieler hat noch
+-- nie gewechselt: weiter in Tower I gewaehlt und in keinem anderen Tower
+-- gekaempft. Nur ohne Rebirth.
+--
+-- Bewusst VOR der Veteranen-Regel "4 Ketten-Quests": die ist nach fuenf
+-- gewonnenen Kaempfen erfuellt, also lange bevor jemand Tower I schafft —
+-- mit ihr saehe diesen Schritt praktisch niemand. Sie schuetzt alte Konten
+-- vor der Einfuehrung; das Umstellen ist dagegen fuer jeden neu (Annahme,
+-- im Bericht). Die Rebirth-Regel gilt weiter.
+function GuideSteps.towerSwitchPending(view: View): boolean
+	if (view.rebirthCount or 0) > 0 then return false end
+	local towers = view.towers
+	if not towers or not towers.unlocked or towers.unlocked.II ~= true then return false end
+	if (towers.selected or "I") ~= "I" then return false end
+	for towerId, record in towers.records do
+		if towerId ~= "I" and record > 0 then return false end
+	end
+	return true
+end
+
 -- Der aktuelle Schritt oder nil (fertig bzw. kein neuer Spieler).
 function GuideSteps.current(view: View, options: Options?): Step?
+	if GuideSteps.towerSwitchPending(view) then
+		return "tower"
+	end
 	if GuideSteps.isVeteran(view) then
 		return nil
 	end
@@ -113,7 +156,18 @@ function GuideSteps.current(view: View, options: Options?): Step?
 		return "collect"
 	end
 
-	-- 4. Erstes Event
+	-- 4. Sammel-Update 3.5: Waben holen und im Recycler abgeben
+	local stats = view.stats
+	if onboarding and stats and (stats.totalCombsDelivered or 0) == 0 then
+		return "combs"
+	end
+
+	-- 5. Sammel-Update 3.5: ein Gebaeude verbessern
+	if onboarding and not GuideSteps.hasUpgraded(view) then
+		return "upgrade"
+	end
+
+	-- 6. Erstes Event (der Client zeigt diesen Schritt nur kurz, Paket 3.2)
 	if onboarding then
 		return "event"
 	end

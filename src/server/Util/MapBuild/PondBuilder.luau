@@ -202,13 +202,15 @@ function PondBuilder.buildPondPlanks(parent: Instance, ground: CFrame)
 		plank.Parent     = parent
 	end
 
-	-- Pfloecke: liegende Zylinder quer zu den Bohlen, wie eingeschlagene
-	-- Pfosten. UPRIGHT waere hier falsch — sie sollen liegen.
+	-- Pfloecke: kleine Pfosten an beiden Bohlen-Enden. CFrame.Angles(0, 0, 90)
+	-- stellt den Zylinder AUFRECHT (seine Laenge ist Size.X) — deshalb muss
+	-- auch die Hoehe aus Size.X kommen. 08.10.: vorher stand hier
+	-- Size.Y * 0.4 (der Durchmesser), der Pfosten steckte 0.49 im Beet.
 	for i, side in { -1, 1 } do
 		local peg = MapParts.newPart(
 			"Pflock_" .. i,
 			MapConfig.POND_PEG_SIZE,
-			ground * CFrame.new(side * MapConfig.POND_PEG_SPREAD, MapConfig.POND_PEG_SIZE.Y * 0.4, -stand)
+			ground * CFrame.new(side * MapConfig.POND_PEG_SPREAD, MapConfig.POND_PEG_SIZE.X * MapConfig.POND_PEG_LIFT, -stand)
 				* CFrame.Angles(0, 0, math.rad(90)),
 			MapConfig.POND_PLANK_COLORS[2],
 			Enum.Material.Wood

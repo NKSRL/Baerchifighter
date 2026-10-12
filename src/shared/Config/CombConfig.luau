@@ -50,7 +50,8 @@ CombConfig.SPAWN_INTERVAL_SECONDS = 1.2
 -- SLOT-ZAHL: so viele Waben gibt es hoechstens gleichzeitig — im Pit, auf
 -- Koepfen getragen und in der Respawn-Warteschlange zusammen. Mehr liegen auch
 -- nie im Pit. Haelt die Zahl der Teile klein und macht Waben knapp.
-CombConfig.MAX_WORLD_COMBS = 40
+-- Sammel-Update 05.10. (Paket 5.1, "Waben langsamer und etwas weniger"): 40 -> 30.
+CombConfig.MAX_WORLD_COMBS = 30
 
 --------------------------------------------------------------------------------
 -- Waben im Event-Pit: Respawn (Slot-Modell)
@@ -60,7 +61,9 @@ CombConfig.MAX_WORLD_COMBS = 40
 -- freien Stelle im Pit zurueck. Der Wabenfluss haengt damit an der Abgabe-Rate.
 
 -- Sekunden zwischen Abgabe und neuer Wabe im Pit.
-CombConfig.RESPAWN_DELAY_SECONDS = 20
+-- Paket 5.1: 20 -> 30 s. Events (Hot Egg, Boss) behalten ihren Wabenwert
+-- (valueFactor der Themen), dort bleibt die Wabe also gleich wertvoll.
+CombConfig.RESPAWN_DELAY_SECONDS = 30
 
 -- Hook: verkuerzt der Recycler-Level den Respawn? Faktor pro Level ueber 1
 -- (1 = nein, 0.9 = je Level 10 % kuerzer). Absichtlich 1, Entscheidung offen.
@@ -74,7 +77,7 @@ CombConfig.ORPHAN_RELEASE_SECONDS = 60
 -- alle MIN_TRICKLE_SECONDS eine dazu (auch ueber die Slot-Zahl hinaus, aber nie
 -- ueber das Limit im Pit), damit Neulinge nie ein leeres Pit sehen.
 CombConfig.MIN_WORLD_COMBS     = 8
-CombConfig.MIN_TRICKLE_SECONDS = 6
+CombConfig.MIN_TRICKLE_SECONDS = 10   -- Paket 5.1: 6 -> 10 s
 
 -- Takt der Respawn-Pruefung (ein Loop, kein Thread pro Wabe).
 CombConfig.RESPAWN_TICK_SECONDS = 0.25

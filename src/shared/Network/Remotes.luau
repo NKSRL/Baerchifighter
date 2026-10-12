@@ -194,6 +194,9 @@ local EventHazardHit = getOrCreateEvent("EventHazardHit")
 -- v15 (Tower): ein Tower-Meilenstein wurde ausgezahlt (Toast).
 -- Args: Types.TowerMilestoneReward
 local TowerMilestoneReceived = getOrCreateEvent("TowerMilestoneReceived")
+-- 08.10.: ein Tower ist durch Schaffen des vorherigen frei geworden
+-- (Server → Client, Argument: TowerId). Feier-Moment + "NEU"-Abzeichen.
+local TowerUnlocked = getOrCreateEvent("TowerUnlocked")
 
 -- v15: Login-Bonus ausgezahlt (Toast). Args: Types.DailyBonusResult
 local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
@@ -202,6 +205,11 @@ local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
 local EggTreeUnlocked        = getOrCreateEvent("EggTreeUnlocked")        -- S->C (Types.EggUnlockResult)
 local EggPressResultReceived = getOrCreateEvent("EggPressResultReceived") -- S->C (Types.EggPressResult)
 local SkillFXPlay            = getOrCreateEvent("SkillFXPlay")            -- S->C (alle Clients, siehe PitArenaService)
+-- Welt aufwerten, Paket G: ein grosser Moment eines Spielers, an ALLE Clients.
+-- Der Server sagt nur WAS passiert ist; wie es aussieht entscheidet der Client
+-- (WorldMomentController). Args: { userId, kind, value, number?, big }
+-- (kind: "hatch" | "tower" | "record" | "rebirth" | "mutation", siehe Modules/WorldMoments)
+local WorldMoment            = getOrCreateEvent("WorldMoment")            -- S->C (alle Clients, siehe WorldMomentService)
 local RequestPressEggs       = getOrCreateEvent("RequestPressEggs")       -- C->S (eggType, path?)
 local RequestUseBlueprint    = getOrCreateEvent("RequestUseBlueprint")    -- C->S (eggType)
 
@@ -236,6 +244,9 @@ local RequestUpgradeBuilding = getOrCreateEvent("RequestUpgradeBuilding")
 -- der Tower beim aktuellen Rebirth offen ist (TowerConfig.isOpen).
 -- Args: towerId: string
 local RequestSelectTower = getOrCreateEvent("RequestSelectTower")
+-- 08.10. (Paket C): Kauf-Dialog fuer einen Gamepass (Argument: Pass-Key aus
+-- GamepassConfig). Der Server prueft Id und Besitz.
+local RequestBuyGamepass = getOrCreateEvent("RequestBuyGamepass")
 
 -- v15: taeglichen Login-Bonus abholen. Der Server prueft UTC-Tag,
 -- Gnadenfrist und doppelte Abholung (Modules/LoginBonusCalc).
@@ -324,6 +335,29 @@ local RequestGoHome = getOrCreateEvent("RequestGoHome")
 local RequestClaimFreeGrab = getOrCreateEvent("RequestClaimFreeGrab")
 
 -- ============================================================
+-- Sammel-Update 05.10.
+-- ============================================================
+-- Paket 4.3: Tower-Wiedergabe beschleunigen. Args: speed (1 | 2 | 4 | 0 = sofort)
+local RequestPitSpeed = getOrCreateEvent("RequestPitSpeed")
+-- Paket 7: Index-Belohnung abholen. Args: rewardId (IndexRewardConfig)
+local RequestClaimIndexReward = getOrCreateEvent("RequestClaimIndexReward")
+-- Paket 7: Belohnung ausgezahlt (S->C, Toast). Args: Types.IndexRewardResult
+local IndexRewardReceived = getOrCreateEvent("IndexRewardReceived")
+-- Paket 6.2: besonderer Meilenstein ausgezahlt (S->C). Args: Types.SpecialMilestoneResult
+local SpecialMilestoneReceived = getOrCreateEvent("SpecialMilestoneReceived")
+-- Paket 8: Inkubator. Start (eggType), Abholen (slot), Beschleunigen (slot),
+-- Ausbauen (keine Args). Das Schluepfen meldet HatchResultReceived.
+local RequestIncubatorStart   = getOrCreateEvent("RequestIncubatorStart")
+local RequestIncubatorCollect = getOrCreateEvent("RequestIncubatorCollect")
+local RequestIncubatorSpeedUp = getOrCreateEvent("RequestIncubatorSpeedUp")
+local RequestUpgradeIncubator = getOrCreateEvent("RequestUpgradeIncubator")
+-- INCUBATOR_BREED: ("put", baerchiUid) / ("take", platz)
+local RequestIncubatorBaerchi = getOrCreateEvent("RequestIncubatorBaerchi")
+-- Paket 8: S->C Hinweis "Platz belegt / fertig / abgeholt" (Feedback, Ton).
+-- Args: { slot: number, kind: "start" | "ready" | "collect" | "speedup" | "upgrade" }
+local IncubatorChanged = getOrCreateEvent("IncubatorChanged")
+
+-- ============================================================
 -- Client → Server Functions (brauchen eine Antwort)
 -- ============================================================
 
@@ -368,11 +402,13 @@ return {
 	EventHazardHit        = EventHazardHit,
 
 	TowerMilestoneReceived = TowerMilestoneReceived,
+	TowerUnlocked          = TowerUnlocked,
 	DailyBonusReceived     = DailyBonusReceived,
 
 	EggTreeUnlocked        = EggTreeUnlocked,
 	EggPressResultReceived = EggPressResultReceived,
 	SkillFXPlay            = SkillFXPlay,
+	WorldMoment            = WorldMoment,
 	RequestPressEggs       = RequestPressEggs,
 	RequestUseBlueprint    = RequestUseBlueprint,
 
@@ -382,6 +418,7 @@ return {
 	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,
 	RequestSelectTower     = RequestSelectTower,
+	RequestBuyGamepass     = RequestBuyGamepass,
 	RequestClaimDailyBonus = RequestClaimDailyBonus,
 	RequestUpgradeRecycler = RequestUpgradeRecycler,
 	RequestFuseBaerchis    = RequestFuseBaerchis,
@@ -399,6 +436,18 @@ return {
 	RequestMarkUiSeen      = RequestMarkUiSeen,
 	RequestGoHome          = RequestGoHome,
 	RequestClaimFreeGrab   = RequestClaimFreeGrab,
+
+	-- Sammel-Update 05.10.
+	RequestPitSpeed          = RequestPitSpeed,
+	RequestClaimIndexReward  = RequestClaimIndexReward,
+	IndexRewardReceived      = IndexRewardReceived,
+	SpecialMilestoneReceived = SpecialMilestoneReceived,
+	RequestIncubatorStart    = RequestIncubatorStart,
+	RequestIncubatorCollect  = RequestIncubatorCollect,
+	RequestIncubatorSpeedUp  = RequestIncubatorSpeedUp,
+	RequestUpgradeIncubator  = RequestUpgradeIncubator,
+	RequestIncubatorBaerchi  = RequestIncubatorBaerchi,
+	IncubatorChanged         = IncubatorChanged,
 
 	-- Functions
 	GetPlayerData          = GetPlayerData,

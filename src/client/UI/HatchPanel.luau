@@ -21,7 +21,10 @@ local Types     = require(ReplicatedStorage.Network.Types)
 local Remotes   = require(ReplicatedStorage.Network.Remotes)
 local EggConfig = require(ReplicatedStorage.Config.EggConfig)
 local Loc       = require(ReplicatedStorage.Localization.Loc)
+local Names     = require(ReplicatedStorage.Localization.Names)
 local EggTree   = require(ReplicatedStorage.Modules.EggTree)
+local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
+local IncubatorRules = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
 
 local Theme          = require(script.Parent.Theme)
 local PanelManager   = require(script.Parent.PanelManager)
@@ -36,6 +39,7 @@ local EGG_HEIGHT = 92
 
 local _root: Frame?              = nil
 local _scroller: ScrollingFrame? = nil
+local _signature = ""
 
 --------------------------------------------------------------------------------
 -- Reihenfolge der Eier
@@ -82,7 +86,7 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	local icon = EggIcon.make(card, eggType, 58, 3, { idle = true, pedestal = true })
 	icon.Position = UDim2.fromOffset(16, 7)
 
-	local name = Theme.label("Name", card, Loc.name("egg." .. eggType .. ".name", def.displayName))
+	local name = Theme.label("Name", card, Names.egg(eggType))
 	name.Position = UDim2.new(0, 76, 0, 12)
 	name.Size     = UDim2.new(1, -212, 0, 22)
 	name.TextColor3 = def.color:Lerp(Color3.new(1, 1, 1), 0.3)
@@ -91,7 +95,7 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	-- v14: ein noch gesperrtes Ei im Lager ist ein Sprung-Ei aus einem Event.
 	local data = ClientState.get()
 	local locked = data ~= nil and not EggTree.isUnlocked(data.eggTree, eggType)
-	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else Loc.name("egg." .. eggType .. ".desc", def.description))
+	local desc = Theme.bodyText("Desc", card, if locked then Loc.t("ui.tree.jump_hint") else Names.eggDesc(eggType))
 	desc.Position = UDim2.new(0, 76, 0, 36)
 	desc.Size     = UDim2.new(1, -212, 0, 44)
 	desc.TextColor3 = Theme.COLORS.cream
@@ -103,12 +107,22 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 	count.TextColor3     = Theme.COLORS.honey
 	Theme.outlineText(count, 2)
 
+	-- Sammel-Update 05.10. (Paket 8): Eier ab Gold-Stufe gehen in den
+	-- Inkubator statt sofort auf (gleiche Regel wie der Server).
+	local toIncubator = FeatureFlags.isOn("INCUBATOR") and not FeatureFlags.isOn("INCUBATOR_BREED") and data ~= nil
+		and IncubatorRules.requiresIncubator(eggType, IncubatorRules.isUnlocked(data))
 	-- "Oeffnen" als Honigtropfen-Siegel
-	local button = Theme.sealButton("Open", card, Loc.t("ui.tree.open"))
+	local button = Theme.sealButton("Open", card,
+		if toIncubator then Loc.t("ui.hatch.to_incubator") else Loc.t("ui.hatch.open"))
 	button.Position = UDim2.new(1, -138, 0, 40)
 	button.Size     = UDim2.new(0, 120, 0, 36)
 
 	button.Activated:Connect(function()
+		if toIncubator then
+			Remotes.RequestIncubatorStart:FireServer(eggType)
+			PanelManager.open("Incubator")
+			return
+		end
 		-- Animation zuerst: der Klick soll sich sofort anfuehlen. Was
 		-- herauskommt, kommt trotzdem ausschliesslich vom Server.
 		HatchAnimation.request(eggType)
@@ -128,6 +142,18 @@ function HatchPanel.refresh()
 
 	local data = ClientState.get()
 	if not data then return end
+
+	-- Sammel-Update 1.3-Muster: nur neu bauen, wenn sich das Lager (oder die
+	-- Sprache) aendert — sonst zerstoert jeder Datenstand den Knopf unter dem
+	-- Finger, und der Tipp kommt nicht an.
+	local parts = { Loc.getLanguage(), tostring(IncubatorRules.isUnlocked(data)) }
+	for _, eggType in EGG_ORDER do
+		local n = data.island.eggStock[eggType] or 0
+		if n > 0 then table.insert(parts, eggType .. n) end
+	end
+	local signature = table.concat(parts, "|")
+	if signature == _signature then return end
+	_signature = signature
 
 	for _, child in scroller:GetChildren() do
 		if child:IsA("Frame") or child:IsA("TextLabel") then
@@ -160,6 +186,7 @@ local function openInternal(...: any)
 	if not root then return end
 
 	root.Visible = true
+	_signature = ""
 	HatchPanel.refresh()
 end
 

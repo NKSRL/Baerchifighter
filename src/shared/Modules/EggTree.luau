@@ -231,13 +231,16 @@ end
 -- Sonderfaelle:
 --   * Kometen-Ei (kein Vorgaenger im eigenen Pfad): das hoechste freie der
 --     drei Endeier, sonst deren Fallback.
---   * Ascensions-Ei: wird IMMER gelegt (selten, nur von wenigen Baerchis).
---     Es ist ein Rebirth-Pfad, sein Knoten zeigt nur, ab wann man es planbar
---     bekommt. Seine Nachfolger legt kein Baerchi.
-local LAY_ALWAYS: { [string]: boolean } = { AscensionEgg = true }
-
+--   * Ascensions-Pfad: wird NIE gelegt (Sammel-Update 05.10., Paket 6.2).
+--     Ascension-Eier gibt es nur aus Rebirth- und besonderen Meilensteinen.
+--     Steht doch einmal eins in einer Lege-Tabelle (alter Stand, Tippfehler),
+--     wird daraus ein Zucker-Ei statt eines Geschenks.
 function EggTree.resolveLaid(state: Types.EggTreeState?, eggType: Types.EggType): Types.EggType
-	if LAY_ALWAYS[eggType] or EggTree.isUnlocked(state, eggType) then
+	local def = EggConfig.data[eggType]
+	if def and def.path == "Ascension" then
+		return "SugarEgg"
+	end
+	if EggTree.isUnlocked(state, eggType) then
 		return eggType
 	end
 

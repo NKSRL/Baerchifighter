@@ -397,6 +397,7 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		createdAt    = data.createdAt,
 		uiSeen       = data.uiSeen,   -- HBB Paket 3
 		shop         = shopView(data),  -- HBB Paket 10
+		indexClaimed = data.indexClaimed,   -- Sammel-Update Paket 7
 	}
 end
 

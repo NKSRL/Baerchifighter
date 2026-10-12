@@ -71,6 +71,52 @@ local FLAGS: { [string]: boolean } = {
 	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
 	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
 	ENDLESS           = true,
+
+	-- Sammel-Update 05.10. (docs/SAMMEL_UPDATE_UMGESETZT_2026-10-05.md):
+	-- Paket 8: Inkubator auf dem Plot. Aus = Eier gehen wie vorher sofort auf,
+	-- der Inkubator wird weder gebaut noch angeboten.
+	INCUBATOR         = true,
+	-- Paket 7: Index-Belohnungen (Abholen im Index).
+	INDEX_REWARDS     = true,
+	-- Paket 5.2: Kampf um die Mitte — gegnerische Event-Baerchis stossen
+	-- Spieler ohne eigenen Baerchi im Event-Pit.
+	PIT_BRAWL         = true,
+	-- Paket 3.8: Bereichs-Schilder (zwei Woerter) auf der Hauptinsel.
+	AREA_SIGNS        = true,
+	-- Wunsch 05.10.: Baerchi darf mehrmals ins selbe UFO; nach dem Absetzen
+	-- ist sein Level fuer EventConfig.UFO.DROP_WEAKEN_SECONDS halbiert.
+	-- Aus = wie vorher (wer schon an Bord war, geht heim).
+	UFO_REJOIN        = true,
+	-- Wunsch 05.10.: aufgeraeumtes HUD. Honig-Brunnen nur vor Ort verbessern
+	-- (E, kein Fenster, Schild mit Level und Preis), keine Kacheln "Verbessern"
+	-- und "Inkubator" mehr, Quests als kleiner Knopf neben dem Zahnrad, Shop
+	-- daneben (eine Zeile), groessere Kacheln rechts.
+	HUD_ROW_V2        = true,
+	-- Wunsch 05.10.: Inkubator = Baerchi hineinsetzen, er bruetet je nach
+	-- Rarity im Takt zusaetzliche Eier (IncubatorConfig.BREED_*). Eier gehen
+	-- wieder sofort auf (kein Brueten von Eiern mehr). Aus = Ei-Inkubator wie
+	-- im Sammel-Update.
+	INCUBATOR_BREED   = true,
+	-- Welt aufwerten (08.10.2026), je Paket ein Schalter. Reine Client-Optik.
+	-- Paket A (Tageslauf) haengt am Schalter AmbienceConfig.DAY_CYCLE.
+	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
+	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
+	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
+	WORLD_D_PLOTS     = true,   -- Insel-Stufen, Teich-Glanz/Ueberlauf, eigene Insel, leere Inseln
+	WORLD_E_ARENA     = true,   -- Steg-Laternen, Torbogen, Zuschauer, Flagge am Schau-Turm
+	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
+	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
+	WORLD_H_SOUND     = true,   -- Klang-Kulisse nach Zonen (laeuft nur mit gepruefter Sound-ID)
+	WORLD_I_ZONES     = true,   -- Licht-Feinschliff nach Zonen (Insel / Arena / Turm)
+
+	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
+	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
+	-- begrenzt dann nichts mehr. Aus = alte Regel (STAGE_CAP_BY_REBIRTH).
+	TOWER_UNLOCK_BY_CLEAR = true,
+	-- 08.10.: Tower-Terminal an der Bruecke (Paket B2)
+	TOWER_TERMINAL    = true,
+	-- 08.10.: neues Tower-Panel im Look Theme.v2 (Paket D); aus = altes CombatPanel
+	TOWER_PANEL_V2    = true,
 }
 
 local FeatureFlags = {}

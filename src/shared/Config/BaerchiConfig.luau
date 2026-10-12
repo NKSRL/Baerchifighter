@@ -57,10 +57,12 @@ export type BaerchiDef = {
 	-- welche Eier legt, ist ansonsten reine Charaktersache (der Zucker-Baerchi
 	-- legt Zucker-Eier, der Kristall-Baerchi Kristall-Eier).
 	--
-	-- ASCENSION-EIER sind bewusst fast unerreichbar: nur die beiden Legendaries
-	-- und der Mythic koennen ueberhaupt eines legen, und selbst bei denen mit
-	-- kleinem Gewicht. Sie sollen verdient bleiben (siehe EggConfig: nicht
-	-- kaufbar, sonst nur aus Rebirth-Meilensteinen).
+	-- ASCENSION-EIER legt KEIN Baerchi (Sammel-Update 05.10., Paket 6.2):
+	-- vorher hatten 19 Baerchis sie mit 3-10 % in der Tabelle, und wer einen
+	-- davon ausruestete, bekam sie dauerhaft fuers Herumstehen. Sie haben
+	-- genau zwei Quellen: Rebirth-Meilensteine (EconomyConfig.REBIRTH_MILESTONES)
+	-- und die besonderen Meilensteine (EconomyConfig.SPECIAL_MILESTONES).
+	-- tools/check_consistency.py schlaegt fehl, sobald hier wieder eins steht.
 	layIntervalSeconds : number,
 	eggTable    : { { eggType: Types.EggType, weight: number } },
 
@@ -280,7 +282,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "GoldenEgg",    weight = 26 },
 			{ eggType = "CrystalEgg",   weight = 55 },
 			{ eggType = "PrismEgg",     weight = 15 },
-			{ eggType = "AscensionEgg", weight = 4 },
 		},
 		defaultSkill = "ChromaBlast", eggSource = {},
 		description = "Jede Farbe. Jede Kraft.",
@@ -295,7 +296,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "PlatinumEgg",  weight = 50 },
 			{ eggType = "SunEgg",       weight = 12 },
 			{ eggType = "CrystalEgg",   weight = 5 },
-			{ eggType = "AscensionEgg", weight = 3 },
 		},
 		defaultSkill = "TitanMode", eggSource = {},
 		description = "War schon da bevor Gummies erfunden wurden.",
@@ -316,7 +316,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "PrismEgg",     weight = 25 },
 			{ eggType = "VoidEgg",      weight = 25 },
 			{ eggType = "CrystalEgg",   weight = 15 },
-			{ eggType = "AscensionEgg", weight = 10 },
 		},
 		defaultSkill = "BigBang", eggSource = {},
 		description = "Ein Stueck Sternenhimmel mit Fell.",
@@ -330,7 +329,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "PlatinumEgg",  weight = 40 },
 			{ eggType = "SunEgg",       weight = 45 },
 			{ eggType = "ZenithEgg",    weight = 10 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "PhoenixRebirth", eggSource = {},
 		description = "Faellt einmal. Steht immer wieder auf.",
@@ -344,7 +342,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "CrystalEgg",   weight = 25 },
 			{ eggType = "PrismEgg",     weight = 45 },
 			{ eggType = "AuroraEgg",    weight = 25 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "GlacierFrost", eggSource = {},
 		description = "Wo er hinschaut, wird alles langsam.",
@@ -359,7 +356,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "MistEgg",      weight = 10 },
 			{ eggType = "VoidEgg",      weight = 45 },
 			{ eggType = "ShadowEgg",    weight = 40 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "PhantomOmen", eggSource = {},
 		description = "Man sieht ihn kaum. Seine Eier schon.",
@@ -377,7 +373,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "SunEgg",       weight = 40 },
 			{ eggType = "ZenithEgg",    weight = 50 },
 			{ eggType = "CometEgg",     weight = 5 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "SeraphGrace", eggSource = {},
 		description = "Sechs Fluegel, ein Herz aus Honig.",
@@ -391,7 +386,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "PrismEgg",     weight = 30 },
 			{ eggType = "AuroraEgg",    weight = 60 },
 			{ eggType = "CometEgg",     weight = 5 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "AuroraVeil", eggSource = {},
 		description = "Tanzt ueber den Himmel, schneller als das Auge.",
@@ -406,7 +400,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "ShadowEgg",    weight = 45 },
 			{ eggType = "AbyssEgg",     weight = 45 },
 			{ eggType = "CometEgg",     weight = 5 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "EclipseShroud", eggSource = {},
 		description = "Wenn er auftaucht, wird es mitten am Tag dunkel.",
@@ -426,7 +419,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "AbyssEgg",     weight = 15 },
 			{ eggType = "CometEgg",     weight = 45 },
 			{ eggType = "NovaEgg",      weight = 5 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "CometImpact", eggSource = {},
 		description = "Kommt mit einem Knall. Bleibt mit einem Krater.",
@@ -440,7 +432,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "AbyssEgg",     weight = 20 },
 			{ eggType = "CometEgg",     weight = 55 },
 			{ eggType = "NovaEgg",      weight = 20 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "NebulaBurn", eggSource = {},
 		description = "Ein Fell aus Sternenstaub, der brennt.",
@@ -454,7 +445,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "AuroraEgg",    weight = 20 },
 			{ eggType = "CometEgg",     weight = 55 },
 			{ eggType = "NovaEgg",      weight = 20 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "PulsarPulse", eggSource = {},
 		description = "Tickt wie eine Uhr. Jeder Schlag lauter.",
@@ -472,7 +462,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "CometEgg",     weight = 30 },
 			{ eggType = "NovaEgg",      weight = 55 },
 			{ eggType = "GalaxyEgg",    weight = 10 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "ShadeSlash", eggSource = {},
 		description = "Niemand hat ihn je ganz gesehen.",
@@ -486,7 +475,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "CometEgg",     weight = 20 },
 			{ eggType = "NovaEgg",      weight = 60 },
 			{ eggType = "GalaxyEgg",    weight = 15 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "RiddleBeam", eggSource = {},
 		description = "Beantwortet jede Frage mit einer neuen.",
@@ -503,7 +491,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		eggTable = {
 			{ eggType = "NovaEgg",      weight = 45 },
 			{ eggType = "GalaxyEgg",    weight = 50 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "TitanFist", eggSource = {},
 		description = "Traegt Berge, als waeren es Gummibaerchen.",
@@ -516,7 +503,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		eggTable = {
 			{ eggType = "NovaEgg",      weight = 40 },
 			{ eggType = "GalaxyEgg",    weight = 55 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "GenesisWave", eggSource = {},
 		description = "Am Anfang war der Baerchi.",
@@ -533,7 +519,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		eggTable = {
 			{ eggType = "NovaEgg",      weight = 30 },
 			{ eggType = "GalaxyEgg",    weight = 65 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "ChronosRift", eggSource = {},
 		description = "Kommt immer genau rechtzeitig.",
@@ -546,7 +531,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		eggTable = {
 			{ eggType = "NovaEgg",      weight = 25 },
 			{ eggType = "GalaxyEgg",    weight = 70 },
-			{ eggType = "AscensionEgg", weight = 5 },
 		},
 		defaultSkill = "InfinityBarrage", eggSource = {},
 		description = "Hoert nie auf. Wirklich nie.",
@@ -562,7 +546,6 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		layIntervalSeconds = 2100,
 		eggTable = {
 			{ eggType = "GalaxyEgg",    weight = 90 },
-			{ eggType = "AscensionEgg", weight = 10 },
 		},
 		defaultSkill = "OmegaStrike", eggSource = {},
 		description = "Der letzte Baerchi. Danach kommt nichts mehr.",
