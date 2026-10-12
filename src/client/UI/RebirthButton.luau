@@ -23,6 +23,7 @@ local Loc         = require(ReplicatedStorage.Localization.Loc)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 
 local Theme        = require(script.Parent.Theme)
+local Icons        = require(script.Parent.Icons)   -- 12.10.: Ausschnitt
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
@@ -101,6 +102,10 @@ function RebirthButton.init(screenGui: ScreenGui)
 	button.Size        = UDim2.fromOffset(SIZE.X, SIZE.Y)
 	button.Visible     = false
 	button.ZIndex      = 5
+	-- 12.10.: fertiger Ausschnitt "Rebirth!" (Schrift im Bild)
+	if Icons.skin(button, "button_rebirth") then
+		button.Size = UDim2.fromOffset(168, 52)   -- Seitenverhaeltnis des Bilds
+	end
 
 	local glow = Instance.new("UIStroke")
 	glow.Name            = "Glow"

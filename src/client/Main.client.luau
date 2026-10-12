@@ -226,4 +226,7 @@ GuideController.init(screenGui)
 -- HBB Paket 3: ⬆ ueber bezahlbaren eigenen Gebaeuden
 UpgradeHintController.init()
 
+-- 12.10.: Signal fuer den Ladebildschirm (ReplicatedFirst/LoadingScreen)
+Players.LocalPlayer:SetAttribute("HBB_ClientReady", true)
+
 print("[Client] Bereit")

@@ -22,6 +22,7 @@ local ROOTS = {
 	ReplicatedStorage    = game:GetService("ReplicatedStorage"),
 	ServerScriptService  = game:GetService("ServerScriptService"),
 	StarterPlayerScripts = game:GetService("StarterPlayer"):WaitForChild("StarterPlayerScripts"),
+	ReplicatedFirst      = game:GetService("ReplicatedFirst"),   -- 12.10.: Ladebildschirm
 }
 
 local BACKUP_NAME = "Backup_vor_HBBUpdate_" .. os.date("%Y-%m-%d_%H%M")

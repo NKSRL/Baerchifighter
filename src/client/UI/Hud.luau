@@ -247,6 +247,14 @@ function Hud.init(screenGui: ScreenGui)
 	local rankPill
 	_rankLabel, rankPill = makePill(right, 1, "crown", "R", Theme.COLORS.accent)
 	_pills.rank = rankPill
+	-- 12.10.: fertiger Ausschnitt (gruenes Banner, Krone steckt im Bild);
+	-- der Rang-Name bleibt Text (wechselt, vier Sprachen)
+	if Icons.skin(rankPill, "banner_rank") then
+		local holder = rankPill:FindFirstChild("IconHolder")
+		if holder and holder:IsA("GuiObject") then holder.Visible = false end
+		local corner = rankPill:FindFirstChildOfClass("UICorner")
+		if corner then corner:Destroy() end
+	end
 
 	local multLabel, multPill = makePill(right, 2, "rebirth", "*", Theme.COLORS.good)
 	_multLabel = multLabel
@@ -303,6 +311,10 @@ function Hud.init(screenGui: ScreenGui)
 		languageButton.Text = "⚙"
 		languageButton.TextXAlignment = Enum.TextXAlignment.Center
 		languageButton.Size = UDim2.new(0, 30, 0, 30)
+		-- 12.10.: fertiger Ausschnitt (gruene Kachel mit Zahnrad), Tippflaeche 40
+		if Icons.skin(languageButton, "button_settings") then
+			languageButton.Size = UDim2.new(0, 40, 0, 40)
+		end
 		local padding = languageButton:FindFirstChildOfClass("UIPadding")
 		if padding then padding.PaddingRight = UDim.new(0, 0) end
 	end

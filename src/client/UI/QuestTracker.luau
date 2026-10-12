@@ -216,6 +216,13 @@ function QuestTracker.init(screenGui: ScreenGui)
 	icon.Position = UDim2.new(0, -10, 0, -12)
 	icon.Size     = UDim2.fromOffset(40, 40)
 	icon.ZIndex   = 4
+	-- 12.10.: fertiger Ausschnitt (blaue Kachel mit Schriftrolle), etwas groesser
+	local scrollCut = Icons.cutout("tile_quests")
+	if scrollCut and icon:IsA("ImageLabel") then
+		icon.Image = scrollCut.id
+		icon.Position = UDim2.new(0, -14, 0, -16)
+		icon.Size = UDim2.fromOffset(46, 46)
+	end
 
 	local header = Theme.label("Header", card, "")
 	header.Position   = UDim2.new(0, 36, 0, 5)

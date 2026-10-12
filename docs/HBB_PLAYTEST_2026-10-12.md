@@ -27,3 +27,21 @@ Syntax, `check_locals`, alle Luau-Tests (neu: `recycler.test.lua`, erweitert: `t
 4. Teich von der Seite: Bohlen flimmern nicht mehr.
 5. Waben abgeben → Gummies sofort; Schild „×N“.
 6. Wegweiser auf der Hauptinsel, Ei-Fenster (X/Ei-Baum), Kampf-Knopf mit gespeichertem Lauf.
+
+## Nachtrag: Ladebildschirm, PC-Größe, UI-Ausschnitte
+
+**Ladebildschirm** (`src/first/LoadingScreen.client.luau` → **ReplicatedFirst**, neu in `default.project.json`, `make_update_rbxmx.py`, `einspielen.lua`): ersetzt Roblox' grauen Standard-Bildschirm ab der ersten Sekunde. Honig-Verlauf, hüpfender Bärchi, steigende Waben, Titel, Status-Zeile, Balken, wechselnde Tipps (4 Sprachen, `ui.loading.*`). Weg erst, wenn Spiel geladen, eigene Insel da, Charakter da, Oberfläche bereit (`HBB_ClientReady`, gesetzt am Ende von `Main`) und Bilder vorgeladen sind, plus 1,5 s Ruhe für die Deko. Sicherheitsnetz 30 s. Ein Block skaliert mit dem Bildschirm (Handy quer bis 4K). Bilder: `docs/screens/ladebildschirm_*.png`.
+
+**PC größer** (`UI/UiScale`): mit Maus + Tastatur wächst die UI früher (1080p 1,27 → 1,49, 1440p 1,6 → 1,85, Deckel über die Breite). Handy und Tablet (Touch ohne Tastatur) rechnen unverändert. Bild: `docs/screens/pc_skalierung_1080p.png`.
+
+**UI-Ausschnitte** (`UI/Icons.luau`, Tabelle `CUTOUTS`): fünf Plätze, leer = alte Optik.
+
+| Schlüssel | Bild | ersetzt |
+|---|---|---|
+| `tile_baerchis` | rote Kachel mit Bärchi | Menü-Kachel „Bärchis“ |
+| `tile_quests` | blaue Kachel mit Schriftrolle | Rolle an der Quest-Karte |
+| `button_settings` | grüne Kachel mit Zahnrad | Zahnrad oben links (40 px) |
+| `banner_rank` | grünes Banner mit Krone | Rang-Pille rechts oben — **ohne Schrift hochladen**, der Rang-Name bleibt Text (wechselt, 4 Sprachen) |
+| `button_rebirth` | „Rebirth!“ | Rebirth-Knopf (168 × 52) |
+
+Einbauen: PNG in Studio hochladen (Asset-Manager → Bilder), ID als `"rbxassetid://<id>"` bei `id` eintragen.

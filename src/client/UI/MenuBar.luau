@@ -189,8 +189,12 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	-- und das gezeichnete Basis-Ei auf einem Sockel. Erst wenn die Bilder
 	-- hochgeladen sind (Icons.luau); bis dahin die normale Kachel.
 	local storybook = entry.panel == "Hatch" and EggIcon.imageId("BasicEgg") ~= nil
-	local hasImage = storybook or Icons.has(entry.icon)
-	if storybook then
+	-- 12.10.: fertiger Ausschnitt (Icons.CUTOUTS) ersetzt die ganze Kachel
+	local cutout = entry.panel == "Inventory" and Icons.skin(button, "tile_baerchis") ~= nil
+	local hasImage = cutout or storybook or Icons.has(entry.icon)
+	if cutout then
+		button.Text = ""
+	elseif storybook then
 		button.Text = ""
 		Theme.gradient(button, Theme.COLORS.cream, Theme.shade(Theme.COLORS.honey, -0.05))
 		Theme.ornate(button, "tile", 0.3)

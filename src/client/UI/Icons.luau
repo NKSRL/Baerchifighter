@@ -148,6 +148,63 @@ function Icons.uiImage(parent: Instance, name: string, sliceScale: number?): Ima
 	return image
 end
 
+--------------------------------------------------------------------------------
+-- 12.10.: Fertige UI-Ausschnitte (Ordner UI_cutouts_2 des Auftraggebers)
+--------------------------------------------------------------------------------
+-- Ganze Knoepfe/Banner als EIN Bild, das die gebaute Optik (Farbe, Verlauf,
+-- Kontur, Glanz) ersetzt. Leere ID = alte Optik bleibt (nichts kaputt, bis
+-- das Bild hochgeladen ist). Hochladen: Studio → Asset-Manager → Bilder,
+-- ID kopieren, hier als "rbxassetid://<id>" eintragen.
+--   baked = true: die Schrift steckt im Bild (z. B. "Rebirth!") — der
+--           Text des Knopfs wird unsichtbar (bleibt fuer Loc/Bedienhilfe da).
+--   baked = false: Bild ohne Schrift, der Text (ueber Loc) liegt darauf.
+--           Der Rang-Banner braucht diese Fassung: der Rang wechselt und
+--           wird in vier Sprachen angezeigt.
+export type Cutout = { id: string, baked: boolean }
+local CUTOUTS: { [string]: Cutout } = {
+	tile_baerchis   = { id = "", baked = true  },   -- rote Kachel mit Baerchi-Kopf (Menue "Baerchis")
+	tile_quests     = { id = "", baked = true  },   -- blaue Kachel mit Schriftrolle (Quest-Karte)
+	button_settings = { id = "", baked = true  },   -- gruene Kachel mit Zahnrad (Einstellungen)
+	banner_rank     = { id = "", baked = false },   -- gruenes Banner mit Krone (Rang), OHNE Schrift hochladen
+	button_rebirth  = { id = "", baked = true  },   -- gruener Knopf "Rebirth!"
+}
+
+function Icons.cutout(name: string): Cutout?
+	local entry = CUTOUTS[name]
+	if not entry or entry.id == "" then return nil end
+	return entry
+end
+
+-- Legt Ausschnitt `name` als Bild in `target` (Knopf oder Rahmen) und
+-- schaltet dessen eigene Optik ab. Gibt das ImageLabel zurueck, nil ohne ID.
+function Icons.skin(target: GuiObject, name: string): ImageLabel?
+	local entry = Icons.cutout(name)
+	if not entry then return nil end
+	target.BackgroundTransparency = 1
+	for _, child in target:GetChildren() do
+		if child:IsA("UIStroke") or child:IsA("UIGradient") then
+			child.Enabled = false
+		elseif child.Name == "Shine" and child:IsA("GuiObject") then
+			child.Visible = false
+		end
+	end
+	local image = Instance.new("ImageLabel")
+	image.Name                   = "Cutout"
+	image.BackgroundTransparency = 1
+	image.BorderSizePixel        = 0
+	image.Image                  = entry.id
+	image.ScaleType              = Enum.ScaleType.Fit
+	image.Size                   = UDim2.fromScale(1, 1)
+	image.ZIndex                 = target.ZIndex
+	image.Active                 = false
+	image.Parent                 = target
+	if entry.baked and target:IsA("TextButton") then
+		target.TextTransparency = 1
+		target.TextStrokeTransparency = 1
+	end
+	return image
+end
+
 function Icons.has(name: string): boolean
 	local id = IDS[name]
 	return id ~= nil and id ~= ""

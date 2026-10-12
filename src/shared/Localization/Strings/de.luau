@@ -1123,4 +1123,16 @@ return {
 	["ui.terminal.screen_new"] = "NEU: {tower}!",
 	["ui.terminal.screen_selected"] = "Gewählt",
 	["msg.terminal_locked"] = "Schaffe zuerst {tower} (Stage {need}) — dann kannst du hier den Tower wechseln.",
+	-- 12.10.: Ladebildschirm (ReplicatedFirst/LoadingScreen)
+	["ui.loading.title"] = "Honey Bear Brawl",
+	["ui.loading.world"] = "Die Welt wacht auf …",
+	["ui.loading.island"] = "Deine Insel wird gebaut …",
+	["ui.loading.bear"] = "Dein Bärchi reckt sich …",
+	["ui.loading.ui"] = "Honig wird abgefüllt …",
+	["ui.loading.images"] = "Fast fertig …",
+	["ui.loading.ready"] = "Los geht's!",
+	["ui.loading.tip1"] = "Tipp: Bring Waben aus der Mitte zu deinem Recycler – das gibt sofort Gummies!",
+	["ui.loading.tip2"] = "Tipp: Jede geschaffte Stage im Tower bringt Gummies.",
+	["ui.loading.tip3"] = "Tipp: Füttere dein Bärchi am Honig-Teich, dann wird es stärker.",
+	["ui.loading.tip4"] = "Tipp: Auf dem gelben Feld an der Arena fliegst du auf den Turm!",
 }

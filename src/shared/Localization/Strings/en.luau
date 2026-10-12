@@ -1115,4 +1115,16 @@ return {
 	["ui.terminal.screen_new"] = "NEW: {tower}!",
 	["ui.terminal.screen_selected"] = "Selected",
 	["msg.terminal_locked"] = "Clear {tower} first (stage {need}) — then you can switch towers here.",
+	-- 12.10.: Ladebildschirm (ReplicatedFirst/LoadingScreen)
+	["ui.loading.title"] = "Honey Bear Brawl",
+	["ui.loading.world"] = "The world is waking up …",
+	["ui.loading.island"] = "Building your island …",
+	["ui.loading.bear"] = "Your bear is stretching …",
+	["ui.loading.ui"] = "Filling the honey jars …",
+	["ui.loading.images"] = "Almost ready …",
+	["ui.loading.ready"] = "Let's go!",
+	["ui.loading.tip1"] = "Tip: Bring honeycombs from the middle to your recycler – instant Gummies!",
+	["ui.loading.tip2"] = "Tip: Every stage you clear in the tower gives Gummies.",
+	["ui.loading.tip3"] = "Tip: Feed your bear at the honey pond to make it stronger.",
+	["ui.loading.tip4"] = "Tip: Step on the yellow pad at the arena to fly up the tower!",
 }

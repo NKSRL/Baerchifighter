@@ -7,6 +7,10 @@
       "$path": "src/shared"
     },
 
+    "ReplicatedFirst": {
+      "$path": "src/first"
+    },
+
     "ServerScriptService": {
       "$path": "src/server"
     },

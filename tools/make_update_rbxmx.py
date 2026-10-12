@@ -38,6 +38,7 @@ ROOTS = {
     "src/shared": "ReplicatedStorage",
     "src/server": "ServerScriptService",
     "src/client": "StarterPlayerScripts",
+    "src/first": "ReplicatedFirst",   # 12.10.: Ladebildschirm
 }
 
 

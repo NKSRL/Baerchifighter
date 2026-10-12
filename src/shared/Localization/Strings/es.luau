@@ -1116,4 +1116,16 @@ return {
 	["ui.terminal.screen_new"] = "¡NUEVO: {tower}!",
 	["ui.terminal.screen_selected"] = "Elegida",
 	["msg.terminal_locked"] = "Supera primero {tower} (etapa {need}) y luego podrás cambiar de torre aquí.",
+	-- 12.10.: Ladebildschirm (ReplicatedFirst/LoadingScreen)
+	["ui.loading.title"] = "Honey Bear Brawl",
+	["ui.loading.world"] = "El mundo se despierta …",
+	["ui.loading.island"] = "Construyendo tu isla …",
+	["ui.loading.bear"] = "Tu osito se estira …",
+	["ui.loading.ui"] = "Llenando los tarros de miel …",
+	["ui.loading.images"] = "Casi listo …",
+	["ui.loading.ready"] = "¡Vamos!",
+	["ui.loading.tip1"] = "Consejo: lleva los panales del centro a tu reciclador: ¡Gummies al instante!",
+	["ui.loading.tip2"] = "Consejo: cada nivel que superas en la torre da Gummies.",
+	["ui.loading.tip3"] = "Consejo: alimenta a tu osito en el estanque de miel para que sea más fuerte.",
+	["ui.loading.tip4"] = "Consejo: ¡pisa la zona amarilla de la arena para volar a lo alto de la torre!",
 }

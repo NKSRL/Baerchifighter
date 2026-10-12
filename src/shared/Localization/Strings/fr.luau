@@ -1116,4 +1116,16 @@ return {
 	["ui.terminal.screen_new"] = "NOUVEAU : {tower} !",
 	["ui.terminal.screen_selected"] = "Choisie",
 	["msg.terminal_locked"] = "Termine d'abord {tower} (étape {need}) — tu pourras alors changer de tour ici.",
+	-- 12.10.: Ladebildschirm (ReplicatedFirst/LoadingScreen)
+	["ui.loading.title"] = "Honey Bear Brawl",
+	["ui.loading.world"] = "Le monde se réveille …",
+	["ui.loading.island"] = "Construction de ton île …",
+	["ui.loading.bear"] = "Ton ourson s'étire …",
+	["ui.loading.ui"] = "On remplit les pots de miel …",
+	["ui.loading.images"] = "Presque prêt …",
+	["ui.loading.ready"] = "C'est parti !",
+	["ui.loading.tip1"] = "Astuce : apporte les rayons du centre à ton recycleur – des Gummies tout de suite !",
+	["ui.loading.tip2"] = "Astuce : chaque étage réussi dans la tour rapporte des Gummies.",
+	["ui.loading.tip3"] = "Astuce : nourris ton ourson à l'étang de miel pour le rendre plus fort.",
+	["ui.loading.tip4"] = "Astuce : monte sur la zone jaune de l'arène pour voler jusqu'en haut de la tour !",
 }
