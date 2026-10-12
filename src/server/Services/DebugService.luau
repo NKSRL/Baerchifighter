@@ -489,6 +489,7 @@ commands.stagebest = function(player, data, towerId: any, stage: any)
 	if typeof(towerId) == "string" and TowerConfig.get(towerId) then
 		data.island.stageBest[towerId] = math.max(0, math.floor(tonumber(stage) or 0))
 		PlayerService.markDirty(player)
+		TowerService.debugApplyUnlocks(player, towerId)   -- 12.10.: Tower pro Leben
 	end
 	local reqTower, reqStage = TowerConfig.getRebirthRequirement(data.rebirthCount, data.towers.records)
 	return {

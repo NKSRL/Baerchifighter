@@ -276,6 +276,14 @@ function TowerService.debugOpenAll(data: Types.PlayerData)
 	_debugOpen[data] = true
 end
 
+-- Debug (12.10.): nach "stagebest" die Freischaltung nachziehen (mit Meldung)
+function TowerService.debugApplyUnlocks(player: Player, towerId: string)
+	local data = PlayerService.getData(player)
+	if not data then return end
+	applyUnlocks(player, data, towerId, true)
+	PlayerService.markDirty(player)
+end
+
 -- Debug: Rekord direkt setzen (mit Meilensteinen bis dorthin).
 function TowerService.debugSetRecord(player: Player, towerId: string, stage: number)
 	local data = PlayerService.getData(player)
@@ -283,6 +291,10 @@ function TowerService.debugSetRecord(player: Player, towerId: string, stage: num
 	if not data or not def then return end
 	local value = math.clamp(math.floor(stage), 0, def.stages)
 	data.towers.records[towerId] = value
+	-- 12.10.: mit TOWER_UNLOCK_PER_LIFE zaehlt fuer die Freischaltung die
+	-- beste Stage dieses Lebens — ein Debug-Rekord gilt als "geschafft"
+	if typeof(data.island.stageBest) ~= "table" then data.island.stageBest = {} end
+	data.island.stageBest[towerId] = math.max(data.island.stageBest[towerId] or 0, value)
 	if value > 0 and def.index > TowerConfig.getIndex(data.towers.highestTower) then
 		data.towers.highestTower = towerId
 	end
