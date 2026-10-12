@@ -446,6 +446,13 @@ local function getBaerchiBaseValue(rarity: Types.Rarity, level: number): number
 	return math.floor(base * (1 + (math.max(level, 1) - 1) * RECYCLE_LEVEL_BONUS))
 end
 
+-- Gummies, die das Verwerten dieses Baerchis bringt. EINE Formel fuer den
+-- Server (RecycleService zahlt aus) und die UI (BaerchiPanel zeigt den Wert
+-- vorher an) — so koennen Anzeige und Auszahlung nie auseinanderlaufen.
+local function getRecycleValue(rarity: Types.Rarity, level: number): number
+	return math.floor(getBaerchiBaseValue(rarity, level) * RECYCLE_RETURN)
+end
+
 local function getRankForPoints(points: number): RankTierDef
 	local result = RANK_TIERS[1]
 	for _, tier in RANK_TIERS do
@@ -498,5 +505,6 @@ return {
 	getHoneyXp            = getHoneyXp,
 	getFusionStatBonus    = getFusionStatBonus,
 	getBaerchiBaseValue   = getBaerchiBaseValue,
+	getRecycleValue       = getRecycleValue,
 	getRankForPoints      = getRankForPoints,
 }

@@ -9,7 +9,7 @@ Es wurde **nichts am Code geändert** – dieser Bericht ist eine Liste.
 ## Gesamturteil
 
 Die Architektur ist solide und für ein Roblox-Projekt überdurchschnittlich sauber.
-Die Funde sind fast alle **lokal** (kleine Doppelungen, tote Reste), keine
+Die Funde sind alle **lokal** (kleine Doppelungen, tote Reste), keine
 strukturellen Brüche.
 
 Stark:
@@ -31,7 +31,7 @@ Priorität: **A** = bald machen (Fehlerquelle), **B** = beim nächsten Anfassen,
 
 | Prio | Was | Wo | Vorschlag |
 | --- | --- | --- | --- |
-| A | **Recycle-Wert** doppelt: Server rechnet `getBaerchiBaseValue × RECYCLE_RETURN` mit `math.floor`, die UI rechnet dieselbe Formel selbst nach. Der Kommentar in `RecycleService` sagt „damit die UI denselben Wert anzeigt“, der Client kann den Service aber gar nicht requiren. | `RecycleService.luau:40`, `BaerchiPanel.luau:431` | `EconomyConfig.getRecycleValue(baerchi)` in `shared`, beide Seiten rufen nur das. |
+| ~~B~~ erledigt | **Recycle-Wert** doppelt: Server und UI rechneten `floor(getBaerchiBaseValue × RECYCLE_RETURN)` je für sich (gleiches Ergebnis, aber zwei Stellen, die auseinanderlaufen können). | `RecycleService.luau:40`, `BaerchiPanel.luau:431` | **Erledigt 12.10.:** `EconomyConfig.getRecycleValue`, beide Seiten rufen nur noch das. |
 | B | **Plot-Besitzer suchen** (Attribut nach oben suchen), 6 Kopien unter 3 Namen | `CombController:130`, `EggTimerController:67`, `WorldController:369`, `IncubatorController:41`, `AreaSignController:47`, `UpgradeHintController:40` | Ein Helfer `PlotOwner.of(instance)` / `PlotOwner.isOwn(instance)` (z. B. in `ClientState` oder einem kleinen Modul). |
 | B | **`fail()`** in 18 Server-Modulen fast gleich, aber uneinheitlich: mal `LocMsg`, mal `LocMsg \| string`, mal nur Schlüssel, mal fester Action-Name | u. a. `RebirthService:62`, `ShopService:47`, `HomeService:31`, `CombatService:81`, `EggService:43` | Eine Funktion `Remotes.fail(player, action, reason: LocMsg)` (bzw. in `RateLimiter`). Rohe Strings dann nicht mehr erlaubt → passt zur Regel „Texte nur über Loc“. |
 | B | **Namen** an `Names` vorbei: `Loc.t("rarity." .. x)` 9×, obwohl `Names.rarity` existiert; `towerName` 3× lokal, `Names.tower` fehlt | `HatchAnimation:424`, `FusionPanel:150/164`, `BaerchiInventory:229`, `ProfilePanel:40`, `IncubatorPanel:232/294`, `IncubatorController:224`, `EggTreePanel:153`; `TerminalController:73`, `CombatPanel:83`, `TowerPanel:122` | `Names.tower(id)` ergänzen, alle Stellen auf `Names.*` umstellen. |
@@ -44,8 +44,8 @@ Priorität: **A** = bald machen (Fehlerquelle), **B** = beim nächsten Anfassen,
 
 | Prio | Was | Wo |
 | --- | --- | --- |
-| B | **Remote ohne Empfänger**: `EventPresenceChanged` wird 7× gefeuert, kein Client hört zu → Netzverkehr ohne Wirkung. | `EventParticipationService:176` |
-| B | **Remote ohne Sender**: `RequestCollectEgg` hat einen Server-Handler, der Client feuert ihn nie (Einsammeln läuft seit Touch über `MapService`). Offene, ungenutzte Angriffsfläche. | `EggLayService:454`, `Remotes.luau:289`, `NetworkConfig:55` |
+| erledigt | **Remote ohne Empfänger**: `EventPresenceChanged` wird 7× gefeuert, kein Client hört zu → Netzverkehr ohne Wirkung. | `EventParticipationService:176` |
+| erledigt | **Remote ohne Sender**: `RequestCollectEgg` hat einen Server-Handler, der Client feuert ihn nie (Einsammeln läuft seit Touch über `MapService`). Offene, ungenutzte Angriffsfläche. | `EggLayService:454`, `Remotes.luau:289`, `NetworkConfig:55` |
 | B | **37 von 38 FeatureFlags stehen auf `true`**, jeweils mit dem alten Weg noch im Code (z. B. `HONEY_POND_V2` → Stock/Veredler 8 Stellen, `TOWER_PANEL_V2` → altes `CombatPanel` baut weiter ein unsichtbares Fenster). Flags sind gut für die Einführung, auf Dauer verdoppeln sie jede Stelle. | `FeatureFlags.luau` |
 | C | `PACING_V2` wird nirgends abgefragt (toter Schalter). | `FeatureFlags.luau:70` |
 | C | `DebugService` requiret 30 Services – okay, weil nur in Studio, sollte aber nie Spiellogik enthalten, die anderswo fehlt. | `DebugService.luau` |
@@ -90,9 +90,16 @@ Projektregel „nichts löschen“ gilt. Bitte dafür eine bewusste Entscheidung
 
 ## Empfohlene Reihenfolge
 
-1. Recycle-Wert in `shared` (A, 10 Min).
-2. Die zwei toten Remotes entfernen, `PACING_V2` klären (B, 15 Min).
+1. ~~Recycle-Wert in `shared`~~ – erledigt 12.10.
+2. ~~Die zwei toten Remotes entfernen~~ – erledigt 12.10. (`EventPresenceChanged`: der Client kennt den Zustand „AtEvent“ über `PetModeChanged`; `RequestCollectEgg`: Einsammeln per Berührung und „Alle einsammeln“ bleiben). `PACING_V2` offen: Schalter ist ohne Wirkung, die Pacing-Werte stehen direkt in den Configs – entscheiden, ob er weg kann.
 3. `fail()` vereinheitlichen, `Names.tower` + Namen umstellen, Plot-Besitzer-Helfer (B, je ~30 Min).
 4. Unnötige `:: any` entfernen, `createDefaultPlayerData` aus `Types` herausziehen (B).
 5. CI-Workflow für die Prüfliste (B).
 6. Für abgenommene Pakete Flags ausbauen; `MapConfig` entlasten (C).
+
+## Nachtrag 12.10.: Prüfungen, die schon auf `main` rot sind
+
+Beim Umsetzen von Schritt 1–2 laufen alle Prüfungen aus `CLAUDE.md`; drei sind **vor und nach** der Änderung gleich rot (nicht durch diese Änderung verursacht):
+- `unlock_rules.test.lua`: „Veteran: alles außer Shop: erwartet 19, bekommen 17“ und ein Laufzeitfehler.
+- `migration_hbb.test.lua`: „C4 Rekord Tower I = 20: erwartet 20, bekommen 17“.
+- `sim/progression_pacing.lua`: Look 4/5 und Rebirth 1 zu früh, Endless Woche 16 bei 39 statt 80–100 – vermutlich nach den Tower-/Freischalt-Änderungen vom 08.10. nicht nachgezogen.

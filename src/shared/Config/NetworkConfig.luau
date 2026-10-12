@@ -49,11 +49,6 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestToggleCharmLock = 0.15,
 
 
-	-- Eier einsammeln ist die haeufigste Weltaktion ueberhaupt: bis zu zwoelf
-	-- liegen gleichzeitig herum, und man klickt sie nacheinander weg. Deshalb
-	-- so kurz wie das Fuettern.
-	RequestCollectEgg      = 0.15,
-
 	-- Alle auf einmal: eine Anfrage statt zwoelf, darf entsprechend traeger sein.
 	RequestCollectAllEggs  = 0.50,
 	RequestPressEggs       = 0.40,   -- v14

@@ -173,10 +173,6 @@ local function fail(player: Player, action: string, reason: Types.LocMsg | strin
 	Remotes.ActionFailed:FireClient(player, action, reason)
 end
 
-local function notifyPresence(player: Player, atEvent: boolean, baerchiUid: string?)
-	Remotes.EventPresenceChanged:FireClient(player, atEvent, baerchiUid)
-end
-
 local function footPosOf(model: Model): Vector3
 	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
@@ -330,7 +326,6 @@ function EventParticipationService.sendToEvent(player: Player): boolean
 			}
 
 			playEventMotion(figure)
-			notifyPresence(player, true, uid)
 
 			print("[EventParticipationService]", player.Name, "| am Event:", uid)
 		end)
@@ -348,7 +343,6 @@ function EventParticipationService.sendToEvent(player: Player): boolean
 		-- sonst bliebe der Spieler dauerhaft blockiert.
 		if not _present[player] then
 			ActivityLock.release(player, LOCK_HOLDER)
-			notifyPresence(player, false, nil)
 		end
 	end)
 
@@ -391,14 +385,12 @@ function EventParticipationService.recall(player: Player): boolean
 	if not figure then
 		_present[player] = nil
 		ActivityLock.release(player, LOCK_HOLDER)
-		notifyPresence(player, false, nil)
 		return true
 	end
 
 	_walking[player]  = true
 	_walkDir[player]  = "back"
 	_present[player]  = nil
-	notifyPresence(player, false, presence.baerchiUid)
 
 	task.spawn(function()
 		local ok, err = pcall(function()
@@ -969,9 +961,6 @@ local function finishHome(presence: any)
 	end
 
 	ActivityLock.release(player, LOCK_HOLDER)
-	if player.Parent ~= nil then
-		notifyPresence(player, false, nil)
-	end
 end
 
 -- UFO-Belohnung beim Absetzen: +1 auf alle Stats (begrenzt durch STAT_CAP)
@@ -1264,10 +1253,6 @@ local function tick()
 		if lost then
 			_present[player] = nil
 			ActivityLock.release(player, LOCK_HOLDER)
-
-			if player.Parent ~= nil then
-				notifyPresence(player, false, nil)
-			end
 		end
 	end
 end

@@ -119,13 +119,6 @@ local CharmRollResultReceived = getOrCreateEvent("CharmRollResultReceived")
 -- Args: EventStatGain
 local EventStatGained = getOrCreateEvent("EventStatGained")
 
--- Der ausgeruestete Baerchi ist am Event angekommen bzw. wieder zuhause.
--- Reiner Anzeige-Zustand fuer den "Zum Event"-Knopf — die Wahrheit darueber,
--- wer am Event steht, liegt ausschliesslich serverseitig
--- (EventParticipationService), dieser Event teilt sie nur mit.
--- Args: atEvent: boolean, baerchiUid: string?
-local EventPresenceChanged = getOrCreateEvent("EventPresenceChanged")
-
 -- Der Event-Zyklus hat die Phase gewechselt: ein Event hat begonnen oder ist
 -- vorbei. Geht an ALLE Spieler (der Zyklus ist fuer alle derselbe) und beim
 -- Join zusaetzlich einmal gezielt an den neuen Spieler.
@@ -282,12 +275,6 @@ local RequestRollCharms = getOrCreateEvent("RequestRollCharms")
 -- Args: baerchiUid: string, slot: number
 local RequestToggleCharmLock = getOrCreateEvent("RequestToggleCharmLock")
 
--- Spieler sammelt ein gelegtes Ei auf, das in der Welt liegt.
--- Args: eggUid: string  (Types.LaidEgg.uid — NICHT die Position: die aendert
---       sich nicht, aber eine uid ist eindeutig auch dann noch, wenn zwei Eier
---       uebereinander liegen.)
-local RequestCollectEgg = getOrCreateEvent("RequestCollectEgg")
-
 -- Spieler sammelt ALLE herumliegenden Eier auf einmal auf.
 -- Args: (keine)
 local RequestCollectAllEggs = getOrCreateEvent("RequestCollectAllEggs")
@@ -388,7 +375,6 @@ return {
 	PromotionResultReceived = PromotionResultReceived,
 	CharmRollResultReceived = CharmRollResultReceived,
 	EventStatGained         = EventStatGained,
-	EventPresenceChanged    = EventPresenceChanged,
 	EventPhaseChanged       = EventPhaseChanged,
 	EggCollectedReceived    = EggCollectedReceived,
 	OfflineEggReportReceived = OfflineEggReportReceived,
@@ -430,7 +416,6 @@ return {
 	RequestPromoteBaerchi  = RequestPromoteBaerchi,
 	RequestRollCharms      = RequestRollCharms,
 	RequestToggleCharmLock = RequestToggleCharmLock,
-	RequestCollectEgg      = RequestCollectEgg,
 	RequestCollectAllEggs  = RequestCollectAllEggs,
 	RequestLogUiEvent      = RequestLogUiEvent,
 	RequestMarkUiSeen      = RequestMarkUiSeen,
