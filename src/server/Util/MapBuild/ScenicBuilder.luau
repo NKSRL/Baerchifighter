@@ -169,6 +169,8 @@ local function buildLamps(parent: Instance, placed: { Placed })
 end
 
 -- Pfosten mit Leuchtkappe an beiden Enden jedes inneren Stegs (Hauptinsel → Plot).
+-- Die aeusseren Kampf-Stege (Plot → Arena) entstehen erst mit dem Spieler-Plot
+-- in ArenaBuilder.buildBridge, damit bei freien Slots nichts ueber dem Wasser schwebt.
 local function buildBridgePosts(parent: Instance)
 	local deckTop = MapConfig.PLATFORM_TOP_Y - MapConfig.BRIDGE_SINK
 	local sideOffset = (MapConfig.BRIDGE_WIDTH + MapConfig.BRIDGE_RAIL_WIDTH) * 0.5
@@ -176,12 +178,15 @@ local function buildBridgePosts(parent: Instance)
 	local fromRadius = MapConfig.PLATFORM_RADIUS
 	local toRadius   = MapConfig.PLOT_RING_RADIUS - MapConfig.PLOT_ISLAND_RADIUS
 	local inset      = AmbienceConfig.BRIDGE_POST_INSET
+	local laneColors = AmbienceConfig.LANE_COLORS
 
 	for slot = 1, MapConfig.PLOT_COUNT do
-		local outward = MapParts.outwardDirection(slot)
-		local side    = Vector3.new(-outward.Z, 0, outward.X)
+		local outward   = MapParts.outwardDirection(slot)
+		local side      = Vector3.new(-outward.Z, 0, outward.X)
+		local laneColor = (laneColors and laneColors[slot]) or AmbienceConfig.LAMP_GLOW_COLOR
 
-		for _, radius in { fromRadius + inset, toRadius - inset } do
+		-- Innere Bruecke (Hauptinsel -> Plot): farbcodierte Kappen + fest montierte Wimpel am Brueckenkopf
+		for idx, radius in { fromRadius + inset, toRadius - inset } do
 			for _, sign in { -1, 1 } do
 				local p = MapConfig.CENTER + outward * radius + side * (sign * sideOffset)
 
@@ -189,7 +194,27 @@ local function buildBridgePosts(parent: Instance)
 					MapConfig.BRIDGE_RAIL_COLOR, Enum.Material.Wood)
 				ball("BridgeCap", parent, Vector3.new(1.9, 1.9, 1.9),
 					CFrame.new(p.X, deckTop + AmbienceConfig.BRIDGE_POST_HEIGHT + 0.5, p.Z),
-					AmbienceConfig.LAMP_GLOW_COLOR, Enum.Material.Neon)
+					laneColor, Enum.Material.Neon)
+
+				if idx == 1 then
+					local barPos = p + side * (sign * 1.0) + Vector3.new(0, deckTop + AmbienceConfig.BRIDGE_POST_HEIGHT - 0.25, 0)
+					decorPart(
+						"LaneCrossbar", parent,
+						Vector3.new(2.1, 0.35, 0.35),
+						CFrame.lookAt(barPos, barPos + outward),
+						MapConfig.BRIDGE_RAIL_COLOR,
+						Enum.Material.Wood
+					)
+
+					local flagPos = p + side * (sign * 1.25) + Vector3.new(0, deckTop + AmbienceConfig.BRIDGE_POST_HEIGHT - 1.45, 0)
+					decorPart(
+						"LanePennant", parent,
+						Vector3.new(1.5, 2.3, 0.22),
+						CFrame.lookAt(flagPos, flagPos + outward),
+						laneColor,
+						Enum.Material.SmoothPlastic
+					)
+				end
 			end
 		end
 	end

@@ -17,6 +17,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local AmbienceConfig   = require(ReplicatedStorage.Config.AmbienceConfig)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
@@ -32,14 +33,90 @@ local ArenaBuilder = {}
 -- buildPlatform.
 function ArenaBuilder.buildBridge(plotModel: Model, slot: number)
 	local islandEdge = MapConfig.PLOT_RING_RADIUS + MapConfig.PLOT_ISLAND_RADIUS
+	local outerTo    = islandEdge + MapConfig.ISLAND_GAP
+	local outward    = MapParts.outwardDirection(slot)
+	local side       = Vector3.new(-outward.Z, 0, outward.X)
 
 	MapParts.buildSpan(
 		plotModel,
 		"Bridge",
-		MapParts.outwardDirection(slot),
+		outward,
 		islandEdge,
-		islandEdge + MapConfig.ISLAND_GAP
+		outerTo
 	)
+
+	-- Goldene Bernsteinschalen und fest montierte Schlacht-Banner am Spieler-Steg
+	-- (entstehen nur fuer belegte Slots zusammen mit dem Steg, damit nichts ueber leerem Wasser schwebt)
+	local deckTop     = MapConfig.PLATFORM_TOP_Y - MapConfig.BRIDGE_SINK
+	local sideOffset  = (MapConfig.BRIDGE_WIDTH + MapConfig.BRIDGE_RAIL_WIDTH) * 0.5
+	local inset       = AmbienceConfig.BRIDGE_POST_INSET
+	local goldColor   = AmbienceConfig.COMBAT_GOLD_COLOR or Color3.fromRGB(255, 205, 70)
+	local glowColor   = AmbienceConfig.COMBAT_GLOW_COLOR or Color3.fromRGB(255, 175, 45)
+	local bannerColor = AmbienceConfig.COMBAT_BANNER_COLOR or Color3.fromRGB(215, 60, 75)
+
+	for idx, radius in { islandEdge + inset, outerTo - inset } do
+		for _, sign in { -1, 1 } do
+			local p = MapConfig.CENTER + outward * radius + side * (sign * sideOffset)
+
+			local post = MapParts.newPart(
+				"CombatPost",
+				Vector3.new(5.8, 1.4, 1.4),
+				CFrame.new(p.X, deckTop + 2.9, p.Z) * CFrame.Angles(0, 0, math.rad(90)),
+				goldColor,
+				Enum.Material.Metal
+			)
+			post.Shape      = Enum.PartType.Cylinder
+			post.CanCollide = false
+			post.CanQuery   = false
+			post.CanTouch   = false
+			post.CastShadow = false
+			post.Parent     = plotModel
+
+			local brazier = MapParts.newPart(
+				"CombatBrazier",
+				Vector3.new(2.3, 1.8, 2.3),
+				CFrame.new(p.X, deckTop + 6.2, p.Z),
+				glowColor,
+				Enum.Material.Neon
+			)
+			brazier.Shape      = Enum.PartType.Ball
+			brazier.CanCollide = false
+			brazier.CanQuery   = false
+			brazier.CanTouch   = false
+			brazier.CastShadow = false
+			brazier.Parent     = plotModel
+
+			if idx == 1 then
+				local barPos = p + side * (sign * 1.05) + Vector3.new(0, deckTop + 5.2, 0)
+				local bar = MapParts.newPart(
+					"CombatCrossbar",
+					Vector3.new(2.2, 0.36, 0.36),
+					CFrame.lookAt(barPos, barPos + outward),
+					goldColor,
+					Enum.Material.Metal
+				)
+				bar.CanCollide = false
+				bar.CanQuery   = false
+				bar.CanTouch   = false
+				bar.CastShadow = false
+				bar.Parent     = plotModel
+
+				local bannerPos = p + side * (sign * 1.30) + Vector3.new(0, deckTop + 3.6, 0)
+				local banner = MapParts.newPart(
+					"CombatPennant",
+					Vector3.new(1.6, 3.0, 0.24),
+					CFrame.lookAt(bannerPos, bannerPos + outward),
+					bannerColor,
+					Enum.Material.SmoothPlastic
+				)
+				banner.CanCollide = false
+				banner.CanQuery   = false
+				banner.CanTouch   = false
+				banner.CastShadow = false
+				banner.Parent     = plotModel
+			end
+		end
+	end
 end
 
 -- Die PIT-Arena am Ende der Bruecke. Flache runde Kampfflaeche.
@@ -106,6 +183,51 @@ function ArenaBuilder.buildPit(plotModel: Model, slot: number)
 	floor.Shape  = Enum.PartType.Cylinder
 	floor.Parent = container
 
+	-- Goldenes Kolosseum-Emblem buendig auf der Kampfflaeche, damit die Arena
+	-- auch im Ruhezustand wie ein echter Kampf-Ring wirkt.
+	local emblemRing = MapParts.newPart(
+		"ArenaEmblemRing",
+		Vector3.new(0.06, 22, 22),
+		CFrame.new(center.X, MapConfig.PLATFORM_TOP_Y + 0.03, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(255, 220, 115),
+		Enum.Material.Neon
+	)
+	emblemRing.Shape        = Enum.PartType.Cylinder
+	emblemRing.Transparency = 0.35
+	emblemRing.CanCollide   = false
+	emblemRing.CanQuery     = false
+	emblemRing.CanTouch     = false
+	emblemRing.CastShadow   = false
+	emblemRing.Parent       = container
+
+	local emblemCore = MapParts.newPart(
+		"ArenaEmblemCore",
+		Vector3.new(0.08, 15, 15),
+		CFrame.new(center.X, MapConfig.PLATFORM_TOP_Y + 0.04, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(225, 175, 65),
+		Enum.Material.SmoothPlastic
+	)
+	emblemCore.Shape      = Enum.PartType.Cylinder
+	emblemCore.CanCollide = false
+	emblemCore.CanQuery   = false
+	emblemCore.CanTouch   = false
+	emblemCore.CastShadow = false
+	emblemCore.Parent     = container
+
+	local emblemStar = MapParts.newPart(
+		"ArenaEmblemStar",
+		Vector3.new(0.10, 6.5, 6.5),
+		CFrame.new(center.X, MapConfig.PLATFORM_TOP_Y + 0.05, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(255, 235, 140),
+		Enum.Material.Neon
+	)
+	emblemStar.Shape      = Enum.PartType.Cylinder
+	emblemStar.CanCollide = false
+	emblemStar.CanQuery   = false
+	emblemStar.CanTouch   = false
+	emblemStar.CastShadow = false
+	emblemStar.Parent     = container
+
 	-- Leuchtender Zaun auf dem Sockelrand.
 	--
 	-- Zur Steg-Seite bleibt eine Luecke frei, sonst muesste man beim Betreten
@@ -141,6 +263,54 @@ function ArenaBuilder.buildPit(plotModel: Model, slot: number)
 			post.Parent     = container
 		end
 	end
+
+	-- Helden-Torbogen (Champion Archway) an der Zaunluecke zum Steg: rahmt den
+	-- Einlauf des Baerchis in die Arena wie ein Stadion-Tor ein.
+	local gatePos   = center - outward * (MapConfig.PIT_BASE_RADIUS - 1.5)
+	local gateFrame = CFrame.lookAt(Vector3.new(gatePos.X, rimY, gatePos.Z), Vector3.new(center.X, rimY, center.Z))
+	local archSpan  = MapConfig.BRIDGE_WIDTH + 2.4
+	local archH     = 11.5
+	for i, side in { -1, 1 } do
+		local archPost = MapParts.newPart(
+			"ArchPost_" .. i,
+			Vector3.new(archH, 1.8, 1.8),
+			gateFrame * CFrame.new(side * archSpan * 0.5, archH * 0.5, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(120, 80, 46),
+			Enum.Material.Wood
+		)
+		archPost.Shape      = Enum.PartType.Cylinder
+		archPost.CanCollide = false
+		archPost.CanQuery   = false
+		archPost.CanTouch   = false
+		archPost.CastShadow = false
+		archPost.Parent     = container
+	end
+	local archBeam = MapParts.newPart(
+		"ArchBeam",
+		Vector3.new(archSpan + 3.6, 1.4, 2.2),
+		gateFrame * CFrame.new(0, archH + 0.5, 0),
+		Color3.fromRGB(245, 190, 60),
+		Enum.Material.Metal
+	)
+	archBeam.CanCollide = false
+	archBeam.CanQuery   = false
+	archBeam.CanTouch   = false
+	archBeam.CastShadow = false
+	archBeam.Parent     = container
+
+	local archCrest = MapParts.newPart(
+		"ArchCrest",
+		Vector3.new(2.8, 2.8, 1.2),
+		gateFrame * CFrame.new(0, archH + 2.1, 0),
+		Color3.fromRGB(255, 210, 75),
+		Enum.Material.Neon
+	)
+	archCrest.Shape      = Enum.PartType.Ball
+	archCrest.CanCollide = false
+	archCrest.CanQuery   = false
+	archCrest.CanTouch   = false
+	archCrest.CastShadow = false
+	archCrest.Parent     = container
 
 	-- Ordner fuer die Kampf-Figuren waehrend eines Laufs. Liegt hier, damit
 	-- PitArenaService nichts selbst anlegen muss und ein Neuaufbau des PIT

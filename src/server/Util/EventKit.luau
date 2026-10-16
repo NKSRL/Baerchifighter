@@ -66,6 +66,7 @@ export type Api = {
 	announce     : (Types.LocMsg, string?) -> (),
 	fightStats   : (Part) -> CombatCalculator.FighterStats?,
 	finishEarly  : () -> (),
+	duel         : ((Part, Part) -> (Part, Part))?,
 }
 
 -- Belohnung eines Spielers am Event-Ende.

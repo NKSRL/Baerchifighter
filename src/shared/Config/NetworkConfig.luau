@@ -15,6 +15,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- Seit v12 oeffnet das sofort ein Ei. Kurz genug fuer mehrere Eier
 	-- hintereinander (die Animation stellt sie in eine Warteschlange).
 	RequestHatchEgg        = 0.35,
+	RequestHatchEggs       = 0.35,
 
 	-- v12: Pet-Leiste (Event/Fight). Startet sichtbare Laufwege, deshalb wie
 	-- SendToEvent nicht im Sekundentakt.

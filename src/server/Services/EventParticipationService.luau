@@ -130,18 +130,19 @@ local ACTION_MOTION: { [string]: { height: number, rate: number } } = {
 -- Zustand
 --------------------------------------------------------------------------------
 
-type Presence = {
+export type Presence = {
+	player     : Player,
+	figure     : Model,
 	baerchiUid : string,
 	homeFoot   : Vector3,   -- wohin zurueckgelaufen wird
 	standFoot  : Vector3,   -- wo auf dem Podest gestanden wird
 	arrivedAt  : number,    -- os.time(), nur fuers Log
 
-	-- Von Event-Handlern genutzt (siehe buildApi):
-	player     : Player?,
-	figure     : Model?,
-	busy       : boolean?,        -- Figur laeuft gerade (walkTo)
+	-- Von Event-Handlern und PitBrawlService genutzt (siehe buildApi):
+	busy       : boolean?,        -- Figur laeuft/kaempft/jagt gerade
 	cancelWalk : boolean?,        -- laufende Bewegung abbrechen
 	abducting  : boolean?,        -- UFO hat die Figur gerade
+	abductedAt : number?,         -- os.clock() beim Start der Entfuehrung
 }
 
 -- Spieler, deren Baerchi gerade AM Event steht (fertig angekommen).
@@ -158,6 +159,9 @@ local _sessionToken = 0
 
 -- Spieler, die waehrend einer Handler-Bewegung "zurueck" gedrueckt haben.
 local _recallPending: { [Player]: boolean } = {}
+
+-- Eingehaengter Duell-Ablauf aus PitBrawlService (echter Tower-Kampf im Event-Pit).
+local _duelRunner: ((Presence, Presence) -> (Presence, Presence))? = nil
 
 -- v12: Richtung des laufenden Wegs ("to" = zum Event, "back" = heim) fuer die
 -- Pet-Leiste, und der Wunsch, einen Hinweg abzubrechen (Zurueckholen, bevor
@@ -323,6 +327,7 @@ function EventParticipationService.sendToEvent(player: Player): boolean
 
 			_present[player] = {
 				player     = player,
+				figure     = figure,
 				baerchiUid = uid,
 				homeFoot   = homeFoot,
 				standFoot  = standFoot,
@@ -1163,6 +1168,14 @@ local function buildApi(token: number): any
 		end
 	end
 
+	-- Echter Tower-Kampf zweier Baerchis im Event-Pit (registriert von PitBrawlService).
+	api.duel = function(a: any, b: any): (any, any)
+		if _duelRunner then
+			return _duelRunner(a, b)
+		end
+		return a, b
+	end
+
 	-- Laeuft die Figur zu `target` (nur X/Z, Y bleibt). Blockiert bis zur
 	-- Ankunft oder bis die Bewegung abgebrochen wurde. true = angekommen.
 	api.walkTo = function(part: any, target: Vector3): boolean
@@ -1287,18 +1300,63 @@ function EventParticipationService.getPhase(player: Player): string?
 	return nil
 end
 
--- Sammel-Update 05.10. (Paket 5.2): wer steht gerade mit welcher Figur am
--- Event (fuer PitBrawlService). Nur lesend; "busy" = laeuft/kaempft gerade,
--- dann greift die Figur niemanden an.
-function EventParticipationService.getParticipants(): { { player: Player, figure: Model, busy: boolean } }
-	local list = {}
+-- Liefert alle aktuell im Event-Pit anwesenden Presences (nicht entfuehrt).
+-- PitBrawlService und Event-Handler teilen sich dieselben Presence-Tabellen,
+-- sodass `presence.busy = true` jede konkurrierende Bewegung sauber sperrt.
+function EventParticipationService.getParticipants(): { Presence }
+	local list: { Presence } = {}
 	for player, presence in _present do
 		local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
 		if figure and figure.Parent and not presence.abducting then
-			table.insert(list, { player = player, figure = figure, busy = presence.busy == true })
+			presence.player = player
+			presence.figure = figure
+			table.insert(list, presence)
 		end
 	end
 	return list
+end
+
+function EventParticipationService.stillHere(presence: Presence): boolean
+	local player = presence.player
+	if not player or _present[player] ~= presence or presence.abducting then
+		return false
+	end
+	local figure = MapService.getBaerchiModel(player, presence.baerchiUid)
+	if not figure or figure.Parent == nil then
+		return false
+	end
+	presence.figure = figure
+	return true
+end
+
+-- Gibt die Bewegungs-Sperre einer Presence frei und fuehrt einen eventuell
+-- waehrenddessen angeforderten Rueckruf (recall) sofort aus.
+function EventParticipationService.releaseBusy(presence: Presence)
+	presence.busy       = false
+	presence.cancelWalk = false
+	local player = presence.player
+	if player and _recallPending[player] and _present[player] == presence then
+		_recallPending[player] = nil
+		EventParticipationService.recall(player)
+	end
+end
+
+function EventParticipationService.playIdle(figure: Model)
+	if figure.Parent ~= nil then
+		playEventMotion(figure)
+	end
+end
+
+function EventParticipationService.finishHome(presence: Presence)
+	finishHome(presence)
+end
+
+function EventParticipationService.getWeakenedLevel(baerchiUid: string, level: number): number
+	return weakenedLevel(baerchiUid, level)
+end
+
+function EventParticipationService.setDuelRunner(runner: (Presence, Presence) -> (Presence, Presence))
+	_duelRunner = runner
 end
 
 function EventParticipationService.isPresent(player: Player): boolean

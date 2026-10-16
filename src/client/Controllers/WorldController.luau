@@ -84,8 +84,8 @@ local INSPECT_DISTANCE = 60
 -- Schilder ab, um das eigene zu finden. Reichweite deshalb so gross, dass sie
 -- vom Spawn in der Mitte aus zu sehen ist (Plot-Ring: 165 Studs).
 local HOME_MARKER_NAME     = "DeinPlot"
-local HOME_MARKER_DISTANCE = 260
-local HOME_MARKER_HEIGHT   = 7
+local HOME_MARKER_DISTANCE = 550
+local HOME_MARKER_HEIGHT   = 8.5
 
 -- Gebaeude-Part-Namen wie MapService sie vergibt (= Types.BuildingId)
 local BUILDING_NAMES: { [string]: boolean } = {
@@ -258,7 +258,8 @@ local function writePond(view: PondView)
 	if cost then
 		local affordable = data ~= nil and data.gummies >= (cost.costGummies or 0)
 			and data.goldGummies >= (cost.costGoldGummies or 0)
-		view.cost.Text = "⬆ " .. costText(cost)
+		-- Pfeil nur, wenn der Ausbau JETZT bezahlbar ist (14.10.)
+		view.cost.Text = (if affordable then "⬆ " else "") .. costText(cost)
 		view.cost.TextColor3 = if affordable then Theme.COLORS.good else Theme.COLORS.text
 		-- Preis steht im Prompt; reicht es nicht, steht dort, wie viel fehlt
 		-- (der Standard-Prompt laesst sich nicht ausgrauen). Druecken geht
@@ -298,7 +299,7 @@ local function attachPond(part: BasePart)
 	gui.Size        = UDim2.fromScale(12, 4)
 	gui.StudsOffset = Vector3.new(0, POND_SIGN_HEIGHT, 0)
 	gui.MaxDistance = POND_SIGN_DISTANCE
-	gui.AlwaysOnTop = false
+	gui.AlwaysOnTop = true
 	gui.Adornee     = part
 	gui.Parent      = part
 
@@ -416,6 +417,43 @@ local function addHomeMarker(board: BasePart)
 	label.TextStrokeTransparency = 0.2
 	label.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
 	label.Parent                 = marker
+
+	-- Weithin sichtbare vertikale goldene Heim-Lichtsaeule (rein lokal fuer den Besitzer):
+	-- ragt hoch in den Himmel (160 Studs), damit junge Spieler ihren eigenen Plot
+	-- aus jedem Winkel der gesamten Insel sofort wiederfinden.
+	if not board:FindFirstChild("HomeBeacon") then
+		local beaconPos = CFrame.new(board.Position + Vector3.new(0, 84, 0)) * CFrame.Angles(0, 0, math.rad(90))
+
+		local beacon = Instance.new("Part")
+		beacon.Name         = "HomeBeacon"
+		beacon.Shape        = Enum.PartType.Cylinder
+		beacon.Size         = Vector3.new(160, 1.8, 1.8)
+		beacon.CFrame       = beaconPos
+		beacon.Color        = Color3.fromRGB(255, 220, 85)
+		beacon.Material     = Enum.Material.Neon
+		beacon.Transparency = 0.60
+		beacon.Anchored     = true
+		beacon.CanCollide   = false
+		beacon.CanQuery     = false
+		beacon.CanTouch     = false
+		beacon.CastShadow   = false
+		beacon.Parent       = board
+
+		local aura = Instance.new("Part")
+		aura.Name         = "HomeBeaconAura"
+		aura.Shape        = Enum.PartType.Cylinder
+		aura.Size         = Vector3.new(160, 4.2, 4.2)
+		aura.CFrame       = beaconPos
+		aura.Color        = Color3.fromRGB(255, 195, 55)
+		aura.Material     = Enum.Material.Neon
+		aura.Transparency = 0.85
+		aura.Anchored     = true
+		aura.CanCollide   = false
+		aura.CanQuery     = false
+		aura.CanTouch     = false
+		aura.CastShadow   = false
+		aura.Parent       = board
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -530,8 +568,8 @@ local function hookWorldPart(instance: Instance)
 		return
 	end
 
-	-- v15: fremdes Plot-Schild → Profilkarte des Besitzers
-	if instance.Name == "SignBoard" then
+	-- v15: fremdes Plot-Schild (vorne oder hinten) → Profilkarte des Besitzers
+	if instance.Name == "SignBoard" or instance.Name == "BackSignBoard" then
 		local owner = findPlotOwner(instance)
 		if owner then
 			addInspector(instance, owner)
@@ -547,7 +585,7 @@ local function hookWorldPart(instance: Instance)
 			if not instance.Parent then return end
 			if isOwnPlot(instance) then
 				hookOwnedPart(instance)
-			elseif instance.Name == "SignBoard" then
+			elseif instance.Name == "SignBoard" or instance.Name == "BackSignBoard" then
 				local owner = findPlotOwner(instance)
 				if owner then addInspector(instance, owner) end
 			end

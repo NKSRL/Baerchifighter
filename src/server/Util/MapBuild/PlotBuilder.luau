@@ -29,15 +29,23 @@ local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 
 local PlotBuilder = {}
 
--- Zaun an den beiden Seiten des Plots. Vorne und hinten bleibt offen, sonst
--- kaeme man weder auf den Plot noch zur Bruecke.
+-- Zaun rund um den Plot: an beiden Seiten durchgehend und vorne (-Z) sowie
+-- hinten (+Z) von den Ecken bis direkt an die Torbogen-Saeulen (x = ±8.6),
+-- sodass das gesamte Beet eingerahmt ist und nur die beiden Torboegen offen bleiben.
 function PlotBuilder.buildFence(plotModel: Model, slot: number)
 	local plotCFrame = MapParts.plotCFrame(slot)
 	local halfX = MapConfig.PLOT_SIZE.X * 0.5
 	local halfZ = MapConfig.PLOT_SIZE.Z * 0.5
 
-	local postY = MapParts.plotSurfaceOffset() + MapConfig.FENCE_POST_SIZE.Y * 0.5
-	local steps = math.max(1, math.floor(MapConfig.PLOT_SIZE.Z / MapConfig.FENCE_POST_SPACING))
+	local surfaceY      = MapParts.plotSurfaceOffset()
+	local postY         = surfaceY + MapConfig.FENCE_POST_SIZE.Y * 0.5
+	local steps         = math.max(1, math.floor(MapConfig.PLOT_SIZE.Z / MapConfig.FENCE_POST_SPACING))
+	local postColor     = Color3.fromRGB(122, 78, 42)
+	local goldColor     = Color3.fromRGB(235, 180, 50)
+	local pillarX       = 8.6
+	local wingSpan      = halfX - pillarX
+	local wingCenterX   = (halfX + pillarX) * 0.5
+	local railThickness = MapConfig.FENCE_POST_SIZE.X * 0.62
 
 	for _, side in { -1, 1 } do
 		for i = 0, steps do
@@ -47,112 +55,344 @@ function PlotBuilder.buildFence(plotModel: Model, slot: number)
 				"FencePost",
 				MapConfig.FENCE_POST_SIZE,
 				plotCFrame * CFrame.new(side * halfX, postY, z),
-				MapConfig.FENCE_COLOR,
+				postColor,
 				Enum.Material.Wood
 			)
 			post.CanCollide = false
 			post.Parent     = plotModel
+
+			-- Goldene Honig-Kappen samt Metall-Kragen auf den vier Eckpfosten
+			-- (Eingang von der Hauptinsel und Ausgang zur Arena), damit das Plot
+			-- wie ein edel eingerahmtes Camp wirkt.
+			if i == 0 or i == steps then
+				local collar = MapParts.newPart(
+					"FenceCollar",
+					Vector3.new(MapConfig.FENCE_POST_SIZE.X + 0.35, 0.45, MapConfig.FENCE_POST_SIZE.Z + 0.35),
+					plotCFrame * CFrame.new(side * halfX, surfaceY + MapConfig.FENCE_POST_SIZE.Y - 0.15, z),
+					goldColor,
+					Enum.Material.Metal
+				)
+				collar.CanCollide = false
+				collar.CanQuery   = false
+				collar.CanTouch   = false
+				collar.CastShadow = false
+				collar.Parent     = plotModel
+
+				local capY = surfaceY + MapConfig.FENCE_POST_SIZE.Y + 0.55
+				local cap = MapParts.newPart(
+					"FenceCap",
+					Vector3.new(1.65, 1.65, 1.65),
+					plotCFrame * CFrame.new(side * halfX, capY, z),
+					Color3.fromRGB(255, 200, 65),
+					Enum.Material.Neon
+				)
+				cap.Shape      = Enum.PartType.Ball
+				cap.CanCollide = false
+				cap.CanQuery   = false
+				cap.CanTouch   = false
+				cap.CastShadow = false
+				cap.Parent     = plotModel
+			end
 		end
 
-		-- Zwei durchgehende Querlatten statt einzelner Segmente: ein Part
-		-- statt acht, und optisch macht es keinen Unterschied.
-		for _, heightFactor in { 0.45, 0.85 } do
-			local railY = MapParts.plotSurfaceOffset() + MapConfig.FENCE_POST_SIZE.Y * heightFactor
+		-- Zwei durchgehende Honig-Zedernholz-Querlatten an den beiden laengsseitigen Zaeunen
+		for _, heightFactor in { 0.42, 0.82 } do
+			local railY = surfaceY + MapConfig.FENCE_POST_SIZE.Y * heightFactor
 
 			local rail = MapParts.newPart(
 				"FenceRail",
-				Vector3.new(MapConfig.FENCE_POST_SIZE.X * 0.6, MapConfig.FENCE_RAIL_HEIGHT, MapConfig.PLOT_SIZE.Z),
+				Vector3.new(railThickness, MapConfig.FENCE_RAIL_HEIGHT, MapConfig.PLOT_SIZE.Z),
 				plotCFrame * CFrame.new(side * halfX, railY, 0),
 				MapConfig.FENCE_COLOR,
-				Enum.Material.Wood
+				Enum.Material.WoodPlanks
 			)
 			rail.CanCollide = false
 			rail.Parent     = plotModel
 		end
+
+		-- Vorne (-Z) und hinten (+Z): Zaunfluegel von der Ecke bis direkt in die Torbogen-Saeule
+		for _, zSign in { -1, 1 } do
+			local zPos = zSign * halfZ
+
+			for step = 1, 2 do
+				local xPos = side * (pillarX + (step / 3) * wingSpan)
+				local wingPost = MapParts.newPart(
+					"FencePost",
+					MapConfig.FENCE_POST_SIZE,
+					plotCFrame * CFrame.new(xPos, postY, zPos),
+					postColor,
+					Enum.Material.Wood
+				)
+				wingPost.CanCollide = false
+				wingPost.Parent     = plotModel
+			end
+
+			for _, heightFactor in { 0.42, 0.82 } do
+				local railY = surfaceY + MapConfig.FENCE_POST_SIZE.Y * heightFactor
+				local wingRail = MapParts.newPart(
+					"FenceRail",
+					Vector3.new(wingSpan, MapConfig.FENCE_RAIL_HEIGHT, railThickness),
+					plotCFrame * CFrame.new(side * wingCenterX, railY, zPos),
+					MapConfig.FENCE_COLOR,
+					Enum.Material.WoodPlanks
+				)
+				wingRail.CanCollide = false
+				wingRail.Parent     = plotModel
+			end
+		end
 	end
 end
 
--- Schild an der zur Mitte zeigenden Kante mit dem Namen des Besitzers.
--- v15: darunter ein kleines Tower-Symbol (hoechster Tower, siehe
--- writeOwnerBadge) — gesetzt von MapService, sobald der Tower-Stand bekannt ist.
+-- Trittstein-Gartenpfad auf dem 72x72-Beet: fuehrt das Auge (und die Fuesse)
+-- vom inneren Steg direkt durch den Torbogen zum Honig-Brunnen/Baerchi-Platz
+-- und weiter zum Arena-Steg sowie zu Inkubator und Recycler. Rein optisch (keine Kollision).
+local STEP_STONES: { { x: number, z: number, r: number } } = {
+	{ x =   0, z = -32, r = 3.5 },
+	{ x =  -3, z = -23, r = 3.0 },
+	{ x =  -8, z = -14, r = 3.0 },
+	{ x =  -6, z =  -3, r = 3.2 },
+	{ x =   0, z =   6, r = 4.2 },
+	{ x =   0, z =  17, r = 3.2 },
+	{ x =   3, z =  26, r = 3.0 },
+	{ x =   0, z =  33, r = 3.4 },
+	{ x =  12, z =   8, r = 2.8 },
+}
+
+function PlotBuilder.buildPlotPath(plotModel: Model, slot: number)
+	local plotCFrame = MapParts.plotCFrame(slot)
+	local y = MapParts.plotSurfaceOffset() + MapConfig.GRASS_HEIGHT + 0.04
+	local stoneColor = Color3.fromRGB(228, 206, 162)
+
+	for i, s in STEP_STONES do
+		local stone = MapParts.newPart(
+			"StepStone_" .. i,
+			Vector3.new(0.12, s.r * 2, s.r * 2),
+			plotCFrame * CFrame.new(s.x, y, s.z) * CFrame.Angles(0, 0, math.rad(90)),
+			stoneColor,
+			Enum.Material.Cobblestone
+		)
+		stone.Shape      = Enum.PartType.Cylinder
+		stone.CanCollide = false
+		stone.CanQuery   = false
+		stone.CanTouch   = false
+		stone.CastShadow = false
+		stone.Parent     = plotModel
+	end
+end
+
+-- Baut jeweils einen eindrucksvollen Torbogen vorne (-Z, Richtung Hauptinsel,
+-- mit grosser Namenstafel "SignBoard" fuer Besitzername und Tower-Rekord) und
+-- hinten (+Z, Richtung Arena-Steg, als reiner monumentaler Ehrenbogen ohne Namenstafel).
+-- Die Saeulen stehen bei x = ±8.6 direkt in der Flucht der vorderen/hinteren Zaeune.
 function PlotBuilder.buildPlotSign(plotModel: Model, slot: number, ownerName: string)
 	local plotCFrame = MapParts.plotCFrame(slot)
-	local halfZ = MapConfig.PLOT_SIZE.Z * 0.5
+	local halfZ      = MapConfig.PLOT_SIZE.Z * 0.5
+	local surfaceY   = MapParts.plotSurfaceOffset()
 
-	local boardSize = MapConfig.SIGN_BOARD_SIZE
-	local postSize  = MapConfig.SIGN_POST_SIZE
+	local boardSize  = MapConfig.SIGN_BOARD_SIZE
+	local pillarX    = 8.6
+	local postHeight = 15.2
+	local goldColor  = Color3.fromRGB(235, 180, 50)
+	local stoneColor = Color3.fromRGB(215, 198, 168)
 
-	-- Zwei Pfosten an den Raendern, HINTER dem Brett (lokal +Z = weg von der
-	-- Mitte; die Schrift zeigt nach -Z). So verdeckt kein Pfosten die Schrift.
-	local postY = MapParts.plotSurfaceOffset() + postSize.Y * 0.5
-	local behind = boardSize.Z * 0.5 + postSize.Z * 0.5
-	for _, side in { -1, 1 } do
-		local post = MapParts.newPart(
-			"SignPost",
-			postSize,
-			plotCFrame * CFrame.new(side * (boardSize.X * 0.5 - postSize.X), postY, -halfZ + 2 + behind),
+	local gates: { { z: number, boardName: string? } } = {
+		{ z = -halfZ, boardName = "SignBoard" },
+		{ z =  halfZ, boardName = nil },
+	}
+
+	for _, gate in gates do
+		local archZ = gate.z
+
+		-- Zwei Torbogen-Saeulen links und rechts neben dem Hauptweg (15+ Studs Durchgang)
+		for _, side in { -1, 1 } do
+			local px = side * pillarX
+
+			local plinth = MapParts.newPart(
+				"SignPlinth",
+				Vector3.new(2.8, 1.8, 2.8),
+				plotCFrame * CFrame.new(px, surfaceY + 0.9, archZ),
+				stoneColor,
+				Enum.Material.Cobblestone
+			)
+			plinth.CanCollide = false
+			plinth.CanQuery   = false
+			plinth.CanTouch   = false
+			plinth.CastShadow = false
+			plinth.Parent     = plotModel
+
+			local post = MapParts.newPart(
+				"SignPost",
+				Vector3.new(MapConfig.SIGN_POST_SIZE.X, postHeight, MapConfig.SIGN_POST_SIZE.Z),
+				plotCFrame * CFrame.new(px, surfaceY + postHeight * 0.5, archZ),
+				MapConfig.SIGN_POST_COLOR,
+				Enum.Material.Wood
+			)
+			post.CanCollide = false
+			post.Parent     = plotModel
+
+			local capital = MapParts.newPart(
+				"SignCapital",
+				Vector3.new(2.6, 0.8, 2.6),
+				plotCFrame * CFrame.new(px, surfaceY + postHeight + 0.4, archZ),
+				goldColor,
+				Enum.Material.Metal
+			)
+			capital.CanCollide = false
+			capital.CanQuery   = false
+			capital.CanTouch   = false
+			capital.CastShadow = false
+			capital.Parent     = plotModel
+
+			-- Warme Honig-Laterne innen an jeder Saeule (direkt mit dem Pfosten verbunden)
+			local lantern = MapParts.newPart(
+				"SignLantern",
+				Vector3.new(1.5, 1.9, 1.5),
+				plotCFrame * CFrame.new(side * (pillarX - 1.25), surfaceY + 9.2, archZ),
+				Color3.fromRGB(255, 205, 75),
+				Enum.Material.Neon
+			)
+			lantern.Shape      = Enum.PartType.Ball
+			lantern.CanCollide = false
+			lantern.CanQuery   = false
+			lantern.CanTouch   = false
+			lantern.CastShadow = false
+			lantern.Parent     = plotModel
+		end
+
+		-- Unterer Tor-Querbalken (ueber 10 Studs freie Durchgangshoehe)
+		local archBeam = MapParts.newPart(
+			"SignArchBeam",
+			Vector3.new(20.0, 1.1, 2.0),
+			plotCFrame * CFrame.new(0, surfaceY + 10.6, archZ),
 			MapConfig.SIGN_POST_COLOR,
 			Enum.Material.Wood
 		)
-		post.CanCollide = false
-		post.Parent     = plotModel
-	end
+		archBeam.CanCollide = false
+		archBeam.CanQuery   = false
+		archBeam.CanTouch   = false
+		archBeam.CastShadow = false
+		archBeam.Parent     = plotModel
 
-	local boardY = MapParts.plotSurfaceOffset() + postSize.Y - boardSize.Y * 0.5
-	local board = MapParts.newPart(
-		"SignBoard",
-		boardSize,
-		plotCFrame * CFrame.new(0, boardY, -halfZ + 2),
-		MapConfig.SIGN_COLOR,
-		Enum.Material.Wood
-	)
-	board.CanCollide = false
-	board.Parent     = plotModel
-
-	-- Dunkle Leisten oben und unten (Rahmen statt nacktem Brett)
-	for i, dy in { boardSize.Y * 0.5, -boardSize.Y * 0.5 } do
-		local trim = MapParts.newPart(
-			"SignTrim" .. i,
-			Vector3.new(boardSize.X + 0.6, 0.45, boardSize.Z + 0.2),
-			plotCFrame * CFrame.new(0, boardY + dy, -halfZ + 2),
-			MapConfig.SIGN_TRIM_COLOR,
-			Enum.Material.Wood
+		-- Goldener Giebelbalken oben (SignTrim1) und goldene Einfassung unten (SignTrim2)
+		local trimTop = MapParts.newPart(
+			"SignTrim1",
+			Vector3.new(20.6, 0.9, 2.2),
+			plotCFrame * CFrame.new(0, surfaceY + 16.2, archZ),
+			goldColor,
+			Enum.Material.Metal
 		)
-		trim.CanCollide = false
-		trim.Parent     = plotModel
+		trimTop.CanCollide = false
+		trimTop.CanQuery   = false
+		trimTop.CanTouch   = false
+		trimTop.CastShadow = false
+		trimTop.Parent     = plotModel
+
+		local trimBot = MapParts.newPart(
+			"SignTrim2",
+			Vector3.new(boardSize.X + 0.8, 0.45, boardSize.Z + 0.5),
+			plotCFrame * CFrame.new(0, surfaceY + 11.15, archZ),
+			goldColor,
+			Enum.Material.Metal
+		)
+		trimBot.CanCollide = false
+		trimBot.CanQuery   = false
+		trimBot.CanTouch   = false
+		trimBot.CastShadow = false
+		trimBot.Parent     = plotModel
+
+		-- Goldene Honigwaben-Krone auf dem Torbogen-Scheitel
+		local crown = MapParts.newPart(
+			"SignCrown",
+			Vector3.new(1.0, 3.6, 3.6),
+			plotCFrame * CFrame.new(0, surfaceY + 17.5, archZ) * CFrame.Angles(0, math.rad(90), 0),
+			goldColor,
+			Enum.Material.Metal
+		)
+		crown.Shape      = Enum.PartType.Cylinder
+		crown.CanCollide = false
+		crown.CanQuery   = false
+		crown.CanTouch   = false
+		crown.CastShadow = false
+		crown.Parent     = plotModel
+
+		local crownGem = MapParts.newPart(
+			"SignCrownGem",
+			Vector3.new(1.6, 1.6, 1.5),
+			plotCFrame * CFrame.new(0, surfaceY + 17.5, archZ),
+			Color3.fromRGB(255, 220, 80),
+			Enum.Material.Neon
+		)
+		crownGem.Shape      = Enum.PartType.Ball
+		crownGem.CanCollide = false
+		crownGem.CanQuery   = false
+		crownGem.CanTouch   = false
+		crownGem.CastShadow = false
+		crownGem.Parent     = plotModel
+
+		-- Die grosse Namenstafel sitzt nur am vorderen Torbogen (-Z, Richtung Hauptinsel)
+		if gate.boardName then
+			local boardY = surfaceY + 13.5
+			local board = MapParts.newPart(
+				gate.boardName,
+				boardSize,
+				plotCFrame * CFrame.new(0, boardY, archZ),
+				MapConfig.SIGN_COLOR,
+				Enum.Material.Wood
+			)
+			board.CanCollide = false
+			board.Parent     = plotModel
+
+			-- Die Schrift kommt auf die Vorderseite (-Z) sowie auf die Rueckseite (+Z)
+			local surface = Instance.new("SurfaceGui")
+			surface.Name          = "SignText"
+			surface.Face          = Enum.NormalId.Front
+			surface.PixelsPerStud = 45
+			surface.Adornee       = board
+			surface.Parent        = board
+
+			local label = MapParts.newTextLabel("Owner", surface, UDim2.fromScale(0.92, 0.50), UDim2.fromScale(0.04, 0.06))
+			label.TextColor3             = Color3.fromRGB(55, 35, 18)
+			label.TextStrokeColor3       = Color3.fromRGB(255, 220, 125)
+			label.TextStrokeTransparency = 0.35
+			label.Text                   = ownerName
+
+			local divider = Instance.new("Frame")
+			divider.Name             = "Divider"
+			divider.Size             = UDim2.fromScale(0.76, 0.04)
+			divider.Position         = UDim2.fromScale(0.12, 0.58)
+			divider.BackgroundColor3 = goldColor
+			divider.BorderSizePixel  = 0
+			divider.Parent           = surface
+
+			local badge = MapParts.newTextLabel("TowerBadge", surface, UDim2.fromScale(0.92, 0.34), UDim2.fromScale(0.04, 0.63))
+			badge.TextStrokeColor3       = Color3.fromRGB(35, 22, 12)
+			badge.TextStrokeTransparency = 0.15
+			badge.Text                   = ""
+
+			local backSurface = surface:Clone()
+			backSurface.Name = "SignTextBack"
+			backSurface.Face = Enum.NormalId.Back
+			backSurface.Parent = board
+		end
 	end
-
-	-- Die Schrift kommt auf die Seite, die zur Plattform-Mitte zeigt. Das ist
-	-- die lokale -Z-Seite des Plots und damit die Vorderseite des Boards.
-	local surface = Instance.new("SurfaceGui")
-	surface.Name        = "SignText"
-	surface.Face        = Enum.NormalId.Front
-	surface.PixelsPerStud = 40
-	surface.Adornee     = board
-	surface.Parent      = board
-
-	local label = MapParts.newTextLabel("Owner", surface, UDim2.fromScale(0.9, 0.56), UDim2.fromScale(0.05, 0.08))
-	label.TextColor3             = Color3.fromRGB(70, 50, 30)
-	label.TextStrokeTransparency = 1
-	label.Text                   = ownerName
-
-	local badge = MapParts.newTextLabel("TowerBadge", surface, UDim2.fromScale(0.9, 0.28), UDim2.fromScale(0.05, 0.64))
-	badge.TextStrokeTransparency = 1
-	badge.Text                   = ""
 end
 
--- v15: Tower-Symbol unter dem Besitzernamen ("◆ III · 42"). Billig, nur Text.
+-- v15: Tower-Symbol unter dem Besitzernamen ("◆ III · 42") am vorderen Torbogen. Billig, nur Text.
 function PlotBuilder.writeOwnerBadge(plotModel: Model, text: string | Types.LocMsg, color: Color3)
 	local board = plotModel:FindFirstChild("SignBoard")
-	local surface = board and board:FindFirstChild("SignText")
-	local badge = surface and surface:FindFirstChild("TowerBadge")
-	if badge and badge:IsA("TextLabel") then
-		WorldText.set(badge, text)
-		badge.TextColor3 = color
+	if board then
+		for _, guiName in { "SignText", "SignTextBack" } do
+			local surface = board:FindFirstChild(guiName)
+			local badge = surface and surface:FindFirstChild("TowerBadge")
+			if badge and badge:IsA("TextLabel") then
+				WorldText.set(badge, text)
+				badge.TextColor3 = color
+			end
+		end
 	end
 end
 
--- Die Plot-Platte samt Zaun und Schild.
+-- Die Plot-Platte samt Terrassen-Einfassung, Zaun und Torbogen-Schild.
 --
 -- Das Besitzer-Attribut wird gesetzt BEVOR das Model in den Workspace kommt:
 -- der Client bekommt es damit zusammen mit dem Model und muss nicht darauf
@@ -177,6 +417,44 @@ function PlotBuilder.buildPlotBase(slot: number, owner: Player): Model
 	base.CanCollide = true
 	base.Parent     = model
 
+	-- Steinerne Garten-Terrassenkante rund um das 72x72-Beet (vorne und hinten
+	-- in der Mitte fuer Steg und Torbogen offen gelassen, damit keine Stufe entsteht).
+	local halfX     = MapConfig.PLOT_SIZE.X * 0.5
+	local halfZ     = MapConfig.PLOT_SIZE.Z * 0.5
+	local curbY     = MapConfig.PLOT_SIZE.Y * 0.5 + 0.06
+	local curbH     = MapConfig.PLOT_SIZE.Y + 0.12
+	local curbColor = Color3.fromRGB(215, 198, 168)
+
+	for _, side in { -1, 1 } do
+		local sideCurb = MapParts.newPart(
+			"PlotCurb",
+			Vector3.new(1.0, curbH, MapConfig.PLOT_SIZE.Z + 2.0),
+			plotCFrame * CFrame.new(side * (halfX + 0.5), curbY, 0),
+			curbColor,
+			Enum.Material.Cobblestone
+		)
+		sideCurb.CanCollide = false
+		sideCurb.CanQuery   = false
+		sideCurb.CanTouch   = false
+		sideCurb.CastShadow = false
+		sideCurb.Parent     = model
+
+		for _, zSign in { -1, 1 } do
+			local endCurb = MapParts.newPart(
+				"PlotCurb",
+				Vector3.new(27.0, curbH, 1.0),
+				plotCFrame * CFrame.new(side * 22.5, curbY, zSign * (halfZ + 0.5)),
+				curbColor,
+				Enum.Material.Cobblestone
+			)
+			endCurb.CanCollide = false
+			endCurb.CanQuery   = false
+			endCurb.CanTouch   = false
+			endCurb.CastShadow = false
+			endCurb.Parent     = model
+		end
+	end
+
 	MapParts.buildCheckerPlate(
 		model,
 		plotCFrame * CFrame.new(0, MapConfig.PLOT_SIZE.Y, 0),
@@ -187,6 +465,7 @@ function PlotBuilder.buildPlotBase(slot: number, owner: Player): Model
 	model.PrimaryPart = base
 
 	PlotBuilder.buildFence(model, slot)
+	PlotBuilder.buildPlotPath(model, slot)
 	PlotBuilder.buildPlotSign(model, slot, owner.DisplayName)
 
 	-- Der Spieler spawnt (und respawnt nach dem Tod) auf seiner EIGENEN
@@ -393,11 +672,19 @@ function PlotBuilder.buildBuilding(plotModel: Model, slot: number, buildingData:
 	-- v15: Grund-Deko plus die Zusaetze des aktuellen Looks.
 	local look  = BuildingBehavior.getLook(buildingData.level)
 	local decor = MapConfig.getBuildingDecor(buildingData.id, look)
-	MapParts.buildDecor(part, ground, decor)
-	PlotBuilder.addLookEffects(part, buildingData.id, look)
+	-- NEW_MODELS_V3: der Honig-Brunnen kommt als Modell aus PondBuilder
+	-- (Assets.Fountains); die alte Teile-Deko wuerde ihn ueberlagern.
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local fountainModel = buildingData.id == "HoneyPond"
+		and require(ReplicatedStorage.Config.FeatureFlags).isOn("NEW_MODELS_V3")
+		and assets ~= nil and assets:FindFirstChild("Fountains") ~= nil
+	if not fountainModel then
+		MapParts.buildDecor(part, ground, decor)
+		PlotBuilder.addLookEffects(part, buildingData.id, look)
 
-	PlotBuilder.buildHoneyDots(part, ground,
-		math.min(BuildingBehavior.getMaxCapacity(buildingData.id), MapConfig.HONEY_DOT_MAX))
+		PlotBuilder.buildHoneyDots(part, ground,
+			math.min(BuildingBehavior.getMaxCapacity(buildingData.id), MapConfig.HONEY_DOT_MAX))
+	end
 
 	-- Level als Attribut: der Client kann es direkt auslesen ohne eigenes Remote
 	part:SetAttribute("BuildingLevel", buildingData.level)

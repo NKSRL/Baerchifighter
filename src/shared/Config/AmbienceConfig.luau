@@ -108,6 +108,26 @@ AmbienceConfig.LAMP_GLOW_COLOR = Color3.fromRGB(255, 205, 110)
 AmbienceConfig.BRIDGE_POST_HEIGHT = 4.6
 AmbienceConfig.BRIDGE_POST_INSET  = 3
 
+-- 8-Wege-Farborientierung (je Slot 1..8 eine eigene harmonische Akzentfarbe),
+-- damit junge Spieler ihren Steg auf der radialsymmetrischen Hauptinsel sofort
+-- wiedererkennen (Stegkappen, Richtungs-Wimpel, Blumen-Akzente am Brueckenkopf).
+AmbienceConfig.LANE_COLORS = {
+	Color3.fromRGB(255, 200,  60),   -- 1 (+X): Sonnengold
+	Color3.fromRGB(255, 115,  95),   -- 2: Korallenrot
+	Color3.fromRGB(255, 130, 195),   -- 3 (+Z): Beeren-Pink
+	Color3.fromRGB(185, 130, 255),   -- 4: Amethyst-Violett
+	Color3.fromRGB(100, 195, 255),   -- 5 (-X): Himmelblau
+	Color3.fromRGB( 80, 225, 200),   -- 6: Lagunen-Tuerkis
+	Color3.fromRGB(130, 225,  95),   -- 7 (-Z): Apfelgruen
+	Color3.fromRGB(255, 155,  70),   -- 8: Mandarinen-Orange
+}
+
+-- Kampf-Highway (aeusserer Steg Plot -> Arena): gold-purpurne Schlacht-Wimpel
+-- und Bernsteinschalen, damit sich der Weg zur Arena wie ein Stadion-Einlauf anfuehlt.
+AmbienceConfig.COMBAT_BANNER_COLOR = Color3.fromRGB(215,  60,  75)
+AmbienceConfig.COMBAT_GOLD_COLOR   = Color3.fromRGB(255, 205,  70)
+AmbienceConfig.COMBAT_GLOW_COLOR   = Color3.fromRGB(255, 175,  45)
+
 -- Plot-Inseln: Felsen und Schilf am Rand. Haelt die Stegachse frei.
 AmbienceConfig.PLOT_RIM_COUNT   = 9
 AmbienceConfig.PLOT_RIM_MIN     = 55

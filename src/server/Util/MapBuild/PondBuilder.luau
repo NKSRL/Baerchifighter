@@ -116,6 +116,54 @@ function PondBuilder.writePondFill(fill: BasePart, ground: CFrame, ratio: number
 	fill.Transparency = if ratio <= 0 then 1 else MapConfig.POND_FILL_TRANSPARENCY
 end
 
+-- NEW_MODELS_V3: Honig-Brunnen aus ReplicatedStorage.Assets.Fountains
+-- (Fountain_Stage0..4, eine Stufe pro Look des Gebaeudes HoneyPond). Die
+-- Vorlagen liegen auf Y = 1000, der Steg zeigt in der Vorlage nach -X; hier
+-- wird der Beckenboden auf `ground` gesetzt und der Steg nach -Z gedreht
+-- (dorthin, wo der Baerchi steht, siehe MapService.getPondPosition).
+local FOUNTAIN_STAGES = 5
+
+function PondBuilder.fountainFolder(): Instance?
+	if not FeatureFlags.isOn("NEW_MODELS_V3") then return nil end
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	return assets and assets:FindFirstChild("Fountains")
+end
+
+function PondBuilder.buildFountain(parent: Instance, ground: CFrame, islandData: Types.IslandData): Model?
+	local folder = PondBuilder.fountainFolder()
+	if not folder then return nil end
+
+	local building = islandData.buildings["HoneyPond" :: any]
+	local look = BuildingBehavior.getLook(if building then building.level else 1)
+	local stage = math.clamp(look - 1, 0, FOUNTAIN_STAGES - 1)
+	local template = folder:FindFirstChild("Fountain_Stage" .. stage)
+	if not template or not template:IsA("Model") then return nil end
+
+	local model = template:Clone()
+	model.Name = "Fountain"
+
+	-- Ursprung: Mitte und Unterkante des Beckenbodens der Vorlage
+	local origin = Vector3.new(0, 1000, 0)
+	local floor = model:FindFirstChild("Basin_Floor_Node")
+	if floor and floor:IsA("Model") then
+		local cf, size = floor:GetBoundingBox()
+		origin = Vector3.new(cf.Position.X, cf.Position.Y - size.Y * 0.5, cf.Position.Z)
+	end
+
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored   = true
+			d.CanCollide = false
+			d.CanTouch   = false
+			d.CanQuery   = false
+		end
+	end
+
+	model:PivotTo(ground * CFrame.Angles(0, math.rad(-90), 0) * CFrame.new(-origin) * model:GetPivot())
+	model.Parent = parent
+	return model
+end
+
 -- Eine der beiden flachen Scheiben des Beckens (Sandkante bzw. Beckenboden).
 -- Beide sind dicker als der sichtbare Teil; der Rest steckt im Beet, damit
 -- unten nichts durchscheint.
@@ -236,6 +284,11 @@ function PondBuilder.buildPond(plotModel: Model, slot: number, islandData: Types
 	pond.Name   = "Pond"
 	pond.Parent = plotModel
 
+	-- Brunnen-Modell statt Scheiben/Steinkranz/Bohlen (NEW_MODELS_V3)
+	if PondBuilder.buildFountain(pond, ground, islandData) then
+		return
+	end
+
 	-- Sandkante zuerst und TIEFER als der Beckenboden: nur so bleibt sie
 	-- ringsum als Streifen sichtbar, ohne dass ein Ring aus Einzelteilen
 	-- noetig waere — derselbe Trick wie am Ufer jeder Insel.
@@ -276,6 +329,31 @@ function PondBuilder.buildPond(plotModel: Model, slot: number, islandData: Types
 	fill.CanQuery   = false
 	fill.CanTouch   = false
 	fill.Parent     = pond
+
+	-- Sanftes goldenes Bienen-/Honig-Schwirren ueber dem Becken (schon ab Level 1),
+	-- damit der Teich vom ersten Moment an lebendig wirkt.
+	local beeEmitter = Instance.new("ParticleEmitter")
+	beeEmitter.Name          = "PondBees"
+	beeEmitter.Texture       = "rbxasset://textures/particles/sparkles_main.dds"
+	beeEmitter.Color         = ColorSequence.new(Color3.fromRGB(255, 225, 110), Color3.fromRGB(255, 175, 40))
+	beeEmitter.Size          = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.25),
+		NumberSequenceKeypoint.new(0.5, 0.55),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	beeEmitter.Transparency  = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(0.8, 0.1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	beeEmitter.Lifetime      = NumberRange.new(1.6, 2.6)
+	beeEmitter.Rate          = 5
+	beeEmitter.Speed         = NumberRange.new(1.2, 2.4)
+	beeEmitter.SpreadAngle   = Vector2.new(160, 160)
+	beeEmitter.Acceleration  = Vector3.new(0, 0.6, 0)
+	beeEmitter.EmissionDirection = Enum.NormalId.Right
+	beeEmitter.LightEmission = 0.85
+	beeEmitter.Parent        = fill
 
 	PondBuilder.writePondFill(fill, ground, PondBuilder.pondFillRatio(islandData))
 end

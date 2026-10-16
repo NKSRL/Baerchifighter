@@ -303,6 +303,9 @@ function MapService.updateBuildingLooks(player: Player, islandData: Types.Island
 			local position = part.Position
 			part:Destroy()
 			PlotBuilder.buildBuilding(model, slot, building, pool)
+			if building.id == "HoneyPond" then
+				PondBuilder.buildPond(model, slot, islandData)
+			end
 			if show then
 				FigureFX.burstAt(position, LOOK_UPGRADE_COLOR, model, LOOK_UPGRADE_SPARKS)
 			end

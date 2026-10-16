@@ -181,10 +181,14 @@ local rootOf    = EventKit.rootOf
 local setLabel  = EventKit.setLabel
 local newFolder = EventKit.newFolder
 
--- Kurzer Kampf zweier Teilnehmer: serverseitiger Vergleich (ATK/HP-basiert,
--- siehe api.power) mit etwas Zufall. Dauert fix `seconds`. Gibt Gewinner und
--- Verlierer zurueck.
+-- Kampf zweier Teilnehmer im Event-Pit: nutzt den echten Tower-Duell-Ablauf
+-- aus PitBrawlService (api.duel) inklusive HP-/Charge-Balken, Clash-Choreografie,
+-- Skill-Show und Heimschicken des Verlierers nach KO.
 local function duel(api: Api, a: Part, b: Part, seconds: number): (Part, Part)
+	if api.duel then
+		return api.duel(a, b)
+	end
+
 	local spread = EventConfig.DUEL.POWER_SPREAD
 	local ra = api.power(a) * (1 - spread + math.random() * spread * 2)
 	local rb = api.power(b) * (1 - spread + math.random() * spread * 2)
@@ -197,8 +201,6 @@ local function duel(api: Api, a: Part, b: Part, seconds: number): (Part, Part)
 	local startedAt = os.clock()
 	task.spawn(function()
 		while os.clock() - startedAt < seconds - DUEL_END_MARGIN_SECONDS and api.running() do
-			-- Sammel-Update 1.1: eine entfuehrte Figur gehoert dem UFO, kein
-			-- Ausfallschritt darf sie zurueckreissen.
 			if a.abducting or b.abducting then
 				break
 			end
@@ -428,7 +430,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				local winner, loser = duel(api, a, b, cfg.FIGHT_SECONDS)
 				local sw, sl = stateOf(winner), stateOf(loser)
 
-				-- Verlierer: aus dem Ring gedraengt, beginnt von vorne.
+				-- Verlierer: im Tower-Duell besiegt (0 HP) und zurueck zum Heimat-Plot geschickt.
 				sl.progress  = 0
 				sl.coolUntil = os.clock() + cfg.LOSER_COOLDOWN_SECONDS
 				api.toast(loser.player, Loc.msg("msg.ufo.fight_lost"))
@@ -436,11 +438,9 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				setLabel(winner, nil)
 				setLabel(loser, nil)
 
-				sl.moving = true
-				task.spawn(function()
-					api.walkTo(loser, loser.standFoot)
-					sl.moving = false
-				end)
+				if api.stillHere(loser) then
+					api.recall(loser.player)
+				end
 				sw.fightUntil = 0
 			end)
 			if not ok then
@@ -503,7 +503,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 					end
 					local foot = api.footOf(part.figure)
 					st.inBeam = beamOpen and flatDist(foot, ringCenter) <= ringR
-					if st.inBeam and now >= st.fightUntil then
+					if st.inBeam and not part.busy and now >= st.fightUntil then
 						anyInBeam = true
 						table.insert(inBeamList, part)
 					end
@@ -989,7 +989,7 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 				local king: Part? = nil
 				local kingTime = -1
 				for _, part in parts do
-					local up = onHill(part)
+					local up = not part.busy and onHill(part)
 					if up then
 						seconds[part.player] = (seconds[part.player] or 0) + cfg.TICK_SECONDS
 					end
@@ -1018,7 +1018,7 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 						end
 						task.spawn(function()
 							api.walkTo(part, target)
-							if running and api.stillHere(part) then
+							if running and api.stillHere(part) and not part.busy then
 								pcall(FigureFX.idleBob, part.figure, CHEER_BOB)
 							end
 						end)
@@ -1041,7 +1041,7 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 					for i = 1, #parts do
 						for j = i + 1, #parts do
 							local a, b = parts[i], parts[j]
-							if onHill(a) and onHill(b)
+							if not a.busy and not b.busy and onHill(a) and onHill(b)
 								and flatDist(api.footOf(a.figure), api.footOf(b.figure)) <= cfg.TOUCH_DISTANCE
 								and os.clock() >= (coolUntil[a] or 0) and os.clock() >= (coolUntil[b] or 0) then
 
@@ -1053,7 +1053,9 @@ function EventHandlers.Koenigshuegel(api: Api, def: EventConfig.EventDef): Sessi
 										coolUntil[loser] = os.clock() + cfg.LOSER_COOLDOWN_SECONDS
 										api.toast(loser.player, Loc.msg("msg.hill.pushed"))
 										api.toast(winner.player, Loc.msg("msg.hill.holding"))
-										api.walkTo(loser, loser.standFoot)
+										if api.stillHere(loser) then
+											api.recall(loser.player)
+										end
 									end)
 									if not ok2 then
 										warn("[EventHandlers.Koenigshuegel] Kampf fehlgeschlagen:", err2)
@@ -1126,6 +1128,9 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 		api.toast(player, Loc.msg("msg.dig.start", { n = sites }))
 
 		for i = 1, sites do
+			while running and api.stillHere(part) and part.busy do
+				task.wait(DIG_CHECK_SECONDS)
+			end
 			if not running or not api.stillHere(part) then return end
 
 			local pos = randomSite()
@@ -1138,20 +1143,26 @@ function EventHandlers.Schatzgraeber(api: Api, _def: EventConfig.EventDef): Sess
 
 			if not api.walkTo(part, pos) then
 				mound:Destroy()
+				if running and api.stillHere(part) then
+					started[part] = false
+				end
 				return
 			end
 
 			-- graben
 			setLabel(part, string.format("⛏ %d/%d", i, sites))
 			pcall(FigureFX.idleBob, part.figure, DIG_BOB)
-			local t0 = os.clock()
-			while os.clock() - t0 < digTime do
+			local dug = 0
+			while dug < digTime do
 				if not running or not api.stillHere(part) then
 					mound:Destroy()
 					setLabel(part, nil)
 					return
 				end
 				task.wait(DIG_CHECK_SECONDS)
+				if not part.busy then
+					dug += DIG_CHECK_SECONDS
+				end
 			end
 			pcall(FigureFX.stopIdle, part.figure)
 			mound:Destroy()

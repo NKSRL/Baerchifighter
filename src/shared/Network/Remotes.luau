@@ -87,6 +87,14 @@ local CombatResultReceived = getOrCreateEvent("CombatResultReceived")
 -- Args: HatchResult
 local HatchResultReceived = getOrCreateEvent("HatchResultReceived")
 
+-- Sammel-Schluepfen (Oeffnen x10): Ergebnisse gebuendelt
+-- Args: { eggType, results }
+local HatchBatchReceived = getOrCreateEvent("HatchBatchReceived")
+
+-- Welt-Moment (Hatch/Tower/Rekord/Rebirth/Mutation) an alle Clients, siehe WorldMomentService
+-- Args: { userId, kind, value, number?, big }
+local WorldMoment = getOrCreateEvent("WorldMoment")
+
 -- Fusions-Ergebnis anzeigen
 -- Args: FusionResult
 local FusionResultReceived = getOrCreateEvent("FusionResultReceived")
@@ -216,6 +224,7 @@ local RequestUseBlueprint    = getOrCreateEvent("RequestUseBlueprint")    -- C->
 -- und ohne Kauf). Ergebnis kommt ueber HatchResultReceived.
 -- Args: eggType: string
 local RequestHatchEgg = getOrCreateEvent("RequestHatchEgg")
+local RequestHatchEggs = getOrCreateEvent("RequestHatchEggs")
 
 -- v13: Quest-Belohnung abholen. Der Server prueft selbst, ob die Quest erledigt ist.
 -- Args: kind: "chain" | "daily", questId: string
@@ -380,6 +389,8 @@ return {
 	PlayerDataUpdated     = PlayerDataUpdated,
 	CombatResultReceived  = CombatResultReceived,
 	HatchResultReceived   = HatchResultReceived,
+	HatchBatchReceived    = HatchBatchReceived,
+	WorldMoment           = WorldMoment,
 	FusionResultReceived  = FusionResultReceived,
 	RecycleResultReceived = RecycleResultReceived,
 	RebirthResultReceived = RebirthResultReceived,
@@ -413,6 +424,7 @@ return {
 
 	-- Client → Server
 	RequestHatchEgg        = RequestHatchEgg,
+	RequestHatchEggs       = RequestHatchEggs,
 	RequestClaimQuest      = RequestClaimQuest,
 	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,

@@ -657,25 +657,26 @@ local function describeReward(def: EventDef): Types.LocMsg
 end
 
 --------------------------------------------------------------------------------
--- Sammel-Update 05.10. (Paket 5.2): KAMPF UM DIE MITTE
+-- Sammel-Update 05.10. / Iteration 3: KAMPF UM DIE MITTE (Tower-Duelle & 1-Shot-Jagd)
 --------------------------------------------------------------------------------
--- Waehrend eines Events stossen die Event-Baerchis Spieler, die KEIN eigenes
--- Baerchi im Event haben und ihnen im Pit zu nahe kommen (Rueckstoss + kurze
--- Verlangsamung + kurze Waben-Pause). Die Baerchis kaempfen zuerst
--- untereinander (Handler); greifen tun sie nur, wenn sie gerade frei sind.
--- Annahmen (Abschnitt 11.10, Standard): kein Angriff auf Spieler mit eigenem
--- Baerchi im Pit, kein Festhalten (Abklingzeit je Spieler), nur im Pit-Radius.
+-- Im zentralen Event-Pit tragen freie Baerchis unterschiedlicher Spieler echte
+-- Tower-Duelle aus (auch ausserhalb von Events). Ist kein fremdes Baerchi mehr
+-- im Event-Pit, verfolgt das verbleibende Baerchi fremde Spieler im Pit-Radius
+-- mit CHASE_SPEED und besiegt sie in ATTACK_RANGE (7 Studs) mit einem 1-Shot.
 local PIT_BRAWL = {
-	TICK_SECONDS        = 0.5,
-	REACH               = 9,      -- Studs: so nah muss der Spieler am Baerchi sein
-	PLAYER_COOLDOWN     = 4,      -- Sekunden: so oft wird ein Spieler hoechstens gestossen
-	BAERCHI_COOLDOWN    = 2.5,    -- Sekunden: so oft greift ein Baerchi hoechstens an
-	KNOCKBACK_SPEED     = 55,
-	SLOW_FACTOR         = 0.7,
-	SLOW_SECONDS        = 1.5,
+	TICK_SECONDS         = 0.25,
+	REACH                = 9,      -- Legacy-Reichweite
+	ATTACK_RANGE         = 7,      -- Studs: Standard-Angriffsreichweite fuer 1-Shot am Spieler
+	CHASE_SPEED          = 24,     -- Studs/s: Verfolgungs-Tempo (> Standard-Spieler-WalkSpeed)
+	DUEL_WALK_SPEED      = 24,     -- Studs/s: Anlaufgeschwindigkeit zum Pet-Duell im Event-Pit
+	PLAYER_COOLDOWN      = 4,      -- Sekunden: Sicherheits-Abklingzeit je Spieler
+	BAERCHI_COOLDOWN     = 2.5,    -- Sekunden: Abklingzeit je Baerchi
+	KNOCKBACK_SPEED      = 55,
+	SLOW_FACTOR          = 0.7,
+	SLOW_SECONDS         = 1.5,
 	PICKUP_PAUSE_SECONDS = 1.5,
-	LUNGE_DISTANCE      = 2.5,
-	LUNGE_SECONDS       = 0.3,
+	LUNGE_DISTANCE       = 3.2,
+	LUNGE_SECONDS        = 0.30,
 }
 
 return {

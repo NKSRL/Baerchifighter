@@ -150,6 +150,56 @@ function WorldBuilder.buildEventPit(parent: Instance)
 	floor.Shape = Enum.PartType.Cylinder
 	floor.Parent = container
 
+	-- Goldene Kompass- & Waben-Intarsie buendig auf dem Event-Pit-Boden:
+	-- verwandelt den 100-Studs-Holzboden auch ausserhalb der Boss-Events in
+	-- einen festlichen Marktplatz und zeigt die 8 Bruecken-Richtungen an.
+	local compassRing = MapParts.newPart(
+		"EventCompassRing",
+		Vector3.new(0.06, 56, 56),
+		CFrame.new(center.X, floorY + 0.03, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(235, 190, 85),
+		Enum.Material.SmoothPlastic
+	)
+	compassRing.Shape      = Enum.PartType.Cylinder
+	compassRing.CanCollide = false
+	compassRing.CanQuery   = false
+	compassRing.CanTouch   = false
+	compassRing.CastShadow = false
+	compassRing.Parent     = container
+
+	local compassInner = MapParts.newPart(
+		"EventCompassInner",
+		Vector3.new(0.08, 48, 48),
+		CFrame.new(center.X, floorY + 0.04, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		MapConfig.EVENT_PIT_DEFAULT_FLOOR_COLOR,
+		Enum.Material.WoodPlanks
+	)
+	compassInner.Shape      = Enum.PartType.Cylinder
+	compassInner.CanCollide = false
+	compassInner.CanQuery   = false
+	compassInner.CanTouch   = false
+	compassInner.CastShadow = false
+	compassInner.Parent     = container
+
+	for slot = 1, MapConfig.PLOT_COUNT do
+		local outward = MapParts.outwardDirection(slot)
+		local rayMid  = center + outward * 27
+		local rayPos  = Vector3.new(rayMid.X, floorY + 0.10, rayMid.Z)
+		local ray = MapParts.newPart(
+			"EventCompassRay_" .. slot,
+			Vector3.new(2.2, 0.06, 36),
+			CFrame.lookAt(rayPos, rayPos + outward),
+			Color3.fromRGB(245, 200, 90),
+			Enum.Material.Neon
+		)
+		ray.Transparency = 0.45
+		ray.CanCollide   = false
+		ray.CanQuery     = false
+		ray.CanTouch     = false
+		ray.CastShadow   = false
+		ray.Parent       = container
+	end
+
 	-- Sockel-Ring am Podestfuss: anders als bei den Spieler-Arenen (dort ein
 	-- SUNKENER Pit mit einem Ring, der grossteils im Boden verschwindet) steht
 	-- dieses Podest ueber dem Boden — der Ring sitzt deshalb komplett OBERHALB

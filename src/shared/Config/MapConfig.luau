@@ -239,20 +239,18 @@ local PLOT_ISLAND_COLOR = Color3.fromRGB(70, 152, 70)
 -- Zaun an den beiden SEITEN des Plots (lokales +X und -X). Vorne (+Z, Richtung
 -- Bruecke) und hinten (-Z, Richtung Mitte) bleibt bewusst offen — sonst muesste
 -- man ueber den Zaun springen um auf den eigenen Plot oder zur Bruecke zu kommen.
-local FENCE_POST_SIZE    = Vector3.new(1.2, 5, 1.2)
-local FENCE_POST_SPACING = 9
-local FENCE_RAIL_HEIGHT  = 0.8
-local FENCE_COLOR        = Color3.fromRGB(225, 215, 190)
+local FENCE_POST_SIZE    = Vector3.new(1.4, 5.2, 1.4)
+local FENCE_POST_SPACING = 12
+local FENCE_RAIL_HEIGHT  = 0.85
+local FENCE_COLOR        = Color3.fromRGB(168, 114, 64)
 
 -- Schild an der zur Mitte zeigenden Kante: zeigt, wem der Plot gehoert
-local SIGN_POST_SIZE  = Vector3.new(0.8, 7, 0.8)
--- Playtest 05.10.: 16 breit wirkte langgezogen, und EIN Pfosten in der Mitte
--- ragte vorne durch die Schrift. Jetzt 12 breit, zwei Pfosten HINTER dem Brett
--- an den Raendern, dunkle Leisten oben und unten.
-local SIGN_BOARD_SIZE = Vector3.new(12, 5.2, 0.6)
-local SIGN_TRIM_COLOR = Color3.fromRGB(150, 105, 60)
-local SIGN_POST_COLOR = Color3.fromRGB(150, 105, 60)
-local SIGN_COLOR      = Color3.fromRGB(245, 235, 205)
+-- (Eindrucksvoller Torbogen ueber dem Gehweg, damit der Spieler frei hindurchlaeuft)
+local SIGN_POST_SIZE  = Vector3.new(1.8, 13.0, 1.8)
+local SIGN_BOARD_SIZE = Vector3.new(15.6, 4.8, 0.8)
+local SIGN_TRIM_COLOR = Color3.fromRGB(122, 78, 42)
+local SIGN_POST_COLOR = Color3.fromRGB(122, 78, 42)
+local SIGN_COLOR      = Color3.fromRGB(248, 238, 208)
 
 -- Blumen auf der freien Wiese der Hauptinsel. Rein optisch, deterministisch
 -- gesetzt (fester Zufallsstartwert), damit die Welt bei jedem Server-Start
@@ -412,13 +410,19 @@ local BUILDING_DECOR: { [string]: { DecorPiece } } = {
 		{ name = "Topfdeckel",  shape = Enum.PartType.Cylinder, size = Vector3.new( 0.4, 1.8,  1.8), offset = Vector3.new( 2.8, 10.70, 2.8), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT },
 	},
 
-	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe. Was
-	-- im Becken steht, steht AUF dem Beckenboden (POND_FLOOR_TOP 0.45), nicht
-	-- im Beet darunter (check_decor.py Regel 6). Die Looks 2-6 bauen darum den
-	-- Brunnen auf.
+	-- Honig-Teich, Look 1: im Becken (PondBuilder) ein Holzpfahl mit Wabe plus
+	-- ein ueberquellender Honigkrug auf Holzsockel mit leuchtendem Honigstrahl,
+	-- damit schon Level 1 saftig und belohnend wirkt. Was im Becken steht, steht
+	-- AUF dem Beckenboden (POND_FLOOR_TOP 0.45), nicht im Beet darunter
+	-- (check_decor.py Regel 6). Die Looks 2-6 bauen darum den Brunnen auf.
 	HoneyPond = {
-		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(1.95, 0.9, 0.9),  offset = Vector3.new(0, 1.425, 0), color = WOOD,  material = Enum.Material.Wood, rotation = UPRIGHT },
-		{ name = "Wabe",       shape = Enum.PartType.Block,    size = Vector3.new(1.6, 1.2, 0.5),   offset = Vector3.new(0, 2.90, 0), color = HONEY, material = Enum.Material.Neon },
+		{ name = "Pfahl",      shape = Enum.PartType.Cylinder, size = Vector3.new(1.95, 0.9, 0.9),  offset = Vector3.new(0, 1.425, 0),    color = WOOD,       material = Enum.Material.Wood, rotation = UPRIGHT },
+		{ name = "Wabe",       shape = Enum.PartType.Block,    size = Vector3.new(1.6, 1.2, 0.5),   offset = Vector3.new(0, 2.90, 0),     color = HONEY,      material = Enum.Material.Neon },
+		{ name = "L1Fass",     shape = Enum.PartType.Cylinder, size = Vector3.new(1.5, 2.2, 2.2),   offset = Vector3.new(-3.2, 1.20, 2.2), color = WOOD_DARK,  material = Enum.Material.Wood, rotation = UPRIGHT },
+		{ name = "L1Topf",     shape = Enum.PartType.Ball,     size = Vector3.new(2.4, 2.2, 2.4),   offset = Vector3.new(-3.2, 2.85, 2.2), color = HONEY_DEEP },
+		{ name = "L1Rand",     shape = Enum.PartType.Cylinder, size = Vector3.new(0.35, 1.8, 1.8),  offset = Vector3.new(-3.2, 3.95, 2.2), color = Color3.fromRGB(255, 205, 70),  material = Enum.Material.Metal, rotation = UPRIGHT },
+		{ name = "L1Quell",    shape = Enum.PartType.Ball,     size = Vector3.new(1.5, 0.8, 1.5),   offset = Vector3.new(-2.7, 3.90, 1.7), color = HONEY,      material = Enum.Material.Neon },
+		{ name = "L1Guss",     shape = Enum.PartType.Cylinder, size = Vector3.new(3.1, 0.45, 0.45), offset = Vector3.new(-2.2, 2.10, 1.2), color = HONEY,      material = Enum.Material.Neon, rotation = UPRIGHT },
 	},
 }
 
@@ -829,9 +833,20 @@ local EAT_LEAN_DEGREES = 26
 -- laeuft also dagegen und nicht hindurch. Genau deshalb ist der Sockel schmal
 -- gehalten (6 Studs bei 24 Studs Pad): sonst koennte jemand darin spawnen.
 local CENTER_DECOR: { DecorPiece } = {
-	{ name = "Sockel",   shape = Enum.PartType.Cylinder, size = Vector3.new( 1.0,  6.0,  6.0), offset = Vector3.new( 0,  0.50, 0), color = Color3.fromRGB(225, 214, 186), rotation = UPRIGHT, solid = true },
-	{ name = "Sockel2",  shape = Enum.PartType.Cylinder, size = Vector3.new( 0.8,  4.4,  4.4), offset = Vector3.new( 0,  1.40, 0), color = Color3.fromRGB(238, 229, 205), rotation = UPRIGHT, solid = true },
-	{ name = "Mast",     shape = Enum.PartType.Cylinder, size = Vector3.new(26.0,  1.8,  1.8), offset = Vector3.new( 0, 14.80, 0), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT, solid = true },
+	{ name = "BasisStufe",   shape = Enum.PartType.Cylinder, size = Vector3.new( 0.6, 13.0, 13.0), offset = Vector3.new( 0,  0.30, 0), color = Color3.fromRGB(214, 200, 170), material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+	{ name = "BasisGold",    shape = Enum.PartType.Cylinder, size = Vector3.new( 0.35, 13.6, 13.6), offset = Vector3.new( 0,  0.175, 0), color = GOLD_TRIM, material = Enum.Material.Neon, rotation = UPRIGHT },
+	{ name = "Sockel",       shape = Enum.PartType.Cylinder, size = Vector3.new( 1.2,  8.6,  8.6), offset = Vector3.new( 0,  0.90, 0), color = Color3.fromRGB(225, 214, 186), material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+	{ name = "Sockel2",      shape = Enum.PartType.Cylinder, size = Vector3.new( 1.2,  6.2,  6.2), offset = Vector3.new( 0,  2.00, 0), color = Color3.fromRGB(238, 229, 205), material = Enum.Material.Slate, rotation = UPRIGHT, solid = true },
+	{ name = "WabenKern",    shape = Enum.PartType.Cylinder, size = Vector3.new( 4.2,  4.2,  4.2), offset = Vector3.new( 0,  4.60, 0), color = WOOD_DARK, material = Enum.Material.Wood, rotation = UPRIGHT, solid = true },
+	{ name = "HonigRing1",   shape = Enum.PartType.Cylinder, size = Vector3.new( 0.45, 4.8,  4.8), offset = Vector3.new( 0,  3.40, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+	{ name = "HonigRing2",   shape = Enum.PartType.Cylinder, size = Vector3.new( 0.45, 4.8,  4.8), offset = Vector3.new( 0,  5.60, 0), color = HONEY, material = Enum.Material.Neon, rotation = UPRIGHT },
+	{ name = "WabenKammer1", shape = Enum.PartType.Ball,     size = Vector3.new( 2.6,  3.2,  2.6), offset = Vector3.new( 2.2, 4.20, 0), color = HONEY, material = Enum.Material.Neon },
+	{ name = "WabenKammer2", shape = Enum.PartType.Ball,     size = Vector3.new( 2.6,  3.2,  2.6), offset = Vector3.new(-2.2, 4.20, 0), color = HONEY, material = Enum.Material.Neon },
+	{ name = "WabenKammer3", shape = Enum.PartType.Ball,     size = Vector3.new( 2.6,  3.2,  2.6), offset = Vector3.new( 0,  4.20,  2.2), color = HONEY, material = Enum.Material.Neon },
+	{ name = "WabenKammer4", shape = Enum.PartType.Ball,     size = Vector3.new( 2.6,  3.2,  2.6), offset = Vector3.new( 0,  4.20, -2.2), color = HONEY, material = Enum.Material.Neon },
+	{ name = "SpireKragen",  shape = Enum.PartType.Cylinder, size = Vector3.new( 1.4,  3.2,  3.2), offset = Vector3.new( 0,  7.30, 0), color = GOLD_TRIM, material = Enum.Material.Metal, rotation = UPRIGHT },
+	{ name = "Mast",         shape = Enum.PartType.Cylinder, size = Vector3.new(26.0,  1.8,  1.8), offset = Vector3.new( 0, 14.80, 0), color = WOOD, material = Enum.Material.Wood, rotation = UPRIGHT, solid = true },
+	{ name = "NestArm",      shape = Enum.PartType.Block,    size = Vector3.new( 4.2,  0.5,  0.5), offset = Vector3.new( 2.1, 18.20, 0), color = WOOD_DARK, material = Enum.Material.Wood },
 
 	-- Zwei gekreuzte Querhoelzer, damit der Mast aus jeder Richtung gleich
 	-- aussieht — er wird ja aus acht verschiedenen Winkeln angeschaut.
@@ -840,14 +855,15 @@ local CENTER_DECOR: { DecorPiece } = {
 	{ name = "QuerB1",   shape = Enum.PartType.Cylinder, size = Vector3.new( 7.6,  0.6,  0.6), offset = Vector3.new( 0, 19.00, 0), color = WOOD_DARK, material = Enum.Material.Wood, rotation = Vector3.new(0, 45, 0) },
 	{ name = "QuerB2",   shape = Enum.PartType.Cylinder, size = Vector3.new( 7.6,  0.6,  0.6), offset = Vector3.new( 0, 19.00, 0), color = WOOD_DARK, material = Enum.Material.Wood, rotation = Vector3.new(0, 135, 0) },
 
-	-- Wimpel an den unteren Querhoelzern
+	-- Wimpel an den unteren Querhoelzer
 	{ name = "Wimpel1",  shape = Enum.PartType.Block,    size = Vector3.new( 2.8,  3.6,  0.3), offset = Vector3.new(-4.6, 10.00, 0), color = HONEY },
 	{ name = "Wimpel2",  shape = Enum.PartType.Block,    size = Vector3.new( 2.8,  3.6,  0.3), offset = Vector3.new( 4.6, 10.00, 0), color = HONEY },
 	{ name = "Wimpel3",  shape = Enum.PartType.Block,    size = Vector3.new( 0.3,  3.6,  2.8), offset = Vector3.new( 0, 10.00, -4.6), color = HONEY_DEEP },
 	{ name = "Wimpel4",  shape = Enum.PartType.Block,    size = Vector3.new( 0.3,  3.6,  2.8), offset = Vector3.new( 0, 10.00,  4.6), color = HONEY_DEEP },
 
-	{ name = "Krone",    shape = Enum.PartType.Cylinder, size = Vector3.new( 0.8,  5.0,  5.0), offset = Vector3.new( 0, 27.40, 0), color = WOOD_DARK, material = Enum.Material.Wood, rotation = UPRIGHT },
-	{ name = "Tropfen",  shape = Enum.PartType.Ball,     size = Vector3.new( 6.0,  6.0,  6.0), offset = Vector3.new( 0, 29.60, 0), color = HONEY, material = Enum.Material.Neon },
+	{ name = "Krone",      shape = Enum.PartType.Cylinder, size = Vector3.new( 0.8,  5.0,  5.0), offset = Vector3.new( 0, 27.40, 0), color = WOOD_DARK, material = Enum.Material.Wood, rotation = UPRIGHT },
+	{ name = "Tropfen",    shape = Enum.PartType.Ball,     size = Vector3.new( 6.0,  6.0,  6.0), offset = Vector3.new( 0, 29.60, 0), color = HONEY, material = Enum.Material.Neon },
+	{ name = "KronenReif", shape = Enum.PartType.Cylinder, size = Vector3.new( 0.4,  7.6,  7.6), offset = Vector3.new( 0, 29.60, 0), color = GOLD_TRIM, material = Enum.Material.Neon, rotation = UPRIGHT },
 }
 
 --------------------------------------------------------------------------------
@@ -863,12 +879,9 @@ local BAERCHI_HOME_OFFSET = Vector3.new(0, 0, 6)
 -- Wo der SPIELER auf seinem eigenen Plot spawnt bzw. nach dem Tod
 -- respawnt — plot-lokal, wie alles hier oben (siehe Kopf der Datei).
 --
--- Bewusst abseits von allem anderen auf dem Plot: der Bienenstock deckt
--- x -28..-16 bei negativem Z, der Teich x 12..32 bei positivem Z, der
--- Baerchi steht bei (0, 6). (-20, 14) liegt mit Rand frei auf der karierten
--- Wiese dazwischen — Zahlen gegen BUILDING_OFFSETS/POND_OFFSET/
--- BAERCHI_HOME_OFFSET gegenpruefen, falls sich das Plot-Layout mal aendert.
-local PLAYER_SPAWN_OFFSET = Vector3.new(-20, 0, 14)
+-- Exakte Mitte des 72x72-Plots auf dem Hauptpfad zwischen Honig-Brunnen (-Z)
+-- und eigenem Baerchi (+Z bei 6).
+local PLAYER_SPAWN_OFFSET = Vector3.new(0, 0, 0)
 
 -- Baerchi-Figur: das Mesh kommt aus Modules/BaerchiMesh (klont
 -- ReplicatedStorage.Assets.BaerchiTemplate bzw. das Rarity-eigene Modell).
