@@ -70,6 +70,7 @@ local SkillConfig = require(ReplicatedStorage.Config.SkillConfig)
 local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
 local BaerchiMesh = require(ReplicatedStorage.Modules.BaerchiMesh)
 local FightTimeline = require(ReplicatedStorage.Modules.FightTimeline)
+local Audio       = require(ReplicatedStorage.Audio)
 local Types       = require(ReplicatedStorage.Network.Types)
 local Loc         = require(ReplicatedStorage.Localization.Loc)
 local Remotes     = require(ReplicatedStorage.Network.Remotes)
@@ -724,9 +725,12 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 						local contact = (stageSelfPos + stageEnemyPos) * 0.5 + Vector3.new(0, 1.5, 0)
 						FigureFX.burstAt(contact, MapConfig.FIGHT_HIT_FLASH_COLOR, fighters,
 							MapConfig.FIGHT_BUMP_SPARKS * (if isSkill then 3 else 1))
-						FigureFX.soundAt(contact, MapConfig.FIGHT_BUMP_SOUND,
-							MapConfig.FIGHT_BUMP_VOLUME * (if isSkill then 1.6 else 1), fighters,
-							0.9 + math.random() * 0.25)
+						-- Audio-Rework 16.10.: weicher Treffer-Klang aus Audio.SFX; die
+						-- Cooldown-Bremse sitzt in FigureFX.soundAt.
+						local bumpName = if isSkill then "hitHeavy" else "hit"
+						FigureFX.soundAt(contact, Audio.sfxId(bumpName),
+							Audio.SFX[bumpName].volume, fighters,
+							0.92 + math.random() * 0.16)
 					end
 
 					if beat.kind == "stunned" then

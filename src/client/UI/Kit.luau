@@ -24,7 +24,7 @@ local RunService        = game:GetService("RunService")
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local SoundConfig = require(ReplicatedStorage.Config.SoundConfig)
+local AudioController = require(script.Parent.Parent.Controllers.AudioController)
 
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
@@ -38,27 +38,22 @@ Kit.T = T
 -- Klang
 --------------------------------------------------------------------------------
 
--- Ein Sound-Objekt je Name, einmal angelegt und wiederverwendet.
-local _sounds: { [string]: Sound } = {}
+-- Audio-Rework 16.10.: die UI-Klaenge kommen jetzt aus ReplicatedStorage/Audio
+-- und laufen ueber den AudioController (Cooldown, Tonhoehen-Streuung, Regler).
+-- SoundConfig bleibt als alte Datei liegen, wird aber nicht mehr gelesen.
+local UI_TO_AUDIO: { [string]: string } = {
+	click   = "click",
+	select  = "select",
+	success = "upgrade",
+	upgrade = "upgrade",
+	lookUp  = "upgradeBig",
+	unlock  = "unlock",
+}
 
--- Spielt einen UI-Klang aus SoundConfig. Stumm-sicher: unbekannt, leer oder
--- nicht ladbar → es passiert nichts.
+-- Spielt einen UI-Klang. Stumm-sicher: unbekannt, leer oder nicht ladbar →
+-- es passiert nichts.
 function Kit.playSound(name: string)
-	local def = SoundConfig.get(name)
-	if not def then return end
-	local sound = _sounds[name]
-	if not sound then
-		local created = Instance.new("Sound")
-		created.Name    = "UiSound_" .. name
-		created.SoundId = def.id
-		created.Parent  = SoundService
-		_sounds[name] = created
-		sound = created
-	end
-	sound.Volume = def.volume * SoundConfig.MASTER_VOLUME
-	pcall(function()
-		SoundService:PlayLocalSound(sound)
-	end)
+	AudioController.play(UI_TO_AUDIO[name] or name)
 end
 
 --------------------------------------------------------------------------------

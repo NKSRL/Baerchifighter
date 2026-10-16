@@ -14,13 +14,15 @@
 -- (FeedbackConfig.MOMENT_QUEUE); wer mehr ausloest, verliert die aeltesten.
 
 local TweenService      = game:GetService("TweenService")
-local SoundService      = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Loc            = require(ReplicatedStorage.Localization.Loc)
 local FeedbackConfig = require(ReplicatedStorage.Config.FeedbackConfig)
 local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
 
+local Audio = require(ReplicatedStorage.Audio)
+
+local AudioController = require(script.Parent.Parent.Controllers.AudioController)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 
@@ -53,14 +55,10 @@ local _scale: UIScale? = nil
 local _queue: { Job } = {}
 local _running = false
 
-local function playSound()
-	local sound = Instance.new("Sound")
-	sound.SoundId = FeedbackConfig.MOMENT_SOUND
-	sound.Volume  = FeedbackConfig.MOMENT_VOLUME
-	SoundService:PlayLocalSound(sound)
-	task.delay(3, function()
-		sound:Destroy()
-	end)
+-- Audio-Rework 16.10.: je Art ein eigener Jingle (Audio.MOMENT_SFX) statt des
+-- Pings, der auch jeder Klick war; laeuft ueber den AudioController.
+local function playSound(kind: string)
+	AudioController.play(Audio.MOMENT_SFX[kind] or Audio.MOMENT_DEFAULT)
 end
 
 local function showOne(job: Job)
@@ -83,7 +81,7 @@ local function showOne(job: Job)
 	ring.BackgroundTransparency = 0.25
 	word.TextTransparency = 0
 	scale.Scale = 0.2
-	playSound()
+	playSound(job.kind)
 
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 	task.wait(FeedbackConfig.MOMENT_SECONDS)

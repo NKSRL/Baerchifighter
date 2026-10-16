@@ -21,6 +21,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Remotes = require(ReplicatedStorage.Network.Remotes)
 local Loc     = require(ReplicatedStorage.Localization.Loc)
+local Audio   = require(ReplicatedStorage.Audio)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
@@ -51,9 +52,29 @@ function SettingsService.setLanguage(player: Player, language: any)
 	PlayerService.markDirty(player)
 end
 
+-- Audio-Rework 16.10.: Musik-/Effekt-Regler und Stumm-Taste. Der Client darf
+-- nur drei Werte schicken; Audio.sanitize klemmt sie auf 0..1 (zwei
+-- Nachkommastellen) bzw. true/false, alles andere wird zum Standardwert.
+function SettingsService.setAudio(player: Player, music: any, sfx: any, muted: any)
+	local data = PlayerService.getData(player)
+	if not data then return end
+
+	local clean = Audio.sanitize({ music = music, sfx = sfx, muted = muted })
+	local old = (data :: any).audio
+	if old and old.music == clean.music and old.sfx == clean.sfx and old.muted == clean.muted then
+		return
+	end
+
+	(data :: any).audio = clean
+	PlayerService.markDirty(player)
+end
+
 function SettingsService.init()
 	RateLimiter.connect(Remotes.RequestSetLanguage, "RequestSetLanguage", function(player, language: any)
 		SettingsService.setLanguage(player, language)
+	end)
+	RateLimiter.connect(Remotes.RequestSetAudio, "RequestSetAudio", function(player, music: any, sfx: any, muted: any)
+		SettingsService.setAudio(player, music, sfx, muted)
 	end)
 
 	print("[SettingsService] Initialisiert")

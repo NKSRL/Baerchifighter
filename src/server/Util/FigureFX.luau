@@ -594,7 +594,20 @@ end
 -- Ein kurzer Ton an einer Weltposition (Aufprall). Alle Spieler in der Naehe
 -- hoeren ihn, weil er serverseitig in der Welt haengt. Leise Grenzen fuer die
 -- Reichweite, damit ein Kampf nicht ueber die ganze Karte schallt.
+-- Audio-Rework 16.10.: hoechstens ein Klang je SOUND_MIN_GAP Sekunden und
+-- Eltern-Ordner, sonst stapeln sich Treffer mehrerer Kaempfe zu Rauschen. Eine
+-- leere Id (noch nicht hochgeladen) spielt nichts. Der Sound heisst "WorldSfx":
+-- der Client haengt ihn in seine Effekt-Gruppe (Regler + Stumm-Taste).
+local SOUND_MIN_GAP = 0.2
+local _lastSoundAt: { [Instance]: number } = setmetatable({}, { __mode = "k" }) :: any
+
 function FigureFX.soundAt(position: Vector3, soundId: string, volume: number, parent: Instance, pitch: number?)
+	if soundId == "" then return end
+	local now = os.clock()
+	local last = _lastSoundAt[parent]
+	if last and now - last < SOUND_MIN_GAP then return end
+	_lastSoundAt[parent] = now
+
 	local anchor = Instance.new("Part")
 	anchor.Name         = "FXSound"
 	anchor.Anchored     = true
@@ -607,6 +620,7 @@ function FigureFX.soundAt(position: Vector3, soundId: string, volume: number, pa
 	anchor.Parent       = parent
 
 	local sound = Instance.new("Sound")
+	sound.Name               = "WorldSfx"
 	sound.SoundId            = soundId
 	sound.Volume             = volume
 	sound.PlaybackSpeed      = pitch or 1

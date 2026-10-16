@@ -20,6 +20,10 @@ return {
 	----------------------------------------------------------------------------
 	["ui.language.title"] = "Sprache",
 	["ui.language.auto"]  = "Automatisch (Roblox)",
+	["ui.audio.section"] = "Ton",
+	["ui.audio.music"] = "Musik",
+	["ui.audio.sfx"] = "Effekte",
+	["ui.audio.mute"] = "Stumm",
 
 	----------------------------------------------------------------------------
 	-- Zeit (Theme.formatDuration) — Werte kommen vorformatiert (z.B. "05")

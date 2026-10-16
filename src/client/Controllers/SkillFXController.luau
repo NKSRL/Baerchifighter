@@ -31,6 +31,11 @@ local Debris            = game:GetService("Debris")
 
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local SkillFXConfig = require(ReplicatedStorage.Config.SkillFXConfig)
+local Audio           = require(ReplicatedStorage.Audio)
+local AudioController = require(script.Parent.AudioController)
+
+-- Audio-Rework 16.10.: letzter Start je Skill-Klang (Cooldown)
+local _skillSoundAt: { [string]: number } = {}
 
 local SkillFXController = {}
 
@@ -653,19 +658,34 @@ BLOCKS.sound = function(ctx, s)
 	local slot = s.slot or "strike"
 	local key = (ctx.fx.sounds :: any)[slot]
 	if not key then return end
-	local id = SkillFXConfig.SOUND_LIBRARY[key] or key
+	-- Audio-Rework 16.10.: Bibliotheksname → Audio.SFX (weiche, selbst erzeugte
+	-- Klaenge). Cooldown, Stimmen-Limit und Tonhoehen-Fenster verhindern, dass
+	-- viele Faehigkeiten gleichzeitig zu Rauschen werden.
+	local libraryName = SkillFXConfig.SOUND_LIBRARY[key]
+	local def = if libraryName then Audio.SFX[libraryName] else nil
+	local id = if libraryName then Audio.sfxId(libraryName) else (if tonumber(key) then "rbxassetid://" .. key else key)
+	if id == "" then return end
+	if def then
+		local now = os.clock()
+		local last = _skillSoundAt[libraryName :: string]
+		if last and now - last < def.cooldown then return end
+		if not AudioController.takeWorldSlot() then return end
+		_skillSoundAt[libraryName :: string] = now
+	end
 	local anchor = newPart(Enum.PartType.Block, Vector3.one * 0.1, Color3.new(), CFrame.new(ctx.selfPos), 1)
 	local snd = Instance.new("Sound")
-	snd.SoundId = if tonumber(id) then "rbxassetid://" .. id else id
+	snd.SoundId = id
 	-- v15: leiser, Echo noch leiser, nach MAX_SECONDS ausgeblendet
-	-- (SkillFXConfig.SOUND) — die eingebauten Klaenge sind sonst sehr hart.
+	-- (SkillFXConfig.SOUND). Die Grundlautstaerke kommt aus Audio.SFX.
 	local cfg = SkillFXConfig.SOUND
-	local volume = if ctx.isOwner then cfg.OWNER_VOLUME else cfg.SPECTATOR_VOLUME
+	local volume = (if def then def.volume else 0.3) * (if ctx.isOwner then cfg.OWNER_VOLUME else cfg.SPECTATOR_VOLUME)
 	if s.echo then
 		volume *= cfg.ECHO_FACTOR
 	end
 	snd.Volume = volume
-	snd.PlaybackSpeed = (ctx.fx.pitch or 1) * (if slot == "charge" then 0.9 elseif slot == "impact" then 0.8 else 1)
+	snd.SoundGroup = AudioController.sfxGroup()
+	local rawPitch = (ctx.fx.pitch or 1) * (if slot == "charge" then 0.9 elseif slot == "impact" then 0.8 else 1)
+	snd.PlaybackSpeed = AudioController.clampWorldPitch(rawPitch) * (1 + (math.random() * 2 - 1) * (if def then def.pitch else 0))
 	snd.RollOffMode = Enum.RollOffMode.InverseTapered
 	snd.RollOffMinDistance = cfg.ROLLOFF_MIN
 	snd.RollOffMaxDistance = cfg.ROLLOFF_MAX

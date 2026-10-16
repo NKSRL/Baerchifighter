@@ -37,6 +37,7 @@ local Icons       = require(script.Parent.Icons)
 local Hud         = require(script.Parent.Hud)
 local MenuBar     = require(script.Parent.MenuBar)
 local ClientState = require(script.Parent.Parent.Controllers.ClientState)
+local AudioController = require(script.Parent.Parent.Controllers.AudioController)
 
 local Feedback = {}
 
@@ -280,6 +281,10 @@ local function launchFlyer(kind: string, amount: number, origin: Origin?)
 	end
 	-- Alle belegt: die Pille zaehlt den Wert ohnehin hoch. Kein siebtes Icon.
 	if not free then return end
+
+	-- Audio-Rework 16.10.: ein kleines Muenz-Blubbern pro fliegendem Icon (der
+	-- AudioController begrenzt Abstand und Anzahl, mehrere Icons = ein Klang)
+	AudioController.play("coin")
 
 	local target = targetFor(kind)
 	local from = resolveOrigin(origin)
