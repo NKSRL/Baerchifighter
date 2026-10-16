@@ -122,6 +122,9 @@ end
 -- wird der Beckenboden auf `ground` gesetzt und der Steg nach -Z gedreht
 -- (dorthin, wo der Baerchi steht, siehe MapService.getPondPosition).
 local FOUNTAIN_STAGES = 5
+-- Groesse: so passt der Steg zu MapService.getPondPosition (6.3 Studs von der
+-- Mitte, ~1.5 hoch) und der Brunnen steht gleichwertig neben dem Inkubator.
+local FOUNTAIN_SCALE = 1.4
 
 function PondBuilder.fountainFolder(): Instance?
 	if not FeatureFlags.isOn("NEW_MODELS_V3") then return nil end
@@ -141,6 +144,7 @@ function PondBuilder.buildFountain(parent: Instance, ground: CFrame, islandData:
 
 	local model = template:Clone()
 	model.Name = "Fountain"
+	model:ScaleTo(model:GetScale() * FOUNTAIN_SCALE)
 
 	-- Ursprung: Mitte und Unterkante des Beckenbodens der Vorlage
 	local origin = Vector3.new(0, 1000, 0)
