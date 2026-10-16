@@ -45,6 +45,7 @@ local Names         = require(ReplicatedStorage.Localization.Names)
 local BaerchiMesh   = require(ReplicatedStorage.Modules.BaerchiMesh)   -- Sammel-Update 2.2: Baerchi gross zeigen
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
+local AudioController = require(script.Parent.Parent.Controllers.AudioController)
 local Theme = require(script.Parent.Theme)
 local EggIcon = require(script.Parent.EggIcon)
 local Toast = require(script.Parent.Toast)
@@ -510,6 +511,7 @@ local function play(job: Job)
 		for _ = 1, cracksNow do
 			crackIndex += 1
 			addCrack(scene, crackIndex)
+			if crackIndex == 1 or crackIndex == 3 then AudioController.play("hatchCrack") end
 		end
 		waitSkippable(WOBBLE_STAGE_SECONDS * intensity.wobbleMul)
 		if _skip then break end
@@ -527,6 +529,9 @@ local function play(job: Job)
 	connection:Disconnect()
 
 	-- 4. Burst
+	-- Audio-Rework 16.10.: normales Schluepfen = kleiner weicher Klang; ab der
+	-- Stufe mit Bildschirmzittern der grosse Jingle (senkt die Musik ab).
+	AudioController.play(if intensity.shake then "hatchRare" else "hatchCommon")
 	flash(scene, intensity.flash)
 	burstRing(scene, rarityColor)
 	burstParticles(scene, rarityColor, intensity.particles)

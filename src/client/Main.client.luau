@@ -43,6 +43,7 @@ local Controllers = root:WaitForChild("Controllers")
 local UI          = root:WaitForChild("UI")
 
 local ClientState        = require(Controllers:WaitForChild("ClientState"))
+local AudioController    = require(Controllers:WaitForChild("AudioController"))   -- Audio-Rework 16.10.
 local LanguageController = require(Controllers:WaitForChild("LanguageController"))
 local ResultFeed         = require(Controllers:WaitForChild("ResultFeed"))
 local WorldController    = require(Controllers:WaitForChild("WorldController"))
@@ -74,6 +75,7 @@ local FusionPanel      = require(UI:WaitForChild("FusionPanel"))
 local CharmPanel       = require(UI:WaitForChild("CharmPanel"))
 local RebirthDialog    = require(UI:WaitForChild("RebirthDialog"))
 local LanguagePanel    = require(UI:WaitForChild("LanguagePanel"))
+local AudioPanel       = require(UI:WaitForChild("AudioPanel"))     -- Audio-Rework 16.10.
 local PetBar           = require(UI:WaitForChild("PetBar"))
 local QuestPanel       = require(UI:WaitForChild("QuestPanel"))
 local QuestTracker     = require(UI:WaitForChild("QuestTracker"))
@@ -120,6 +122,9 @@ require(game:GetService("ReplicatedStorage"):WaitForChild("Localization"):WaitFo
 
 Toast.init(screenGui)
 ClientState.init()
+-- Audio-Rework 16.10.: Musik + Effekte (braucht ClientState und PanelManager,
+-- beide sind als Module schon geladen; die Musik startet erst nach dem Laden)
+AudioController.init()
 
 BaerchiPanel.init(screenGui)
 BaerchiInventory.init(screenGui)
@@ -135,6 +140,7 @@ FusionPanel.init(screenGui)
 CharmPanel.init(screenGui)
 RebirthDialog.init(screenGui)
 LanguagePanel.init(screenGui)
+AudioPanel.init(screenGui)         -- Audio-Rework 16.10.: Regler + Lautsprecher-Knopf
 QuestPanel.init(screenGui)
 -- v14: Ei-Baum (oeffnet sich aus dem Ei-Menue)
 EggTreePanel.init(screenGui)

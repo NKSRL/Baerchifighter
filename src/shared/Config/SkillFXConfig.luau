@@ -89,25 +89,24 @@ local PARTICLE_BUDGET = {
 -- halter erlaubt). Die Bibliothek unten ist in SOUND_LIBRARY benannt, die
 -- Faehigkeiten verweisen nur auf Namen.
 local SOUND_LIBRARY: { [string]: string } = {
-	-- Eingebaute Roblox-Klaenge (immer vorhanden, kein Upload noetig).
-	whoosh    = "rbxasset://sounds/unsheath.wav",
-	hit       = "rbxasset://sounds/hit.wav",
-	ping      = "rbxasset://sounds/electronicpingshort.wav",
-	boom      = "rbxasset://sounds/collide.wav",
-	glass     = "rbxasset://sounds/glassbreak.wav",
-	splat     = "rbxasset://sounds/splat.wav",
-	snap      = "rbxasset://sounds/snap.mp3",
-	rocket    = "rbxasset://sounds/Rocket shot.wav",
-	rumble    = "rbxasset://sounds/Rocket whoosh 01.wav",
-	slash     = "rbxasset://sounds/swordslash.wav",
-	lunge     = "rbxasset://sounds/swordlunge.wav",
-	thunder   = "rbxasset://sounds/HalloweenThunder.wav",
-	ghost     = "rbxasset://sounds/HalloweenGhost.wav",
-	bass      = "rbxasset://sounds/bass.wav",
-	flash     = "rbxasset://sounds/flashbulb.wav",
+	-- Audio-Rework 16.10.: Namen aus ReplicatedStorage/Audio (Audio.SFX). Die Id
+	-- eines Klangs aendert man dort, nicht hier.
+	whoosh    = "fx_whoosh",
+	hit       = "fx_hit",
+	ping      = "fx_ping",
+	boom      = "fx_boom",
+	glass     = "fx_glass",
+	splat     = "fx_splat",
+	snap      = "fx_snap",
+	rocket    = "fx_rocket",
+	rumble    = "fx_rumble",
+	slash     = "fx_slash",
+	lunge     = "fx_lunge",
+	thunder   = "fx_thunder",
+	ghost     = "fx_ghost",
+	bass      = "fx_bass",
+	flash     = "fx_flash",
 }
--- (Alle Eintraege in Studio mit ContentProvider:PreloadAsync geprueft:
--- laden. "swoosh.wav" gibt es nicht — deshalb unsheath.wav.)
 
 -- v15: Lautstaerke. Die eingebauten Klaenge sind laut und hart (Donner,
 -- Rakete, Glas) — in v14 klangen manche Shows aggressiv. Deshalb leiser,
@@ -116,8 +115,8 @@ local SOUND_LIBRARY: { [string]: string } = {
 -- Zuschauer hoeren deutlich leiser als der Besitzer, ROLLOFF_* sorgt dafuer,
 -- dass ein Kampf auf der Nachbar-Insel kaum durchdringt.
 local SOUND = {
-	OWNER_VOLUME     = 0.35,
-	SPECTATOR_VOLUME = 0.12,
+	OWNER_VOLUME     = 1.0,    -- Faktor auf die Lautstaerke des Klangs (Audio.SFX)
+	SPECTATOR_VOLUME = 0.4,    -- Faktor fuer Zuschauer
 	ECHO_FACTOR      = 0.6,
 	MAX_SECONDS      = 1.6,
 	FADE_SECONDS     = 0.4,

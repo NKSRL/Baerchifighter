@@ -28,3 +28,6 @@ desktop.ini
 
 # Python-Cache
 __pycache__/
+
+# Audio-Rework: erzeugte WAVs (neu erzeugen mit: node tools/audio/synth.js)
+/tools/audio/out/

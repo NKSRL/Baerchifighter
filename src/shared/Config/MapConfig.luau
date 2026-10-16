@@ -1637,7 +1637,7 @@ return {
 	FIGHT_CHARGE_BAR_HEIGHT   = 0.35,
 	FIGHT_CHARGE_COLOR        = Color3.fromRGB(120, 200, 255),
 	FIGHT_CHARGE_FULL_COLOR   = Color3.fromRGB(255, 214, 70),
-	FIGHT_BUMP_SOUND          = "rbxasset://sounds/action_jump_land.mp3",
+	FIGHT_BUMP_SOUND          = "",   -- Audio-Rework 16.10.: jetzt Audio.SFX.hit / hitHeavy (nicht mehr gelesen)
 	FIGHT_BUMP_VOLUME         = 0.25,
 	FIGHT_BUMP_SPARKS         = 6,
 

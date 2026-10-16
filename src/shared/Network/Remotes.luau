@@ -309,6 +309,11 @@ local RequestRebirth = getOrCreateEvent("RequestRebirth")
 -- Args: language: string?   ("de" | "en" | "fr" | "es")
 local RequestSetLanguage = getOrCreateEvent("RequestSetLanguage")
 
+-- Audio-Rework 16.10.: Lautstaerke-Regler speichern. Der Server klemmt die Werte
+-- (Audio.sanitize) und legt sie in data.audio ab.
+-- Args: music: number (0..1), sfx: number (0..1), muted: boolean
+local RequestSetAudio = getOrCreateEvent("RequestSetAudio")
+
 -- HBB Paket 0: Messpunkte der Oberflaeche (Panel geoeffnet, Panel schnell
 -- wieder geschlossen, Spieler steht still). Reine Statistik, aendert nichts
 -- am Spielstand. Der Server prueft Art und Panel-Namen gegen
@@ -421,6 +426,7 @@ return {
 	RequestEquipBaerchi    = RequestEquipBaerchi,
 	RequestRebirth         = RequestRebirth,
 	RequestSetLanguage     = RequestSetLanguage,
+	RequestSetAudio        = RequestSetAudio,
 	RequestPromoteBaerchi  = RequestPromoteBaerchi,
 	RequestRollCharms      = RequestRollCharms,
 	RequestToggleCharmLock = RequestToggleCharmLock,

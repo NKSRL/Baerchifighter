@@ -13,6 +13,10 @@ return {
 	----------------------------------------------------------------------------
 	["ui.language.title"] = "Langue",
 	["ui.language.auto"]  = "Automatique (Roblox)",
+	["ui.audio.section"] = "Son",
+	["ui.audio.music"] = "Musique",
+	["ui.audio.sfx"] = "Effets",
+	["ui.audio.mute"] = "Muet",
 
 	----------------------------------------------------------------------------
 	-- Temps

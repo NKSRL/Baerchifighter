@@ -62,6 +62,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- Reines Umschalten einer Einstellung. Kein Spam-Risiko fuer Spielwerte,
 	-- aber jeder Wechsel stoesst ein Daten-Update an — daher nicht null.
 	RequestSetLanguage     = 1.00,
+	RequestSetAudio        = 0.50,
 
 	GetPlayerData          = 1.00,
 

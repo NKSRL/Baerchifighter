@@ -547,6 +547,10 @@ export type PlayerData = {
 	-- und bedeutet genau "automatisch" (wie equippedUid in v6).
 	language     : string?,
 
+	-- Audio-Rework 16.10.: Lautstaerke-Regler. Fehlt bei alten Spielstaenden
+	-- (nil = Audio.DEFAULTS), kein Versions-Sprung noetig.
+	audio        : { music: number, sfx: number, muted: boolean }?,
+
 	-- Insel
 	island : IslandData,
 
@@ -622,6 +626,7 @@ export type PlayerDataUpdate = {
 	rebirthMult  : number,
 	rank         : Rank,
 	language     : string?,
+	audio        : { music: number, sfx: number, muted: boolean }?,
 	island       : IslandData,
 	discovered   : { [string]: boolean },
 	quests       : QuestView,
