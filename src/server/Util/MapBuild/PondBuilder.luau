@@ -19,6 +19,7 @@ local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 
@@ -125,6 +126,38 @@ local FOUNTAIN_STAGES = 5
 -- Groesse: so passt der Steg zu MapService.getPondPosition (6.3 Studs von der
 -- Mitte, ~1.5 hoch) und der Brunnen steht gleichwertig neben dem Inkubator.
 local FOUNTAIN_SCALE = 1.4
+-- Ausbau macht den Brunnen groesser: bis +25 % auf Level 60 (waechst vom
+-- Beckenboden aus, siehe growFountain).
+local FOUNTAIN_GROWTH = 0.25
+
+function PondBuilder.fountainScale(level: number): number
+	local max = EconomyConfig.MAX_BUILDING_LEVEL
+	local progress = (math.clamp(level, 1, max) - 1) / (max - 1)
+	return FOUNTAIN_SCALE * (1 + FOUNTAIN_GROWTH * progress)
+end
+
+-- Billig: nur skalieren, kein Neuaufbau. Aufruf bei jedem Ausbau (MapService.updatePondFill).
+function PondBuilder.growFountain(plotModel: Model, level: number)
+	local pond = plotModel:FindFirstChild("Pond")
+	local fountain = pond and pond:FindFirstChild("Fountain")
+	if fountain and fountain:IsA("Model") then
+		local target = PondBuilder.fountainScale(level)
+		if math.abs(fountain:GetScale() - target) > 0.001 then
+			fountain:ScaleTo(target)
+		end
+	end
+end
+
+-- Faktor fuer den Standplatz am Steg (MapService.getPondPosition rechnet mit
+-- Groesse FOUNTAIN_SCALE): der Steg wandert mit dem Wachstum nach aussen.
+function PondBuilder.standFactor(plotModel: Model?): number
+	local pond = plotModel and plotModel:FindFirstChild("Pond")
+	local fountain = pond and pond:FindFirstChild("Fountain")
+	if fountain and fountain:IsA("Model") then
+		return fountain:GetScale() / FOUNTAIN_SCALE
+	end
+	return 1
+end
 
 function PondBuilder.fountainFolder(): Instance?
 	if not FeatureFlags.isOn("NEW_MODELS_V3") then return nil end
@@ -144,7 +177,6 @@ function PondBuilder.buildFountain(parent: Instance, ground: CFrame, islandData:
 
 	local model = template:Clone()
 	model.Name = "Fountain"
-	model:ScaleTo(model:GetScale() * FOUNTAIN_SCALE)
 
 	-- Ursprung: Mitte und Unterkante des Beckenbodens der Vorlage
 	local origin = Vector3.new(0, 1000, 0)
@@ -163,7 +195,10 @@ function PondBuilder.buildFountain(parent: Instance, ground: CFrame, islandData:
 		end
 	end
 
-	model:PivotTo(ground * CFrame.Angles(0, math.rad(-90), 0) * CFrame.new(-origin) * model:GetPivot())
+	-- Pivot an den Beckenboden: Skalieren (auch spaeter beim Ausbau) wirkt von dort aus
+	model.WorldPivot = CFrame.new(origin)
+	model:ScaleTo(PondBuilder.fountainScale(if building then building.level else 1))
+	model:PivotTo(ground * CFrame.Angles(0, math.rad(-90), 0))
 	model.Parent = parent
 	return model
 end

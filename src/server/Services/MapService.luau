@@ -500,6 +500,10 @@ function MapService.updatePondFill(player: Player, islandData: Types.IslandData)
 	local pond = model:FindFirstChild("Pond")
 	if not pond then return end
 
+	-- Ausbau macht den Brunnen groesser
+	local building = islandData.buildings["HoneyPond" :: any]
+	if building then PondBuilder.growFountain(model, building.level) end
+
 	local fill = pond:FindFirstChild("Fuellung")
 	if fill and fill:IsA("BasePart") then
 		PondBuilder.writePondFill(fill, PondBuilder.pondGround(slot), PondBuilder.pondFillRatio(islandData))
