@@ -191,11 +191,12 @@ MapMeshes.VEGETATION_NAMES = {
 -- Sie liegen als Ordner "GroundStuds" im Modell `parent`; der Zylinder `top` darunter
 -- wird nur eingefaerbt (Alt-Werte als Attribute gemerkt). Gibt die Anzahl Bloecke zurueck.
 -- opts (optional, fuer kleine Inseln wie die Raketen-Insel): center, radius, levels, margin, folderName.
-function MapMeshes.groundOldschool(parent: Instance, top: BasePart, opts: { center: Vector3?, radius: number?, levels: { number }?, margin: number?, folderName: string? }?): number
+function MapMeshes.groundOldschool(parent: Instance, top: BasePart, opts: { center: Vector3?, radius: number?, levels: { number }?, margin: number?, folderName: string?, color: Color3? }?): number
 	local cfg = MapStyleConfig.GROUND
 	local o = opts or {}
 	local center = o.center or MapConfig.CENTER
 	local folderName = o.folderName or "GroundStuds"
+	local baseColor = o.color or cfg.COLOR
 	local old = parent:FindFirstChild(folderName)
 	if old then old:Destroy() end
 	local cells = MapStyleRules.groundCells(o.radius or MapConfig.PLATFORM_RADIUS, o.levels or cfg.LEVELS, o.margin or cfg.MARGIN)
@@ -212,15 +213,15 @@ function MapMeshes.groundOldschool(parent: Instance, top: BasePart, opts: { cent
 		p.Size = Vector3.new(c.size, cfg.THICKNESS, c.size)
 		p.Position = Vector3.new(center.X + c.x, y, center.Z + c.z)
 		p.Material = Enum.Material.Plastic
-		-- leichter Zweiton im Raster der groessten Kacheln (nur Optik)
+		-- Schachbrett: jedes zweite Feld (je Kachelgroesse) etwas dunkler (nur Optik)
 		local shade = 0
-		if cfg.ALT_TON > 0 and c.size == (o.levels or cfg.LEVELS)[1] then
-			shade = if (math.floor(c.x / c.size) + math.floor(c.z / c.size)) % 2 == 0 then cfg.ALT_TON else -cfg.ALT_TON
+		if cfg.ALT_TON > 0 and (math.floor(c.x / c.size) + math.floor(c.z / c.size)) % 2 ~= 0 then
+			shade = -cfg.ALT_TON
 		end
 		p.Color = Color3.new(
-			math.clamp(cfg.COLOR.R * (1 + shade), 0, 1),
-			math.clamp(cfg.COLOR.G * (1 + shade), 0, 1),
-			math.clamp(cfg.COLOR.B * (1 + shade), 0, 1)
+			math.clamp(baseColor.R * (1 + shade), 0, 1),
+			math.clamp(baseColor.G * (1 + shade), 0, 1),
+			math.clamp(baseColor.B * (1 + shade), 0, 1)
 		)
 		p.BottomSurface = Enum.SurfaceType.Smooth
 		if cfg.TEXTURE ~= "" then
@@ -247,7 +248,7 @@ function MapMeshes.groundOldschool(parent: Instance, top: BasePart, opts: { cent
 		top:SetAttribute("AltMaterial", top.Material.Name)
 	end
 	top.Material = Enum.Material.Plastic
-	top.Color = cfg.COLOR
+	top.Color = baseColor
 	return #cells
 end
 

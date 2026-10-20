@@ -424,8 +424,32 @@ function PlotBuilder.buildPlotBase(slot: number, owner: Player): Model
 	local studBed = FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and not MapStyleConfig.STUD_GROUND.MODERN
 	if studBed then
 		base.Material   = Enum.Material.Plastic
-		base.Color      = MapStyleConfig.GROUND.COLOR
+		base.Color      = MapStyleConfig.GROUND.PLOT_COLOR
 		base.TopSurface = Enum.SurfaceType.Studs
+		-- Schachbrett: jedes zweite Feld etwas dunkler, als duenne Platten mit Noppen obendrauf
+		local cfg   = MapStyleConfig.GROUND
+		local n     = math.max(1, math.floor(MapConfig.PLOT_SIZE.X / cfg.PLOT_TILE))
+		local step  = MapConfig.PLOT_SIZE.X / n
+		local dark  = Color3.new(cfg.PLOT_COLOR.R * (1 - cfg.ALT_TON), cfg.PLOT_COLOR.G * (1 - cfg.ALT_TON), cfg.PLOT_COLOR.B * (1 - cfg.ALT_TON))
+		for i = 0, n - 1 do
+			for j = 0, n - 1 do
+				if (i + j) % 2 == 1 then
+					local tile = MapParts.newPart(
+						"BedTile",
+						Vector3.new(step, 0.1, step),
+						plotCFrame * CFrame.new((i - (n - 1) * 0.5) * step, MapConfig.PLOT_SIZE.Y + 0.05, (j - (n - 1) * 0.5) * step),
+						dark,
+						Enum.Material.Plastic
+					)
+					tile.TopSurface = Enum.SurfaceType.Studs
+					tile.CanCollide = false
+					tile.CanQuery   = false
+					tile.CanTouch   = false
+					tile.CastShadow = false
+					tile.Parent     = model
+				end
+			end
+		end
 	end
 
 	-- Steinerne Garten-Terrassenkante rund um das 72x72-Beet (vorne und hinten

@@ -98,7 +98,9 @@ MapStyleConfig.STUD_GROUND = {
 -- Zylinder "Ground" darunter bekommt dieselbe Farbe und fuellt den runden Rand.
 MapStyleConfig.GROUND = {
 	COLOR = Color3.fromRGB(96, 170, 84), -- Baseplate-Noppen in Gruen: zwischen Wiesengruen (84,150,76) und hellem Gruen
-	ALT_TON = 0, -- +-Helligkeit im Schachbrett der groessten Kacheln (0 = aus; Baseplate ist einfarbig)
+	ALT_TON = 0.11, -- jedes zweite Feld im Schachbrett um so viel dunkler (0 = aus): gibt dem Boden Tiefe
+	PLOT_COLOR = Color3.fromRGB(76, 144, 66), -- eigener Plot: allgemein dunkler als die Hauptinsel
+	PLOT_TILE = 9, -- Kantenlaenge der Schachbrett-Felder auf dem Beet (72 = 8 x 9)
 	LEVELS = { 40, 20, 10 }, -- Kantenlaengen grob -> fein (jede teilt die vorige)
 	MARGIN = 1, -- Abstand der Block-Ecken zum Inselrand
 	THICKNESS = 1,

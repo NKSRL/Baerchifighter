@@ -19,6 +19,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
+local MapStyleConfig   = require(ReplicatedStorage.Config.MapStyleConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 local SkyBuilder = require(ServerScriptService.Util.MapBuild.SkyBuilder)
@@ -549,7 +550,7 @@ function WorldBuilder.buildPlatform()
 		if FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and MapMeshes.enabled() then
 			MapMeshes.groundOldschool(model, plotIsland, {
 				center = center, radius = MapConfig.PLOT_ISLAND_RADIUS,
-				folderName = "PlotGroundStuds_" .. slot,
+				folderName = "PlotGroundStuds_" .. slot, color = MapStyleConfig.GROUND.PLOT_COLOR,
 			})
 		end
 

@@ -164,6 +164,7 @@ function IncubatorBuilder.build(plotModel: Model, slot: number, incubator: Types
 
 	local ground = MapParts.plotCFrame(slot)
 		* CFrame.new(look.offset.X, MapParts.plotSurfaceOffset() + look.offset.Y, look.offset.Z)
+		* CFrame.Angles(0, math.rad(look.yaw), 0)
 
 	for _, piece in IncubatorModels.LEVELS[IncubatorRules.levelOf(incubator)] do
 		local cframe = ground * CFrame.new(piece.offset)
