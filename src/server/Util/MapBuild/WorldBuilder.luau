@@ -18,10 +18,13 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 local SkyBuilder = require(ServerScriptService.Util.MapBuild.SkyBuilder)
 local ScenicBuilder = require(ServerScriptService.Util.MapBuild.ScenicBuilder)
+local MapMeshes = require(ServerScriptService.Util.MapBuild.MapMeshes)
+local RocketIslandBuilder = require(ServerScriptService.Util.MapBuild.RocketIslandBuilder)   -- P4 Raketen-Insel
 
 local WorldBuilder = {}
 
@@ -516,7 +519,7 @@ function WorldBuilder.buildPlatform()
 	water.Parent       = model
 
 	-- Hauptinsel: dunkle Wiesenscheibe mit Sandkante, darauf die hellen Karos.
-	MapParts.buildIsland(
+	local ground = MapParts.buildIsland(
 		model,
 		"Ground",
 		MapConfig.CENTER,
@@ -524,14 +527,17 @@ function WorldBuilder.buildPlatform()
 		MapConfig.GRASS_DARK,
 		Enum.Material.Grass
 	)
-	MapParts.buildCheckerDisc(model, MapConfig.CENTER.X, MapConfig.CENTER.Z, MapConfig.PLATFORM_RADIUS)
+	MapMeshes.studGround(ground, MapMeshes.enabled())
+	if not MapMeshes.enabled() then
+		MapParts.buildCheckerDisc(model, MapConfig.CENTER.X, MapConfig.CENTER.Z, MapConfig.PLATFORM_RADIUS)
+	end
 
 	-- Die acht Plot-Inseln und die Stege dorthin.
 	for slot = 1, MapConfig.PLOT_COUNT do
 		local outward = MapParts.outwardDirection(slot)
 		local center  = MapConfig.CENTER + outward * MapConfig.PLOT_RING_RADIUS
 
-		MapParts.buildIsland(
+		local plotIsland = MapParts.buildIsland(
 			model,
 			"PlotIsland_" .. slot,
 			center,
@@ -539,6 +545,13 @@ function WorldBuilder.buildPlatform()
 			MapConfig.PLOT_ISLAND_COLOR,
 			Enum.Material.Grass
 		)
+		-- Baseplate-Boden auch auf dem eigenen Plot (gleiches Raster wie die Hauptinsel)
+		if FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and MapMeshes.enabled() then
+			MapMeshes.groundOldschool(model, plotIsland, {
+				center = center, radius = MapConfig.PLOT_ISLAND_RADIUS,
+				folderName = "PlotGroundStuds_" .. slot,
+			})
+		end
 
 		MapParts.buildSpan(
 			model,
@@ -547,6 +560,13 @@ function WorldBuilder.buildPlatform()
 			MapConfig.PLATFORM_RADIUS,
 			MapConfig.PLOT_RING_RADIUS - MapConfig.PLOT_ISLAND_RADIUS
 		)
+	end
+
+	-- P4 (20.10.): dauerhafte Raketen-Insel mit Bruecke (Schalter ROCKET_ISLAND, eigene Maße
+	-- in Config/RocketIslandConfig). Ein Fehler hier darf den Welt-Aufbau nie stoppen.
+	if FeatureFlags.isOn("ROCKET_ISLAND") then
+		local ok, err = pcall(RocketIslandBuilder.build, model)
+		if not ok then warn("[WorldBuilder] Raketen-Insel nicht gebaut:", err) end
 	end
 
 	WorldBuilder.buildFlowers(model)
@@ -606,6 +626,28 @@ function WorldBuilder.buildPlatform()
 		"| Plot-Inseln:", MapConfig.PLOT_COUNT, "bei", MapConfig.PLOT_RING_RADIUS,
 		"| Wasser:", MapConfig.WATER_RADIUS
 	)
+end
+
+-- Nur Studio-Debug (D:Invoke("mapstyle")): Bodenkacheln der Hauptinsel und die Vegetation
+-- nach dem Schalter MAP_STYLE_V2 neu aufbauen. Plot-Beete folgen beim naechsten Plot-Aufbau
+-- (Rebirth/Reset), weil sie mit dem Plot entstehen. Gibt (Kacheln, Vegetationsteile) zurueck.
+function WorldBuilder.restyle(): (number, number)
+	local model = workspace:FindFirstChild("Platform")
+	if not model then return 0, 0 end
+
+	for _, child in model:GetChildren() do
+		if child.Name == "GrassTile" then child:Destroy() end
+	end
+	MapMeshes.studGround(model:FindFirstChild("Ground"), MapMeshes.enabled())
+	if not MapMeshes.enabled() then
+		MapParts.buildCheckerDisc(model, MapConfig.CENTER.X, MapConfig.CENTER.Z, MapConfig.PLATFORM_RADIUS)
+	end
+	local tiles = 0
+	for _, child in model:GetChildren() do
+		if child.Name == "GrassTile" then tiles += 1 end
+	end
+
+	return tiles, ScenicBuilder.restyle(model, WorldBuilder.isOnBridgeLane)
 end
 
 return WorldBuilder

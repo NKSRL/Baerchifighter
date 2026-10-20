@@ -31,17 +31,21 @@ SoundConfig.SOUNDS = {
 	hatchBurstHigh  = { id = "", volume = 0.7 },
 	hatchReveal     = { id = "", volume = 0.5 },
 	hatchRevealHigh = { id = "", volume = 0.7 },
-	-- 20.10. Final-Epilog Prompt 5: Platzhalter (leer = stumm), Prompt 7 fuellt sie.
-	epilog_hit    = { id = "", volume = 0.8 },   -- letzter Treffer, Hit-Freeze
-	epilog_flash  = { id = "", volume = 0.8 },   -- Flash
-	epilog_rise   = { id = "", volume = 0.6 },   -- Aufstieg / Wind
-	epilog_run    = { id = "", volume = 0.5 },   -- Lauf ueber die Bruecke
-	epilog_reveal = { id = "", volume = 0.7 },   -- Insel-Reveal, Musik-Aufbau
-	-- Prompt 6: Knopf-Finale (Platzhalter, Prompt 7 fuellt sie)
-	epilog_press     = { id = "", volume = 0.9 },   -- Knopf gedrueckt (harter Klack)
-	epilog_countdown = { id = "", volume = 0.7 },   -- je Zahl 3 / 2 / 1
-	epilog_launch    = { id = "", volume = 0.9 },   -- Raketenstart
-	epilog_unlock    = { id = "", volume = 0.8 },   -- Welt 2 freigeschaltet (Banner)
+	-- 20.10. Final-Epilog (Prompt 5-7). Eigene Klaenge (tools/audio/synth_epilog.py -> assets/epilog/sound/*.ogg).
+	-- Hier die hochgeladene Asset-Id eintragen ("rbxassetid://<id>"). Leer = im Studio die Vorschau-Datei
+	-- (rbxasset://sounds/hbb/sfx_<name>.wav), im Spiel stumm. Abgespielt ueber Audio.SFX / AudioController.play.
+	epilog_hit           = { id = "", volume = 0.8 },   -- letzter Treffer + Glasbruch
+	epilog_flash         = { id = "", volume = 0.7 },   -- Aufwaerts-Sweep
+	epilog_rise          = { id = "", volume = 0.6 },   -- Orchesterflaeche steigt
+	epilog_run           = { id = "", volume = 0.5 },   -- ein Schritt auf Holz (Takt 0,28 s)
+	epilog_reveal        = { id = "", volume = 0.7 },   -- 0,4 s Stille, dann Fanfare
+	epilog_terminal_idle = { id = "", volume = 0.25 },  -- leises Summen (Schleife)
+	epilog_ready         = { id = "", volume = 0.5 },   -- Piepton, Terminal bereit
+	epilog_press         = { id = "", volume = 0.9 },   -- hartes Klacken
+	epilog_countdown     = { id = "", volume = 0.7 },   -- je Zahl 3 / 2 / 1
+	epilog_launch        = { id = "", volume = 0.9 },   -- Rumpeln -> Zischen
+	epilog_unlock        = { id = "", volume = 0.8 },   -- Sieges-Jingle
+	epilog_music         = { id = "", volume = 0.22 },  -- Musik 76,8 s (Schleife), Spur "epilog" in Audio.MUSIC
 } :: { [string]: SoundDef }
 
 -- Gesamt-Lautstaerke der UI-Klaenge (0 = alles stumm)

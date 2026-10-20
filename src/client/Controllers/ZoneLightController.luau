@@ -27,7 +27,6 @@ local RunService        = game:GetService("RunService")
 local AmbienceConfig = require(ReplicatedStorage.Config.AmbienceConfig)
 local MapConfig      = require(ReplicatedStorage.Config.MapConfig)
 local WorldFXConfig  = require(ReplicatedStorage.Config.WorldFXConfig)
-local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
 local MapLayout      = require(ReplicatedStorage.Modules.MapLayout)
 
 local WorldFXKit         = require(script.Parent.WorldFXKit)
@@ -63,7 +62,7 @@ local function highWeight(p: Vector3): number
 end
 
 function ZoneLightController.init()
-	if not (FeatureFlags.isOn("WORLD_I_ZONES") and WorldFXKit.enabled("zoneLight")) then return end
+	if not WorldFXKit.enabled("zoneLight") then return end
 	local cfg = WorldFXConfig.ZONE_LIGHT
 
 	local grade = Instance.new("ColorCorrectionEffect")

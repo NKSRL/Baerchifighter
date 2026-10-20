@@ -304,44 +304,20 @@ local function onFightClicked()
 
 	-- Neuer Lauf: gibt es einen letzten Lauf in diesem Tower, zuerst die
 	-- Fortsetzungs-Frage.
-	local data = ClientState.get()
-
-	-- Entscheidung 05.10. (FIGHT_RESUME_PROMPT): Standard ist IMMER Stage 1.
+	-- Entscheidung 05.10. (Fight-Start-Feld): Standard ist IMMER Stage 1.
 	-- Der Einstieg ab der letzten Stage gegen Gummies ist ein kleines Feld,
 	-- das nach 7 s von selbst verschwindet (dann Stage 1). Ein zweiter
 	-- Fight-Klick waehrend das Feld offen ist, startet sofort bei Stage 1.
-	if FeatureFlags.isOn("FIGHT_RESUME_PROMPT") then
-		if FightStartPrompt.isOpen() then
-			FightStartPrompt.chooseFresh()
-			return
-		end
-		local opened = FightStartPrompt.open(function(choice)
-			Remotes.RequestPetMode:FireServer("Fight", choice)
-		end)
-		if not opened then
-			Remotes.RequestPetMode:FireServer("Fight", "Fresh")
-		end
+	if FightStartPrompt.isOpen() then
+		FightStartPrompt.chooseFresh()
 		return
 	end
-
-	-- HBB Paket 2: keine Frage mehr. Mit gespeichertem Lauf geht es
-	-- kostenlos ab 65 % weiter; der bezahlte Einstieg ab der letzten Stage
-	-- ist ein eigener kleiner Knopf im Tower-Fenster (CombatPanel). Der
-	-- Server rechnet beide Wege unveraendert.
-	if FeatureFlags.isOn("UI_V2_GUIDE") then
-		local choice = if data and PitResumeDialog.getProgress(data) then "Percent" else "Fresh"
+	local opened = FightStartPrompt.open(function(choice)
 		Remotes.RequestPetMode:FireServer("Fight", choice)
-		return
+	end)
+	if not opened then
+		Remotes.RequestPetMode:FireServer("Fight", "Fresh")
 	end
-
-	if data and PitResumeDialog.getProgress(data) then
-		PitResumeDialog.open(function(choice)
-			Remotes.RequestPetMode:FireServer("Fight", choice)
-		end)
-		return
-	end
-
-	Remotes.RequestPetMode:FireServer("Fight", "Fresh")
 end
 
 --------------------------------------------------------------------------------

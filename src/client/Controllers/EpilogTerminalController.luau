@@ -23,6 +23,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Loc          = require(ReplicatedStorage.Localization.Loc)
 local EpilogConfig = require(ReplicatedStorage.Config.EpilogConfig)
+local Audio        = require(ReplicatedStorage.Audio)
+local AudioController = require(script.Parent.AudioController)
 
 local EpilogTerminalController = {}
 
@@ -45,6 +47,7 @@ type View = {
 	press     : NumberValue,   -- Knopf gesenkt in Studs
 	angleTween: Tween?,
 	pressTween: Tween?,
+	hum       : Sound?,        -- leises Summen (3D, Schleife) solange das Terminal wartet
 	state     : string,
 	stateAt   : number,
 	conns     : { RBXScriptConnection },
@@ -83,7 +86,7 @@ end
 local function setText(view: View)
 	local n = countdownOf(view.model)
 	if view.state == ST.FIRED and n > 0 then
-		view.label.Text = tostring(n)
+		view.label.Text = Loc.t("epilog.finale.count_" .. tostring(math.clamp(math.floor(n), 1, 3)))
 		view.label.TextColor3 = T.colors.yellow
 		return
 	end
@@ -104,6 +107,14 @@ local function targetAngle(state: string): number
 	if state == ST.READY then return math.rad(T.lidReadyDeg) end
 	if state == ST.ARMED or state == ST.FIRED or state == ST.DONE then return math.rad(T.lidOpenDeg) end
 	return 0
+end
+
+-- Summen nur vor dem Druck (idle/ready/armed); danach schweigt das Terminal.
+local function updateHum(view: View)
+	local hum = view.hum
+	if not hum then return end
+	local waiting = view.state == ST.IDLE or view.state == ST.READY or view.state == ST.ARMED
+	if waiting and not hum.IsPlaying then hum:Play() elseif not waiting and hum.IsPlaying then hum:Stop() end
 end
 
 local function play(view: View, instant: boolean)
@@ -135,6 +146,7 @@ local function play(view: View, instant: boolean)
 		view.emitter.Enabled = (state == ST.FIRED or state == ST.DONE)
 	end
 	setText(view)
+	updateHum(view)
 end
 
 local function readState(model: Model): string
@@ -223,6 +235,7 @@ local function forget(model: Model)
 	for _, conn in view.conns do conn:Disconnect() end
 	view.angle:Destroy()
 	view.press:Destroy()
+	if view.hum then view.hum:Destroy() end
 	stopBeat()
 end
 
@@ -273,11 +286,28 @@ local function build(model: Model)
 		lid = lid, lidClosed = lid.CFrame, hingeCF = hinge.WorldCFrame,
 		knob = knob, knobClosed = knob.CFrame, label = label, emitter = emitter,
 		angle = Instance.new("NumberValue"), press = Instance.new("NumberValue"),
-		angleTween = nil, pressTween = nil,
+		angleTween = nil, pressTween = nil, hum = nil,
 		state = readState(model), stateAt = os.clock(), conns = {},
 	}
 	_views[model] = view
 	_count += 1
+
+	-- Summen: 3D-Schleife am Korpus, folgt dem Effekt-Regler (SoundGroup) und der Stumm-Taste
+	local humId = Audio.sfxId("epilog_terminal_idle")
+	local humDef = Audio.SFX.epilog_terminal_idle
+	if humId ~= "" and humDef then
+		local hum = Instance.new("Sound")
+		hum.Name = "Epilog_TerminalSummen"
+		hum.SoundId = humId
+		hum.Looped = true
+		hum.Volume = humDef.volume
+		hum.RollOffMode = Enum.RollOffMode.Linear
+		hum.RollOffMinDistance = 6
+		hum.RollOffMaxDistance = 40
+		hum.SoundGroup = AudioController.sfxGroup()
+		hum.Parent = korpus
+		view.hum = hum
+	end
 
 	table.insert(view.conns, view.angle.Changed:Connect(function() applyLid(view) end))
 	table.insert(view.conns, view.press.Changed:Connect(function() applyKnob(view) end))
@@ -287,6 +317,8 @@ local function build(model: Model)
 		view.state = new
 		view.stateAt = os.clock()
 		play(view, false)
+		-- Piepton, wenn das Terminal bereit wird (Avatar nah genug)
+		if new == ST.READY then AudioController.play(EpilogConfig.CUES.ready) end
 	end))
 	table.insert(view.conns, model:GetAttributeChangedSignal(T.COUNTDOWN_ATTRIBUTE):Connect(function()
 		setText(view)

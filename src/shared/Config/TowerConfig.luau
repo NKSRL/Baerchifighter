@@ -86,6 +86,19 @@ export type TowerDef = {
 --     nicht am Tower — eine Stage zahlt so viel, wie ihr Gegner stark ist.
 --     Hoehere Tower bringen pro Lauf trotzdem mehr, weil sie mehr Stages pro
 --     Staerke-Bereich haben.
+-- 20.10. (P2, Schalter TOWER_F_EASIER): Final Stage 100 soll mit einem gut ausgebauten
+-- Legendaer/Mythisch-Team schaffbar sein (kein Omega-Pet noetig). Dazu sinkt die Kurve
+-- von Final und, damit sie nie unter dem Ende von Tower III liegt, die von Tower III
+-- leicht mit. Alt/neu stehen nebeneinander; Schalter aus = alte Werte 1:1.
+-- Bericht: docs/HBB_TOWER_F_BALANCE_2026-10-20.md
+local ALT_III   = { start = 55, per = 0.6 }
+local NEU_III   = { start = 55, per = 0.6 } -- unveraendert: schon II endet bei 66,8 und III startet bei 55, die Kurven springen je Tower zurueck
+local ALT_FINAL = { start = 82, per = 0.5, reward = 1, gold = 40 }
+local NEU_FINAL = { start = 52, per = 0.303, reward = 10, gold = 40 } -- Stage 100 ~ Aequivalenz 82 (statt 131,5)
+local EASIER = FeatureFlags.isOn("TOWER_F_EASIER")
+local CUR_III   = if EASIER then NEU_III else ALT_III
+local CUR_FINAL = if EASIER then NEU_FINAL else ALT_FINAL
+
 local TOWERS: { TowerDef } = {
 	{
 		-- Sammel-Update 05.10. (Paket 4.2, "Kaempfe frueher vorbei, nicht
@@ -111,16 +124,16 @@ local TOWERS: { TowerDef } = {
 	},
 	{
 		id = "III", index = 3, stages = 60,
-		startEquivalent = 55, equivalentPerStage = 0.6,
+		startEquivalent = CUR_III.start, equivalentPerStage = CUR_III.per,
 		rewardFactor = 1,
 		goldPerFive = 24,
 		look = "Gold", color = Color3.fromRGB(255, 196, 60), numeral = "III",
 	},
 	{
 		id = "Final", index = 4, stages = 100,
-		startEquivalent = 82, equivalentPerStage = 0.5,
-		rewardFactor = 1,
-		goldPerFive = 40,
+		startEquivalent = CUR_FINAL.start, equivalentPerStage = CUR_FINAL.per,
+		rewardFactor = CUR_FINAL.reward,
+		goldPerFive = CUR_FINAL.gold,
 		look = "Crystal", color = Color3.fromRGB(150, 220, 255), numeral = "F",
 	},
 }

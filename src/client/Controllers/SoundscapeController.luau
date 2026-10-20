@@ -25,7 +25,6 @@ local RunService        = game:GetService("RunService")
 local SoundService      = game:GetService("SoundService")
 
 local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
-local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local SoundZones    = require(ReplicatedStorage.Modules.SoundZones)
 
 local WorldFXKit         = require(script.Parent.WorldFXKit)
@@ -84,7 +83,7 @@ function SoundscapeController.setEventLive(live: boolean)
 end
 
 function SoundscapeController.init()
-	if not (FeatureFlags.isOn("WORLD_H_SOUND") and WorldFXKit.enabled("soundscape")) then return end
+	if not WorldFXKit.enabled("soundscape") then return end
 
 	for _, key in LOOPS do
 		local sound = newSound(key, true)

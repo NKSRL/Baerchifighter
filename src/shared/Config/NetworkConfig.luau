@@ -28,6 +28,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestSelectTower     = 0.30,
 	RequestBuyGamepass     = 2.00,   -- 08.10. Paket C: Kauf-Dialog oeffnen
 	RequestClaimDailyBonus = 1.00,
+	RequestJourney         = 0.40,   -- v19: Reise abholen/ueberspringen (zahlt aus)
 	RequestUpgradeRecycler = 0.50,   -- v15: Waben-Recycler
 	RequestFuseBaerchis    = 1.00,
 	RequestRecycleBaerchi  = 0.25,

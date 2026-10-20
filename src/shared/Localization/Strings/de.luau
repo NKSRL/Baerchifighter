@@ -1222,4 +1222,27 @@ return {
 	["epilog.terminal.screen_done"] = "WELT 2 OFFEN",
 	["epilog.terminal.prompt_action"] = "Freigabe erteilen",
 	["epilog.terminal.prompt_object"] = "Start-Terminal",
+	["ui.moment.endless_open"] = "ENDLESS GEÖFFNET",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.skip.hint"] = "Halten zum Überspringen",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_3"] = "3",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_2"] = "2",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_1"] = "1",   -- 20.10. Final-Epilog Prompt 7
+	["ui.journey.title"] = "Reise",   -- 20.10. P3 Reise
+	["ui.journey.skip"] = "Später",   -- 20.10. P3 Reise
+	["ui.journey.claim"] = "Abholen",   -- 20.10. P3 Reise
+	["ui.journey.hide"] = "Ausblenden",   -- 20.10. P3 Reise
+	["ui.journey.show"] = "Reise zeigen",   -- 20.10. P3 Reise
+	["ui.journey.done"] = "Reise abgeschlossen!",   -- 20.10. P3 Reise
+	["ui.journey.step"] = "Etappe {n}/{total}",   -- 20.10. P3 Reise
+	["ui.journey.hatch"] = "Öffne dein erstes Ei und hol dir einen Bärchi.",   -- 20.10. P3 Reise
+	["ui.journey.equip"] = "Rüste deinen Bärchi aus, er kämpft für dich.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_enter"] = "Betritt Tower I am Terminal und kämpfe los.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_clear"] = "Schaffe Tower I bis Stage 30.",   -- 20.10. P3 Reise
+	["ui.journey.tower3_open"] = "Schalte Tower III frei, besiege erst Tower II.",   -- 20.10. P3 Reise
+	["ui.journey.final_open"] = "Erreiche den Finalen Tower.",   -- 20.10. P3 Reise
+	["ui.journey.final_clear"] = "Besiege Final 100 und starte die Rakete!",   -- 20.10. P3 Reise
+	["world.rocket.locked"] = "Welt 2 wartet! Besiege den Finalen Tower, um die Rakete zu starten.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.ready"] = "Der Finale Tower ist besiegt – zum Gipfel!",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.launched"] = "Welt 2 ist geöffnet.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.progress"] = "Final-Tower: Stage {stage}/{total}",   -- 20.10. P4 Raketen-Insel
 }

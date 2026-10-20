@@ -12,6 +12,9 @@
 -- werden kann: tools/luau-tests/migration.test.lua schickt alte Spielstaende
 -- hindurch und prueft das Ergebnis gegen Types.createDefaultPlayerData.
 --
+-- Umbauen/Erweitern: vorher und nachher tools/luau-tests/migration_golden.test.lua laufen lassen
+-- (Ausgabe speichern, mit diff vergleichen) - jede Abweichung ist eine Verhaltensaenderung.
+--
 -- Regel fuer neue Felder: jedes Feld, das in Types.PlayerData dazukommt, wird
 -- hier nachgeruestet (oder ausdruecklich begruendet, warum nil reicht). Eine
 -- Migration, die Werte UMRECHNET statt Fehlendes anzulegen, haengt an
@@ -33,14 +36,12 @@ local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local HoneyPondMode    = require(ReplicatedStorage.Modules.HoneyPondMode)
 local EpilogConfig     = require(ReplicatedStorage.Config.EpilogConfig)   -- v18
 local EpilogRules      = require(ReplicatedStorage.Modules.EpilogRules)   -- v18
+local OnboardingRules  = require(ReplicatedStorage.Modules.OnboardingRules)   -- v19
 
 local PlayerMigration = {}
 
--- Fehlende Felder aus Default auffuellen (einfache Migration fuer neue Felder).
--- Muss jedes Feld abdecken das seit dem ersten Release in Types.luau
--- dazugekommen ist — sonst crasht alter Save-Stand beim ersten Zugriff.
-function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
-	local default = Types.createDefaultPlayerData()
+-- Top-Level-Felder, Stats und Island-Grundfelder
+local function stepTopLevel(data: Types.PlayerData, default: Types.PlayerData)
 
 	-- Neue Top-Level-Felder
 	if data.gummies      == nil then data.gummies      = default.gummies      end
@@ -88,7 +89,12 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	-- sich in Lua ohnehin als nil, und IslandService.autoEquipIfNone laeuft
 	-- bei jedem Join (onDataLoaded) und ruestet automatisch den ersten
 	-- vorhandenen Baerchi aus, falls noch/wieder keiner steht.
+end
 
+-- v13 Quests + Index, uiSeen, Shop-Teil
+local function stepQuestsAndIndex(data: Types.PlayerData, default: Types.PlayerData)
+	local island = data.island
+	local stats = data.stats :: any
 	-- ============================================================
 	-- ============================================================
 	-- v13: QUESTS + INDEX
@@ -129,7 +135,11 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	if data.quests == nil then
 		data.quests = default.quests
 	end
+end
 
+-- v14 Ei-Baum
+local function stepEggTree(data: Types.PlayerData)
+	local island = data.island
 	-- ============================================================
 	-- v14: EI-BAUM (Mega Egg Tree)
 	-- ============================================================
@@ -164,7 +174,11 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		end
 	end
 	EggTree.evaluate(data)
+end
 
+-- v12 Brut-Slots/pitProgress, v10 gelegte Eier, v15 Recycler
+local function stepEggsAndRecycler(data: Types.PlayerData)
+	local island = data.island
 	-- v12: BRUT-SLOTS ENTFALLEN (Eier werden sofort geoeffnet)
 	-- ============================================================
 	-- Alte Spielstaende koennen noch laufende oder fertige Bruten in
@@ -244,7 +258,11 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 
 	-- (v5 hatte hier die uid-Nachruestung der Brut-Eier — seit v12 gibt es
 	-- keine Brut-Eier mehr, siehe oben.)
+end
 
+-- v4/v7/v15 Gebaeude (inkl. Honig-Teich)
+local function stepBuildings(data: Types.PlayerData, default: Types.PlayerData)
+	local island = data.island
 	-- v4: die Gebaeude sind komplett ausgetauscht. Frueher gab es Hatchery,
 	-- GummyFarm, Recycler (und davor FusionLab) mit je eigener Funktion —
 	-- jetzt reine Honig-Produzenten. Alte Eintraege werden entfernt und
@@ -371,7 +389,13 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 			building.level = EconomyConfig.clampBuildingLevel(building.level or 1)
 		end
 	end
+end
 
+-- v15 Tower statt PIT, v17 Freischaltung, v18 Epilog, v19 Reise
+local function stepTowers(data: Types.PlayerData)
+	local island = data.island
+	local stats = data.stats :: any
+	local legacyIsland = data.island :: any
 	-- ============================================================
 	-- v15: TOWER STATT PIT-LEVEL
 	-- ============================================================
@@ -500,6 +524,19 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	end
 	EpilogRules.migrate(data, finalRecord, finalStages, os.time())
 
+	-- v19 (P3 Reise): journey. Bestandsspieler: schon erfuellte Etappen = abgeholt, ohne Nachzahlung.
+	-- Nur beim ersten Mal (Version < 19, die Defaults legen das Feld vorher leer an); danach
+	-- bleibt der gespeicherte Stand unangetastet.
+	if (data.version or 0) < 19 then
+		(data :: any).journey = OnboardingRules.migrate(nil, data :: any)
+	else
+		(data :: any).journey = OnboardingRules.sanitize((data :: any).journey)
+	end
+end
+
+-- Fortsetzen pro Tower, Erstattung, Login-Bonus
+local function stepRunResumeAndDaily(data: Types.PlayerData)
+	local legacyIsland = data.island :: any
 	-- Fortsetzen pro Tower (ersetzt pitProgress) und Erstattungs-Feld.
 	if typeof(legacyIsland.towerProgress) ~= "table" then
 		legacyIsland.towerProgress = {}
@@ -522,7 +559,11 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 		if typeof(daily.lastClaimDay) ~= "number" then daily.lastClaimDay = 0 end
 		if typeof(daily.streak) ~= "number" then daily.streak = 0 end
 	end
+end
 
+-- v8/v2/v4 Felder auf den Baerchis
+local function stepBaerchiFields(data: Types.PlayerData)
+	local island = data.island
 	-- v8: die zweite Fortschrittsachse (Promotion, Stat-Level, Charms).
 	--
 	-- Steht bewusst VOR der currentHp-Migration weiter unten: die rechnet mit
@@ -680,7 +721,11 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 			end
 		end
 	end
+end
 
+-- v16 Sammel-Update
+local function stepSammelUpdate(data: Types.PlayerData)
+	local island = data.island
 	-- ============================================================
 	-- v16: SAMMEL-UPDATE 05.10. (eine gemeinsame Migration)
 	-- ============================================================
@@ -723,6 +768,28 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	if typeof((data :: any).specialClaimed) ~= "table" then
 		data.specialClaimed = {}
 	end
+end
+
+-- Fehlende Felder aus Default auffuellen (einfache Migration fuer neue Felder).
+-- Muss jedes Feld abdecken das seit dem ersten Release in Types.luau
+-- dazugekommen ist — sonst crasht alter Save-Stand beim ersten Zugriff.
+--
+-- Die Schritte laufen in dieser festen Reihenfolge (Abhaengigkeiten stehen in den Kommentaren
+-- der Schritte). Schritte, die UMRECHNEN, haengen an data.version, alle anderen erkennen
+-- fehlende Felder einzeln. ACHTUNG: createDefaultPlayerData legt neue Felder schon leer an -
+-- "Feld fehlt" greift dann nie, wer Werte aus dem Bestand ableitet, braucht die Version.
+function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
+	local default = Types.createDefaultPlayerData()
+
+	stepTopLevel(data, default)
+	stepQuestsAndIndex(data, default)
+	stepEggTree(data)
+	stepEggsAndRecycler(data)
+	stepBuildings(data, default)
+	stepTowers(data)
+	stepRunResumeAndDaily(data)
+	stepBaerchiFields(data)
+	stepSammelUpdate(data)
 
 	-- Zum Schluss die Versionsnummer nachziehen. Sie steuert heute keine der
 	-- Migrationen oben — die pruefen alle einzeln auf fehlende Felder und

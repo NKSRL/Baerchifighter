@@ -14,7 +14,7 @@
 -- Plot-Schilder (Honig-Teich, Recycler, Inkubator, Arena) nur am eigenen Plot
 -- — fremde Plots sind nicht das, was ein neuer Spieler verstehen muss.
 --
--- Mit FeatureFlags.AREA_SIGNS = false baut dieses Modul nichts.
+-- (Der Schalter AREA_SIGNS ist entfernt, 20.10.: das Modul laeuft immer.)
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -112,7 +112,6 @@ local function hook(instance: Instance)
 end
 
 function AreaSignController.init()
-	if not FeatureFlags.isOn("AREA_SIGNS") then return end
 	local folder = Instance.new("Folder")
 	folder.Name = "AreaSigns"
 	folder.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

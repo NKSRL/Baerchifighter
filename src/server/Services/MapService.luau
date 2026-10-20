@@ -1187,7 +1187,7 @@ end
 -- v15: die Bestenlisten-Tafel(n) beschriften (Titel + bis zu
 -- LEADERBOARD_BOARD.lines Zeilen). Aufrufer ist LeaderboardService.
 -- HBB Paket 5: eine Tafel je Liste; Schluessel = listId, "_rotating" = die
--- eine wechselnde Tafel ohne MAP_V2_BOARDS.
+-- eine wechselnde Tafel (alter Weg, Schalter entfernt).
 local ROTATING = "_rotating"
 local _leaderboardBoards: { [string]: BasePart } = {}
 local _liveBoard: BasePart? = nil

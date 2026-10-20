@@ -32,8 +32,6 @@ local FLAGS: { [string]: boolean } = {
 	MAP_V2_MERCHANT   = true,
 	MAP_V2_HOME       = true,
 	MAP_V2_SHOWCASE   = true,
-	MAP_V2_BOARDS     = true,
-	MAP_V2_ARENA_SPRINT = true,   -- Baerchi sprintet zur Arena und zurueck
 	-- Paket 6
 	MAP_V2_LIVE_BOARD = true,
 	MAP_V2_WASP_NEST  = true,
@@ -46,7 +44,6 @@ local FLAGS: { [string]: boolean } = {
 
 	-- Entscheidung 05.10.: Laeufe starten immer bei Stage 1. Ab der letzten
 	-- Stage nur per Klick gegen Gummies (kleines Feld, 7 s, UI/FightStartPrompt).
-	FIGHT_RESUME_PROMPT = true,
 
 	-- HBB Paket 10: Shop mit Gratis-Griff (GoldGummies) und Robux-Paketen
 	-- (Pakete erst sichtbar, wenn ShopConfig eine Product-ID hat).
@@ -54,7 +51,6 @@ local FLAGS: { [string]: boolean } = {
 	SHOP_V1            = true,
 
 	-- Playtest 05.10.: Basis-Eier (unbegrenzt beim Haendler) nicht pressbar
-	PRESS_NO_BASIC_EGG = true,
 
 	-- Paket 7: Boss-Belohnung nach Stufen
 	BOSS_TIERS        = true,
@@ -67,7 +63,6 @@ local FLAGS: { [string]: boolean } = {
 
 	-- Paket 8/9: neue Pacing-Werte. Bleibt aus, bis der Mensch die Tabelle
 	-- freigegeben hat (Stopp-Punkt im Plan).
-	PACING_V2         = false,
 	-- Paket 9: Endless-Tower (Stage 101+), freigegeben 05.10.
 	-- Bericht: docs/HBB_PAKET_9_ENDLESS_2026-10-05.md
 	ENDLESS           = true,
@@ -80,9 +75,7 @@ local FLAGS: { [string]: boolean } = {
 	INDEX_REWARDS     = true,
 	-- Paket 5.2: Kampf um die Mitte — gegnerische Event-Baerchis stossen
 	-- Spieler ohne eigenen Baerchi im Event-Pit.
-	PIT_BRAWL         = true,
 	-- Paket 3.8: Bereichs-Schilder (zwei Woerter) auf der Hauptinsel.
-	AREA_SIGNS        = true,
 	-- Wunsch 05.10.: Baerchi darf mehrmals ins selbe UFO; nach dem Absetzen
 	-- ist sein Level fuer EventConfig.UFO.DROP_WEAKEN_SECONDS halbiert.
 	-- Aus = wie vorher (wer schon an Bord war, geht heim).
@@ -100,14 +93,9 @@ local FLAGS: { [string]: boolean } = {
 	-- Welt aufwerten (08.10.2026), je Paket ein Schalter. Reine Client-Optik.
 	-- Paket A (Tageslauf) haengt am Schalter AmbienceConfig.DAY_CYCLE.
 	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
-	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
 	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
-	WORLD_D_PLOTS     = true,   -- Insel-Stufen, Teich-Glanz/Ueberlauf, eigene Insel, leere Inseln
-	WORLD_E_ARENA     = true,   -- Steg-Laternen, Torbogen, Zuschauer, Flagge am Schau-Turm
 	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
 	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
-	WORLD_H_SOUND     = true,   -- Klang-Kulisse nach Zonen (laeuft nur mit gepruefter Sound-ID)
-	WORLD_I_ZONES     = true,   -- Licht-Feinschliff nach Zonen (Insel / Arena / Turm)
 
 	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
 	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
@@ -159,6 +147,29 @@ local FLAGS: { [string]: boolean } = {
 	-- Bleibt AUS, bis Prompt 2-7 stehen; in Studio: D:Invoke("epilog","on").
 	-- Bericht: docs/HBB_EPILOG_P1_2026-10-20.md
 	FINAL_EPILOG      = false,
+
+	-- 20.10. (Map-Stil V2): Boden-Kacheln, Baeume, Buesche, Rand-Buesche und Felsen
+	-- als Meshes im Epilog-Insel-Stil (Config/MapStyleConfig, Util/MapBuild/MapMeshes).
+	-- Fehlt eine Vorlage, baut der Builder das alte Primitiv. Bleibt AUS bis zur
+	-- Abnahme; in Studio: D:Invoke("mapstyle", "on").
+	MAP_STYLE_V2      = true,
+
+	-- 20.10. P1: Hauptinsel-Boden wie die alte Classic Baseplate (echte Noppen),
+	-- eingefaerbt. Aus = bisheriger Boden (moderne Textur). Bericht: docs/HBB_BODEN_ALT_2026-10-20.md
+	MAP_GROUND_OLDSCHOOL = true,
+
+	-- 20.10. P2: Final-Tower Stage 100 ohne Omega-Pet schaffbar (Kurve von Final und
+	-- Tower III sinkt, Belohnung gleicht aus). Aus = alte Werte. Endless bleibt fix auf 132.
+	-- Bericht: docs/HBB_TOWER_F_BALANCE_2026-10-20.md
+	TOWER_F_EASIER = true,
+
+	-- 20.10. P3: "Reise" (Ziel-Leiste, Etappen von Bearchi bis Final 100). Setzt UI_V2_GUIDE
+	-- voraus; aus = heutige Fuehrung. Bericht: docs/HBB_ONBOARDING_2026-10-20.md
+	ONBOARDING_V2 = true,
+
+	-- 20.10. P4: dauerhafte Raketen-Insel mit Bruecke in Welt 1 (Hinweis auf Welt 2; Start
+	-- bleibt im Epilog). Aus = Welt wie vorher. Bericht: docs/HBB_RAKETENINSEL_2026-10-20.md
+	ROCKET_ISLAND = true,
 }
 
 local FeatureFlags = {}

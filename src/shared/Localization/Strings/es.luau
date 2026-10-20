@@ -1215,4 +1215,27 @@ return {
 	["epilog.terminal.screen_done"] = "MUNDO 2 ABIERTO",
 	["epilog.terminal.prompt_action"] = "Conceder autorización",
 	["epilog.terminal.prompt_object"] = "Terminal de lanzamiento",
+	["ui.moment.endless_open"] = "¡ENDLESS ABIERTO!",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.skip.hint"] = "Mantén para saltar",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_3"] = "3",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_2"] = "2",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_1"] = "1",   -- 20.10. Final-Epilog Prompt 7
+	["ui.journey.title"] = "Viaje",   -- 20.10. P3 Reise
+	["ui.journey.skip"] = "Luego",   -- 20.10. P3 Reise
+	["ui.journey.claim"] = "Recoger",   -- 20.10. P3 Reise
+	["ui.journey.hide"] = "Ocultar",   -- 20.10. P3 Reise
+	["ui.journey.show"] = "Mostrar viaje",   -- 20.10. P3 Reise
+	["ui.journey.done"] = "¡Viaje completado!",   -- 20.10. P3 Reise
+	["ui.journey.step"] = "Etapa {n}/{total}",   -- 20.10. P3 Reise
+	["ui.journey.hatch"] = "Abre tu primer huevo y consigue un Baerchi.",   -- 20.10. P3 Reise
+	["ui.journey.equip"] = "Equipa a tu Baerchi para que luche por ti.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_enter"] = "Entra en la Torre I en el terminal y lucha.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_clear"] = "Supera la Torre I hasta el piso 30.",   -- 20.10. P3 Reise
+	["ui.journey.tower3_open"] = "Desbloquea la Torre III venciendo la Torre II.",   -- 20.10. P3 Reise
+	["ui.journey.final_open"] = "Llega a la Torre final.",   -- 20.10. P3 Reise
+	["ui.journey.final_clear"] = "¡Vence Final 100 y lanza el cohete!",   -- 20.10. P3 Reise
+	["world.rocket.locked"] = "¡El mundo 2 te espera! Vence la Torre final para lanzar el cohete.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.ready"] = "¡La Torre final está vencida! Ve a la cumbre.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.launched"] = "El mundo 2 está abierto.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.progress"] = "Torre final: piso {stage}/{total}",   -- 20.10. P4 Raketen-Insel
 }

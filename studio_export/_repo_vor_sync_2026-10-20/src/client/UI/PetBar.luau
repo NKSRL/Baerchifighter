@@ -1,0 +1,502 @@
+--!strict
+-- PetBar.luau
+-- StarterPlayerScripts/UI/PetBar.luau
+--
+-- Einzige Zustaendigkeit:
+--   - Die untere Pet-Leiste: zwei grosse Knoepfe "Event" und "Fight", die den
+--     ausgeruesteten Baerchi hinschicken bzw. zurueckholen.
+--
+-- Die Leiste ZEIGT nur an, was der Server meldet (PetModeChanged) — was ein
+-- Klick bedeutet, entscheidet PetModeService. Der Client schickt nur, welcher
+-- Knopf gedrueckt wurde, und beim Fight-Knopf ggf. die Wahl aus der
+-- Fortsetzungs-Frage (PitResumeDialog).
+--
+-- Zustaende je Knopf:
+--   normal        Normalfarbe, Klick schickt hin
+--   unterwegs/da  leuchtet, Text "Zurueckholen"
+--   wartet        der Baerchi geht erst heim und dann hierher; Klick bricht ab
+--   gesperrt      grau, kleine Zeile mit dem Grund
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService        = game:GetService("RunService")
+local FeatureFlags      = require(ReplicatedStorage.Config.FeatureFlags)
+
+local Remotes          = require(ReplicatedStorage.Network.Remotes)
+local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
+local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
+local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local Loc              = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 2.4
+local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
+
+local Theme           = require(script.Parent.Theme)
+local PanelManager = require(script.Parent.PanelManager)   -- 08.10.: Tower-Name oeffnet das Tower-Panel
+local UiScale         = require(script.Parent.UiScale)
+local TouchSafeArea   = require(script.Parent.TouchSafeArea)
+local Icons           = require(script.Parent.Icons)
+local PitResumeDialog = require(script.Parent.PitResumeDialog)
+local FightStartPrompt = require(script.Parent.FightStartPrompt)
+local ClientState     = require(script.Parent.Parent.Controllers.ClientState)
+local Unlock          = require(script.Parent.Unlock)
+
+local PetBar = {}
+
+local BUTTON_WIDTH  = 210
+local BUTTON_HEIGHT = 68    -- Mindesthoehe 56 px fuer Touch
+local GAP           = 14
+
+local EVENT_COLOR = Color3.fromRGB(120, 190, 255)
+local FIGHT_COLOR = Color3.fromRGB(255,  96,  96)
+local GLOW_COLOR  = Color3.fromRGB(255, 236, 140)
+
+type ButtonView = {
+	button : TextButton,
+	title  : TextLabel,
+	sub    : TextLabel,
+	stroke : UIStroke,
+	color  : Color3,
+	icon   : GuiObject,
+}
+
+local _event: ButtonView? = nil
+local _fight: ButtonView? = nil
+
+-- Letzte Server-Meldung (PetModeChanged)
+local _state   = "Home"
+-- Sammel-Update 05.10. (Paket 4.3): gewaehltes Wiedergabe-Tempo (0 = sofort)
+local SPEED_STEPS = { 1, 2, 4, 0 }
+local _bossAt: number? = nil   -- Sammel-Update 5.3
+local _speedChoice = 1
+local _speedButton: TextButton? = nil
+local _pending: string? = nil
+local _stage: number? = nil
+local _tower: string? = nil   -- v15: Tower des laufenden Kampfs (vom Server)
+local _from: string? = nil
+local _abducting = false
+
+-- Event-Zyklus (EventPhaseChanged)
+local _eventId: string? = nil
+local _nextEventId: string? = nil
+local _phaseEndsAt = 0
+
+--------------------------------------------------------------------------------
+-- Hilfen
+--------------------------------------------------------------------------------
+
+-- HBB Paket 6: Icon je Event fuer den Timer am Knopf (Name aus UI/Icons,
+-- sonst das Zeichen als Rueckfall). Die Wespenkoenigin bekommt ein eigenes.
+local EVENT_ICON: { [string]: { name: string, fallback: string } } = {
+	Ufo            = { name = "ufo",   fallback = "UFO" },
+	HotEgg         = { name = "egg",   fallback = "🥚" },
+	MutationsSturm = { name = "",      fallback = "🌪" },
+	Koenigshuegel  = { name = "crown", fallback = "♛" },
+	Schatzgraeber  = { name = "gift",  fallback = "💎" },
+	WaspQueen      = { name = "",      fallback = "🐝" },
+}
+
+local function clock(seconds: number): string
+	local s = math.max(0, math.floor(seconds))
+	return string.format("%d:%02d", math.floor(s / 60), s % 60)
+end
+
+local function eventLine(): string
+	local remaining = _phaseEndsAt - os.clock()
+	if _eventId then
+		local def = EventConfig.getById(_eventId)
+		return string.format("%s  %s", Names.event(_eventId), clock(remaining))
+	end
+	if _nextEventId then
+		return Loc.t("ui.petbar.next_event", { t = clock(remaining) })
+	end
+	return ""
+end
+
+-- Sammel-Update 5.3: "🐝 Boss in 12 min" (bzw. "🐝 Boss LIVE").
+local function bossLine(): string
+	local at = _bossAt
+	if not at then return "" end
+	local left = at - os.clock()
+	if left <= 0 then return Loc.t("ui.petbar.boss_live") end
+	return Loc.t("ui.petbar.boss_in", { min = math.max(1, math.ceil(left / 60)) })
+end
+
+-- "Tower II" fuer eine Tower-Id.
+local function towerLabel(towerId: string?): string
+	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
+	return Loc.t("ui.petbar.tower", { n = def.numeral })
+end
+
+-- HP-Anteil des ausgeruesteten Baerchis (nil = keiner da) und der gewaehlte
+-- Tower (v15, ersetzt das PIT-Level).
+local function fighterInfo(): (number?, string)
+	local data = ClientState.get()
+	if not data then return nil, "I" end
+
+	local tower = if data.towers then data.towers.selected else "I"
+	local uid = data.island.equippedUid
+	local baerchi = if uid then data.island.baerchis[uid] else nil
+	local def = if baerchi then BaerchiConfig.getById(baerchi.configId) else nil
+	if not baerchi or not def then
+		return nil, tower
+	end
+
+	local maxHp = CombatCalculator.getEffectiveStats(baerchi, def.baseStats).maxHp
+	local hp = math.clamp(baerchi.currentHp or maxHp, 0, maxHp)
+	return hp / math.max(1, maxHp), tower
+end
+
+local function paint(view: ButtonView, title: string, sub: string, mode: "normal" | "active" | "waiting" | "disabled")
+	view.title.Text = title
+	view.sub.Text   = sub
+
+	if mode == "disabled" then
+		view.button.Active           = false
+		view.button.AutoButtonColor  = false
+		view.button.BackgroundColor3 = Theme.COLORS.disabled
+		view.stroke.Color            = Theme.COLORS.outline
+		view.stroke.Thickness        = Theme.OUTLINE_THICKNESS
+		view.title.TextTransparency  = 0.35
+		Icons.tint(view.icon, Color3.fromRGB(140, 140, 150))
+		return
+	end
+
+	Icons.tint(view.icon, Color3.new(1, 1, 1))
+
+	view.button.Active          = true
+	view.button.AutoButtonColor = false
+	view.title.TextTransparency = 0
+
+	if mode == "active" then
+		view.button.BackgroundColor3 = Theme.shade(view.color, 0.15)
+		view.stroke.Color            = GLOW_COLOR
+		view.stroke.Thickness        = 5
+	elseif mode == "waiting" then
+		view.button.BackgroundColor3 = Theme.shade(view.color, -0.25)
+		view.stroke.Color            = GLOW_COLOR
+		view.stroke.Thickness        = 3
+	else
+		view.button.BackgroundColor3 = view.color
+		view.stroke.Color            = Theme.COLORS.outline
+		view.stroke.Thickness        = Theme.OUTLINE_THICKNESS
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Anzeige
+--------------------------------------------------------------------------------
+
+local _eventIconKey: string? = nil
+
+-- Tauscht das Icon des Event-Knopfs gegen das des kommenden/laufenden Events.
+local function setEventIcon(view: ButtonView, eventId: string?)
+	local key = eventId or "Ufo"
+	if _eventIconKey == key then return end
+	_eventIconKey = key
+	local look = EVENT_ICON[key] or EVENT_ICON.Ufo
+	local old = view.icon
+	local icon = Icons.make(view.button, look.name, look.fallback)
+	icon.AnchorPoint = old.AnchorPoint
+	icon.Position    = old.Position
+	icon.Size        = old.Size
+	icon.ZIndex      = old.ZIndex
+	old:Destroy()
+	view.icon = icon
+end
+
+local function refresh()
+	local event, fight = _event, _fight
+	if not event or not fight then return end
+
+	-- Paket 4.3: Tempo-Knopf nur im Tower
+	local speedButton = _speedButton
+	if speedButton then
+		speedButton.Visible = _state == "InPit" or _state == "ToPit"
+		speedButton.Text = if _speedChoice == 0 then "⏭ " .. Loc.t("ui.petbar.speed_skip") else "⏩ x" .. _speedChoice
+	end
+
+	-- HBB Paket 3: der Event-Knopf erscheint erst nach dem ersten Kampf
+	Unlock.apply("button_event", event.button)
+
+	local hpRatio, selectedTower = fighterInfo()
+	local hasPet = hpRatio ~= nil
+
+	-- --------------------------------------------------------------- Event
+	local eventTitle = Loc.t("ui.petbar.event")
+	local recall     = Loc.t("ui.petbar.recall")
+	local waiting    = Loc.t("ui.petbar.waiting")
+	if not hasPet then
+		paint(event, eventTitle, Loc.t("ui.petbar.no_pet"), "disabled")
+	elseif _abducting then
+		paint(event, eventTitle, Loc.t("ui.petbar.abducted"), "disabled")
+	elseif _state == "ToEvent" then
+		paint(event, Loc.t("ui.petbar.recall"), Loc.t("ui.petbar.walking_there") .. " • " .. eventLine(), "active")
+	elseif _state == "AtEvent" then
+		paint(event, Loc.t("ui.petbar.recall"), eventLine(), "active")
+	elseif _pending == "Event" then
+		paint(event, Loc.t("ui.petbar.waiting"), Loc.t("ui.petbar.switch_hint"), "waiting")
+	elseif _state == "Returning" and _from == "Event" then
+		paint(event, eventTitle, Loc.t("ui.petbar.coming_home"), "normal")
+	elseif FeatureFlags.isOn("EVENT_V2_TIMER") then
+		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
+		-- keine Woerter.
+		setEventIcon(event, _eventId or _nextEventId)
+		paint(event, clock(_phaseEndsAt - os.clock()), bossLine(), "normal")
+	else
+		paint(event, eventTitle, eventLine(), "normal")
+	end
+
+	-- --------------------------------------------------------------- Fight
+	local hpText = if hpRatio then string.format("HP %d%%  •  %s", math.floor(hpRatio * 100 + 0.5), towerLabel(selectedTower)) else ""
+
+	local fightTitle = Loc.t("ui.petbar.fight")
+	if not hasPet then
+		paint(fight, fightTitle, Loc.t("ui.petbar.no_pet"), "disabled")
+	elseif _state == "ToPit" then
+		paint(fight, Loc.t("ui.petbar.recall"), Loc.t("ui.petbar.walking_pit"), "active")
+	elseif _state == "InPit" then
+		paint(fight, Loc.t("ui.petbar.recall"), if _stage then Loc.t("ui.petbar.in_pit_stage", { tower = towerLabel(_tower or selectedTower), stage = _stage }) else towerLabel(_tower or selectedTower), "active")
+	elseif _pending == "Fight" then
+		paint(fight, Loc.t("ui.petbar.waiting"), Loc.t("ui.petbar.switch_hint_pit"), "waiting")
+	elseif _state == "Returning" and _from == "Fight" then
+		paint(fight, fightTitle, Loc.t("ui.petbar.coming_home"), "normal")
+	elseif (hpRatio or 0) <= 0 then
+		paint(fight, fightTitle, Loc.t("ui.petbar.exhausted"), "disabled")
+	else
+		paint(fight, fightTitle, hpText, "normal")
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Klicks
+--------------------------------------------------------------------------------
+
+local function onEventClicked()
+	Unlock.markSeen("button_event")
+	Remotes.RequestPetMode:FireServer("Event")
+end
+
+local function onFightClicked()
+	-- Zurueckholen oder einen vorgemerkten Wechsel abbrechen: keine Frage.
+	if _state == "ToPit" or _state == "InPit" or _pending == "Fight" then
+		Remotes.RequestPetMode:FireServer("Fight")
+		return
+	end
+
+	-- Neuer Lauf: gibt es einen letzten Lauf in diesem Tower, zuerst die
+	-- Fortsetzungs-Frage.
+	local data = ClientState.get()
+
+	-- Entscheidung 05.10. (FIGHT_RESUME_PROMPT): Standard ist IMMER Stage 1.
+	-- Der Einstieg ab der letzten Stage gegen Gummies ist ein kleines Feld,
+	-- das nach 7 s von selbst verschwindet (dann Stage 1). Ein zweiter
+	-- Fight-Klick waehrend das Feld offen ist, startet sofort bei Stage 1.
+	if FeatureFlags.isOn("FIGHT_RESUME_PROMPT") then
+		if FightStartPrompt.isOpen() then
+			FightStartPrompt.chooseFresh()
+			return
+		end
+		local opened = FightStartPrompt.open(function(choice)
+			Remotes.RequestPetMode:FireServer("Fight", choice)
+		end)
+		if not opened then
+			Remotes.RequestPetMode:FireServer("Fight", "Fresh")
+		end
+		return
+	end
+
+	-- HBB Paket 2: keine Frage mehr. Mit gespeichertem Lauf geht es
+	-- kostenlos ab 65 % weiter; der bezahlte Einstieg ab der letzten Stage
+	-- ist ein eigener kleiner Knopf im Tower-Fenster (CombatPanel). Der
+	-- Server rechnet beide Wege unveraendert.
+	if FeatureFlags.isOn("UI_V2_GUIDE") then
+		local choice = if data and PitResumeDialog.getProgress(data) then "Percent" else "Fresh"
+		Remotes.RequestPetMode:FireServer("Fight", choice)
+		return
+	end
+
+	if data and PitResumeDialog.getProgress(data) then
+		PitResumeDialog.open(function(choice)
+			Remotes.RequestPetMode:FireServer("Fight", choice)
+		end)
+		return
+	end
+
+	Remotes.RequestPetMode:FireServer("Fight", "Fresh")
+end
+
+--------------------------------------------------------------------------------
+-- HBB Paket 2: Anker fuer die Fuehrung (GuideController)
+--------------------------------------------------------------------------------
+
+-- 08.10.: letzter Zustand vom Server ("Home", "ToPit", "InPit", ...)
+function PetBar.getState(): string
+	return _state
+end
+
+function PetBar.getButton(mode: string): GuiObject?
+	local view = if mode == "Fight" then _fight elseif mode == "Event" then _event else nil
+	return if view then view.button else nil
+end
+
+--------------------------------------------------------------------------------
+-- Aufbau
+--------------------------------------------------------------------------------
+
+local function buildButton(parent: Instance, name: string, color: Color3, order: number, onClick: () -> (), iconName: string, fallback: string): ButtonView
+	local button = Theme.bigButton(name, parent, "", color)
+	button.Size        = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT)
+	button.LayoutOrder = order
+
+	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
+
+	-- Icon links, ragt oben ueber den Knopf hinaus
+	local icon = Icons.make(button, iconName, fallback)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position    = UDim2.new(0, 6, 0.5, -6)
+	icon.Size        = UDim2.fromOffset(60, 60)
+	icon.ZIndex      = 4
+
+	-- Beschriftung setzt refresh() (in der Spielersprache); `name` ist nur der Instanz-Name
+	local title = Theme.label("Title", button, "")
+	title.Position       = UDim2.new(0, 64, 0, 6)
+	title.Size           = UDim2.new(1, -72, 0, 30)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	title.TextColor3     = Theme.COLORS.text
+	Theme.outlineText(title)
+
+	local sub = Theme.label("Sub", button, "")
+	sub.Position       = UDim2.new(0, 64, 1, -26)
+	sub.Size           = UDim2.new(1, -70, 0, 18)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	sub.TextScaled     = false
+	sub.TextSize       = 12
+	sub.Font           = Theme.FONT_BODY
+	sub.TextColor3     = Theme.COLORS.outline
+	sub.TextTruncate   = Enum.TextTruncate.AtEnd
+
+	button.Activated:Connect(function()
+		if not button.Active then return end
+		onClick()
+	end)
+
+	return { button = button, title = title, sub = sub, stroke = stroke, color = color, icon = icon }
+end
+
+function PetBar.init(screenGui: ScreenGui)
+	local bar = Theme.container("PetBar", screenGui)
+	bar.AnchorPoint = Vector2.new(0.5, 1)
+	bar.Position    = UDim2.new(0.5, 0, 1, -14)
+	bar.Size        = UDim2.fromOffset(BUTTON_WIDTH * 2 + GAP, BUTTON_HEIGHT)
+	bar.ZIndex      = 5
+
+	-- Auf schmalen Bildschirmen (Handy) mitskalieren statt ueber den Rand.
+	-- Playtest 07.10.: auf Touch-Geraeten ausserdem raus aus der Zone des
+	-- Bewegungs-Sticks und weg vom Sprung-Knopf (TouchSafeArea) — sonst
+	-- loeste, wer laufen wollte, den Event-Knopf aus.
+	local scale = Instance.new("UIScale")
+	scale.Parent = bar
+	local barWidth = BUTTON_WIDTH * 2 + GAP
+	local function rescale()
+		local zone = TouchSafeArea.zone(screenGui)
+		if zone then
+			bar.Position = UDim2.new(0, zone.center, 1, -14)
+			scale.Scale  = math.clamp(zone.width / barWidth, 0.5, 1)
+		else
+			local width = UiScale.toGui(screenGui.AbsoluteSize.X)
+			bar.Position = UDim2.new(0.5, 0, 1, -14)
+			scale.Scale  = math.clamp((width - 32) / barWidth, 0.6, 1)
+		end
+	end
+	TouchSafeArea.watch(screenGui, rescale)
+
+	local layout = Theme.listLayout(bar, GAP, true)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO")
+	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X")
+
+	-- Sammel-Update 05.10. (Paket 4.3): Tempo-Knopf ueber dem Fight-Knopf,
+	-- nur waehrend der Baerchi im Tower kaempft. Ein Tipp schaltet
+	-- x1 -> x2 -> x4 -> "sofort" -> x1. Der Server spielt ab der naechsten
+	-- Stage schneller ab; die Abrechnung bleibt gleich.
+	local speedButton = Theme.button("SpeedButton", _fight.button, "⏩ x1", Theme.COLORS.panelLight)
+	speedButton.AnchorPoint = Vector2.new(1, 1)
+	speedButton.Position    = UDim2.new(1, 0, 0, -6)
+	speedButton.Size        = UDim2.fromOffset(96, 34)
+	speedButton.ZIndex      = 6
+	speedButton.TextColor3  = Theme.COLORS.text
+	speedButton.Visible     = false
+	_speedButton = speedButton
+	speedButton.Activated:Connect(function()
+		local index = (table.find(SPEED_STEPS, _speedChoice) or 1) % #SPEED_STEPS + 1
+		_speedChoice = SPEED_STEPS[index]
+		Remotes.RequestPitSpeed:FireServer(_speedChoice)
+		refresh()
+	end)
+	FightStartPrompt.init(screenGui, bar)
+
+	-- 08.10. (Tower-Terminal): Antippen des Tower-Namens unter "Kampf"
+	-- ("HP 100% · Tower I") oeffnet das Tower-Panel — derselbe Weg wie am
+	-- Terminal, nur kuerzer. Eine unsichtbare Flaeche ueber der Unterzeile.
+	local towerTap = Instance.new("TextButton")
+	towerTap.Name = "TowerTap"
+	towerTap.BackgroundTransparency = 1
+	towerTap.Text = ""
+	towerTap.AnchorPoint = Vector2.new(1, 1)
+	towerTap.Position = UDim2.new(1, 0, 1, 0)
+	towerTap.Size = UDim2.new(1, -64, 0, 30)
+	towerTap.ZIndex = 7
+	towerTap.Parent = _fight.button
+	towerTap.Activated:Connect(function()
+		if _state == "ToPit" or _state == "InPit" then
+			onFightClicked()   -- waehrend des Kampfs bleibt es der Zurueckholen-Knopf
+			return
+		end
+		PanelManager.open(PanelManager.ARENA_PANEL)
+	end)
+
+	PitResumeDialog.init(screenGui)
+
+	Remotes.PetModeChanged.OnClientEvent:Connect(function(state: any, pending: any, info: any)
+		_state   = if typeof(state) == "string" then state else "Home"
+		_pending = if typeof(pending) == "string" then pending else nil
+		local typedInfo = if typeof(info) == "table" then info else {}
+		_stage     = if typeof(typedInfo.stage) == "number" then typedInfo.stage else nil
+		_tower     = if typeof(typedInfo.tower) == "string" then typedInfo.tower else nil
+		_from      = if typeof(typedInfo.from) == "string" then typedInfo.from else nil
+		_abducting = typedInfo.abducting == true
+
+		-- Laeuft der Baerchi los, ist eine offene Fortsetzungs-Frage hinfaellig.
+		if _state ~= "Home" and _state ~= "Returning" and PitResumeDialog.isOpen() then
+			PitResumeDialog.close()
+		end
+
+		refresh()
+	end)
+
+	Remotes.EventPhaseChanged.OnClientEvent:Connect(function(eventId: any, remaining: any, nextEventId: any, untilBoss: any)
+		-- Sammel-Update 5.3: Countdown bis zum Boss
+		_bossAt      = if typeof(untilBoss) == "number" then os.clock() + untilBoss else nil
+		_eventId     = if typeof(eventId) == "string" then eventId else nil
+		_nextEventId = if typeof(nextEventId) == "string" then nextEventId else nil
+		_phaseEndsAt = os.clock() + (if typeof(remaining) == "number" then remaining else 0)
+		refresh()
+	end)
+
+	ClientState.onChanged(refresh)
+	Loc.onChanged(function() refresh() end)
+
+	-- Restzeit des Events jede Sekunde nachziehen
+	local accumulator = 0
+	RunService.Heartbeat:Connect(function(delta)
+		accumulator += delta
+		if accumulator < 1 then return end
+		accumulator = 0
+		refresh()
+	end)
+
+	refresh()
+	print("[PetBar] Initialisiert")
+end
+
+return PetBar

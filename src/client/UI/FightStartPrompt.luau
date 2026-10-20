@@ -3,7 +3,7 @@
 -- StarterPlayerScripts/UI/FightStartPrompt.luau
 --
 -- Einzige Zustaendigkeit:
---   - Das kleine Feld beim Fight-Klick (FeatureFlags.FIGHT_RESUME_PROMPT):
+--   - Das kleine Feld beim Fight-Klick (immer aktiv):
 --     "Ab Stage X weiter" gegen Gummies. Klickt der Spieler nichts, ist es
 --     nach AUTO_SECONDS weg und der Lauf startet bei Stage 1.
 --

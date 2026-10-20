@@ -1214,4 +1214,27 @@ return {
 	["epilog.terminal.screen_done"] = "WORLD 2 OPEN",
 	["epilog.terminal.prompt_action"] = "Grant authorization",
 	["epilog.terminal.prompt_object"] = "Launch terminal",
+	["ui.moment.endless_open"] = "ENDLESS OPEN!",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.skip.hint"] = "Hold to skip",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_3"] = "3",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_2"] = "2",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_1"] = "1",   -- 20.10. Final-Epilog Prompt 7
+	["ui.journey.title"] = "Journey",   -- 20.10. P3 Reise
+	["ui.journey.skip"] = "Later",   -- 20.10. P3 Reise
+	["ui.journey.claim"] = "Claim",   -- 20.10. P3 Reise
+	["ui.journey.hide"] = "Hide",   -- 20.10. P3 Reise
+	["ui.journey.show"] = "Show journey",   -- 20.10. P3 Reise
+	["ui.journey.done"] = "Journey complete!",   -- 20.10. P3 Reise
+	["ui.journey.step"] = "Step {n}/{total}",   -- 20.10. P3 Reise
+	["ui.journey.hatch"] = "Hatch your first egg and get a Baerchi.",   -- 20.10. P3 Reise
+	["ui.journey.equip"] = "Equip your Baerchi so it can fight for you.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_enter"] = "Enter Tower I at the terminal and start fighting.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_clear"] = "Clear Tower I up to stage 30.",   -- 20.10. P3 Reise
+	["ui.journey.tower3_open"] = "Unlock Tower III by beating Tower II first.",   -- 20.10. P3 Reise
+	["ui.journey.final_open"] = "Reach the Final Tower.",   -- 20.10. P3 Reise
+	["ui.journey.final_clear"] = "Beat Final 100 and launch the rocket!",   -- 20.10. P3 Reise
+	["world.rocket.locked"] = "World 2 awaits! Beat the Final Tower to launch the rocket.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.ready"] = "The Final Tower is beaten – head to the summit!",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.launched"] = "World 2 is open.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.progress"] = "Final Tower: Stage {stage}/{total}",   -- 20.10. P4 Raketen-Insel
 }

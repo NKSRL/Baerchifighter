@@ -129,8 +129,20 @@ local maxP = results["L50 Max (P10 C S100)"]
 check("L50 Max Common schafft Tower I locker", maxP.Common.I >= 30, maxP.Common.I)
 check("L50 Max Legendaer: Tower III mit Muehe (40-60)", maxP.Legendary.III >= 38 and maxP.Legendary.III <= 60, maxP.Legendary.III)
 check("L50 Max Mythisch: Tower III mit Muehe (45-60)", maxP.Mythic.III >= 45, maxP.Mythic.III)
-check("L50 Max Mythisch: Final kaum (< 30)", maxP.Mythic.Final < 30, maxP.Mythic.Final)
-check("L50 Max Omega: Final 70-100", maxP.Omega.Final >= 70 and maxP.Omega.Final <= 100, maxP.Omega.Final)
-check("Final 100 nur mit Maximal-Ausbau (Omega P5 S50 < 100)", results["L50 P5 C S50"].Omega.Final < 100, results["L50 P5 C S50"].Omega.Final)
+local FeatureFlags = require(RS.Config.FeatureFlags)
+if FeatureFlags.isOn("TOWER_F_EASIER") then
+	-- 20.10. (P2): Final 100 mit Legendaer/Mythisch-Team knapp, Epic scheitert, Omega locker
+	local p5 = results["L50 P5 C S50"]
+	check("L50 Max Epic scheitert an Final 100 (70-95)", maxP.Epic.Final >= 70 and maxP.Epic.Final <= 95, maxP.Epic.Final)
+	check("L50 Max Legendaer kommt knapp heran (>= 85)", maxP.Legendary.Final >= 85, maxP.Legendary.Final)
+	check("L50 Max Mythisch schafft Final 100", maxP.Mythic.Final >= 100, maxP.Mythic.Final)
+	check("L50 P5 Mythisch kommt weit (>= 85)", p5.Mythic.Final >= 85, p5.Mythic.Final)
+	check("L50 P5 Epic scheitert (< 80)", p5.Epic.Final < 80, p5.Epic.Final)
+	check("L50 P5 Omega schafft Final locker", p5.Omega.Final >= 100, p5.Omega.Final)
+else
+	check("L50 Max Mythisch: Final kaum (< 30)", maxP.Mythic.Final < 30, maxP.Mythic.Final)
+	check("L50 Max Omega: Final 70-100", maxP.Omega.Final >= 70 and maxP.Omega.Final <= 100, maxP.Omega.Final)
+	check("Final 100 nur mit Maximal-Ausbau (Omega P5 S50 < 100)", results["L50 P5 C S50"].Omega.Final < 100, results["L50 P5 C S50"].Omega.Final)
+end
 check("Simulation 100 Stages < 50 ms", perRun < 0.05, perRun)
 __log(fails == 0 and "ALLE ZIELE OK" or ("ZIELE VERFEHLT: " .. fails))

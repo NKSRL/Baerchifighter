@@ -394,6 +394,7 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		towers       = data.towers,
 		epilog       = data.epilog,   -- v18
 		worlds       = data.worlds,   -- v18
+		journey      = data.journey,  -- v19
 		daily        = dailyView(data),
 		-- HBB Paket 2: Zaehler und Konto-Alter fuer Fuehrung/Freischaltung
 		stats        = data.stats :: any,

@@ -695,34 +695,34 @@ end
 -- ueberspringt Abstand und Rate-Limit.
 local function canStartFinale(player: Player, force: boolean): (boolean, string)
 	local F = EpilogConfig.FINALE
-	if not isEnabled() or not F.enabled then return false, "disabled" end
-	local data = PlayerService.getData(player)
-	if not data then return false, "no_data" end
-	if _fin[player] then return false, "already_running" end   -- doppelte Anfrage = no-op
-	if not bridgeAllowed(player) then return false, "state_not_allowed" end
-	if not MapService.hasTerminal(player) then return false, "no_terminal" end
+	-- Messen, entscheiden laesst EpilogRules.checkPress (Test: epilog_rules.test.lua)
+	local enabled = isEnabled() and F.enabled
+	local data = if enabled then PlayerService.getData(player) else nil
 	local character = player.Character
 	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
 	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
-		return false, "dead"
-	end
-	if not force then
-		local last = _lastPress[player]
-		if last and os.clock() - last < F.pressCooldownSeconds then return false, "rate_limit" end
-		local mount = MapService.getTerminalMount(player)
-		if not mount or (root.Position - mount.Position).Magnitude > F.pressMaxDistance then
-			return false, "too_far"
-		end
-	end
-	return true, "ok"
+	local last = _lastPress[player]
+	local mount = if enabled and data then MapService.getTerminalMount(player) else nil
+	local distance: number? = nil
+	if mount and root and root:IsA("BasePart") then distance = (root.Position - mount.Position).Magnitude end
+	return EpilogRules.checkPress({
+		enabled = enabled, hasData = data ~= nil, running = _fin[player] ~= nil,
+		allowed = enabled and data ~= nil and bridgeAllowed(player),
+		hasTerminal = enabled and data ~= nil and MapService.hasTerminal(player),
+		alive = humanoid ~= nil and humanoid.Health > 0 and root ~= nil and root:IsA("BasePart"),
+		force = force,
+		sinceLastPress = if last then os.clock() - last else nil,
+		distance = distance,
+	}, F.pressMaxDistance, F.pressCooldownSeconds)
 end
 
 -- Phase 1: Freigabe. Prueft, schreibt "launched" + Welt 2 in EINER Mutation, speichert und
 -- startet den Ablauf. Rueckgabe true = angenommen. Doppelte/ungueltige Anfragen aendern nichts.
 function EpilogService.startFinale(player: Player, source: string, force: boolean?): boolean
-	_lastPress[player] = if force == true then _lastPress[player] else os.clock()
+	-- Erst pruefen (gegen den VORHERIGEN Druck), dann den Zeitstempel setzen: jeder Versuch zaehlt
+	-- fuers Rate-Limit, aber ein erster, gueltiger Druck wird nicht an sich selbst abgelehnt.
 	local ok, why = canStartFinale(player, force == true)
+	if force ~= true then _lastPress[player] = os.clock() end
 	if not ok then
 		if why ~= "already_running" then reject(player, "startFinale:" .. source, why) end
 		return false
@@ -801,7 +801,11 @@ end
 -- Prompt 4 -> 6: Startwunsch vom Terminal (Prompt voll gehalten, 1,2 s). Der Prompt ist
 -- serverseitig, ein Token ist hier nicht noetig. true = angenommen.
 function EpilogService.onLaunchRequested(player: Player): boolean
-	if MapService.getTerminalState(player) ~= EpilogConfig.TERMINAL.STATE.ARMED then
+	-- Roblox feuert bei vollem Halten PromptButtonHoldEnded VOR Triggered: der Terminal-Zustand ist dann
+	-- schon wieder "ready". Darum zaehlen "armed" und "ready"; Abstand, Zustand und Rate-Limit prueft
+	-- startFinale (EpilogRules.checkPress), "idle" (zu weit weg) bleibt abgelehnt.
+	local terminalState = MapService.getTerminalState(player)
+	if terminalState ~= EpilogConfig.TERMINAL.STATE.ARMED and terminalState ~= EpilogConfig.TERMINAL.STATE.READY then
 		reject(player, "onLaunchRequested", "not_armed")
 		return false
 	end

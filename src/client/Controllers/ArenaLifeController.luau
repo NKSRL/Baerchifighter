@@ -29,7 +29,6 @@ local RunService        = game:GetService("RunService")
 
 local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
 local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
-local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 
@@ -377,7 +376,6 @@ end
 --------------------------------------------------------------------------------
 
 function ArenaLifeController.init()
-	if not FeatureFlags.isOn("WORLD_E_ARENA") then return end
 	_folder = WorldFXKit.folder("ArenaLife", WorldFXKit.root())
 
 	for slot = 1, MapConfig.PLOT_COUNT do

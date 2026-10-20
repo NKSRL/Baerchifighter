@@ -394,6 +394,65 @@ do
 	end)
 end
 
+-- ===============================================================
+-- K) v17 -> v18 (Final-Epilog, 20.10.): epilog/worlds, Bestandsspieler
+--    mit Final-Rekord >= 100 bekommen "pending", Endless bleibt offen.
+-- ===============================================================
+do
+	local function v17Fixture(finalRecord)
+		local d = deepCopy(PlayerMigration.applyDefaults(legacyV14()))
+		d.version = 17
+		d.epilog = nil
+		d.worlds = nil
+		d.towers.records.Final = finalRecord
+		d.towers.unlocked.Endless = nil
+		return d
+	end
+
+	check("K0 Standard-Version ist 19", Types.createDefaultPlayerData().version, 19)
+	local fresh = Types.createDefaultPlayerData()
+	check("K0 neuer Spieler: epilog none", fresh.epilog.state, "none")
+	check("K0 neuer Spieler: Welt 2 zu", fresh.worlds.unlocked.World2, nil)
+
+	local veteran = PlayerMigration.applyDefaults(v17Fixture(100))
+	check("K1 Final 100 -> pending", veteran.epilog.state, "pending")
+	check("K1 firstClearAt gesetzt", type(veteran.epilog.firstClearAt), "number")
+	check("K1 Endless offen", veteran.towers.unlocked.Endless, true)
+	check("K1 Welt 2 zu", veteran.worlds.unlocked.World2, nil)
+	check("K1 Version 19", veteran.version, 19)
+	-- v19 (P3 Reise): Bestandsspieler mit Final 100 hat alle Etappen abgeholt, ohne Nachzahlung
+	check("K1 Reise: Final-100-Etappe abgeholt", veteran.journey.claimed.final_clear, true)
+	check("K1 Reise: nicht ausgeblendet", veteran.journey.hidden, false)
+	check("K0 neuer Spieler: Reise leer", next(fresh.journey.claimed), nil)
+
+	local snap = deepCopy(veteran)
+	check("K2 zweiter Lauf aendert nichts", deepEqual(snap, PlayerMigration.applyDefaults(veteran)), true)
+
+	local almost = PlayerMigration.applyDefaults(v17Fixture(99))
+	check("K3 Final 99 -> none", almost.epilog.state, "none")
+	check("K3 Endless zu", almost.towers.unlocked.Endless, nil)
+
+	-- gueltiger Stand wird nicht ueberschrieben (seen bleibt seen, launched -> Welt 2 da)
+	local seen = v17Fixture(100)
+	seen.epilog = { state = "seen", firstClearAt = 5 }
+	check("K4 seen bleibt seen", PlayerMigration.applyDefaults(seen).epilog.state, "seen")
+	local done = v17Fixture(100)
+	done.epilog = { state = "launched", firstClearAt = 5, launchedAt = 9 }
+	done.worlds = { unlocked = {} }
+	local outDone = PlayerMigration.applyDefaults(done)
+	check("K4 launched bleibt launched", outDone.epilog.state, "launched")
+	check("K4 launched -> Welt 2 steht", outDone.worlds.unlocked.World2, true)
+
+	-- kaputte Felder werden repariert
+	local junk = v17Fixture(100)
+	junk.epilog = { state = "banane", firstClearAt = "x" }
+	junk.worlds = { unlocked = { World2 = 1, Welt9 = true } }
+	local outJunk = PlayerMigration.applyDefaults(junk)
+	check("K5 Muell-State -> pending (Rekord 100)", outJunk.epilog.state, "pending")
+	check("K5 Muell-Zeit entfernt/neu", type(outJunk.epilog.firstClearAt), "number")
+	check("K5 Muell-Welten entfernt", next(outJunk.worlds.unlocked), nil)
+end
+
 FLAGS.HONEY_POND_V2 = originalPond
 
 if failures > 0 then error(failures .. " Test(s) fehlgeschlagen") end

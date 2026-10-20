@@ -21,7 +21,6 @@ local Types         = require(script.Parent.Parent.Network.Types)
 -- v14: die hatchTables werden aus den Baerchis BERECHNET (Rarity + Pfad).
 -- BaerchiConfig kennt EggConfig nicht, es gibt also keinen Ringschluss.
 local BaerchiConfig = require(script.Parent.BaerchiConfig)
-local FeatureFlags  = require(script.Parent.FeatureFlags)
 
 -- Wahrscheinlichkeiten muessen pro Egg genau 1.0 ergeben.
 -- Format: { configId = Gewichtung }  (wird von GachaRoller normalisiert)
@@ -500,7 +499,7 @@ end
 local PRESS = {
 	cost          = 5,
 	blockedPaths  = { Ascension = true, Event = true },
-	-- Playtest 05.10. (Schalter PRESS_NO_BASIC_EGG): Basis-Eier gibt es beim
+	-- Playtest 05.10. (Schalter entfernt): Basis-Eier gibt es beim
 	-- Haendler unbegrenzt fuer Gummies. Waeren sie pressbar, liesse sich jedes
 	-- Gummi-Polster ueber die Presse in immer bessere Eier tauschen.
 	blockedEggs   = { BasicEgg = true } :: { [string]: boolean },
@@ -511,7 +510,7 @@ local PRESS = {
 local function canPress(eggType: Types.EggType): boolean
 	local egg = EGGS[eggType]
 	if not egg or PRESS.blockedPaths[egg.path] then return false end
-	if PRESS.blockedEggs[eggType] and FeatureFlags.isOn("PRESS_NO_BASIC_EGG") then return false end
+	if PRESS.blockedEggs[eggType] then return false end
 	return true
 end
 

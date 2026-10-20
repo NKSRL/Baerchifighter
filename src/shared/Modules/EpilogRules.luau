@@ -159,4 +159,28 @@ function EpilogRules.consumeSeen(entry: any)
 	entry.seenUsed = true
 end
 
+-- Prompt 7: reine Entscheidung ueber einen Knopfdruck (Prompt oder Remote). Der Server misst die
+-- Werte (Abstand, Zeit seit dem letzten Druck, Zustand) und uebergibt sie; hier steht nur die Regel.
+--   enabled / hasData / running / allowed / hasTerminal / alive : Bedingungen (Reihenfolge = Pruefreihenfolge)
+--   sinceLastPress : Sekunden seit dem letzten Druck dieses Spielers (nil = noch nie)
+--   distance       : Abstand Avatar - Terminal in Studs (nil = Terminal-Halterung fehlt)
+--   force          : Debug, ueberspringt Rate-Limit und Abstand
+function EpilogRules.checkPress(input: any, maxDistance: number, cooldown: number): (boolean, string)
+	if not input.enabled then return false, "disabled" end
+	if not input.hasData then return false, "no_data" end
+	if input.running then return false, "already_running" end   -- Doppeldruck = no-op
+	if not input.allowed then return false, "state_not_allowed" end
+	if not input.hasTerminal then return false, "no_terminal" end
+	if not input.alive then return false, "dead" end
+	if input.force ~= true then
+		local since = input.sinceLastPress
+		if type(since) == "number" and since < cooldown then return false, "rate_limit" end
+		local distance = input.distance
+		if type(distance) ~= "number" or distance ~= distance or distance >= maxDistance then
+			return false, "too_far"
+		end
+	end
+	return true, "ok"
+end
+
 return EpilogRules

@@ -68,7 +68,7 @@ local function v16(rebirths: number, records: { [string]: number })
 end
 
 local a = PlayerMigration.applyDefaults(v16(4, { I = 30, II = 20 })) :: any
-check("v17: Version", a.version == 17, a.version)
+check("Version nachgezogen (18 seit Final-Epilog; v17-Freischaltung unveraendert)", a.version == Types.createDefaultPlayerData().version, a.version)
 check("R4: III bleibt offen (Altregel)", a.towers.unlocked.III == true)
 check("R4: II offen", a.towers.unlocked.II == true)
 check("R4: Final zu", a.towers.unlocked.Final ~= true)

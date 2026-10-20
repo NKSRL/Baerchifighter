@@ -532,6 +532,14 @@ export type ShopView = {
 
 -- v18 (Final-Epilog): Fortschritt der Epilog-Sequenz nach Final 100. Nur der
 -- Server schreibt. none -> pending -> seen -> launched (Config/EpilogConfig).
+-- v19 (20.10., P3 "Reise"): was der Spieler mit den Etappen gemacht hat. Die Etappen selbst
+-- (erfuellt/nicht) kommen immer aus dem Spielstand (Modules/OnboardingRules).
+export type JourneyState = {
+	claimed : { [string]: boolean },
+	skipped : { [string]: boolean },
+	hidden  : boolean,
+}
+
 export type EpilogState = {
 	state       : string,   -- "none" | "pending" | "seen" | "launched"
 	firstClearAt : number?, -- Unix-Zeit des ersten Final-100-Siegs
@@ -616,6 +624,9 @@ export type PlayerData = {
 	epilog : EpilogState,
 	worlds : WorldsState,
 
+	-- v19: Reise (Tower-Tutorial)
+	journey : JourneyState,
+
 	-- v15: taeglicher Login-Bonus
 	daily : DailyState,
 
@@ -655,6 +666,7 @@ export type PlayerDataUpdate = {
 	towers       : TowerState,     -- v15
 	epilog       : EpilogState?,   -- v18 (nur lesen; Token kommt ueber EpilogStart)
 	worlds       : WorldsState?,   -- v18
+	journey      : JourneyState?,  -- v19
 	daily        : DailyView,      -- v15
 	-- HBB Paket 2: fuer Fuehrung und Freischaltung (rein lesend im Client)
 	stats        : { [string]: number }?,
@@ -1067,7 +1079,10 @@ local function createDefaultPlayerData(): PlayerData
 		-- und worlds { unlocked }. Die Migration setzt fuer Spieler mit Final-
 		-- Rekord >= 100 "pending" (Epilog nachholen) — das haengt am Rekord, nicht
 		-- nur am fehlenden Feld, deshalb Sprung.
-		version    = 18,  -- v18: Final-Epilog, v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v19 (20.10., P3): journey { claimed, skipped, hidden }. Die Migration markiert
+		-- schon erfuellte Etappen als abgeholt (ohne Nachzahlung) — das haengt am Spielstand,
+		-- nicht nur am fehlenden Feld, deshalb Sprung.
+		version    = 19,  -- v19: Reise (Tower-Tutorial), v18: Final-Epilog, v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -1152,6 +1167,7 @@ local function createDefaultPlayerData(): PlayerData
 
 		epilog = { state = "none" },        -- v18
 		worlds = { unlocked = {} },         -- v18
+		journey = { claimed = {}, skipped = {}, hidden = false },   -- v19
 
 		daily = {
 			lastClaimDay = 0,

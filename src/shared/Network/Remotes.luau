@@ -459,6 +459,8 @@ return {
 	RequestPetMode         = RequestPetMode,
 	RequestUpgradeBuilding = RequestUpgradeBuilding,
 	RequestSelectTower     = RequestSelectTower,
+	-- v19 (P3 Reise): Args (action: "claim" | "skip" | "hide" | "show", stageId: string?)
+	RequestJourney         = getOrCreateEvent("RequestJourney"),
 	RequestBuyGamepass     = RequestBuyGamepass,
 	RequestClaimDailyBonus = RequestClaimDailyBonus,
 	RequestUpgradeRecycler = RequestUpgradeRecycler,

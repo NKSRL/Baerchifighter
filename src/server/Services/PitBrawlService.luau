@@ -25,7 +25,6 @@ local Workspace           = game:GetService("Workspace")
 local Audio            = require(ReplicatedStorage.Audio)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
-local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local SkillConfig      = require(ReplicatedStorage.Config.SkillConfig)
 local SkillFXConfig    = require(ReplicatedStorage.Config.SkillFXConfig)
@@ -735,7 +734,6 @@ function PitBrawlService.init()
 end
 
 function PitBrawlService.start()
-	if not FeatureFlags.isOn("PIT_BRAWL") then return end
 	task.spawn(function()
 		while true do
 			task.wait(EventConfig.PIT_BRAWL.TICK_SECONDS)

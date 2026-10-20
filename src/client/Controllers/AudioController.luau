@@ -55,6 +55,11 @@ local _started = false
 local _settings: Audio.Settings = Audio.sanitize(nil)
 local _duckFactor = 1
 local _duckToken = 0
+-- Final-Epilog: Faktor nur fuer die Spielmusik-Spuren (die Epilog-Spur ist davon ausgenommen)
+local _gameFactor = 1
+local _epilogOn = false
+local _epilogToken = 0
+local _epilogVoices = 0   -- laufende Epilog-Klaenge (Obergrenze EPILOG_MAX_VOICES)
 
 local _lastPlayed: { [string]: number } = {}
 local _routineTimes: { number } = {}
@@ -87,7 +92,13 @@ end
 
 local function trackVolume(name: string): number
 	local def = Audio.MUSIC[name]
-	return (if def then def.volume else 0) * (_trackLevel[name] or 0)
+	local factor = if name == "epilog" then 1 else _gameFactor
+	return (if def then def.volume else 0) * (_trackLevel[name] or 0) * factor
+end
+
+-- Lautstaerke aller Spuren neu setzen (nach Aenderung von _gameFactor)
+local function refreshTrackVolumes()
+	for name, sound in _tracks do sound.Volume = trackVolume(name) end
 end
 
 -- Zielstufe einer Spur in `seconds` ansteuern (Stufe 0..1, nicht Sound.Volume,
@@ -205,6 +216,46 @@ function AudioController.duck(seconds: number)
 end
 
 --------------------------------------------------------------------------------
+-- Final-Epilog-Musik
+--------------------------------------------------------------------------------
+
+-- Faktor der Spielmusik gleichmaessig auf `target` fahren (bricht bei neuem Token ab).
+local function tweenGameFactor(target: number, seconds: number, token: number)
+	local from = _gameFactor
+	local startTime = os.clock()
+	while token == _epilogToken do
+		local alpha = if seconds <= 0 then 1 else math.clamp((os.clock() - startTime) / seconds, 0, 1)
+		_gameFactor = from + (target - from) * (alpha * alpha * (3 - 2 * alpha))
+		refreshTrackVolumes()
+		if alpha >= 1 then break end
+		task.wait()
+	end
+end
+
+-- an = true : Spielmusik -10 dB (1 s), Epilog-Musik blendet ein (4 s), Spielmusik laeuft dabei ganz aus.
+-- an = false: Epilog-Musik blendet in 2 s aus, Spielmusik kommt in 2 s zurueck. Auch fuer Abbruch;
+--             ohne vorheriges "an" passiert nichts. Kein harter Schnitt, jeder Wechsel ist ein Fade.
+function AudioController.epilogMusic(on: boolean)
+	if on == _epilogOn then return end
+	_epilogOn = on
+	_epilogToken += 1
+	local token = _epilogToken
+	task.spawn(function()
+		if on then
+			local epilog = _tracks.epilog
+			if epilog then epilog.TimePosition = 0 end
+			tweenGameFactor(T.EPILOG_GAME_DUCK, T.EPILOG_DUCK_SECONDS, token)
+			if token ~= _epilogToken then return end
+			fadeTrack("epilog", 1, T.EPILOG_FADE_IN)
+			tweenGameFactor(0, T.EPILOG_FADE_IN, token)
+		else
+			fadeTrack("epilog", 0, T.EPILOG_FADE_OUT)
+			tweenGameFactor(1, T.EPILOG_FADE_OUT, token)
+		end
+	end)
+end
+
+--------------------------------------------------------------------------------
 -- Effekte
 --------------------------------------------------------------------------------
 
@@ -238,6 +289,9 @@ function AudioController.play(name: string, volumeScale: number?): Sound?
 	local id = Audio.resolve(def)
 	if id == "" then return nil end
 
+	local isEpilog = string.sub(name, 1, 7) == "epilog_"
+	if isEpilog and _epilogVoices >= T.EPILOG_MAX_VOICES then return nil end   -- hoechstens 6 gleichzeitig
+
 	local now = os.clock()
 	local last = _lastPlayed[name]
 	if last and now - last < def.cooldown then return nil end
@@ -251,12 +305,35 @@ function AudioController.play(name: string, volumeScale: number?): Sound?
 	sound.PlaybackSpeed = pitchFor(def)
 	sound.SoundGroup = group
 	sound.Parent = group
+	if isEpilog then
+		_epilogVoices += 1
+		sound.Destroying:Once(function() _epilogVoices = math.max(0, _epilogVoices - 1) end)
+	end
 	sound:Play()
 	sound.Ended:Once(function() sound:Destroy() end)
 	Debris:AddItem(sound, 12)
 
 	if def.special and def.duck then AudioController.duck(def.duck) end
 	return sound
+end
+
+-- Pruefbericht fuer `epilog audit`: nach dem Finale/Abbruch muss alles 0/false sein.
+function AudioController.epilogAudit(): { [string]: any }
+	local sounds = 0
+	local group = _sfxGroup
+	if group then
+		for _, child in group:GetChildren() do
+			if string.sub(child.Name, 1, 11) == "Sfx_epilog_" then sounds += 1 end
+		end
+	end
+	local music = _tracks.epilog
+	return {
+		musikAn = _epilogOn,
+		spielmusikFaktor = math.floor(_gameFactor * 1000 + 0.5) / 1000,
+		epilogMusikLaeuft = music ~= nil and music.IsPlaying and music.Volume > 0.001,
+		epilogStimmen = _epilogVoices,
+		epilogKlangInstanzen = sounds,
+	}
 end
 
 -- Fuer Klaenge anderer Spieler / der Welt (Faehigkeiten): Stimmen-Limit und

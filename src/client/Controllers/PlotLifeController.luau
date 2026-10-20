@@ -25,7 +25,6 @@ local RunService        = game:GetService("RunService")
 
 local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
 local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
-local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
@@ -461,7 +460,6 @@ end
 --------------------------------------------------------------------------------
 
 function PlotLifeController.init()
-	if not FeatureFlags.isOn("WORLD_D_PLOTS") then return end
 	_folder = WorldFXKit.folder("PlotLife", WorldFXKit.root())
 
 	for slot = 1, MapConfig.PLOT_COUNT do

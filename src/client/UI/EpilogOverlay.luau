@@ -23,6 +23,7 @@ local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EpilogConfig = require(ReplicatedStorage.Config.EpilogConfig)
+local Loc          = require(ReplicatedStorage.Localization.Loc)
 
 local EpilogOverlay = {}
 
@@ -62,6 +63,7 @@ local _vig: { Frame } = {}
 local _letter: { Frame } = {}
 local _glow: Frame? = nil
 local _skip: TextButton? = nil
+local _skipHint: TextLabel? = nil   -- Hinweistext am Skip-Ring (Loc epilog.skip.hint)
 local _dots: { Frame } = {}
 local _flare: { Frame } = {}
 local _conns: { RBXScriptConnection } = {}
@@ -401,6 +403,27 @@ local function buildSkip(root: Frame)
 	center.Size = UDim2.fromOffset(14, 14)
 	center.Rotation = 45
 	corner(center, 0.15)
+	-- Hinweis ueber dem Ring ("Halten zum Ueberspringen"), rechtsbuendig, kleine Schrift
+	local hint = Instance.new("TextLabel")
+	hint.Name = "SkipHinweis"
+	hint.BackgroundTransparency = 1
+	hint.AnchorPoint = Vector2.new(1, 1)
+	hint.Position = UDim2.new(1, 0, 0, -6)
+	hint.Size = UDim2.fromOffset(190, 20)
+	hint.Font = Enum.Font.GothamBold
+	hint.TextSize = 14
+	hint.TextScaled = true
+	hint.TextXAlignment = Enum.TextXAlignment.Right
+	hint.TextColor3 = FX.colors.white
+	hint.TextStrokeTransparency = 0.5
+	hint.Text = Loc.t("epilog.skip.hint")
+	hint.ZIndex = 61
+	hint.Parent = button
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = 14
+	limit.MinTextSize = 8
+	limit.Parent = hint
+	_skipHint = hint
 	_skip = button
 end
 
@@ -579,7 +602,9 @@ end
 function EpilogOverlay.setSkip(visible: boolean, progress: number)
 	local button = _skip
 	if not button then return end
-	button.Visible = visible and _running
+	local show = visible and _running
+	if show and not button.Visible and _skipHint then _skipHint.Text = Loc.t("epilog.skip.hint") end   -- aktuelle Sprache
+	button.Visible = show
 	local lit = math.floor(math.clamp(progress, 0, 1) * SKIP_DOTS + 0.5)
 	for i, d in _dots do
 		if i <= lit then

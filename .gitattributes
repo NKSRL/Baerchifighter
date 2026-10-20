@@ -1,0 +1,18 @@
+# Zeilenenden: Git darf CRLF/LF je Plattform umwandeln, Index bleibt einheitlich (20.10.2026)
+* text=auto
+
+# Binaerdateien nie umwandeln oder diffen
+*.png binary
+*.jpg binary
+*.fbx binary
+*.glb binary
+*.blend binary
+*.blend1 binary
+*.rbxm binary
+*.rbxl binary
+*.exe binary
+*.zip binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.bundle binary

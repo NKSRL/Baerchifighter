@@ -1215,4 +1215,27 @@ return {
 	["epilog.terminal.screen_done"] = "MONDE 2 OUVERT",
 	["epilog.terminal.prompt_action"] = "Accorder l'autorisation",
 	["epilog.terminal.prompt_object"] = "Terminal de lancement",
+	["ui.moment.endless_open"] = "ENDLESS OUVERT !",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.skip.hint"] = "Maintenir pour passer",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_3"] = "3",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_2"] = "2",   -- 20.10. Final-Epilog Prompt 7
+	["epilog.finale.count_1"] = "1",   -- 20.10. Final-Epilog Prompt 7
+	["ui.journey.title"] = "Voyage",   -- 20.10. P3 Reise
+	["ui.journey.skip"] = "Plus tard",   -- 20.10. P3 Reise
+	["ui.journey.claim"] = "Récupérer",   -- 20.10. P3 Reise
+	["ui.journey.hide"] = "Masquer",   -- 20.10. P3 Reise
+	["ui.journey.show"] = "Afficher le voyage",   -- 20.10. P3 Reise
+	["ui.journey.done"] = "Voyage terminé !",   -- 20.10. P3 Reise
+	["ui.journey.step"] = "Étape {n}/{total}",   -- 20.10. P3 Reise
+	["ui.journey.hatch"] = "Ouvre ton premier œuf et obtiens un Baerchi.",   -- 20.10. P3 Reise
+	["ui.journey.equip"] = "Équipe ton Baerchi pour qu’il combatte.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_enter"] = "Entre dans la Tour I au terminal et combats.",   -- 20.10. P3 Reise
+	["ui.journey.tower1_clear"] = "Termine la Tour I jusqu’à l’étage 30.",   -- 20.10. P3 Reise
+	["ui.journey.tower3_open"] = "Débloque la Tour III en battant la Tour II.",   -- 20.10. P3 Reise
+	["ui.journey.final_open"] = "Atteins la Tour finale.",   -- 20.10. P3 Reise
+	["ui.journey.final_clear"] = "Bats Final 100 et lance la fusée !",   -- 20.10. P3 Reise
+	["world.rocket.locked"] = "Le monde 2 t’attend ! Bats la Tour finale pour lancer la fusée.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.ready"] = "La Tour finale est vaincue – direction le sommet !",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.launched"] = "Le monde 2 est ouvert.",   -- 20.10. P4 Raketen-Insel
+	["world.rocket.progress"] = "Tour finale : étage {stage}/{total}",   -- 20.10. P4 Raketen-Insel
 }

@@ -1,6 +1,8 @@
 -- endless.test.lua — HBB Paket 9: Endless-Tower, Endless-Level, Woche
 -- python tools/luau-tests/run_local.py tools/luau-tests/endless.test.lua
 --
+local FeatureFlags = rbxRequire("ReplicatedStorage/Config/FeatureFlags")
+
 -- 1. Tower: Endless gibt es nur mit Schalter, ist bis Final 100 zu, danach
 --    offen (unabhaengig von Rebirths); zeigt "Stage 101+" im Schau-Turm-Mass.
 -- 2. Meilensteine: jede 10. Endless-Stage +1 Endless-Level, sonst keins.
@@ -38,9 +40,14 @@ local endless = TowerConfig.get("Endless")
 local final = TowerConfig.get("Final")
 check("Endless existiert", endless ~= nil)
 check("Endless ist der letzte Tower", TowerConfig.TOWERS[#TowerConfig.TOWERS].id == "Endless")
-check("Endless setzt Final fort (Aequivalenz)",
-	math.abs(endless.startEquivalent - (final.startEquivalent + final.stages * final.equivalentPerStage)) <= 0.5,
-	endless.startEquivalent)
+if FeatureFlags.isOn("TOWER_F_EASIER") then
+	-- 20.10. (P2, A4): Endless behaelt seinen festen Anker 132 (nicht mehr an Final gekoppelt)
+	check("Endless-Anker fest bei 132", endless.startEquivalent == 132, endless.startEquivalent)
+else
+	check("Endless setzt Final fort (Aequivalenz)",
+		math.abs(endless.startEquivalent - (final.startEquivalent + final.stages * final.equivalentPerStage)) <= 0.5,
+		endless.startEquivalent)
+end
 check("zu ohne Rekorde", not TowerConfig.isEndlessOpen(nil))
 check("zu bei Final 99", not TowerConfig.isEndlessOpen({ Final = 99 }))
 check("offen bei Final 100", TowerConfig.isEndlessOpen({ Final = 100 }))
@@ -102,10 +109,8 @@ local found = {}
 for _, board in MapLayout.leaderboardBoards() do
 	if board.listId then found[board.listId] = true end
 end
-if FeatureFlags.isOn("MAP_V2_BOARDS") then
-	check("Tafel Endless", found.Endless == true)
-	check("Tafel Endless-Woche", found.EndlessWeek == true)
-end
+check("Tafel Endless", found.Endless == true)
+check("Tafel Endless-Woche", found.EndlessWeek == true)
 for _, listId in LeaderboardConfig.LISTS do
 	check("Store-Name fuer " .. listId, LeaderboardConfig.STORE_NAMES[listId] ~= nil)
 end

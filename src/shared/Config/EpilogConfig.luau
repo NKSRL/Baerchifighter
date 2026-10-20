@@ -442,7 +442,12 @@ EpilogConfig.FX = {
 EpilogConfig.CUES = {
 	hit = "epilog_hit", flash = "epilog_flash", rise = "epilog_rise", run = "epilog_run", reveal = "epilog_reveal",
 	press = "epilog_press", countdown = "epilog_countdown", launch = "epilog_launch", unlock = "epilog_unlock",   -- Prompt 6
+	ready = "epilog_ready", terminal_idle = "epilog_terminal_idle",   -- Prompt 7: Terminal bereit / Summen
 }
+-- Prompt 7: Schritt-Takt auf der Bruecke (Sekunden) und wie spaet ein Cue noch hoerbar sein darf
+-- (nach Skip/Sprung bleiben veraltete Cues stumm).
+EpilogConfig.STEP_INTERVAL = 0.28
+EpilogConfig.CUE_LATE_SECONDS = 0.5
 -- Zeitpunkte der Cues (Sekunde der Sequenz)
 EpilogConfig.CUE_TIMES = {
 	{ 0.0, "hit" }, { 2.0, "flash" }, { 5.0, "rise" }, { 12.0, "run" }, { 8.8, "reveal" },

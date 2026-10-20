@@ -31,3 +31,20 @@ __pycache__/
 
 # Audio-Rework: erzeugte WAVs (neu erzeugen mit: node tools/audio/synth.js)
 /tools/audio/out/
+
+# Aufgeraeumt 20.10.2026: erzeugte bzw. lokale Dateien nicht ins Repo
+# Luau-CLI (Windows-Binaries; Download siehe CLAUDE.md)
+/luau-bin/
+/luau.zip
+# Update-Dateien fuer Studio werden mit tools/make_update_rbxmx.py erzeugt
+/updates/*.rbxmx
+/updates/*.rbxl
+/updates/*.bundle
+/updates/*_Befehl.lua
+# Sicherungen
+*.blend1
+*.bak
+*.bak_*
+*.luau.bak*
+# Git-Reste abgebrochener Synchronisierung
+tmp_obj_*

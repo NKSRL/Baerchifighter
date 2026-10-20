@@ -31,6 +31,8 @@
 
 local RunService = game:GetService("RunService")
 
+local SoundConfig = require(script.Parent.Config.SoundConfig)
+
 local Audio = {}
 
 export type MusicDef = { id: string, file: string, volume: number }
@@ -52,6 +54,9 @@ Audio.MUSIC = {
 	main  = { id = "rbxassetid://139380738783087", file = "music_main",  volume = 0.20 },   -- Farm / Lobby, 92 BPM
 	menu  = { id = "rbxassetid://138217075818409", file = "music_menu",  volume = 0.20 },   -- Menues / Shops, 86 BPM
 	fight = { id = "rbxassetid://70592307088714", file = "music_fight", volume = 0.20 },   -- Kampf / Tower, 100 BPM
+	-- 20.10. Final-Epilog (Prompt 7): 76,8 s, 100 BPM, Intro -> Aufbau -> Hoehepunkt -> ruhiges Finale.
+	-- Die Id steht in Config/SoundConfig (epilog_music); leer = Studio-Vorschau bzw. stumm.
+	epilog = { id = SoundConfig.SOUNDS.epilog_music.id, file = "music_epilog", volume = SoundConfig.SOUNDS.epilog_music.volume },
 } :: { [string]: MusicDef }
 
 --------------------------------------------------------------------------------
@@ -97,6 +102,24 @@ Audio.SFX = {
 	fx_flash   = { id = "rbxassetid://86716684162177", file = "sfx_fx_flash",   volume = 0.22, cooldown = 0.10, pitch = 0.04 },
 } :: { [string]: SfxDef }
 
+-- 20.10. Final-Epilog (Prompt 7): Ids und Lautstaerken kommen aus Config/SoundConfig.
+-- Epilog-Klaenge senken die Musik NICHT selbst ab (das steuert AudioController.epilogMusic),
+-- darum special ohne duck. epilog_run ist ein Routine-Schritt mit +/- 5 % Tonhoehe.
+do
+	local EPILOG_SFX = {
+		{ "epilog_hit", 0, 0 }, { "epilog_flash", 0, 0 }, { "epilog_rise", 0, 0 }, { "epilog_reveal", 0, 0 },
+		{ "epilog_terminal_idle", 0, 0 }, { "epilog_ready", 0, 0 }, { "epilog_press", 0, 0 },
+		{ "epilog_countdown", 0, 0 }, { "epilog_launch", 0, 0 }, { "epilog_unlock", 0, 0 },
+	}
+	for _, e in EPILOG_SFX do
+		local name = e[1] :: string
+		local cfg = SoundConfig.SOUNDS[name]
+		Audio.SFX[name] = { id = cfg.id, file = "sfx_" .. name, volume = cfg.volume, cooldown = 0, pitch = 0, special = true }
+	end
+	local run = SoundConfig.SOUNDS.epilog_run
+	Audio.SFX.epilog_run = { id = run.id, file = "sfx_epilog_run", volume = run.volume, cooldown = 0.05, pitch = 0.05 }
+end
+
 --------------------------------------------------------------------------------
 -- Feineinstellung
 --------------------------------------------------------------------------------
@@ -121,6 +144,13 @@ Audio.TUNING = {
 	WORLD_PITCH_MAX     = 1.2,
 	-- Speichern: erst nach so langer Ruhe senden (Regler ziehen = viele Werte)
 	SAVE_DELAY_SECONDS  = 0.8,
+	-- Final-Epilog: hoechstens 6 Epilog-Klaenge gleichzeitig; Spielmusik -10 dB (Faktor 0.316),
+	-- Epilog-Musik blendet in 4 s ein, nach dem Finale 2 s zurueck zur Spielmusik.
+	EPILOG_MAX_VOICES   = 6,
+	EPILOG_GAME_DUCK    = 0.316,
+	EPILOG_DUCK_SECONDS = 1.0,
+	EPILOG_FADE_IN      = 4.0,
+	EPILOG_FADE_OUT     = 2.0,
 }
 
 -- Zuordnung "Moment"-Art (UI/Moment) → Klang

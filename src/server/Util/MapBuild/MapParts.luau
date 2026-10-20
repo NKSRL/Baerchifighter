@@ -16,6 +16,7 @@
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local MapMeshes        = require(script.Parent.MapMeshes)
 
 local MapParts = {}
 
@@ -128,7 +129,11 @@ end
 -- exakt gleich hohe Flaechen flimmern in Roblox gegeneinander. Es kollidiert
 -- nicht — die begehbare Flaeche bleibt die Insel darunter, sonst haette die
 -- Wiese alle paar Studs eine 0.08 hohe Stufe.
-function MapParts.newGrassTile(parent: Instance, name: string, cframe: CFrame, sizeX: number, sizeZ: number)
+function MapParts.newGrassTile(parent: Instance, name: string, cframe: CFrame, sizeX: number, sizeZ: number, index: number?)
+	-- Map-Stil V2: Mesh-Kachel (Fallback: der alte Block unten). Variante je Rasterfeld.
+	if MapMeshes.groundTile(parent, name, cframe, sizeX, sizeZ, index or 0) then
+		return
+	end
 	local tile = MapParts.newPart(
 		name,
 		Vector3.new(sizeX, MapConfig.GRASS_HEIGHT, sizeZ),
@@ -178,7 +183,7 @@ function MapParts.buildCheckerDisc(parent: Instance, centerX: number, centerZ: n
 				end
 
 				if inside then
-					MapParts.newGrassTile(parent, "GrassTile", CFrame.new(x, y, z), tile, tile)
+					MapParts.newGrassTile(parent, "GrassTile", CFrame.new(x, y, z), tile, tile, i * 31 + j)
 				end
 			end
 		end
@@ -207,7 +212,7 @@ function MapParts.buildCheckerPlate(parent: Instance, plate: CFrame, sizeX: numb
 			if (i + j) % 2 == 0 then
 				local x = (i - (countX - 1) * 0.5) * stepX
 				local z = (j - (countZ - 1) * 0.5) * stepZ
-				MapParts.newGrassTile(parent, "GrassTile", plate * CFrame.new(x, y, z), stepX, stepZ)
+				MapParts.newGrassTile(parent, "GrassTile", plate * CFrame.new(x, y, z), stepX, stepZ, i * 31 + j)
 			end
 		end
 	end

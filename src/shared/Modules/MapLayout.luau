@@ -118,16 +118,13 @@ end
 
 -- Die Bestenlisten-Tafeln: je Tafel Liste (nil = wechselnd, alter Weg) und Winkel.
 function MapLayout.leaderboardBoards(): { { listId: string?, angleDegrees: number } }
-	if FeatureFlags.isOn("MAP_V2_BOARDS") then
-		local boards = {}
-		for _, b in MapConfig.LEADERBOARD_BOARDS_V2 do
-			if b.flag == nil or FeatureFlags.isOn(b.flag) then
-				table.insert(boards, { listId = b.listId :: string?, angleDegrees = b.angleDegrees })
-			end
+	local boards = {}
+	for _, b in MapConfig.LEADERBOARD_BOARDS_V2 do
+		if b.flag == nil or FeatureFlags.isOn(b.flag) then
+			table.insert(boards, { listId = b.listId :: string?, angleDegrees = b.angleDegrees })
 		end
-		return boards
 	end
-	return { { listId = nil, angleDegrees = MapConfig.LEADERBOARD_BOARD.angleDegrees } }
+	return boards
 end
 
 -- Mitte des Wespen-Nests (Weltkoordinaten).

@@ -28,7 +28,6 @@ local AmbienceConfig = require(ReplicatedStorage.Config.AmbienceConfig)
 local MapConfig      = require(ReplicatedStorage.Config.MapConfig)
 local WorldFXConfig  = require(ReplicatedStorage.Config.WorldFXConfig)
 local MapLayout      = require(ReplicatedStorage.Modules.MapLayout)
-local FeatureFlags   = require(ReplicatedStorage.Config.FeatureFlags)
 
 local WorldFXKit         = require(script.Parent.WorldFXKit)
 local DayCycleController = require(script.Parent.DayCycleController)
@@ -373,7 +372,6 @@ end
 --------------------------------------------------------------------------------
 
 function WaterController.init()
-	if not FeatureFlags.isOn("WORLD_B_WATER") then return end
 	local folder = WorldFXKit.folder("Water", WorldFXKit.root())
 	_folder = folder
 

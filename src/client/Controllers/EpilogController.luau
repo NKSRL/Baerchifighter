@@ -19,6 +19,7 @@
 -- Avatar am Terminal steht.
 
 local Players           = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
 local Workspace         = game:GetService("Workspace")
 local Lighting          = game:GetService("Lighting")
 local GuiService        = game:GetService("GuiService")
@@ -27,7 +28,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local EpilogConfig     = require(ReplicatedStorage.Config.EpilogConfig)
-local SoundConfig      = require(ReplicatedStorage.Config.SoundConfig)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
 local EpilogRoute      = require(ReplicatedStorage.Modules.EpilogRoute)
 local EpilogCameraPath = require(ReplicatedStorage.Modules.EpilogCameraPath)
@@ -71,6 +71,7 @@ type Run = {
 	reduced     : boolean,
 	ended       : boolean,
 	lastClock   : number,
+	stepAt      : number,    -- naechster Schritt-Klang (Sequenzzeit)
 }
 
 local _run: Run? = nil
@@ -145,12 +146,35 @@ local function isNight(): boolean
 	return h < FX.dayFrom or h >= FX.dayTo
 end
 
+-- Spielt einen Epilog-Klang ueber Audio.SFX (Ids/Lautstaerken aus Config/SoundConfig).
+-- Stumm, Effekt-Regler und 6-Stimmen-Limit gelten dort (AudioController.play).
+-- Das Terminal-Modell steht unter dem Plot und traegt das Tag EpilogConfig.TERMINAL.TAG (der Name
+-- ist "Terminal"); gesucht wird das naechste zum Avatar.
+local function nearestTerminal(root: BasePart?): Model?
+	if not root then return nil end
+	local best: Model? = nil
+	local bestDistance = math.huge
+	for _, instance in CollectionService:GetTagged(EpilogConfig.TERMINAL.TAG) do
+		if instance:IsA("Model") then
+			local distance = (instance:GetPivot().Position - root.Position).Magnitude
+			if distance < bestDistance then best, bestDistance = instance, distance end
+		end
+	end
+	return best
+end
+
 local function playCue(name: string)
 	local id = EpilogConfig.CUES[name]
-	if id and SoundConfig.get(id) then
+	if id then
 		AudioController.play(id)
 	end
 end
+
+-- Epilog-Musik: an = Spielmusik -10 dB und Epilog-Spur blendet ein; aus = 2 s zurueck zur Spielmusik.
+-- Beides ist idempotent und wird bei jedem Abbruch (cleanup/endFinale) gegengesteuert.
+local function musicOn() pcall(AudioController.epilogMusic, true) end
+local function musicOff() pcall(AudioController.epilogMusic, false) end
+local watchMusic: () -> () = function() end   -- Waechter, unten definiert (braucht _fin)
 
 local function sequenceTime(run: Run): number
 	return math.max(0, (Workspace:GetServerTimeNow() - run.startAt) * run.speed) + run.jump
@@ -233,6 +257,9 @@ local function cleanup(run: Run, reason: string)
 		c:Disconnect()
 	end
 	table.clear(run.conns)
+	-- Musik: nach regulärem Ende ("done") und beim Wechsel ins Finale ("finale") bleibt sie,
+	-- bei jedem Abbruch (Tod, Respawn, Fehler, neuer Lauf ausser Finale) geht sie sanft aus.
+	if reason ~= "done" and reason ~= "finale" and reason ~= "new_run" then musicOff() end
 
 	-- Kamera zurueck
 	local cam = run.camera
@@ -317,6 +344,12 @@ local function walk(run: Run, t: number)
 	local carrot = EpilogRoute.pointAt(run.route, math.min(run.route.length, progress + 6))
 	hum:MoveTo(v3(carrot))
 	flashPlanks(run, root.Position)
+	-- Schritte auf Holz im Takt 0,28 s (Tonhoehe +/-5 % kommt aus Audio.SFX.epilog_run);
+	-- nur wenn der Avatar wirklich laeuft, und nach einem Skip/Sprung nicht nachholen.
+	if t >= run.stepAt then
+		run.stepAt = math.max(run.stepAt + EpilogConfig.STEP_INTERVAL, t)
+		if root.AssemblyLinearVelocity.Magnitude > 2 then playCue("run") end
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -428,7 +461,10 @@ local function step(run: Run): boolean
 	for i, c in EpilogConfig.CUE_TIMES do
 		if not run.cuesDone[i] and t >= c[1] then
 			run.cuesDone[i] = true
-			playCue(c[2] :: string)
+			-- "run" macht walk() im Schritt-Takt; veraltete Cues (nach Skip/Sprung) bleiben stumm
+			if c[2] ~= "run" and t - c[1] <= EpilogConfig.CUE_LATE_SECONDS then
+				playCue(c[2] :: string)
+			end
 		end
 	end
 	if not run.momentDone and t >= FX.momentAt then
@@ -508,9 +544,11 @@ local function startFull(payload: any)
 		stop = nil, conns = {}, effects = {}, controls = getControls(), controlsOff = false,
 		hidden = hideHud(),
 		skipHeld = nil, skipSent = false, cuesDone = {}, momentDone = false, seenSent = false,
-		planks = {}, reduced = reduced, ended = false, lastClock = os.clock(),
+		planks = {}, reduced = reduced, ended = false, lastClock = os.clock(), stepAt = Q.walkAt,
 	}
 	_run = run
+	musicOn()
+	watchMusic()
 	camera.CameraType = Enum.CameraType.Scriptable
 	setControls(run, true)
 	makeEffects(run)
@@ -540,14 +578,16 @@ local function startRestore(payload: any)
 	local token = tostring(payload.token)
 	EpilogOverlay.flashNow(Q.restoreFlashSeconds, "restore")
 	if payload.state ~= "pending" then return end
+	musicOn()
+	watchMusic()
 	if _restoreWatch then task.cancel(_restoreWatch) end
 	_restoreWatch = task.spawn(function()
 		for _ = 1, 240 do
 			task.wait(0.5)
 			local character = player.Character
 			local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-			local terminal = Workspace:FindFirstChild("Epilog_Terminal", true)
-			if root and terminal and terminal:IsA("Model") then
+			local terminal = nearestTerminal(root :: BasePart?)
+			if root and terminal then
 				if (terminal:GetPivot().Position - (root :: BasePart).Position).Magnitude < Q.arriveRadius * 1.5 then
 					Remotes.EpilogSeen:FireServer(token)
 					return
@@ -590,6 +630,32 @@ type FRun = {
 
 local _fin: FRun? = nil
 
+-- Waechter: steht weder Sequenz noch Finale und der Avatar ist weit weg vom Terminal
+-- (Server-Rueckholung, Teleport, Abbruch), geht die Epilog-Musik sanft aus.
+local _musicWatch: thread? = nil
+watchMusic = function()
+	if _musicWatch then return end
+	_musicWatch = task.spawn(function()
+		local away = 0
+		while true do
+			task.wait(1)
+			if _run == nil and _fin == nil then
+				local character = player.Character
+				local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+				local terminal = nearestTerminal(root :: BasePart?)
+				local near = terminal ~= nil and root ~= nil
+					and (terminal:GetPivot().Position - (root :: BasePart).Position).Magnitude < 160
+				away = if near then 0 else away + 1
+				if away >= 3 then break end
+			else
+				away = 0
+			end
+		end
+		_musicWatch = nil
+		musicOff()
+	end)
+end
+
 local function finaleTime(run: FRun): number
 	return math.max(0, (Workspace:GetServerTimeNow() - run.startAt) * run.speed) + run.jump
 end
@@ -611,6 +677,7 @@ local function endFinale(run: FRun, reason: string, hintSeconds: number?)
 	if run.ended then return end
 	run.ended = true
 	if _fin == run then _fin = nil end
+	musicOff()   -- 2 s sanft zurueck zur Spielmusik (auch bei Abbruch)
 	if run.stop then run.stop() run.stop = nil end
 	for _, c in run.conns do c:Disconnect() end
 	table.clear(run.conns)
@@ -663,7 +730,8 @@ local function finaleStep(run: FRun): boolean
 	-- Countdown 3 ... 2 ... 1 (Terminal zeigt ihn selbst, hier die grosse Zahl am Rand)
 	while run.counted < #FIN.countTimes and f >= FIN.countTimes[run.counted + 1] do
 		run.counted += 1
-		EpilogOverlay.setCountdown(#FIN.countTimes - run.counted + 1)
+		local n = #FIN.countTimes - run.counted + 1
+		EpilogOverlay.setCountdown(n, Loc.t("epilog.finale.count_" .. tostring(math.clamp(n, 1, 3))))
 		playCue("countdown")
 	end
 	if not run.silence and f >= FIN.silenceAt then
@@ -739,6 +807,8 @@ local function startFinale(payload: any)
 		bannerDone = false, returned = false, reduced = reduced, ended = false, lastClock = os.clock(),
 	}
 	_fin = run
+	musicOn()   -- falls die Sequenz uebersprungen/wiederaufgenommen wurde (idempotent)
+	watchMusic()
 	finaleControls(run, true)
 	EpilogOverlay.begin(if reduced then "reduced" else "full")
 	local button = EpilogOverlay.skipButton()
@@ -829,6 +899,7 @@ local function audit(): { [string]: any }
 		walkSpeed = if hum then hum.WalkSpeed else 0,
 		hudVersteckt = (if _run then #_run.hidden else 0) + (if _fin then #_fin.hidden else 0),
 		overlay = EpilogOverlay.audit(),
+		audio = AudioController.epilogAudit(),
 	}
 end
 

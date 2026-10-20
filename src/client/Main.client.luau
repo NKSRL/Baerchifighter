@@ -71,6 +71,7 @@ local GuideController    = require(Controllers:WaitForChild("GuideController"))
 local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintController"))
 local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
 local AreaSignController    = require(Controllers:WaitForChild("AreaSignController"))    -- Sammel-Update 3.8
+local RocketIslandController = require(Controllers:WaitForChild("RocketIslandController"))   -- P4 Raketen-Insel
 local EpilogIslandFX        = require(Controllers:WaitForChild("EpilogIslandFX"))        -- 20.10. Final-Epilog P3: Inseldeko wippt
 local EpilogTerminalController = require(Controllers:WaitForChild("EpilogTerminalController"))   -- 20.10. Final-Epilog P4: Start-Terminal
 local EpilogController = require(Controllers:WaitForChild("EpilogController"))   -- 20.10. Final-Epilog P5: Kamerafahrt
@@ -96,6 +97,7 @@ local AudioPanel       = require(UI:WaitForChild("AudioPanel"))     -- Audio-Rew
 local PetBar           = require(UI:WaitForChild("PetBar"))
 local QuestPanel       = require(UI:WaitForChild("QuestPanel"))
 local QuestTracker     = require(UI:WaitForChild("QuestTracker"))
+local JourneyPanel     = require(UI:WaitForChild("JourneyPanel"))   -- v19 (P3 Reise)
 local HudRow           = require(UI:WaitForChild("HudRow"))
 local EggTreePanel     = require(UI:WaitForChild("EggTreePanel"))
 local LeaderboardPanel = require(UI:WaitForChild("LeaderboardPanel"))
@@ -192,6 +194,8 @@ CurrencyHint.init(screenGui)    -- Sammel-Update 3.4: Waehrungs-Hinweise
 QuestTracker.init(screenGui)
 -- HUD_ROW_V2: Zahnrad · Quests · Shop in einer Zeile (versteckt die Quest-Karte)
 HudRow.init(screenGui)
+-- v19 (P3): Reise-Leiste (Tower-Tutorial), Schalter ONBOARDING_V2
+JourneyPanel.init(screenGui)
 
 -- v12: untere Pet-Leiste (Event / Fight), legt auch den PitResumeDialog an
 PetBar.init(screenGui)
@@ -201,6 +205,7 @@ WorldController.init()
 EggTimerController.init()
 IncubatorController.init()   -- Sammel-Update Paket 8
 AreaSignController.init()    -- Sammel-Update Paket 3.8
+RocketIslandController.init()   -- P4: Schild/Rakete nach eigenem Stand
 EpilogIslandFX.init()        -- 20.10. Final-Epilog Prompt 3 (wippende Inseldeko)
 EpilogTerminalController.init()   -- 20.10. Final-Epilog Prompt 4 (Start-Terminal)
 EpilogController.init()   -- 20.10. Final-Epilog Prompt 5 (Kamerafahrt)

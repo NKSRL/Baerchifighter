@@ -97,6 +97,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "ProfileService",     module = ServerScriptService.Services.ProfileService },
 	{ name = "PlayerBadgeService", module = ServerScriptService.Services.PlayerBadgeService },
 	{ name = "LoginBonusService",  module = ServerScriptService.Services.LoginBonusService },
+	-- v19 (P3): Reise (Etappen-Belohnungen)
+	{ name = "JourneyService",     module = ServerScriptService.Services.JourneyService },
 
 	-- HBB Paket 0: Messpunkte (Onboarding-Trichter, UI-Ereignisse)
 	{ name = "FunnelService",      module = ServerScriptService.Services.FunnelService },
@@ -108,9 +110,6 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "LiveBoardService",   module = ServerScriptService.Services.LiveBoardService },
 	-- HBB Paket 10: Shop (Gratis-Griff, Robux-Goldpakete)
 	{ name = "ShopService",        module = ServerScriptService.Services.ShopService },
-
-	-- Kein Spiel-Service: die Studio-Test-Schnittstelle
-	{ name = "DebugService", module = ServerScriptService.Services.DebugService },
 }
 
 local loaded: { [string]: any } = {}
@@ -131,6 +130,14 @@ for _, entry in REGISTRY do
 	if service.start then
 		service.start()
 	end
+end
+
+-- Kein Spiel-Service: die Studio-Test-Schnittstelle. Im Live-Spiel wird das
+-- Modul (und alles, was es braucht) gar nicht erst geladen.
+if RunService:IsStudio() then
+	local DebugService = require(ServerScriptService.Services.DebugService)
+	DebugService.init()
+	loaded.DebugService = DebugService
 end
 
 --------------------------------------------------------------------------------

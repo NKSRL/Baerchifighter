@@ -27,6 +27,8 @@ local EggConfig      = require(ReplicatedStorage.Config.EggConfig)
 local MapConfig      = require(ReplicatedStorage.Config.MapConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local MapMeshes = require(ServerScriptService.Util.MapBuild.MapMeshes)
+local MapStyleConfig = require(ReplicatedStorage.Config.MapStyleConfig)
 local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 
 local ScenicBuilder = {}
@@ -259,7 +261,13 @@ local function buildMainIslandScenery(parent: Instance, placed: { Placed }, isOn
 		return nil, nil
 	end
 
-	-- Baeume: Stamm + zwei uebereinander gesetzte Kronen-Baelle.
+	-- Map-Stil V2: Varianten/Drehung/Groesse aus eigenem Strom, die Positionen bleiben die alten.
+	local styleOn = MapMeshes.enabled()
+	local treeStream = MapMeshes.stream(1)
+	local bushStream = MapMeshes.stream(2)
+	local rockStream = MapMeshes.stream(3)
+
+	-- Baeume: Stamm + zwei uebereinander gesetzte Kronen-Baelle (Stil V2: ein MeshPart).
 	for i = 1, AmbienceConfig.TREE_COUNT do
 		local x, z = findSpot(7)
 		if x and z then
@@ -267,39 +275,53 @@ local function buildMainIslandScenery(parent: Instance, placed: { Placed }, isOn
 			local scale = random:NextNumber(0.85, 1.25)
 			local trunkHeight = 7 * scale
 
-			pole("TreeTrunk", parent, x, y, z, trunkHeight, 1.8 * scale,
-				AmbienceConfig.TREE_TRUNK_COLOR, Enum.Material.Wood)
-			ball("TreeCrown", parent, Vector3.new(11, 9, 11) * scale,
-				CFrame.new(x, y + trunkHeight + 2.5 * scale, z),
-				canopyColor, Enum.Material.Grass)
-			ball("TreeTop", parent, Vector3.new(7, 6, 7) * scale,
-				CFrame.new(x, y + trunkHeight + 7 * scale, z),
-				canopyColor, Enum.Material.Grass)
+			if not (styleOn and MapMeshes.tree(parent, x, y, z, treeStream, canopyColor)) then
+				pole("TreeTrunk", parent, x, y, z, trunkHeight, 1.8 * scale,
+					AmbienceConfig.TREE_TRUNK_COLOR, Enum.Material.Wood)
+				ball("TreeCrown", parent, Vector3.new(11, 9, 11) * scale,
+					CFrame.new(x, y + trunkHeight + 2.5 * scale, z),
+					canopyColor, Enum.Material.Grass)
+				ball("TreeTop", parent, Vector3.new(7, 6, 7) * scale,
+					CFrame.new(x, y + trunkHeight + 7 * scale, z),
+					canopyColor, Enum.Material.Grass)
+			end
 		end
 	end
 
-	-- Buesche: ein platter Ball.
+	-- Buesche: ein platter Ball (Stil V2: Mesh-Busch).
 	for i = 1, AmbienceConfig.BUSH_COUNT do
 		local x, z = findSpot(3.5)
 		if x and z then
 			local size = random:NextNumber(4, 6.5)
-			ball("Bush", parent, Vector3.new(size, size * 0.65, size),
-				CFrame.new(x, y + size * 0.2, z) * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
-				AmbienceConfig.BUSH_COLORS[random:NextInteger(1, #AmbienceConfig.BUSH_COLORS)],
-				Enum.Material.Grass)
+			local yaw = random:NextNumber(0, math.pi)
+			local bushColor = AmbienceConfig.BUSH_COLORS[random:NextInteger(1, #AmbienceConfig.BUSH_COLORS)]
+			if not (styleOn and MapMeshes.bush(parent, "Bush", "bush", x, y, z, size, yaw, bushStream, bushColor)) then
+				ball("Bush", parent, Vector3.new(size, size * 0.65, size),
+					CFrame.new(x, y + size * 0.2, z) * CFrame.Angles(0, yaw, 0),
+					bushColor, Enum.Material.Grass)
+			end
 		end
 	end
 
-	-- Felsen: plattgedrueckte, verdrehte Baelle.
+	-- Felsen: plattgedrueckte, verdrehte Baelle (Stil V2: Rand-Fels, jeder n-te mit Kristall).
+	local rockIndex = 0
 	for i = 1, AmbienceConfig.ROCK_COUNT do
 		local x, z = findSpot(3.5)
 		if x and z then
 			local size = random:NextNumber(3, 6)
-			ball("Rock", parent, Vector3.new(size, size * 0.6, size * random:NextNumber(0.7, 1.1)),
-				CFrame.new(x, y + size * 0.12, z)
-					* CFrame.Angles(random:NextNumber(-0.2, 0.2), random:NextNumber(0, math.pi * 2), random:NextNumber(-0.2, 0.2)),
-				AmbienceConfig.ROCK_COLORS[random:NextInteger(1, #AmbienceConfig.ROCK_COLORS)],
-				Enum.Material.Slate)
+			local depth = size * random:NextNumber(0.7, 1.1)
+			local tiltX = random:NextNumber(-0.2, 0.2)
+			local yaw   = random:NextNumber(0, math.pi * 2)
+			local tiltZ = random:NextNumber(-0.2, 0.2)
+			local rockColor = AmbienceConfig.ROCK_COLORS[random:NextInteger(1, #AmbienceConfig.ROCK_COLORS)]
+			rockIndex += 1
+			local withCrystal = rockIndex % MapStyleConfig.CRYSTAL_EVERY == 0
+			if not (styleOn and MapMeshes.rock(parent, "Rock", "rock", x, y, z, size,
+				CFrame.Angles(tiltX, yaw, tiltZ), rockStream, rockColor, withCrystal)) then
+				ball("Rock", parent, Vector3.new(size, size * 0.6, depth),
+					CFrame.new(x, y + size * 0.12, z) * CFrame.Angles(tiltX, yaw, tiltZ),
+					rockColor, Enum.Material.Slate)
+			end
 		end
 	end
 
@@ -325,6 +347,9 @@ end
 -- und der Gebaeude. Die Stegachse (zur Mitte und zur Arena) bleibt frei.
 local function buildPlotRims(parent: Instance)
 	local random = Random.new(AmbienceConfig.SCENERY_SEED + 1)
+	local styleOn = MapMeshes.enabled()
+	local rimBushStream = MapMeshes.stream(4)
+	local rimRockStream = MapMeshes.stream(5)
 	local y = MapConfig.PLATFORM_TOP_Y
 
 	for slot = 1, MapConfig.PLOT_COUNT do
@@ -350,16 +375,22 @@ local function buildPlotRims(parent: Instance)
 
 				if placedCount % 2 == 0 then
 					local size = random:NextNumber(2.4, 3.6)
-					ball("RimRock", parent, Vector3.new(size, size * 0.6, size),
-						CFrame.new(x, y + size * 0.1, z) * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
-						AmbienceConfig.ROCK_COLORS[random:NextInteger(1, #AmbienceConfig.ROCK_COLORS)],
-						Enum.Material.Slate)
+					local yaw = random:NextNumber(0, math.pi)
+					local rockColor = AmbienceConfig.ROCK_COLORS[random:NextInteger(1, #AmbienceConfig.ROCK_COLORS)]
+					if not (styleOn and MapMeshes.rock(parent, "RimRock", "rimRock", x, y, z, size,
+						CFrame.Angles(0, yaw, 0), rimRockStream, rockColor, false)) then
+						ball("RimRock", parent, Vector3.new(size, size * 0.6, size),
+							CFrame.new(x, y + size * 0.1, z) * CFrame.Angles(0, yaw, 0),
+							rockColor, Enum.Material.Slate)
+					end
 				else
 					local size = random:NextNumber(2.6, 3.8)
-					ball("RimBush", parent, Vector3.new(size, size * 0.7, size),
-						CFrame.new(x, y + size * 0.2, z),
-						AmbienceConfig.BUSH_COLORS[random:NextInteger(1, #AmbienceConfig.BUSH_COLORS)],
-						Enum.Material.Grass)
+					local bushColor = AmbienceConfig.BUSH_COLORS[random:NextInteger(1, #AmbienceConfig.BUSH_COLORS)]
+					if not (styleOn and MapMeshes.bush(parent, "RimBush", "rimBush", x, y, z, size,
+						rimBushStream:NextNumber(0, math.pi * 2), rimBushStream, bushColor)) then
+						ball("RimBush", parent, Vector3.new(size, size * 0.7, size),
+							CFrame.new(x, y + size * 0.2, z), bushColor, Enum.Material.Grass)
+					end
 				end
 				placedCount += 1
 			end
@@ -373,14 +404,7 @@ end
 
 -- `isOnLane` kommt von WorldBuilder (isOnBridgeLane); als Parameter statt
 -- require, damit die beiden Module sich nicht gegenseitig laden.
-function ScenicBuilder.build(platform: Instance, isOnLane: (Vector3, number) -> boolean)
-	if platform:FindFirstChild("Scenery") then
-		return   -- schon gebaut
-	end
-
-	local folder = Instance.new("Folder")
-	folder.Name = "Scenery"
-
+local function buildAll(folder: Folder, isOnLane: (Vector3, number) -> boolean)
 	local placed: { Placed } = {}
 
 	buildSeabed(folder)
@@ -399,8 +423,44 @@ function ScenicBuilder.build(platform: Instance, isOnLane: (Vector3, number) -> 
 	buildBridgePosts(folder)
 	buildMainIslandScenery(folder, placed, isOnLane)
 	buildPlotRims(folder)
+end
 
+function ScenicBuilder.build(platform: Instance, isOnLane: (Vector3, number) -> boolean)
+	if platform:FindFirstChild("Scenery") then
+		return   -- schon gebaut
+	end
+
+	local folder = Instance.new("Folder")
+	folder.Name = "Scenery"
+	buildAll(folder, isOnLane)
 	folder.Parent = platform
+end
+
+-- Nur Studio-Debug (D:Invoke("mapstyle")): tauscht Baeume/Buesche/Felsen nach dem Schalter
+-- MAP_STYLE_V2 aus, ohne den Ordner "Scenery" neu anzulegen (Client-Controller halten ihn).
+-- Die ganze Deko wird in einen Wegwerf-Ordner gebaut (gleicher Seed = gleiche Positionen)
+-- und nur die Vegetations-Teile wandern in den echten Ordner.
+function ScenicBuilder.restyle(platform: Instance, isOnLane: (Vector3, number) -> boolean): number
+	local scenery = platform:FindFirstChild("Scenery")
+	if not scenery then return 0 end
+
+	for _, child in scenery:GetChildren() do
+		if MapMeshes.VEGETATION_NAMES[child.Name] then
+			child:Destroy()
+		end
+	end
+
+	local temp = Instance.new("Folder")
+	buildAll(temp, isOnLane)
+	local moved = 0
+	for _, child in temp:GetChildren() do
+		if MapMeshes.VEGETATION_NAMES[child.Name] then
+			child.Parent = scenery
+			moved += 1
+		end
+	end
+	temp:Destroy()
+	return moved
 end
 
 return ScenicBuilder

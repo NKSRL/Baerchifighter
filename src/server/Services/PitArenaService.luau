@@ -63,7 +63,6 @@ local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 local MapConfig   = require(ReplicatedStorage.Config.MapConfig)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 local SkillConfig = require(ReplicatedStorage.Config.SkillConfig)
@@ -92,10 +91,10 @@ local LOCK_HOLDER = "Kampf"
 
 local PitArenaService = {}
 
--- HBB Paket 5 (MAP_V2_ARENA_SPRINT): auf dem Weg Plot <-> Arena sprintet der
--- Baerchi (MapConfig.ARENA_WALK_SPEED) statt zu gehen — weniger Warten je Lauf.
+-- HBB Paket 5: auf dem Weg Plot <-> Arena sprintet der Baerchi
+-- (MapConfig.ARENA_WALK_SPEED) statt zu gehen — weniger Warten je Lauf.
 local function arenaWalkSpeed(): number
-	return if FeatureFlags.isOn("MAP_V2_ARENA_SPRINT") then MapConfig.ARENA_WALK_SPEED else MapConfig.WALK_SPEED
+	return MapConfig.ARENA_WALK_SPEED
 end
 
 -- Gleich viele Hopser pro SEKUNDE wie beim Gehen, dafuer weitere: schnelleres

@@ -588,7 +588,9 @@ local function onUnlocked(towerId: string)
 	Notify.emit("tower_unlocked", function()
 		Toast.success(Loc.t("msg.tower_unlocked", { tower = towerName(towerId) }))
 	end, function()
-		Moment.show("tower_unlocked", def.color, "ui.moment.tower_unlocked")
+		-- 20.10. Final-Epilog: Endless oeffnet nach dem Sieg mit eigenem Text (Schalter aus = wie bisher)
+		local key = if towerId == "Endless" and FeatureFlags.isOn("FINAL_EPILOG") then "ui.moment.endless_open" else "ui.moment.tower_unlocked"
+		Moment.show("tower_unlocked", def.color, key)
 	end)
 	local view = _cards[towerId]
 	local window = _window
