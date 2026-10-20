@@ -88,7 +88,7 @@ MapStyleConfig.FOLIAGE_TINT = Color3.fromRGB(176, 196, 160)
 -- Inselboden (Hauptinsel): Noppen-Muster der Classic Baseplate auf der runden Scheibe.
 MapStyleConfig.STUD_GROUND = {
 	COLOR = Color3.fromRGB(84, 168, 76),
-	TEXTURE = "rbxassetid://9111382216", -- Baseplate-Boden (Wunsch 20.10.)
+	TEXTURE = "rbxassetid://6372755229",
 	TILE = 8,
 	TRANSPARENCY = 0.55,
 	TEXTURE_COLOR = Color3.new(0.2, 0.2, 0.2),
@@ -97,17 +97,17 @@ MapStyleConfig.STUD_GROUND = {
 -- Old-School-Boden (P1): echte Roblox-Noppen (TopSurface = Studs) auf einem Block-Raster.
 -- Zylinder "Ground" darunter bekommt dieselbe Farbe und fuellt den runden Rand.
 MapStyleConfig.GROUND = {
-	COLOR = Color3.fromRGB(84, 150, 76), -- Wiesengruen, leicht gedaempft
-	ALT_TON = 0.04, -- +-4 % Helligkeit im Schachbrett der groessten Kacheln (0 = aus)
+	COLOR = Color3.fromRGB(99, 95, 98), -- Classic-Baseplate-Grau (Asset 9111382216: Plastic, TopSurface Studs)
+	ALT_TON = 0, -- +-Helligkeit im Schachbrett der groessten Kacheln (0 = aus; Baseplate ist einfarbig)
 	LEVELS = { 40, 20, 10 }, -- Kantenlaengen grob -> fein (jede teilt die vorige)
 	MARGIN = 1, -- Abstand der Block-Ecken zum Inselrand
 	THICKNESS = 1,
 	LIFT = 0.05, -- Oberkante knapp ueber dem Zylinder (kein Z-Fighting)
 	MAX_PARTS = 120,
-	-- Baseplate-Textur auf der Deckflaeche jedes Blocks (statt Studs-Oberflaeche).
-	-- TILE 10 = Kantenlaenge der kleinsten Kachel, damit die Naht auf Blockkanten faellt.
-	-- TEXTURE = "" schaltet zurueck auf die echten Studs.
-	TEXTURE = "rbxassetid://9111382216",
+	-- Die Classic Baseplate (Asset 9111382216) ist ein MODELL: ein Plastic-Block mit
+	-- TopSurface = Studs, keine Textur. Darum echte Studs (TEXTURE = ""). Ein Bild
+	-- aus einer Textur-ID hier einzutragen legt es stattdessen als Texture auf die Deckflaeche.
+	TEXTURE = "",
 	TILE = 10,
 }
 MapStyleConfig.CRYSTAL_COLORS = { Color3.fromRGB(80, 224, 204), Color3.fromRGB(184, 146, 238) }

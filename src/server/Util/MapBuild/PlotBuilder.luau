@@ -19,6 +19,8 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
+local MapStyleConfig   = require(ReplicatedStorage.Config.MapStyleConfig)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc       = require(ReplicatedStorage.Localization.Loc)
@@ -417,6 +419,15 @@ function PlotBuilder.buildPlotBase(slot: number, owner: Player): Model
 	base.CanCollide = true
 	base.Parent     = model
 
+	-- Old-School-Boden (P1): das Beet ist selbst die Baseplate (Plastic, grau, echte
+	-- Noppen). Ohne diese Zeilen deckt das Gras-Beet samt Karos den Noppen-Boden zu.
+	local studBed = FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and not MapStyleConfig.STUD_GROUND.MODERN
+	if studBed then
+		base.Material   = Enum.Material.Plastic
+		base.Color      = MapStyleConfig.GROUND.COLOR
+		base.TopSurface = Enum.SurfaceType.Studs
+	end
+
 	-- Steinerne Garten-Terrassenkante rund um das 72x72-Beet (vorne und hinten
 	-- in der Mitte fuer Steg und Torbogen offen gelassen, damit keine Stufe entsteht).
 	local halfX     = MapConfig.PLOT_SIZE.X * 0.5
@@ -455,12 +466,14 @@ function PlotBuilder.buildPlotBase(slot: number, owner: Player): Model
 		end
 	end
 
-	MapParts.buildCheckerPlate(
-		model,
-		plotCFrame * CFrame.new(0, MapConfig.PLOT_SIZE.Y, 0),
-		MapConfig.PLOT_SIZE.X,
-		MapConfig.PLOT_SIZE.Z
-	)
+	if not studBed then
+		MapParts.buildCheckerPlate(
+			model,
+			plotCFrame * CFrame.new(0, MapConfig.PLOT_SIZE.Y, 0),
+			MapConfig.PLOT_SIZE.X,
+			MapConfig.PLOT_SIZE.Z
+		)
+	end
 
 	model.PrimaryPart = base
 
