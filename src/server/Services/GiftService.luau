@@ -20,7 +20,7 @@ local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 
-local STORE_NAME   = "EggGifts_v1"
+local STORE_NAME   = "EggGifts_v2"
 local POLL_SECONDS = 30
 local MAX_PER_GIFT = 100
 local CRYSTAL_KEY  = "HoneyCrystal" -- Geschenk-Typ fuer Honey Crystals (goldGummies)

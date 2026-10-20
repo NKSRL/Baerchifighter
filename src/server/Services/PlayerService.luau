@@ -40,7 +40,7 @@ local SessionLock     = require(ServerScriptService.Util.SessionLock)
 -- Konstanten
 --------------------------------------------------------------------------------
 
-local DATA_STORE_NAME = "PlayerData_v1"
+local DATA_STORE_NAME = "PlayerData_v2"   -- 20.10.: Reset aller Spielstaende (v1 bleibt unangetastet im DataStore, Namen zurueckstellen = Wiederherstellung)
 -- v1 im Namen: wenn wir das Schema brechen, wird es v2 und alte Daten
 -- werden nicht mehr geladen (sauberer als Migration fuer early dev).
 -- Nicht-brechende Feld-Ergaenzungen laufen ueber

@@ -31,11 +31,11 @@ end
 -- Name des OrderedDataStores je Liste. Versions-Suffix, damit eine spaetere
 -- Umstellung der Wertformel mit leeren Listen startet statt mit Altwerten.
 LeaderboardConfig.STORE_NAMES = {
-	Tower      = "LB_Tower_v1",
-	Rebirths   = "LB_Rebirths_v1",
-	Collection = "LB_Collection_v1",
-	Endless    = "LB_Endless_v1",
-	EndlessWeek = "LB_EndlessWeek_v1_W",   -- + Wochennummer (storeName)
+	Tower      = "LB_Tower_v2",
+	Rebirths   = "LB_Rebirths_v2",
+	Collection = "LB_Collection_v2",
+	Endless    = "LB_Endless_v2",
+	EndlessWeek = "LB_EndlessWeek_v2_W",   -- + Wochennummer (storeName)
 } :: { [string]: string }
 
 -- Paket 9: Wochen. Woche 0 begann Montag, 05.01.1970 00:00 UTC (os.time 0

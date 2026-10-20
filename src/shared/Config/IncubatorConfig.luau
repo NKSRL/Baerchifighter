@@ -65,7 +65,7 @@ IncubatorConfig.BREED_FIGURE_HEIGHT = 3.2
 -- dem Beet links hinten. Teile je Stufe: siehe Config/IncubatorModels
 -- (hoechstens PART_BUDGET).
 IncubatorConfig.LOOK = {
-	offset       = Vector3.new(-20, 0, 20),
+	offset       = Vector3.new(-20, 0.25, 20), -- 0.25 hoch: Glow-Scheibe liegt sonst in der Ebene der Beet-Platten (Z-Fighting)
 	signDistance = 80,
 	yaw          = -90, -- Grad: dreht Sockel, Kuppel und Ohren; die Baerchi-Figur darin behaelt ihre Blickrichtung (rosa Ohr-Innenseite zeigt nach vorn)
 }
