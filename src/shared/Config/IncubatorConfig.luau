@@ -67,7 +67,7 @@ IncubatorConfig.BREED_FIGURE_HEIGHT = 3.2
 IncubatorConfig.LOOK = {
 	offset       = Vector3.new(-20, 0, 20),
 	signDistance = 80,
-	yaw          = 90, -- Grad: dreht Sockel, Kuppel und Ohren; die Baerchi-Figur darin behaelt ihre Blickrichtung
+	yaw          = -90, -- Grad: dreht Sockel, Kuppel und Ohren; die Baerchi-Figur darin behaelt ihre Blickrichtung (rosa Ohr-Innenseite zeigt nach vorn)
 }
 IncubatorConfig.PART_BUDGET = 20
 

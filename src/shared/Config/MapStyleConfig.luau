@@ -101,11 +101,12 @@ MapStyleConfig.GROUND = {
 	ALT_TON = 0.11, -- jedes zweite Feld im Schachbrett um so viel dunkler (0 = aus): gibt dem Boden Tiefe
 	PLOT_COLOR = Color3.fromRGB(76, 144, 66), -- eigener Plot: allgemein dunkler als die Hauptinsel
 	PLOT_TILE = 9, -- Kantenlaenge der Schachbrett-Felder auf dem Beet (72 = 8 x 9)
-	LEVELS = { 40, 20, 10 }, -- Kantenlaengen grob -> fein (jede teilt die vorige)
+	LEVELS = { 20, 10 }, -- Hauptinsel: Kantenlaengen grob -> fein (jede teilt die vorige); 20 = Schachbrett-Feld
+	PLOT_LEVELS = { 40, 20, 10 }, -- Plot-Inseln: der Rand ums Beet darf grober sein
 	MARGIN = 1, -- Abstand der Block-Ecken zum Inselrand
 	THICKNESS = 1,
 	LIFT = 0.05, -- Oberkante knapp ueber dem Zylinder (kein Z-Fighting)
-	MAX_PARTS = 120,
+	MAX_PARTS = 260,
 	-- Die Classic Baseplate (Asset 9111382216) ist ein MODELL: ein Plastic-Block mit
 	-- TopSurface = Studs, keine Textur. Darum echte Studs (TEXTURE = ""). Ein Bild
 	-- aus einer Textur-ID hier einzutragen legt es stattdessen als Texture auf die Deckflaeche.

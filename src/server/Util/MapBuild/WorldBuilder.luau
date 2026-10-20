@@ -550,7 +550,7 @@ function WorldBuilder.buildPlatform()
 		if FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and MapMeshes.enabled() then
 			MapMeshes.groundOldschool(model, plotIsland, {
 				center = center, radius = MapConfig.PLOT_ISLAND_RADIUS,
-				folderName = "PlotGroundStuds_" .. slot, color = MapStyleConfig.GROUND.PLOT_COLOR,
+				folderName = "PlotGroundStuds_" .. slot, color = MapStyleConfig.GROUND.PLOT_COLOR, levels = MapStyleConfig.GROUND.PLOT_LEVELS,
 			})
 		end
 
