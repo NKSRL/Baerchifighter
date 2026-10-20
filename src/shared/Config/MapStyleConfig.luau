@@ -97,7 +97,7 @@ MapStyleConfig.STUD_GROUND = {
 -- Old-School-Boden (P1): echte Roblox-Noppen (TopSurface = Studs) auf einem Block-Raster.
 -- Zylinder "Ground" darunter bekommt dieselbe Farbe und fuellt den runden Rand.
 MapStyleConfig.GROUND = {
-	COLOR = Color3.fromRGB(99, 95, 98), -- Classic-Baseplate-Grau (Asset 9111382216: Plastic, TopSurface Studs)
+	COLOR = Color3.fromRGB(96, 170, 84), -- Baseplate-Noppen in Gruen: zwischen Wiesengruen (84,150,76) und hellem Gruen
 	ALT_TON = 0, -- +-Helligkeit im Schachbrett der groessten Kacheln (0 = aus; Baseplate ist einfarbig)
 	LEVELS = { 40, 20, 10 }, -- Kantenlaengen grob -> fein (jede teilt die vorige)
 	MARGIN = 1, -- Abstand der Block-Ecken zum Inselrand
