@@ -391,6 +391,10 @@ export type IncubatorData = {
 	-- im Takt ihrer Rarity zusaetzliche Eier bruehten. Optional, damit alte
 	-- Staende ohne das Feld gueltig bleiben (PlayerMigration fuellt es).
 	breeders : { IncubatorBreeder }?,
+	-- 15.10. Solo-Inkubator: im Inkubator gesammelte Eier (Sorte -> Anzahl).
+	-- Level 1..4 (IncubatorConfig.LEVELS), bleibt beim Rebirth. Optional, damit
+	-- alte Staende ohne das Feld gueltig bleiben (IncubatorRules.storedOf).
+	stored : { [string]: number }?,
 }
 
 -- INCUBATOR_BREED: ein belegter Platz mit Baerchi. `lastEggAt` ist die
@@ -526,6 +530,19 @@ export type ShopView = {
 	freeGold   : number,
 }
 
+-- v18 (Final-Epilog): Fortschritt der Epilog-Sequenz nach Final 100. Nur der
+-- Server schreibt. none -> pending -> seen -> launched (Config/EpilogConfig).
+export type EpilogState = {
+	state       : string,   -- "none" | "pending" | "seen" | "launched"
+	firstClearAt : number?, -- Unix-Zeit des ersten Final-100-Siegs
+	launchedAt   : number?, -- Unix-Zeit des Knopfdrucks
+}
+
+-- v18: freigeschaltete Welten (heute nur World2).
+export type WorldsState = {
+	unlocked : { [string]: boolean },
+}
+
 export type PlayerData = {
 	-- Schema
 	version    : number,   -- fuer Migrationen beim Laden alter Daten
@@ -595,6 +612,10 @@ export type PlayerData = {
 	-- v15: Tower-Rekorde und Meilensteine (ueberleben Rebirths)
 	towers : TowerState,
 
+	-- v18: Final-Epilog und freigeschaltete Welten
+	epilog : EpilogState,
+	worlds : WorldsState,
+
 	-- v15: taeglicher Login-Bonus
 	daily : DailyState,
 
@@ -632,6 +653,8 @@ export type PlayerDataUpdate = {
 	quests       : QuestView,
 	eggTree      : EggTreeState,   -- v14
 	towers       : TowerState,     -- v15
+	epilog       : EpilogState?,   -- v18 (nur lesen; Token kommt ueber EpilogStart)
+	worlds       : WorldsState?,   -- v18
 	daily        : DailyView,      -- v15
 	-- HBB Paket 2: fuer Fuehrung und Freischaltung (rein lesend im Client)
 	stats        : { [string]: number }?,
@@ -692,6 +715,7 @@ export type FightBeat = {
 	enemyHp : number,    -- HP des Gegners nach dem Zug (0..1)
 	charge  : number,    -- Ladestand der Faehigkeit des Baerchis (0..1)
 	skillId : string?,   -- bei "skill"/"burst"
+	bonus   : boolean?,  -- Finisher/Opener hat gegriffen (nur Optik der Show)
 }
 
 -- Eine bestandene (oder verlorene) Stage innerhalb eines PIT-Laufs.
@@ -945,6 +969,7 @@ export type PlayerProfileCard = {
 	rebirths     : number,
 	indexCount   : number,
 	indexTotal   : number,
+	world2       : boolean?,   -- 20.10. Final-Epilog P6: Welt 2 freigeschaltet
 	top          : { ProfileBaerchi },
 }
 
@@ -1038,7 +1063,11 @@ local function createDefaultPlayerData(): PlayerData
 		-- v17 (08.10., Tower-Terminal): towers.unlocked. Die Migration RECHNET
 		-- die alte Rebirth-Regel in Freischaltungen um (Bestandsschutz) und
 		-- darf das nur einmal — deshalb Sprung.
-		version    = 17,  -- v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v18 (20.10., Final-Epilog): epilog { state, firstClearAt, launchedAt }
+		-- und worlds { unlocked }. Die Migration setzt fuer Spieler mit Final-
+		-- Rekord >= 100 "pending" (Epilog nachholen) — das haengt am Rekord, nicht
+		-- nur am fehlenden Feld, deshalb Sprung.
+		version    = 18,  -- v18: Final-Epilog, v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -1081,7 +1110,7 @@ local function createDefaultPlayerData(): PlayerData
 			pitRefund     = 0,
 
 			stageBest = {},                       -- v16: Paket 4.1
-			incubator = { level = 1, slots = {}, breeders = {} },  -- v16: Paket 8
+			incubator = { level = 1, slots = {}, breeders = {}, stored = {} },  -- v16: Paket 8, 15.10. Solo
 		},
 
 		stats = {
@@ -1120,6 +1149,9 @@ local function createDefaultPlayerData(): PlayerData
 			selected     = "I",
 			unlocked     = { I = true },   -- v17
 		},
+
+		epilog = { state = "none" },        -- v18
+		worlds = { unlocked = {} },         -- v18
 
 		daily = {
 			lastClaimDay = 0,

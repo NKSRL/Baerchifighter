@@ -3,14 +3,14 @@
 -- StarterPlayerScripts/Controllers/IncubatorController.luau
 --
 -- Einzige Zustaendigkeit:
---   - Den Inkubator auf dem EIGENEN Plot lebendig machen (Sammel-Update
---     05.10., Paket 8): Prompt "Inkubator" am Sockel, ueber jeder belegten
---     Kuppel ein Fortschrittsbalken mit Restzeit, Leuchten kurz vor dem
---     Schluepfen und solange das Ei fertig ist.
+--   - Den Solo-Inkubator auf dem EIGENEN Plot lebendig machen (15.10.2026):
+--     Prompt am Stumpf (oeffnet das Fenster) und ein Schild ueber der Kuppel
+--     mit Name und Chancen des Baerchis, Zeit bis zum naechsten Ei und dem
+--     Fuellstand des Lagers ("5 / 12").
 --
--- Rein clientseitig aus den Attributen der Kuppeln (StartedAt/FinishAt, siehe
--- IncubatorBuilder) — dasselbe Zeitmarken-Prinzip wie EggTimerController:
--- kein Server-Takt pro Ei, kein zusaetzliches Remote. "Jetzt" ist
+-- Rein clientseitig aus den Attributen der Kuppel (BreederUid, LastEggAt,
+-- BreedSeconds, Stored, Capacity, siehe IncubatorBuilder) — Zeitmarken-
+-- Prinzip wie EggTimerController: kein Server-Takt, kein Remote. "Jetzt" ist
 -- workspace:GetServerTimeNow() (die Marken sind os.time() des Servers).
 
 local Players           = game:GetService("Players")
@@ -18,24 +18,28 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 
 local Loc             = require(ReplicatedStorage.Localization.Loc)
-local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
+local Names           = require(ReplicatedStorage.Localization.Names)
 local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
+local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
+local EggCalculator   = require(ReplicatedStorage.Modules.EggCalculator)
 
 local PanelManager = require(script.Parent.Parent.UI.PanelManager)
 local ClientState  = require(script.Parent.ClientState)
-local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
-local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
-local EggCalculator = require(ReplicatedStorage.Modules.EggCalculator)
 
 local IncubatorController = {}
 
 local OWNER_ATTRIBUTE = "PlotOwner"
 local TICK_SECONDS    = 0.5
-local BAR_COLOR       = Color3.fromRGB(120, 230, 140)
-local READY_COLOR     = Color3.fromRGB(255, 220, 90)
+local OK_COLOR        = Color3.fromRGB(120, 230, 140)
+local FULL_COLOR      = Color3.fromRGB(255, 220, 90)
+local MAX_ODDS_LINES  = 3
 
-type DomeView = { dome: BasePart, gui: BillboardGui, fill: Frame, text: TextLabel, light: PointLight }
+type DomeView = {
+	dome: BasePart, gui: BillboardGui,
+	title: TextLabel, odds: TextLabel, timer: TextLabel, stored: TextLabel,
+	key: string,
+}
 local _views: { [BasePart]: DomeView } = {}
 
 local function isOwnPlot(instance: Instance): boolean
@@ -50,165 +54,76 @@ local function isOwnPlot(instance: Instance): boolean
 	return false
 end
 
+local function label(parent: Instance, name: string, y: number, h: number, color: Color3): TextLabel
+	local l = Instance.new("TextLabel")
+	l.Name = name
+	l.Position = UDim2.fromScale(0, y)
+	l.Size = UDim2.fromScale(1, h)
+	l.BackgroundTransparency = 1
+	l.Font = Enum.Font.FredokaOne
+	l.TextScaled = true
+	l.TextColor3 = color
+	l.TextStrokeTransparency = 0.2
+	l.Text = ""
+	l.Parent = parent
+	return l
+end
+
 local function attachView(dome: BasePart)
 	if _views[dome] then return end
-
 	local gui = Instance.new("BillboardGui")
-	gui.Name        = "IncubatorProgress"
-	gui.Size        = UDim2.fromScale(4.4, 1.2)
-	gui.StudsOffset = Vector3.new(0, dome.Size.Y * 0.5 + 1.0, 0)
+	gui.Name        = "IncubatorInfo"
+	gui.Size        = UDim2.fromScale(8, 5.6)
+	gui.StudsOffset = Vector3.new(0, dome.Size.Y * 0.5 + 4.2, 0)   -- ueber den Ohren
 	gui.MaxDistance = IncubatorConfig.LOOK.signDistance
-	gui.AlwaysOnTop = false
+	gui.AlwaysOnTop = true
 	gui.Adornee     = dome
-	gui.Enabled     = false
 	gui.Parent      = dome
 
-	local track = Instance.new("Frame")
-	track.Name = "Track"
-	track.Size = UDim2.fromScale(1, 0.38)
-	track.Position = UDim2.fromScale(0, 0.62)
-	track.BackgroundColor3 = Color3.fromRGB(30, 26, 46)
-	track.BorderSizePixel = 0
-	track.Parent = gui
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent = track
-
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.Size = UDim2.fromScale(0, 1)
-	fill.BackgroundColor3 = BAR_COLOR
-	fill.BorderSizePixel = 0
-	fill.Parent = track
-	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(0.5, 0)
-	fillCorner.Parent = fill
-
-	local text = Instance.new("TextLabel")
-	text.Name = "Time"
-	text.Size = UDim2.fromScale(1, 0.6)
-	text.BackgroundTransparency = 1
-	text.Font = Enum.Font.FredokaOne
-	text.TextScaled = true
-	text.TextColor3 = Color3.new(1, 1, 1)
-	text.TextStrokeTransparency = 0.2
-	text.Text = ""
-	text.Parent = gui
-
-	local light = Instance.new("PointLight")
-	light.Name = "ReadyGlow"
-	light.Color = READY_COLOR
-	light.Range = 9
-	light.Brightness = 0
-	light.Parent = dome
-
-	_views[dome] = { dome = dome, gui = gui, fill = fill, text = text, light = light }
-end
-
-local function update(view: DomeView, now: number)
-	local dome = view.dome
-	local eggType = dome:GetAttribute("EggType")
-	local startedAt = dome:GetAttribute("StartedAt")
-	local finishAt = dome:GetAttribute("FinishAt")
-	if typeof(eggType) ~= "string" or eggType == "" or typeof(startedAt) ~= "number" or typeof(finishAt) ~= "number" then
-		view.gui.Enabled = false
-		view.light.Brightness = 0
-		return
-	end
-
-	view.gui.Enabled = true
-	local total = math.max(1, finishAt - startedAt)
-	local left = math.max(0, finishAt - now)
-	local share = math.clamp(1 - left / total, 0, 1)
-	view.fill.Size = UDim2.fromScale(share, 1)
-	if left <= 0 then
-		view.text.Text = "✔ " .. Loc.t("ui.incubator.ready")
-		view.fill.BackgroundColor3 = READY_COLOR
-		-- Fertig: pulsierendes Leuchten, damit man es vom anderen Ende des Plots sieht
-		view.light.Brightness = 1.5 + math.sin(os.clock() * 4) * 0.8
-	else
-		view.text.Text = Loc.formatDuration(math.ceil(left))
-		view.fill.BackgroundColor3 = BAR_COLOR
-		view.light.Brightness = if left <= IncubatorConfig.GLOW_LAST_SECONDS then 1 else 0
-	end
-end
-
---------------------------------------------------------------------------------
--- INCUBATOR_BREED: Schild ueber einem Platz mit Baerchi
---------------------------------------------------------------------------------
--- Wunsch Projektinhaber 05.10.: "Der Baerchi zeigt im Inkubator an, mit
--- welcher Wahrscheinlichkeit welches Ei gebruetet wird." Name, die Chancen
--- (nach EggTree.resolveLaid zusammengefasst — gesperrte Eier rutschen auf den
--- freien Vorgaenger, genau wie beim Server) und die Zeit bis zum naechsten Ei.
-
-local BREED_MAX_LINES = 4
-
-type BreedView = { dome: BasePart, gui: BillboardGui, title: TextLabel, odds: TextLabel, timer: TextLabel, key: string }
-local _breedViews: { [BasePart]: BreedView } = {}
-
-local function breedLabel(parent: Instance, name: string, y: number, h: number, color: Color3): TextLabel
-	local label = Instance.new("TextLabel")
-	label.Name = name
-	label.Position = UDim2.fromScale(0, y)
-	label.Size = UDim2.fromScale(1, h)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = color
-	label.TextStrokeTransparency = 0.2
-	label.Text = ""
-	label.Parent = parent
-	return label
-end
-
-local function attachBreedView(dome: BasePart)
-	if _breedViews[dome] then return end
-	local gui = Instance.new("BillboardGui")
-	gui.Name        = "BreederInfo"
-	gui.Size        = UDim2.fromScale(7, 5)
-	gui.StudsOffset = Vector3.new(0, dome.Size.Y * 0.5 + 3.2, 0)
-	gui.MaxDistance = IncubatorConfig.LOOK.signDistance
-	gui.AlwaysOnTop = false
-	gui.Adornee     = dome
-	gui.Enabled     = false
-	gui.Parent      = dome
-
-	local title = breedLabel(gui, "Title", 0, 0.24, Color3.new(1, 1, 1))
-	local odds = breedLabel(gui, "Odds", 0.25, 0.55, Color3.fromRGB(255, 240, 200))
+	local title  = label(gui, "Title", 0, 0.2, Color3.new(1, 1, 1))
+	local odds   = label(gui, "Odds", 0.2, 0.42, Color3.fromRGB(255, 240, 200))
 	odds.TextYAlignment = Enum.TextYAlignment.Top
-	local timer = breedLabel(gui, "Timer", 0.82, 0.18, BAR_COLOR)
-	_breedViews[dome] = { dome = dome, gui = gui, title = title, odds = odds, timer = timer, key = "" }
+	local timer  = label(gui, "Timer", 0.63, 0.17, OK_COLOR)
+	local stored = label(gui, "Stored", 0.82, 0.18, Color3.new(1, 1, 1))
+	_views[dome] = { dome = dome, gui = gui, title = title, odds = odds, timer = timer, stored = stored, key = "" }
 end
 
-local function eggName(eggType: string): string
-	local def = EggConfig.data[eggType :: any]
-	return Names.egg(eggType)
-end
-
--- Chancen dieses Baerchis, nach dem tatsaechlich gebrueteten Ei zusammengefasst.
+-- Chancen dieses Baerchis, nach dem tatsaechlich gebrueteten Ei zusammengefasst
+-- (gesperrte Eier rutschen auf den freien Vorgaenger, wie auf dem Server).
 local function oddsText(baerchi: any, eggTree: any): string
-	local list = EggCalculator.getResolvedChances(baerchi, eggTree)
 	local lines: { string } = {}
-	for i, entry in list do
-		if i > BREED_MAX_LINES then break end
+	for i, entry in EggCalculator.getResolvedChances(baerchi, eggTree) do
+		if i > MAX_ODDS_LINES then break end
 		local percent = if entry.percent >= 10 then string.format("%d", math.floor(entry.percent + 0.5))
 			else Loc.formatDecimal(entry.percent, 1)
-		table.insert(lines, string.format("%s  %s%%", eggName(entry.eggType), percent))
+		table.insert(lines, string.format("%s  %s%%", Names.egg(entry.eggType), percent))
 	end
 	return table.concat(lines, "\n")
 end
 
-local function updateBreed(view: BreedView, now: number)
+local function update(view: DomeView, now: number)
 	local dome = view.dome
+	local stored = dome:GetAttribute("Stored")
+	local capacity = dome:GetAttribute("Capacity")
 	local uid = dome:GetAttribute("BreederUid")
 	local data = ClientState.get()
 	local baerchi = if typeof(uid) == "string" and uid ~= "" and data then data.island.baerchis[uid] else nil
+
+	-- Lager immer zeigen
+	if typeof(stored) == "number" and typeof(capacity) == "number" then
+		local full = stored >= capacity
+		view.stored.Text = "🥚 " .. string.format("%d / %d", stored, capacity)
+		view.stored.TextColor3 = if full then FULL_COLOR else Color3.new(1, 1, 1)
+	end
+
 	if not baerchi or not data then
-		view.gui.Enabled = false
+		view.title.Text = Loc.t("ui.incubator.prompt_breed")
+		view.title.TextColor3 = Color3.new(1, 1, 1)
+		view.odds.Text = ""
+		view.timer.Text = ""
 		view.key = ""
 		return
 	end
-	view.gui.Enabled = true
 
 	-- Name und Chancen nur neu schreiben, wenn sich etwas daran aendert
 	local unlockedCount = 0
@@ -219,56 +134,42 @@ local function updateBreed(view: BreedView, now: number)
 		tostring(unlockedCount) }, "|")
 	if key ~= view.key then
 		view.key = key
-		local def = BaerchiConfig.getById(baerchi.configId)
-		local name = Names.baerchi(baerchi.configId)
-		view.title.Text = string.format("%s · %s", name, Loc.name("rarity." .. baerchi.rarity, baerchi.rarity))
+		view.title.Text = string.format("%s · %s", Names.baerchi(baerchi.configId),
+			Loc.name("rarity." .. baerchi.rarity, baerchi.rarity))
 		view.title.TextColor3 = BaerchiConfig.getRarityColor(baerchi.rarity)
 		view.odds.Text = oddsText(baerchi, data.eggTree)
 	end
 
-	local unlocked = dome:GetAttribute("Unlocked")
-	if unlocked == false then
-		view.timer.Text = "🔒"
-		return
-	end
-	local lying = 0
-	for _, egg in data.island.laidEggs do
-		if (egg :: any).fromIncubator then lying += 1 end
-	end
-	if lying >= IncubatorConfig.BREED_MAX_LYING then
-		view.timer.Text = "🥚 " .. Loc.t("ui.incubator.breed_full")
-		view.timer.TextColor3 = READY_COLOR
+	if typeof(stored) == "number" and typeof(capacity) == "number" and stored >= capacity then
+		view.timer.Text = Loc.t("ui.incubator.breed_full")
+		view.timer.TextColor3 = FULL_COLOR
 		return
 	end
 	local last = dome:GetAttribute("LastEggAt")
 	local seconds = dome:GetAttribute("BreedSeconds")
 	if typeof(last) == "number" and typeof(seconds) == "number" and seconds > 0 then
 		local left = math.max(0, last + seconds - now)
-		view.timer.Text = "🥚 " .. Loc.formatDuration(math.ceil(left))
-		view.timer.TextColor3 = BAR_COLOR
+		view.timer.Text = "⏱ " .. Loc.formatDuration(math.ceil(left))
+		view.timer.TextColor3 = OK_COLOR
 	end
-end
-
--- INCUBATOR_BREED: "Baerchi einsetzen" statt "Oeffnen"
-local function actionKey(): string
-	return if FeatureFlags.isOn("INCUBATOR_BREED") then "ui.incubator.prompt_breed" else "ui.incubator.prompt_action"
 end
 
 local function attachPrompt(base: BasePart)
 	if base:FindFirstChild("IncubatorPrompt") then return end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "IncubatorPrompt"
-	prompt.ActionText = Loc.t(actionKey())
+	prompt.ActionText = Loc.t("ui.incubator.prompt_action")
 	prompt.ObjectText = Loc.t("ui.incubator.title")
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.MaxActivationDistance = 14
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 16
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = base
 	prompt.Triggered:Connect(function()
 		PanelManager.open("Incubator")
 	end)
 	Loc.onChanged(function()
-		prompt.ActionText = Loc.t(actionKey())
+		prompt.ActionText = Loc.t("ui.incubator.prompt_action")
 		prompt.ObjectText = Loc.t("ui.incubator.title")
 	end)
 end
@@ -280,11 +181,8 @@ local function hook(instance: Instance)
 	if not isOwnPlot(model) then return end
 	if instance.Name == "Base" then
 		attachPrompt(instance)
-	elseif string.match(instance.Name, "^Dome_%d+$") then
+	elseif instance.Name == "Dome_1" then
 		attachView(instance)
-		if FeatureFlags.isOn("INCUBATOR_BREED") then
-			attachBreedView(instance)
-		end
 	end
 end
 
@@ -307,15 +205,8 @@ function IncubatorController.init()
 				if dome.Parent == nil then
 					_views[dome] = nil
 				else
-					update(view, now)
-				end
-			end
-			for dome, view in _breedViews do
-				if dome.Parent == nil then
-					_breedViews[dome] = nil
-				else
-					local ok, err = pcall(updateBreed, view, now)
-					if not ok then warn("[IncubatorController] Brut-Schild:", err) end
+					local ok, err = pcall(update, view, now)
+					if not ok then warn("[IncubatorController] Schild:", err) end
 				end
 			end
 		end

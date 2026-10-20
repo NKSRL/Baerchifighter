@@ -91,6 +91,19 @@ local RARITY_LETTER: { [Types.CharmRarity]: string } = {
 	Ascended  = "A",
 }
 
+-- 16.10. Bild je Rarity (Slot-Kacheln in Charm-Fenster und Baerchi-Details).
+-- Leere ID = kein Bild, dann bleiben Farbflaeche + Buchstabe (siehe UI/CharmIcon).
+-- Epic-Bild = SuperRare, Ascendant-Bild = Ascended.
+local RARITY_ICON: { [Types.CharmRarity]: string } = {
+	-- Bilder mit echtem Alpha-Kanal (361x361). Image-IDs, aus den Decal-IDs umgerechnet.
+	Common    = "rbxassetid://119562697163434",   -- Decal 79998039234504
+	Uncommon  = "rbxassetid://137697276032105",   -- Decal 77140435732891
+	Rare      = "rbxassetid://120361218015910",   -- Decal 109483756594322
+	SuperRare = "rbxassetid://71491926811618",    -- Decal 139139603755712 (Epic)
+	Legendary = "rbxassetid://72824208693958",    -- Decal 90850087818303
+	Ascended  = "rbxassetid://81359276545418",    -- Decal 87049074161365 (Ascendant)
+}
+
 local RARITY_LABEL: { [Types.CharmRarity]: string } = {
 	Common    = "Common",
 	Uncommon  = "Uncommon",
@@ -167,6 +180,13 @@ local SPREAD = 0.25
 -- have not locked"). Deshalb ist der Preis pro WURF, nicht pro Slot.
 local ROLL_COST_GOLD_GUMMIES = 25
 
+-- 14.10. Ein Wurf wuerfelt IMMER alle acht Slots neu — ausser den gesperrten.
+-- Jeder gesperrte Slot macht den Wurf teurer: Grundpreis * (1 + LOCK_SURCHARGE
+-- * Anzahl gesperrter Slots), aufgerundet. Bei 25 Grundpreis und 0.4: 25, 35,
+-- 45, 55 ... bis 95 bei sieben Sperren. Wirksam sind am Ende trotzdem nur die
+-- Slots, die die aktuelle Promotion freischaltet (CombatCalculator).
+local LOCK_SURCHARGE = 0.4
+
 -- "Auto Roll" ist serverseitig einfach ein Wurf-Paket: der Client schickt eine
 -- Anzahl, der Server wuerfelt so oft hintereinander, bis die Anzahl erreicht
 -- ist ODER die GoldGummies nicht mehr reichen, und meldet das Ergebnis
@@ -202,6 +222,22 @@ local function countUnlockedSlots(promotionLevel: number): number
 		end
 	end
 	return count
+end
+
+-- Wie viele Charms dieser Liste gesperrt sind.
+local function countLocked(charms: { Types.Charm }?): number
+	local count = 0
+	for _, charm in charms or {} do
+		if charm.locked then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Preis eines Wurfs bei dieser Anzahl gesperrter Slots (Server UND Anzeige).
+local function getRollCost(lockedCount: number): number
+	return math.ceil(ROLL_COST_GOLD_GUMMIES * (1 + LOCK_SURCHARGE * math.max(0, lockedCount)))
 end
 
 local function getStatDef(statId: string): CharmStatDef?
@@ -294,6 +330,7 @@ return {
 	RARITY_ORDER   = RARITY_ORDER,
 	RARITY_ODDS    = RARITY_ODDS,
 	RARITY_LETTER  = RARITY_LETTER,
+	RARITY_ICON    = RARITY_ICON,
 	RARITY_LABEL   = RARITY_LABEL,
 	RARITY_COLORS  = RARITY_COLORS,
 	RARITY_POWER   = RARITY_POWER,
@@ -303,6 +340,10 @@ return {
 
 	ROLL_COST_GOLD_GUMMIES = ROLL_COST_GOLD_GUMMIES,
 	AUTO_ROLL_COUNT        = AUTO_ROLL_COUNT,
+	LOCK_SURCHARGE         = LOCK_SURCHARGE,
+
+	countLocked = countLocked,
+	getRollCost = getRollCost,
 
 	getUnlockPromotion = getUnlockPromotion,
 	isSlotUnlocked     = isSlotUnlocked,

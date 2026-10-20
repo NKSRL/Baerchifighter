@@ -46,12 +46,14 @@ local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local PromotionConfig  = require(ReplicatedStorage.Config.PromotionConfig)
 local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
+local CharmIcon        = require(script.Parent.CharmIcon)   -- 16.10. Charm-Bilder je Rarity
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local EggCalculator    = require(ReplicatedStorage.Modules.EggCalculator)
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 
 local Theme        = require(script.Parent.Theme)
+local Icons        = require(script.Parent.Icons)
 local Toast        = require(script.Parent.Toast)
 -- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
 local Notify        = require(script.Parent.Notify)
@@ -65,6 +67,8 @@ local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local CombatRating = require(ReplicatedStorage.Modules.CombatRating)
 local Loc          = require(ReplicatedStorage.Localization.Loc)
 local Names        = require(ReplicatedStorage.Localization.Names)
+local BaerchiMesh  = require(ReplicatedStorage.Modules.BaerchiMesh)
+local RunService   = game:GetService("RunService")
 
 -- HBB Paket 4: Kampfwert im Kopf, "Staerker machen" (Befoerdern + Fusion)
 local _ratingLabel: TextLabel? = nil
@@ -77,6 +81,9 @@ local PANEL_NAME = "Baerchi"
 
 local _root: Frame?      = nil
 local _openUid: string?  = nil
+
+-- Honig-Fenster (UI_HONEY_SKIN): fuellt alle Felder des Bildes; nil = altes Layout
+local _honeyFill: ((Types.Baerchi) -> ())? = nil
 
 -- Referenzen auf die Felder der Karte
 local _titleLabel: TextLabel?  = nil
@@ -306,6 +313,12 @@ local function fillEgg(baerchi: Types.Baerchi)
 end
 
 local function fill(baerchi: Types.Baerchi)
+	local honeyFill = _honeyFill
+	if honeyFill then
+		honeyFill(baerchi)
+		return
+	end
+
 	local def = BaerchiConfig.getById(baerchi.configId)
 	local color = Theme.rarityColor(baerchi.rarity)
 
@@ -427,10 +440,7 @@ local function fill(baerchi: Types.Baerchi)
 	-- Verwertungs-Wert, damit man vor dem Verwerten weiss was es bringt.
 	-- Feste Quote seit v4 (kein Recycler-Gebaeude mehr).
 	if _valueLabel then
-		local value = math.floor(
-			EconomyConfig.getBaerchiBaseValue(baerchi.rarity, baerchi.level)
-			* EconomyConfig.RECYCLE_RETURN
-		)
+		local value = EconomyConfig.getRecycleValue(baerchi.rarity, baerchi.level)
 		_valueLabel.Text = Loc.t("ui.baerchi.recycle_value", { n = value })
 	end
 
@@ -538,6 +548,476 @@ function BaerchiPanel.show(uid: string)
 end
 
 --------------------------------------------------------------------------------
+-- Honig-Fenster (14.10., UI_HONEY_SKIN): alle Felder des Bildes pet_stats_window
+--------------------------------------------------------------------------------
+-- Koordinaten stehen in Pixeln des Originalbildes (1536 x 1024); hx/hy rechnen sie in
+-- Fenster-Einheiten (900 x 564) um. Was nicht im Bild steht (Zahlen, Balken, Sterne, Charms,
+-- Modell) legt dieser Teil darueber; die Klicks sitzen als durchsichtige Knoepfe auf den
+-- gemalten Knoepfen.
+local HONEY_SCALE = 0.589
+local function hx(x: number): number return (x - 6) * HONEY_SCALE end
+local function hy(y: number): number return (y - 27) * HONEY_SCALE end
+local function hplace(obj: GuiObject, x0: number, y0: number, x1: number, y1: number)
+	obj.Position = UDim2.fromOffset(hx(x0), hy(y0))
+	obj.Size     = UDim2.fromOffset((x1 - x0) * HONEY_SCALE, (y1 - y0) * HONEY_SCALE)
+end
+
+local INK        = Color3.fromRGB(255, 244, 214)
+local INK_STROKE = Color3.fromRGB(58, 30, 8)
+local GOLD_TEXT  = Color3.fromRGB(255, 205, 80)
+
+local function hexColor(c: Color3): string
+	return string.format("#%02x%02x%02x", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+end
+
+local function hlabel(parent: Instance, name: string, x0: number, y0: number, x1: number, y1: number,
+	maxSize: number, align: Enum.TextXAlignment?): TextLabel
+	local label = Instance.new("TextLabel")
+	label.Name                   = name
+	label.BackgroundTransparency = 1
+	label.Font                   = Theme.FONT
+	label.Text                   = ""
+	label.TextScaled             = true
+	label.TextWrapped            = true
+	label.TextColor3             = INK
+	label.TextStrokeColor3       = INK_STROKE
+	label.TextStrokeTransparency = 0.35
+	label.TextXAlignment         = align or Enum.TextXAlignment.Left
+	label.ZIndex                 = 6
+	label.Active                 = false
+	label.Parent                 = parent
+	hplace(label, x0, y0, x1, y1)
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = maxSize
+	limit.MinTextSize = 7
+	limit.Parent = label
+	return label
+end
+
+-- Durchsichtiger Klickbereich ueber einem gemalten Knopf
+local function hbutton(parent: Instance, name: string, x0: number, y0: number, x1: number, y1: number): TextButton
+	local button = Instance.new("TextButton")
+	button.Name                   = name
+	button.BackgroundTransparency = 1
+	button.Text                   = ""
+	button.AutoButtonColor        = false
+	button.ZIndex                 = 8
+	button.Parent                 = parent
+	hplace(button, x0, y0, x1, y1)
+	return button
+end
+
+-- Dunkle Abdeckung (graut einen gemalten Knopf aus oder verdeckt Ueberfluessiges)
+local function hcover(parent: Instance, name: string, x0: number, y0: number, x1: number, y1: number,
+	color: Color3, transparency: number, radius: number, z: number): Frame
+	local frame = Instance.new("Frame")
+	frame.Name                   = name
+	frame.BackgroundColor3       = color
+	frame.BackgroundTransparency = transparency
+	frame.BorderSizePixel        = 0
+	frame.ZIndex                 = z
+	frame.Active                 = false
+	frame.Parent                 = parent
+	hplace(frame, x0, y0, x1, y1)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = frame
+	return frame
+end
+
+-- Die sechs Wertefelder (Original-Pixel der dunklen Leisten). Links Schwerter, Herz, Schild;
+-- rechts Tropfen, Muskel, Fluegel.
+local HONEY_PILLS = {
+	{ key = "atk",    x0 = 698,  x1 = 970,  y0 = 266, y1 = 314 },
+	{ key = "hp",     x0 = 698,  x1 = 970,  y0 = 366, y1 = 414 },
+	{ key = "rating", x0 = 698,  x1 = 970,  y0 = 466, y1 = 514 },   -- Schild: es gibt keine Defense mehr
+	{ key = "egg",    x0 = 1108, x1 = 1408, y0 = 266, y1 = 314 },
+	{ key = "pwr",    x0 = 1108, x1 = 1408, y0 = 366, y1 = 414 },
+	{ key = "spd",    x0 = 1108, x1 = 1408, y0 = 466, y1 = 514 },
+}
+local STAR_X = { 145, 207, 268, 329, 390 }   -- die fuenf Sterne der Leiste (der sechste wird verdeckt)
+
+local function buildHoney(root: Frame)
+	type Pill = { fill: Frame, text: TextLabel, sub: TextLabel }
+	local pills: { [string]: Pill } = {}
+
+	-- ------------------------------------------------------------ Bild-Modell oben links
+	local view = Instance.new("ViewportFrame")
+	view.Name                   = "Portrait"
+	view.BackgroundTransparency = 1
+	-- Die Vorderseite der Figur zeigt nach -Z: Kamera davor, Licht von der Kamera her
+	view.Ambient                = Color3.fromRGB(150, 150, 160)
+	view.LightColor             = Color3.fromRGB(255, 248, 232)
+	view.LightDirection         = Vector3.new(0.4, -0.6, 1.2)
+	view.ZIndex                 = 3
+	view.Parent                 = root
+	hplace(view, 128, 262, 543, 560)
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 30
+	camera.Parent = view
+	view.CurrentCamera = camera
+
+	local model: Model? = nil
+	local modelKey = ""
+	local center = Vector3.zero
+	local distance = 10
+
+	RunService.RenderStepped:Connect(function()
+		if not root.Visible or not model then return end
+		-- sanftes Hin- und Herdrehen, damit das Gesicht immer zu sehen bleibt
+		local angle = math.sin(os.clock() * 0.8) * 0.7
+		local dir = Vector3.new(math.sin(angle), 0.28, -math.cos(angle)).Unit
+		camera.CFrame = CFrame.lookAt(center + dir * distance, center)
+	end)
+
+	local function setModel(baerchi: Types.Baerchi)
+		local key = baerchi.configId .. "|" .. baerchi.rarity .. "|" .. tostring(baerchi.mutation)
+		if key == modelKey then return end
+		modelKey = key
+		if model then model:Destroy() model = nil end
+
+		local mutationColor = if baerchi.mutation then BaerchiConfig.getMutationColor(baerchi.mutation) else nil
+		local ok, built = pcall(function()
+			return BaerchiMesh.build(Vector3.zero, Theme.rarityColor(baerchi.rarity), baerchi.rarity, mutationColor, baerchi.configId)
+		end)
+		if not ok or not built then return end
+		local newModel = built :: Model
+		newModel.Parent = view
+		model = newModel
+		local cf, size = newModel:GetBoundingBox()
+		center = cf.Position
+		local radius = math.max(size.X, size.Y, size.Z)
+		distance = radius / (2 * math.tan(math.rad(camera.FieldOfView / 2))) * 1.05
+	end
+
+	-- ------------------------------------------------- Karten-Angaben im Bild-Rahmen
+	local tagLeft   = hlabel(root, "TagLeft",   138, 268, 380, 300, 16, Enum.TextXAlignment.Left)
+	local tagRight  = hlabel(root, "TagRight",  385, 268, 536, 300, 16, Enum.TextXAlignment.Right)
+	local levelText = hlabel(root, "Level",     152, 504, 345, 536, 16, Enum.TextXAlignment.Left)
+	local rarityText = hlabel(root, "Rarity",   350, 504, 522, 536, 16, Enum.TextXAlignment.Right)
+	tagLeft.RichText = true
+
+	-- ---------------------------------------------------------------- sechs Werte
+	for _, def in HONEY_PILLS do
+		local track = Instance.new("Frame")
+		track.Name                   = "Pill_" .. def.key
+		track.BackgroundTransparency = 1
+		track.ClipsDescendants       = true
+		track.ZIndex                 = 3
+		track.Parent                 = root
+		hplace(track, def.x0, def.y0, def.x1, def.y1)
+
+		local fill = Instance.new("Frame")
+		fill.Name                   = "Fill"
+		fill.BackgroundColor3       = Color3.fromRGB(255, 255, 255)
+		fill.BackgroundTransparency = 0.15
+		fill.BorderSizePixel        = 0
+		fill.Size                   = UDim2.fromScale(0, 1)
+		fill.ZIndex                 = 4
+		fill.Active                 = false
+		fill.Parent                 = track
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = fill
+		local gradient = Instance.new("UIGradient")
+		gradient.Color = ColorSequence.new(Color3.fromRGB(255, 214, 92), Color3.fromRGB(240, 142, 18))
+		gradient.Rotation = 90
+		gradient.Parent = fill
+
+		local text = hlabel(track, "Text", 0, 0, 1, 1, 18, Enum.TextXAlignment.Left)
+		text.Position = UDim2.fromScale(0.05, 0)
+		text.Size     = UDim2.fromScale(0.64, 1)
+		local sub = hlabel(track, "Sub", 0, 0, 1, 1, 14, Enum.TextXAlignment.Right)
+		sub.Position = UDim2.fromScale(0.66, 0.1)
+		sub.Size     = UDim2.fromScale(0.31, 0.8)
+		pills[def.key] = { fill = fill, text = text, sub = sub }
+	end
+
+	-- ------------------------------------------------------------------ Skills
+	local skillName = hlabel(root, "SkillName", 900, 570, 1400, 610, 22, Enum.TextXAlignment.Left)
+	skillName.TextColor3 = GOLD_TEXT
+	local skillDesc = hlabel(root, "SkillDesc", 900, 612, 1400, 692, 16, Enum.TextXAlignment.Left)
+	skillDesc.TextYAlignment = Enum.TextYAlignment.Top
+
+	local passiveText = hlabel(root, "Passive", 900, 740, 1385, 880, 17, Enum.TextXAlignment.Left)
+	passiveText.TextYAlignment = Enum.TextYAlignment.Top
+	passiveText.RichText = true
+
+	-- ------------------------------------------------- Beförderung: Sterne + Pfeil
+	local stars: { TextLabel } = {}
+	for index, cx in STAR_X do
+		local star = hlabel(root, "Star_" .. index, cx - 30, 618, cx + 30, 680, 60, Enum.TextXAlignment.Center)
+		star.Font = Enum.Font.SourceSansBold
+		star.Text = "★"
+		star.TextYAlignment = Enum.TextYAlignment.Center
+		star.ZIndex = 5
+		star.Visible = false
+		stars[index] = star
+	end
+	-- sechster, im Bild gemalter Stern: es gibt nur fuenf Sterne (zehn Stufen), er wird verdeckt
+	hcover(root, "StarPatch", 416, 616, 486, 684, Color3.fromRGB(52, 30, 13), 0, 10, 4)
+
+	local promoteCount = hlabel(root, "PromoteCount", 622, 630, 672, 668, 15, Enum.TextXAlignment.Center)
+	local promoteDim = hcover(root, "PromoteDim", 510, 608, 676, 688, Color3.fromRGB(30, 16, 6), 0.45, 14, 7)
+	local promoteButton = hbutton(root, "Promote", 510, 608, 676, 688)
+
+	-- ---------------------------------------- Ausruesten (lila Knopf) + Verwerten (Gummibaer)
+	local equipDim = hcover(root, "EquipDim", 488, 720, 672, 778, Color3.fromRGB(30, 16, 6), 0.5, 12, 7)
+	local equipButton = hbutton(root, "Equip", 488, 720, 672, 778)
+	local charmText = hlabel(root, "CharmsText", 538, 728, 664, 770, 20, Enum.TextXAlignment.Center)   -- 19.10.
+	local recycleText = hlabel(root, "RecycleText", 222, 736, 452, 772, 16, Enum.TextXAlignment.Center)
+	local recycleButton = hbutton(root, "Recycle", 100, 708, 462, 792)
+
+	-- ----------------------------------------------------------- Charms (acht Slots)
+	local strip = hcover(root, "CharmStrip", 103, 797, 662, 886, Color3.fromRGB(46, 26, 11), 0, 12, 4)
+	local strokeLine = Instance.new("UIStroke")
+	strokeLine.Color = Color3.fromRGB(122, 74, 20)
+	strokeLine.Thickness = 2
+	strokeLine.Parent = strip
+	local charmTiles: { { tile: TextButton, letter: TextLabel } } = {}
+	local tileWidth = 62
+	local tileGap = (548 - CharmConfig.SLOT_COUNT * tileWidth) / (CharmConfig.SLOT_COUNT - 1)
+	for slot = 1, CharmConfig.SLOT_COUNT do
+		local x0 = 108 + (slot - 1) * (tileWidth + tileGap)
+		local tile = Instance.new("TextButton")
+		tile.Name                   = "Charm_" .. slot
+		tile.AutoButtonColor        = false
+		tile.BackgroundColor3       = Color3.fromRGB(70, 42, 20)
+		tile.BorderSizePixel        = 0
+		tile.Text                   = ""
+		tile.ZIndex                 = 5
+		tile.Parent                 = root
+		hplace(tile, x0, 809, x0 + tileWidth, 809 + tileWidth)
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 9)
+		corner.Parent = tile
+		local outline = Instance.new("UIStroke")
+		outline.Color = Color3.fromRGB(30, 16, 6)
+		outline.Thickness = 2
+		outline.Parent = tile
+		local letter = hlabel(tile, "Letter", 0, 0, 1, 1, 26, Enum.TextXAlignment.Center)
+		letter.Position = UDim2.fromScale(0, 0)
+		letter.Size     = UDim2.fromScale(1, 1)
+		letter.TextYAlignment = Enum.TextYAlignment.Center
+		letter.ZIndex   = 6
+		charmTiles[slot] = { tile = tile, letter = letter }
+		tile.Activated:Connect(function()
+			local uid = _openUid
+			if not uid then return end
+			Unlock.markSeen("charms")
+			PanelManager.open("Charms", uid)
+		end)
+	end
+
+	-- ------------------------------------------------------------------ Aktionen
+	local promoteReady = false
+	local isEquipped = false
+
+	promoteButton.Activated:Connect(function()
+		local uid = _openUid
+		if not uid or not promoteReady then return end
+		Remotes.RequestPromoteBaerchi:FireServer(uid)
+	end)
+	equipButton.Activated:Connect(function()
+		local uid = _openUid
+		if not uid then return end   -- 19.10. Charm-Knopf
+		Unlock.markSeen("charms")
+		PanelManager.open("Charms", uid)
+	end)
+	recycleButton.Activated:Connect(function()
+		local uid = _openUid
+		if not uid or isEquipped or not Unlock.isVisible("recycling") then return end
+		Unlock.markSeen("recycling")
+		Remotes.RequestRecycleBaerchi:FireServer(uid)
+		-- sofort zumachen (Erfolgsmeldung kommt aus ResultFeed, Ablehnung als Toast)
+		BaerchiPanel.close()
+	end)
+
+	-- ------------------------------------------------------------------ Inhalt
+	_honeyFill = function(baerchi: Types.Baerchi)
+		local def = BaerchiConfig.getById(baerchi.configId)
+		local rarityColor = Theme.rarityColor(baerchi.rarity)
+		local data = ClientState.get()
+		isEquipped = data ~= nil and data.island.equippedUid == baerchi.uid
+
+		if _titleLabel then _titleLabel.Text = Names.baerchi(baerchi.configId) end
+		setModel(baerchi)
+
+		-- Angaben im Bild-Rahmen
+		local tags: { string } = {}
+		if baerchi.mutation then
+			local mutationName = Loc.name("mutation." .. baerchi.mutation .. ".name", BaerchiConfig.getMutationDisplayName(baerchi.mutation))
+			table.insert(tags, string.format('<font color="%s">%s</font>', hexColor(BaerchiConfig.getMutationColor(baerchi.mutation)), string.upper(mutationName)))
+		end
+		if baerchi.isFusionResult then table.insert(tags, Loc.t("ui.card.badge_fusion")) end
+		tagLeft.Text = table.concat(tags, "  ")
+		tagRight.Text = if isEquipped then string.upper(Loc.t("ui.card.equipped")) else ""
+		tagRight.TextColor3 = Color3.fromRGB(150, 235, 130)
+		levelText.Text = Loc.t("ui.baerchi.level", { level = baerchi.level, max = BaerchiConfig.MAX_LEVEL })
+		if baerchi.level >= BaerchiConfig.MAX_LEVEL and (baerchi.endlessLevel or 0) > 0 then
+			levelText.Text ..= "  " .. Loc.t("ui.baerchi.endless_level", { n = baerchi.endlessLevel or 0 })
+		end
+		rarityText.Text = string.upper(Names.rarity(baerchi.rarity))
+		rarityText.TextColor3 = rarityColor
+
+		-- Werte: dieselbe Rechnung wie im Kampf (CombatCalculator), Balken = Stat-Stufen
+		local stats = if def then CombatCalculator.getEffectiveStats(baerchi, def.baseStats) else nil
+		local cap = PromotionConfig.getStatCap(baerchi.rarity)
+		local levels: any = baerchi.statLevels or {}
+
+		local function setPill(key: string, text: string, ratio: number?, sub: string?, textColor: Color3?)
+			local pill = pills[key]
+			if not pill then return end
+			pill.text.Text = text
+			pill.text.TextColor3 = textColor or INK
+			pill.sub.Text = sub or ""
+			pill.fill.Visible = ratio ~= nil
+			if ratio then pill.fill.Size = UDim2.fromScale(math.clamp(ratio, 0, 1), 1) end
+		end
+		local function levelRatio(key: string): (number, string)
+			local value = (levels[key] or 0) :: number
+			return (if cap > 0 then value / cap else 0), string.format("%d/%d", value, cap)
+		end
+		local function label(key: string): string
+			return PromotionConfig.STAT_LABELS[key] or string.upper(key)
+		end
+
+		if stats then
+			local ratio, sub = levelRatio("atk")
+			setPill("atk", label("atk") .. "  " .. Theme.formatNumber(stats.atk), ratio, sub)
+
+			-- HP: Balken = aktuelle HP (die wichtigste Zahl: leer heisst erschoepft)
+			local hp = math.clamp(baerchi.currentHp or stats.maxHp, 0, stats.maxHp)
+			local _, hpSub = levelRatio("hp")
+			setPill("hp", string.format("%s  %s / %s", label("hp"), Theme.formatNumber(hp), Theme.formatNumber(stats.maxHp)),
+				if stats.maxHp > 0 then hp / stats.maxHp else 0, hpSub,
+				if hp <= 0 then Color3.fromRGB(255, 120, 110) else nil)
+
+			local pwrRatio, pwrSub = levelRatio("pwr")
+			setPill("pwr", label("pwr") .. "  " .. tostring(math.floor(stats.pwr * 100 + 0.5)) .. "%", pwrRatio, pwrSub)
+			local spdRatio, spdSub = levelRatio("spd")
+			setPill("spd", label("spd") .. string.format("  %.2f", stats.spd), spdRatio, spdSub)
+		end
+
+		local eggRatio, eggSub = levelRatio("egg")
+		local interval = EggCalculator.getLayIntervalSeconds(baerchi, false)
+		setPill("egg", label("egg") .. "  " .. (if interval then Theme.formatDuration(interval) else "—"), eggRatio, eggSub)
+
+		local ratingValue, ratingSuffix = CombatRating.short(CombatRating.of(baerchi))
+		local digits = if ratingSuffix ~= "" and ratingValue < 100 then 1 else 0
+		local ratingText = if digits > 0 then Loc.formatDecimal(ratingValue, digits) else Loc.formatNumber(math.floor(ratingValue))
+		setPill("rating", Loc.t("ui.pet.rating") .. "  " .. ratingText .. ratingSuffix, nil, nil)
+
+		-- Skill (ein aktiver pro Baerchi; ein reiner Passiv-Skill steht rechts unten)
+		local skill = SkillConfig.getById(baerchi.skillId)
+		local passiveSkill = skill ~= nil and skill.effectType == "Passive"
+		local shownSkillId = if skill and not passiveSkill then baerchi.skillId else "BasicPunch"
+		local shownSkill = SkillConfig.getById(shownSkillId)
+		skillName.Text = Names.skill(shownSkillId)
+		local desc = Names.skillDesc(shownSkillId)
+		if shownSkill and shownSkill.charge > 0 then
+			desc ..= "  " .. Loc.t("ui.pet.skill_charge", { n = shownSkill.charge })
+		end
+		skillDesc.Text = desc
+
+		-- Passive Boni: Passiv-Skill, Mutation, Fusion, Befoerderung
+		local lines: { string } = {}
+		if passiveSkill then
+			table.insert(lines, Names.skill(baerchi.skillId) .. ": " .. Names.skillDesc(baerchi.skillId))
+		end
+		if baerchi.mutation then
+			local mutationName = Loc.name("mutation." .. baerchi.mutation .. ".name", BaerchiConfig.getMutationDisplayName(baerchi.mutation))
+			local line = Loc.t("ui.pet.passive_mutation", {
+				name = mutationName,
+				mult = string.format("%.2g", BaerchiConfig.getMutationMultiplier(baerchi.mutation)),
+			})
+			table.insert(lines, string.format('<font color="%s">%s</font>', hexColor(BaerchiConfig.getMutationColor(baerchi.mutation)), line))
+		end
+		if (baerchi.fusionBonus or 0) > 0 then
+			table.insert(lines, Loc.t("ui.pet.passive_fusion", { pct = math.floor((baerchi.fusionBonus or 0) * 100 + 0.5) }))
+		end
+		local promotion = baerchi.promotionLevel or 0
+		local promotionBonus = PromotionConfig.getPromotionBonus(promotion)
+		if promotionBonus > 0 then
+			table.insert(lines, Loc.t("ui.pet.passive_promotion", { pct = math.floor(promotionBonus * 100 + 0.5) }))
+		end
+		if #lines == 0 then lines = { Loc.t("ui.pet.passive_none") } end
+		passiveText.Text = table.concat(lines, "\n")
+
+		-- Beförderung: Sterne (silber = 1-5, gold = 6-10) und Pfeil mit Duplikat-Zaehler
+		local states = PromotionConfig.getStarStates(promotion)
+		for index, star in stars do
+			local state = states[index]
+			star.Visible = state ~= nil and state ~= "empty"
+			if star.Visible then
+				star.TextColor3 = PromotionConfig.STAR_COLORS[state] or PromotionConfig.STAR_COLORS.empty
+			end
+		end
+		local maxed = promotion >= PromotionConfig.MAX_PROMOTION
+		promoteReady = false
+		if maxed then
+			promoteCount.Text = "MAX"
+			promoteCount.TextColor3 = GOLD_TEXT
+		else
+			local cost = PromotionConfig.getDuplicateCost(baerchi.rarity, promotion + 1)
+			local have = countMaterials(baerchi)
+			promoteReady = have >= cost
+			promoteCount.Text = string.format("%d/%d", have, cost)
+			promoteCount.TextColor3 = if promoteReady then Color3.fromRGB(70, 36, 8) else INK
+			promoteCount.TextStrokeTransparency = if promoteReady then 1 else 0.35
+		end
+		promoteDim.Visible = not promoteReady
+
+		-- Ausruesten / Verwerten
+		-- 19.10.: der alte Ausruesten-Knopf oeffnet jetzt das Charm-Fenster (Ausruesten sitzt in der Liste)
+		equipDim.Visible = false
+		local openSlots = 0
+		for slotIndex = 1, CharmConfig.SLOT_COUNT do
+			if CharmConfig.isSlotUnlocked(slotIndex, promotion) then openSlots += 1 end
+		end
+		charmText.Text = "Charms  " .. openSlots .. "/" .. CharmConfig.SLOT_COUNT
+		local recycleUnlocked = Unlock.isVisible("recycling")
+		if isEquipped then
+			recycleText.Text = Loc.t("ui.card.equipped")
+			recycleText.TextColor3 = Color3.fromRGB(190, 160, 130)
+		elseif recycleUnlocked then
+			recycleText.Text = Loc.t("ui.baerchi.recycle") .. "  +" .. Theme.formatNumber(EconomyConfig.getRecycleValue(baerchi.rarity, baerchi.level))
+			recycleText.TextColor3 = INK
+		else
+			recycleText.Text = ""
+		end
+
+		-- Charms
+		local bySlot: { [number]: Types.Charm } = {}
+		for _, charm in (baerchi.charms or {}) do bySlot[charm.slot] = charm end
+		for slot, entry in charmTiles do
+			local isOpen = CharmConfig.isSlotUnlocked(slot, promotion)
+			local charm = if isOpen then bySlot[slot] else nil
+			if not isOpen then
+				entry.letter.Text = "-"
+				entry.letter.TextColor3 = Color3.fromRGB(150, 120, 95)
+				entry.tile.BackgroundColor3 = Color3.fromRGB(52, 33, 18)
+			elseif not charm then
+				entry.letter.Text = "?"
+				entry.letter.TextColor3 = INK
+				entry.tile.BackgroundColor3 = Color3.fromRGB(96, 62, 30)
+			else
+				entry.letter.Text = CharmConfig.RARITY_LETTER[charm.rarity] or "?"
+				entry.letter.TextColor3 = Color3.fromRGB(46, 26, 11)
+				entry.tile.BackgroundColor3 = CharmConfig.RARITY_COLORS[charm.rarity] or Color3.fromRGB(96, 62, 30)
+			end
+			-- 16.10.: Charm-Bild statt Farbflaeche + Buchstabe (ohne Bild bleibt das alte Aussehen)
+			local hasIcon = CharmIcon.set(entry.tile, if charm then charm.rarity else nil, UDim2.fromScale(1.14, 1.14), 6)
+			entry.tile.BackgroundTransparency = if hasIcon then 1 else 0
+			local stroke = entry.tile:FindFirstChildOfClass("UIStroke")
+			if stroke then stroke.Enabled = not hasIcon end
+			entry.letter.Visible = not hasIcon
+			entry.letter.TextStrokeTransparency = if charm then 1 else 0.35
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
 -- Aufbau
 --------------------------------------------------------------------------------
 
@@ -556,12 +1036,19 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	-- anderen Menues — passt sich kleinen Bildschirmen an, Name in der
 	-- Kopfzeile, grosses Schliessen-X oben rechts. Der fruehere farbige
 	-- Rarity-Streifen ist jetzt der Titelbalken selbst.
+	-- 14.10. (UI_HONEY_SKIN): das Fenster ist ein Bild (pet_stats_window, zugeschnitten,
+	-- 900 x 564 Einheiten). Feste Groesse = auch Mindestgroesse, damit sich der Dialog auf
+	-- kleinen Bildschirmen als Ganzes verkleinert.
+	local WIN_W, WIN_H = 900, 564
+	local honeyReady = FeatureFlags.isOn("UI_HONEY_SKIN") and Icons.hasUi("honey/pet_stats_window")
+
 	local root = Theme.dialog(
 		"BaerchiPanel", screenGui,
 		Vector2.new(0.72, 0.74),
-		Vector2.new(560, 400),
-		Vector2.new(920, 680)
+		if honeyReady then Vector2.new(WIN_W, WIN_H) else Vector2.new(560, 400),
+		if honeyReady then Vector2.new(WIN_W, WIN_H) else Vector2.new(920, 680)
 	)
+	local honey = honeyReady and Icons.honeyWindow(root, "honey/pet_stats_window", WIN_W, WIN_H) ~= nil
 
 	_titleLabel = Theme.dialogHeader(root, "—", function()
 		BaerchiPanel.close()
@@ -576,6 +1063,15 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 
 	local shell = Theme.dialogBody(root)
 
+	if honey then
+		-- Name in die Titelleiste (zwischen Pfote und Kreuz), Kreuz auf das Kreuz im Bild
+		Icons.honeyHeader(root, Rect.new(220, 46, 756, 99), 836, 64, 60)
+		shell.Visible = false
+		buildHoney(root)
+	end
+
+	-- Altes Layout (zwei scrollende Spalten), nur ohne UI_HONEY_SKIN
+	if not honey then
 	-- Zwei Spalten, jede scrollt fuer sich. `row()` haengt an die Spalte, die
 	-- gerade in `column` steht (umgeschaltet vor dem Abschnitt "Zustand").
 	local leftColumn = Theme.scroller("Content", shell)
@@ -948,6 +1444,8 @@ function BaerchiPanel.init(screenGui: ScreenGui)
 	close.Size       = UDim2.new(1, 0, 1, 0)
 	close.TextColor3 = Theme.COLORS.text
 	close.Activated:Connect(BaerchiPanel.close)
+
+	end
 
 	_root = root
 

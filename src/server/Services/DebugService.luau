@@ -38,6 +38,7 @@
 --   D:Invoke("honey")               -- alle Honig-Lager sofort voll
 --   D:Invoke("feed", uid, 20)       -- 20x fuettern (heilt + gibt XP)
 --   D:Invoke("fight", uid)          -- kompletter Lauf im gewaehlten Tower
+--   D:Invoke("skill", "equipped", "OmegaStrike") -- Faehigkeit tauschen (Show-Test)
 --   D:Invoke("rebirth")
 --
 -- v8 (Promotion / Charms / Event-Teilnahme):
@@ -66,8 +67,10 @@
 --   D:Invoke("towerrecord", "III", 45) -- Rekord setzen (Meilensteine bis dorthin werden ausgezahlt)
 --   D:Invoke("rebirthcap")          -- Deckel des aktuellen Rebirths in allen Towern
 --   D:Invoke("stagebest", "I", 30)  -- Sammel-Update: beste Stage dieses Lebens (Rebirth-Bedingung)
---   D:Invoke("incubator", "done")   -- Sammel-Update: Inkubator-Stand, "done" = alle Eier fertig
---   D:Invoke("incubator", "breed")  -- INCUBATOR_BREED: jedes Baerchi im Inkubator bruetet sofort ein Ei
+--   D:Invoke("incubator")           -- Solo-Inkubator: Stufe, Lager, Baerchi
+--   D:Invoke("incubator", "breed")  -- der Baerchi im Inkubator bruetet sofort ein Ei
+--   D:Invoke("incubator", "level", 3) -- Stufe setzen (1-4)
+--   D:Invoke("incubator", "fill")   -- Lager voll
 --   D:Invoke("dailyshift", 1)       -- Login-Bonus: so tun, als waeren 1 Tag(e) vergangen
 --   D:Invoke("lbflush")             -- Bestenlisten sofort schreiben und neu lesen
 --   D:Invoke("parts")               -- Teile auf der eigenen Insel zaehlen (Budget 250)
@@ -92,6 +95,22 @@
 --   D:Invoke("snapshot")             -- Spielstand merken (fuer Tests)
 --   D:Invoke("restore")              -- gemerkten Spielstand zurueckschreiben
 --
+-- Welt aufwerten (08.10.2026, nur Optik, setzt workspace-Attribute fuer die
+-- Client-Controller; alle Test-Clients sehen dasselbe):
+--   D:Invoke("worldshots", 1)        -- Kamera auf festen Punkt 1..6 (UI aus), 0 = zurueck
+--   D:Invoke("daytime", 19)          -- Tageslauf auf feste Uhrzeit, "auto" = Zyklus
+--   D:Invoke("pitstate", "soon")     -- Pit-Rahmen: idle | soon | live | auto
+--   D:Invoke("neststate", "boss")    -- Wespen-Nest: calm | boss | auto
+--   D:Invoke("arrival")              -- Ankunft (Blasen + Bienen) erneut abspielen
+--   D:Invoke("fish")                 -- sofort einen Honig-Fisch springen lassen
+--   D:Invoke("islandstage", 4)       -- Insel-Deko Stufe 1..4 zeigen ("auto" = aus dem Fortschritt)
+--   D:Invoke("pondfull")             -- Teich bis zum Rand fuellen (Ueberlauf-Tropfen)
+--   D:Invoke("spectators", "hop")    -- Zuschauer an der eigenen Arena: hop | cheer
+--   D:Invoke("record")               -- Rekord-Moment am eigenen Schau-Turm (Flagge glaenzt, Jubel)
+--   D:Invoke("moment", "hatch", "Cosmic") -- Welt-Moment an alle: hatch <Rarity> | tower <Id> | record | rebirth | mutation <Id>
+--   D:Invoke("moments5")             -- fuenf grosse Momente gleichzeitig (Drosselung pruefen)
+--   (Event-Start und Boss: D:Invoke("pitstate", "live") / D:Invoke("neststate", "boss"))
+--
 -- HBB Paket 0 (Test-Zustaende, erst "snapshot"):
 --   D:Invoke("state", "fresh")       -- neues Konto, Trichter F01–F10 misst
 --   D:Invoke("state", "hatch10")     -- dazu zehn geoeffnete Basis-Eier
@@ -114,11 +133,13 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
+local GiftService = require(game:GetService("ServerScriptService").Services.GiftService)
 local EventConfig      = require(ReplicatedStorage.Config.EventConfig)
 local Loc = require(ReplicatedStorage.Localization.Loc)   -- Belohnung ist eine LocMsg
 local CharmConfig      = require(ReplicatedStorage.Config.CharmConfig)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiFactory   = require(ReplicatedStorage.Modules.BaerchiFactory)
+local SkillConfig      = require(ReplicatedStorage.Config.SkillConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local EggCalculator    = require(ReplicatedStorage.Modules.EggCalculator)
 local CombConfig       = require(ReplicatedStorage.Config.CombConfig)
@@ -170,6 +191,8 @@ local JackpotRoll               = require(ServerScriptService.Util.JackpotRoll)
 
 -- HBB Paket 0
 local FunnelService             = require(ServerScriptService.Services.FunnelService)
+local EpilogService             = require(ServerScriptService.Services.EpilogService)   -- 20.10. Final-Epilog
+local FeatureFlags              = require(ReplicatedStorage.Config.FeatureFlags)
 
 local DebugService = {}
 
@@ -298,6 +321,24 @@ commands.add = function(player, data, configId: any, level: any, mutation: any)
 	}
 end
 
+-- Faehigkeit eines Baerchis tauschen (zum Testen der Shows).
+-- uid "equipped" (oder leer) = der ausgeruestete Baerchi.
+--   D:Invoke("skill", "equipped", "OmegaStrike")
+commands.skill = function(player, data, uid: any, skillId: any)
+	local id = if uid == nil or uid == "equipped" then data.island.equippedUid else tostring(uid)
+	local baerchi = if id then data.island.baerchis[id] else nil
+	if not baerchi then
+		return { error = "Kein Baerchi mit uid " .. tostring(id) }
+	end
+	if not SkillConfig.getById(tostring(skillId)) then
+		return { error = "Unbekannte Faehigkeit: " .. tostring(skillId) }
+	end
+	local before = baerchi.skillId
+	baerchi.skillId = tostring(skillId) :: any
+	PlayerService.markDirty(player)
+	return { uid = baerchi.uid, configId = baerchi.configId, vorher = before, jetzt = baerchi.skillId }
+end
+
 -- Die Kampfwerte eines Baerchis so, wie der Kampf sie sieht. Praktisch, um
 -- Promotion, Stat-Stufen, Charms und Mutation gegeneinander nachzurechnen.
 commands.stats = function(_player, data, uid: any)
@@ -364,6 +405,15 @@ commands.hatch = function(player, data, eggType: any)
 	}
 end
 
+-- Ei verschenken (auch an einen anderen Spieler, im echten Spiel): kommt beim naechsten Laden
+-- bzw. innerhalb von 30 s an, wenn er online ist.
+--   D:Invoke("gift", 1542221687, "OmegaEgg", 1)
+commands.gift = function(player, data, userId: any, eggType: any, count: any)
+	local ok, text = GiftService.enqueue(tonumber(userId) or 0, tostring(eggType or "OmegaEgg"), tonumber(count) or 1)
+	if not ok then return { error = text } end
+	return { ok = text }
+end
+
 -- v12: Eier ins Lager legen, ohne sie zu oeffnen (fuer Tests im Ei-Menue)
 commands.egg = function(player, data, eggType: any, count: any)
 	local egg = tostring(eggType or "BasicEgg")
@@ -411,7 +461,7 @@ commands.tower = function(player, data, towerId: any, stage: any)
 	PlayerService.markDirty(player)
 	task.spawn(PetModeService.request, player, "Fight", choice :: any)
 	return {
-		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id, data.towers.records, data.towers.unlocked),
+		tower = id, ab = start, deckel = TowerConfig.getStageCap(data.rebirthCount, id, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked),
 		gegnerStage1 = TowerConfig.getEnemyStats(id, start),
 	}
 end
@@ -437,11 +487,67 @@ commands.towerrecord = function(player, data, towerId: any, stage: any)
 	return { towers = data.towers }
 end
 
+-- 20.10. Final-Epilog (Prompt 1). D:Invoke("epilog", "start|reset|state|launch|scan|on|off")
+--   start  neue Sequenz erzwingen (state none -> pending, EpilogStart), unabhaengig vom Rekord
+--   reset  state zurueck auf none (Endless/Welt 2 bleiben; danach loest ein Final-100-Sieg wieder aus)
+--   state  Zustand + Token-Vorschau
+--   launch pending/seen -> launched (Welt 2 frei), ohne Sequenz
+--   summit / summitoff  Gipfel bauen+teleportieren bzw. entfernen (ohne Zustandswechsel)
+--   scan   Final-Rekord >= 100 aber state none? (Luecke) + Zaehler verworfener Anfragen
+--          + Prompt 3: Insel-/Brueckenteile (Spieler und ganzer Workspace)
+--   terminal [idle|ready|armed|fired|done|off]  Prompt 4: Start-Terminal bauen und Zustand setzen
+--   bridge / bridgeinstant / bridgeoff  Prompt 3: Insel + Bruecke wachsen lassen /
+--          sofort bauen / animiert abbauen (verlangt state pending/seen: erst `epilog start`)
+--   speed N  Prompt 5: Zeitraffer 0,5..5 fuer den naechsten `start`
+--   audit    Prompt 5: Client-Zustand (Kamera, FOV, Lighting, Steuerung, Verbindungen) - muss sauber sein
+--   on|off Schalter FINAL_EPILOG fuer diese Studio-Sitzung
+commands.epilog = function(player, data, action: any, argument: any)
+	local act = tostring(action or "state")
+	local FLAGS = FeatureFlags.FLAGS
+	if act == "on" or act == "off" then
+		FLAGS.FINAL_EPILOG = (act == "on")
+	elseif act == "start" then
+		local started, note = EpilogService.debugStart(player)
+		return { gestartet = started, hinweis = note, epilog = data.epilog }
+	elseif act == "reset" then
+		EpilogService.debugReset(player)
+	elseif act == "launch" then
+		return { gestartet = EpilogService.debugLaunch(player, if argument ~= nil then tostring(argument) else nil), epilog = data.epilog, worlds = data.worlds }
+	elseif act == "scan" then
+		return EpilogService.debugScan(player, data)
+	elseif act == "bridge" or act == "bridgeinstant" or act == "bridgeoff" then
+		local ok, note = EpilogService.debugBridge(player, act)
+		return { ok = ok, hinweis = note, teile = MapService.countParts(player) }
+	elseif act == "terminal" then
+		-- Prompt 4: D:Invoke("epilog","terminal") -> ready; ("epilog","terminal","fired") spielt die Ausloese-Animation;
+		-- idle|ready|armed|fired|done setzen den Zustand, "off" entfernt das Terminal.
+		local ok, note = EpilogService.debugTerminal(player, if argument ~= nil then tostring(argument) else nil)
+		return { ok = ok, hinweis = note, teile = MapService.countParts(player) }
+	elseif act == "speed" then
+		-- Prompt 5: Zeitraffer fuer den naechsten Start (0,5..5), z. B. D:Invoke("epilog","speed",3)
+		return { zeitraffer = EpilogService.debugSpeed(player, argument) }
+	elseif act == "audit" then
+		-- Prompt 5: Zustand von Kamera, Lighting, Steuerung, Verbindungen (muss nach jedem Durchlauf sauber sein)
+		return EpilogService.debugAudit(player)
+	elseif act == "summit" or act == "summitoff" then
+		return { ok = EpilogService.debugSummit(player, act == "summit"), teile = MapService.countParts(player) }
+	elseif act ~= "state" then
+		return { error = "epilog start|reset|state|launch [fast]|scan|summit|summitoff|bridge|bridgeinstant|bridgeoff|terminal|speed|audit|on|off" }
+	end
+	return {
+		schalter = FeatureFlags.isOn("FINAL_EPILOG"),
+		epilog   = data.epilog,
+		worlds   = data.worlds,
+		endless  = data.towers.unlocked.Endless == true,
+		token    = EpilogService.debugToken(player),
+	}
+end
+
 -- v15: Deckel des aktuellen Rebirths
 commands.rebirthcap = function(_player, data)
 	local caps: { [string]: number } = {}
 	for _, def in TowerConfig.TOWERS do
-		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id, data.towers.records, data.towers.unlocked)
+		caps[def.id] = TowerConfig.getStageCap(data.rebirthCount, def.id, TowerConfig.unlockRecords(data.towers, data.island), data.towers.unlocked)
 	end
 	local capTower, capStage = TowerConfig.getCap(data.rebirthCount)
 	return { rebirths = data.rebirthCount, deckelTower = capTower, deckelStage = capStage, proTower = caps }
@@ -453,6 +559,7 @@ commands.stagebest = function(player, data, towerId: any, stage: any)
 	if typeof(towerId) == "string" and TowerConfig.get(towerId) then
 		data.island.stageBest[towerId] = math.max(0, math.floor(tonumber(stage) or 0))
 		PlayerService.markDirty(player)
+		TowerService.debugApplyUnlocks(player, towerId)   -- 12.10.: Tower pro Leben
 	end
 	local reqTower, reqStage = TowerConfig.getRebirthRequirement(data.rebirthCount, data.towers.records)
 	return {
@@ -463,18 +570,25 @@ commands.stagebest = function(player, data, towerId: any, stage: any)
 end
 
 -- Sammel-Update 05.10. (Paket 8): Inkubator-Stand; "done" macht alle Eier fertig.
-commands.incubator = function(player, data, action: any)
+commands.incubator = function(player, data, action: any, arg: any)
 	local incubator = data.island.incubator
-	if action == "done" then
-		for _, entry in incubator.slots do entry.finishAt = os.time() end
-		PlayerService.markDirty(player)
-	elseif action == "breed" then
-		-- INCUBATOR_BREED: jedes Baerchi im Inkubator bruetet sofort ein Ei.
+	local Rules = require(game:GetService("ReplicatedStorage").Modules.IncubatorRules)
+	if action == "breed" then
+		-- Der Baerchi im Inkubator bruetet sofort ein Ei.
 		-- Lazy require: kein weiterer Modul-Local (200er-Grenze).
 		local made = require(ServerScriptService.Services.IncubatorService).breedNow(player)
-		return { gebruetet = made, baerchis = incubator.breeders }
+		return { gebruetet = made, lager = Rules.storedTotal(incubator) }
+	elseif action == "level" and typeof(arg) == "number" then
+		incubator.level = math.clamp(math.floor(arg), 1, 4)
+		PlayerService.markDirty(player)
+	elseif action == "fill" then
+		local stored = Rules.storedOf(incubator)
+		stored.BasicEgg = (stored.BasicEgg or 0) + Rules.storedFree(incubator)
+		PlayerService.markDirty(player)
 	end
-	return { level = incubator.level, plaetze = incubator.slots, baerchis = incubator.breeders }
+	local level = Rules.levelOf(incubator)
+	return { level = level, lager = Rules.storedTotal(incubator) .. "/" .. Rules.capacity(level),
+		eier = incubator.stored, baerchi = incubator.breeders }
 end
 
 -- v15: Login-Bonus — so tun, als waeren `days` Tage vergangen
@@ -490,6 +604,107 @@ end
 -- v15: Teile auf der eigenen Insel zaehlen (Budget: 250 ohne Baerchi-Figuren)
 commands.parts = function(player, _data)
 	return MapService.countParts(player) or { error = "kein Plot" }
+end
+
+-- Welt aufwerten: Debug-Signale an die Client-Controller (workspace-Attribute,
+-- siehe WorldFXKit.onDebug). Ein Zaehler im Wert sorgt dafuer, dass derselbe
+-- Befehl zweimal hintereinander auch zweimal ausloest.
+local _worldSignal = 0
+local function worldSignal(attribute: string, value: any)
+	_worldSignal += 1
+	workspace:SetAttribute(attribute, if value == nil then tostring(_worldSignal) else value)
+end
+
+commands.worldshots = function(_player, _data, index: any)
+	local n = tonumber(index)
+	if n == nil then
+		local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
+		local names = {}
+		for _, shot in WorldFXConfig.WORLD_SHOTS do table.insert(names, shot.name) end
+		return { hinweis = "worldshots <1..6> (0 = zurueck)", punkte = names }
+	end
+	_worldSignal += 1
+	workspace:SetAttribute("DebugWorldShot", string.format("%d|%d", n, _worldSignal))
+	return { punkt = n }
+end
+
+commands.daytime = function(_player, _data, hour: any)
+	local h = tonumber(hour)
+	workspace:SetAttribute("DebugDayTime", if h then h else -1)
+	return { tageszeit = if h then h else "auto" }
+end
+
+commands.pitstate = function(_player, _data, state: any)
+	local value = tostring(state or "auto")
+	workspace:SetAttribute("DebugPitState", value)
+	return { pit = value }
+end
+
+commands.neststate = function(_player, _data, state: any)
+	local value = tostring(state or "auto")
+	workspace:SetAttribute("DebugNestState", value)
+	return { nest = value }
+end
+
+commands.arrival = function(_player, _data)
+	worldSignal("DebugArrival", nil)
+	return { ankunft = true }
+end
+
+commands.fish = function(_player, _data)
+	worldSignal("DebugFish", nil)
+	return { fisch = true }
+end
+
+-- Paket D: Insel-Stufe am Player-Attribut (wie PlotDisplayService), "auto"
+-- rechnet sie aus dem Spielstand neu.
+commands.islandstage = function(player, data, stage: any)
+	local IslandStage = require(ReplicatedStorage.Modules.IslandStage)
+	local n = tonumber(stage)
+	local value = if n then math.clamp(math.floor(n), 1, IslandStage.MAX)
+		else IslandStage.compute(data.towers and data.towers.records, data.rebirthCount or 0)
+	player:SetAttribute("IslandStage", value)
+	return { stufe = value }
+end
+
+-- Paket D: Teich voll (alle Honig-Lager voll, wie "honey"), damit der Ueberlauf laeuft
+commands.pondfull = function(player, data)
+	local result = commands.honey(player, data)
+	return { teich = "voll", honig = result }
+end
+
+-- Paket E: Zuschauer-Baerchis an der eigenen Arena testen
+commands.spectators = function(player, _data, mode: any)
+	_worldSignal += 1
+	workspace:SetAttribute("DebugSpectators", string.format("%d|%s|%d", player.UserId, tostring(mode or "hop"), _worldSignal))
+	return { zuschauer = tostring(mode or "hop") }
+end
+
+-- Paket G: Welt-Moment wie vom Server erkannt an alle schicken (ohne den
+-- Spielstand zu aendern). Erzwingt "gross", damit man jede Art sieht.
+commands.moment = function(player, _data, kind: any, value: any)
+	local WorldMomentService = require(ServerScriptService.Services.WorldMomentService)
+	local k = tostring(kind or "hatch")
+	local defaults = { hatch = "Cosmic", tower = "II", record = "I", rebirth = "1", mutation = "Galaxy" }
+	local v = if value ~= nil then tostring(value) else defaults[k] or "?"
+	WorldMomentService.announce(player, { kind = k :: any, value = v, number = 42 }, true)
+	return { moment = k, wert = v }
+end
+
+-- Paket G: fuenf grosse Momente auf einmal (Client muss sie nacheinander zeigen)
+commands.moments5 = function(player, _data)
+	local WorldMomentService = require(ServerScriptService.Services.WorldMomentService)
+	for _, m in { { "hatch", "Mythic" }, { "tower", "III" }, { "rebirth", "2" }, { "mutation", "Rainbow" }, { "hatch", "Omega" } } do
+		WorldMomentService.announce(player, { kind = m[1] :: any, value = m[2], number = 2 }, true)
+	end
+	return { momente = 5 }
+end
+
+-- Paket E: Rekord-Moment am eigenen Schau-Turm
+commands.record = function(player, _data)
+	_worldSignal += 1
+	workspace:SetAttribute("DebugRecord", string.format("%d|%d", player.UserId, _worldSignal))
+	return { rekord = true }
 end
 
 -- v15: den aktuellen Spielstand in ein v14-Format zuruckverwandeln (Topf L7,
@@ -537,6 +752,44 @@ end
 commands.pm = function(player, data, mode: any, resume: any)
 	PetModeService.request(player, tostring(mode or "Home"), if resume then tostring(resume) :: any else nil)
 	return commands.petmode(player, data)
+end
+
+-- 14.10. Test der Bewegung: Zustand, Position, Abstand zum Heimplatz.
+--   D:Invoke("probe")
+commands.probe = function(player, data)
+	local FigurePlacement = require(ServerScriptService.Util.FigurePlacement)
+	local uid = data.island.equippedUid
+	local figure = if uid then MapService.getBaerchiModel(player, uid) else nil
+	local homeFoot = MapService.getBaerchiHome(player)
+	local foot = if figure then FigurePlacement.footOf(figure) else nil
+	local baerchi = if uid then data.island.baerchis[uid] else nil
+	local uids = {}
+	for id, b in data.island.baerchis do table.insert(uids, id .. ":" .. b.configId .. ":L" .. b.level) end
+	table.sort(uids)
+	local pitPhase, stage = PitArenaService.getPhase(player)
+	return {
+		pit      = pitPhase,
+		stage    = stage,
+		event    = EventParticipationService.getPhase(player),
+		lock     = ActivityLock.owner(player),
+		equipped = uid,
+		hp       = if baerchi then baerchi.currentHp else nil,
+		level    = if baerchi then baerchi.level else nil,
+		gummies  = data.gummies,
+		won      = data.stats.totalFightsWon,
+		lost     = data.stats.totalFightsLost,
+		foot     = if foot then string.format("%.1f, %.1f, %.1f", foot.X, foot.Y, foot.Z) else nil,
+		toHome   = if foot and homeFoot then math.floor((foot - homeFoot).Magnitude * 10) / 10 else nil,
+		figure   = if figure then figure.Name else nil,
+		bears    = uids,
+	}
+end
+
+-- Ausruesten wie ueber die Inventar-Oberflaeche.   D:Invoke("equipbear", uid)
+commands.equipbear = function(player, data, uid: any)
+	local IslandService = require(ServerScriptService.Services.IslandService)
+	IslandService.equipBaerchi(player, tostring(uid))
+	return commands.probe(player, data)
 end
 
 commands.fight = function(player, _data, uid: any)
@@ -1067,7 +1320,7 @@ commands.help = function()
 		"add <configId> <level> [mutation]", "stats <uid>",
 		"building <id> <level>",
 		"hatch <eggType>", "egg <eggType> [anzahl]", "pitprogress <stage>", "honey", "feed <uid> <times>",
-		"fight <uid>",
+		"fight <uid>", "skill <uid|equipped> <skillId>",
 		"fuse <uidA> <uidB> [ability|level|eggs] [A|B]",
 		"recycle <uid>", "upgrade <buildingId>", "rebirth",
 
@@ -1093,11 +1346,18 @@ commands.help = function()
 
 		-- v15 (Tower/Gebaeude/Angeben/Login-Bonus)
 		"tower <I|II|III|Final> <stage>", "towerrecord <id> <stage>", "rebirthcap",
+		"epilog <start|reset|state|launch [fast]|scan|summit|summitoff|bridge|bridgeinstant|bridgeoff|terminal [zustand]|speed N|audit|on|off>  (20.10. Final-Epilog)",
 		"pass <on|off|reset> [KEY]  (08.10.: Gamepass Gratis-Skip testen)",
 		"dailyshift <tage>", "lbflush", "parts", "v14save",
 
 		-- v17
 		"jackpot", "combtheme <themeId|off>", "launch [anzahl]",
+
+		-- Welt aufwerten
+		"worldshots [1..6|0]", "daytime <uhrzeit|auto>", "pitstate <idle|soon|live|auto>",
+		"neststate <calm|boss|auto>", "arrival", "fish",
+		"islandstage <1..4|auto>", "pondfull", "spectators <hop|cheer>", "record",
+		"moment <hatch|tower|record|rebirth|mutation> [wert]", "moments5",
 	}
 end
 

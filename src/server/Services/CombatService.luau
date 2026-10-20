@@ -242,6 +242,12 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 
 		local stageBeats: { Types.FightBeat } = {}
 		for _, entry in result.log do
+			-- Finisher/Opener hat gegriffen: nur fuer die Optik der Show
+			-- (PitArenaService -> SkillFXPlay.bonus).
+			local bonus = false
+			for _, effect in entry.effects or {} do
+				if effect == "finisher" or effect == "opener" then bonus = true end
+			end
 			table.insert(stageBeats, {
 				actor   = entry.actor,
 				kind    = entry.kind,
@@ -249,6 +255,7 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 				enemyHp = math.clamp(entry.defenderHpAfter / enemyMax, 0, 1),
 				charge  = entry.chargeA,
 				skillId = entry.skillId,
+				bonus   = if bonus then true else nil,
 			})
 		end
 		table.insert(beats, stageBeats)
@@ -295,6 +302,49 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 	-- recalled = der Spieler hat zurueckgeholt.
 	local settled: Types.PitRunResult? = nil
 
+	-- ============================================================
+	-- 14.10. AUSZAHLUNG JE STAGE
+	-- ============================================================
+	-- Jede fertig gespielte Stage wird SOFORT abgerechnet (PitArenaService ruft
+	-- payStage nach jeder Stage): Gummies gehen gleich an den Spieler, HP und
+	-- Kampfzaehler stehen aktuell. Wer den Baerchi mitten im Lauf umlenkt oder
+	-- ausruestet, behaelt genau das, was er besiegt hat — mehr nicht. Nur die
+	-- GoldGummies (Lauf-Bonus), Rekord und Fortsetzungs-Stand kommen weiter am
+	-- Ende in settle.
+	local paidUpTo    = 0
+	local paidGummies = 0
+
+	local function payStage(index: number)
+		if index <= paidUpTo or index > #stages then
+			return
+		end
+		paidUpTo = index
+
+		local current = PlayerService.getData(player)
+		if not current then
+			return
+		end
+
+		local stage = stages[index]
+		local fighter = current.island.baerchis[baerchiUid]
+		if fighter then
+			-- Erschoepfungszustand festhalten: DAS ist die Verbindung zum
+			-- Fuettern.
+			fighter.currentHp = stage.hpAfter
+		end
+
+		if stage.won then
+			current.stats.totalFightsWon += 1
+			if stage.gummiesWon > 0 then
+				paidGummies += EconomyService.awardGummies(player, stage.gummiesWon)
+			end
+		else
+			current.stats.totalFightsLost += 1
+		end
+
+		PlayerService.markDirty(player)
+	end
+
 	local function settle(played: number, recalled: boolean): Types.PitRunResult
 		if settled then
 			return settled
@@ -306,13 +356,11 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 		local cleared     = 0
 		local paidCleared = 0   -- geschaffte Stages bis zum Deckel (GoldGummies)
 		local highestWon  = 0
-		local baseGummies = 0
 		for index = 1, played do
 			local stage = stages[index]
 			table.insert(playedStages, stage)
 			if stage.won then
 				cleared += 1
-				baseGummies += stage.gummiesWon
 				highestWon = math.max(highestWon, stage.stage)
 				if stage.stage <= capStage then
 					paidCleared += 1
@@ -355,27 +403,17 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 				EconomyService.awardGummiesFlat(player, cost)
 			end
 		else
-			local fighter = current.island.baerchis[baerchiUid]
-			if fighter then
-				-- Erschoepfungszustand festhalten: DAS ist die Verbindung zum
-				-- Fuettern.
-				fighter.currentHp = hpAfter
+			-- Gummies, HP und Kampfzaehler sind Stage fuer Stage schon bezahlt
+			-- (payStage). Hier nur nachholen, was noch offen ist — z.B. wenn
+			-- der Spieler mitten in der Stage geht: sie zaehlt als gespielt.
+			for index = paidUpTo + 1, played do
+				payStage(index)
 			end
-
-			if baseGummies > 0 then
-				result.gummiesWon = EconomyService.awardGummies(player, baseGummies)
-			end
+			result.gummiesWon = paidGummies
 
 			local goldReward = TowerConfig.getRunGold(towerId, paidCleared)
 			if goldReward > 0 then
 				result.goldGummiesWon = EconomyService.awardGoldGummies(player, goldReward)
-			end
-
-			if cleared > 0 then
-				current.stats.totalFightsWon += cleared
-			end
-			if not playedStages[played].won then
-				current.stats.totalFightsLost += 1
 			end
 
 			-- v15: Rekord, Meilensteine, Deckel-Hinweis (TowerService).
@@ -387,6 +425,11 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 			-- eingetreten ist — pro Tower.
 			current.island.towerProgress[towerId] = playedStages[played].stage
 		end
+
+		-- 14.10. VOR dem Speichern festhalten: saveNow yieldet, und ein zweiter
+		-- Aufruf in dieser Zeit (Abbruch + Fallback der alten Wiedergabe) wuerde
+		-- sonst ein zweites Mal abrechnen.
+		settled = result
 
 		FunnelService.step(player, "F06_FirstFightEnded")
 		PlayerService.markDirty(player)
@@ -409,7 +452,7 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 
 	-- Den Client informiert NICHT dieser Service, sondern PitArenaService — am
 	-- Ende der Wiedergabe mit dem abgerechneten Ergebnis.
-	PitArenaService.play(player, fullRun, settle, beats)
+	PitArenaService.play(player, fullRun, settle, beats, payStage)
 	FunnelService.step(player, "F05_FirstFightStarted")
 
 	-- Kosten sind schon abgezogen: syncen, damit die Anzeige stimmt.

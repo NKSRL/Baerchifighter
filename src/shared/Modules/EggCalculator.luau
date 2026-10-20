@@ -111,12 +111,29 @@ end
 -- Die Tabelle ist pro Baerchi verschieden und haengt ausdruecklich NICHT an
 -- der Rarity: ein Common kann eine andere Mischung legen als ein Epic. Siehe
 -- BaerchiConfig, Kommentar bei eggTable.
-function EggCalculator.rollEggType(baerchi: Types.Baerchi): Types.EggType?
+-- Gluecks-Bonus (Inkubator): alle Eier ausser dem haeufigsten (hoechstes Gewicht,
+-- bei Gleichstand das erste) zaehlen (1 + Bonus) mal. Ohne Bonus unveraendert.
+local function luckWeights(eggTable: { { eggType: Types.EggType, weight: number } }, luckPercent: number?): { { eggType: Types.EggType, weight: number } }
+	if not luckPercent or luckPercent <= 0 then return eggTable end
+	local topIndex, topWeight = 0, 0
+	for i, entry in eggTable do
+		if entry.weight > topWeight then topIndex, topWeight = i, entry.weight end
+	end
+	local result = {}
+	for i, entry in eggTable do
+		local weight = entry.weight
+		if i ~= topIndex and weight > 0 then weight *= (1 + luckPercent / 100) end
+		table.insert(result, { eggType = entry.eggType, weight = weight })
+	end
+	return result
+end
+
+function EggCalculator.rollEggType(baerchi: Types.Baerchi, luckPercent: number?): Types.EggType?
 	local def = BaerchiConfig.getById(baerchi.configId)
 	if not def or not def.eggTable then
 		return nil
 	end
-	return EggConfig.rollEggType(def.eggTable)
+	return EggConfig.rollEggType(luckWeights(def.eggTable, luckPercent))
 end
 
 -- Die Chancen dieses Baerchis als lesbare Liste, absteigend sortiert.
@@ -127,14 +144,15 @@ export type ChanceEntry = {
 	percent : number,
 }
 
-function EggCalculator.getChances(baerchi: Types.Baerchi): { ChanceEntry }
+function EggCalculator.getChances(baerchi: Types.Baerchi, luckPercent: number?): { ChanceEntry }
 	local def = BaerchiConfig.getById(baerchi.configId)
 	if not def or not def.eggTable then
 		return {}
 	end
 
+	local weighted = luckWeights(def.eggTable, luckPercent)
 	local total = 0
-	for _, entry in def.eggTable do
+	for _, entry in weighted do
 		if entry.weight > 0 then
 			total += entry.weight
 		end
@@ -144,7 +162,7 @@ function EggCalculator.getChances(baerchi: Types.Baerchi): { ChanceEntry }
 	end
 
 	local result: { ChanceEntry } = {}
-	for _, entry in def.eggTable do
+	for _, entry in weighted do
 		if entry.weight > 0 then
 			table.insert(result, {
 				eggType = entry.eggType,
@@ -180,9 +198,9 @@ end
 -- gesperrte Eier rutschen auf den freien Vorgaenger (EggTree.resolveLaid),
 -- genau wie beim Legen und Brueten auf dem Server. Gleiche Eier werden
 -- zusammengezaehlt; absteigend sortiert.
-function EggCalculator.getResolvedChances(baerchi: Types.Baerchi, eggTree: Types.EggTreeState?): { ChanceEntry }
+function EggCalculator.getResolvedChances(baerchi: Types.Baerchi, eggTree: Types.EggTreeState?, luckPercent: number?): { ChanceEntry }
 	local merged: { [string]: number } = {}
-	for _, entry in EggCalculator.getChances(baerchi) do
+	for _, entry in EggCalculator.getChances(baerchi, luckPercent) do
 		local eggType = EggTree.resolveLaid(eggTree, entry.eggType)
 		merged[eggType] = (merged[eggType] or 0) + entry.percent
 	end

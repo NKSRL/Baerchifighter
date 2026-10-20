@@ -291,16 +291,30 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 	-- UFO-Optik: Scheibe, Kuppel, Beam, Ring am Boden (alles im Model, ein
 	-- PivotTo pro Frame beim Client)
 	local discPos = Vector3.new(ground0.X, hoverY, ground0.Z)
-	fxPart({
-		Name = "Disc", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Metal,
-		Color = UFO_DISC_COLOR, Size = UFO_DISC_SIZE,
-		CFrame = CFrame.new(discPos) * CFrame.Angles(0, 0, math.rad(90)),
-	}, ufoModel)
-	fxPart({
-		Name = "Dome", Shape = Enum.PartType.Ball, Material = Enum.Material.Glass,
-		Color = UFO_COLOR, Transparency = UFO_DOME_TRANSPARENCY, Size = UFO_DOME_SIZE,
-		CFrame = CFrame.new(discPos + Vector3.new(0, UFO_DOME_LIFT, 0)),
-	}, ufoModel)
+	-- 20.10.: Scheibe und Kuppel kommen aus dem Modell Assets.EventUfoModel
+	-- (Blender, 40 Studs breit). Faellt es aus, bleibt die alte Primitiv-Optik.
+	local ufoTemplate = ReplicatedStorage:FindFirstChild("Assets") and ReplicatedStorage.Assets:FindFirstChild("EventUfoModel")
+	if ufoTemplate and ufoTemplate:IsA("Model") then
+		for _, tp in ufoTemplate:GetChildren() do
+			if tp:IsA("BasePart") then
+				local part = tp:Clone()
+				part.CFrame = CFrame.new(discPos) * tp.CFrame
+				part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch, part.CastShadow = true, false, false, false, false
+				part.Parent = ufoModel
+			end
+		end
+	else
+		fxPart({
+			Name = "Disc", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Metal,
+			Color = UFO_DISC_COLOR, Size = UFO_DISC_SIZE,
+			CFrame = CFrame.new(discPos) * CFrame.Angles(0, 0, math.rad(90)),
+		}, ufoModel)
+		fxPart({
+			Name = "Dome", Shape = Enum.PartType.Ball, Material = Enum.Material.Glass,
+			Color = UFO_COLOR, Transparency = UFO_DOME_TRANSPARENCY, Size = UFO_DOME_SIZE,
+			CFrame = CFrame.new(discPos + Vector3.new(0, UFO_DOME_LIFT, 0)),
+		}, ufoModel)
+	end
 	local beamHeight = hoverY - center.Y
 	local beam = fxPart({
 		Name = "Beam", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,

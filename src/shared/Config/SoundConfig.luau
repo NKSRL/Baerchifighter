@@ -22,6 +22,26 @@ SoundConfig.SOUNDS = {
 	upgrade = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.45 },
 	lookUp  = { id = "rbxasset://sounds/bass.wav",                volume = 0.5 },
 	unlock  = { id = "rbxasset://sounds/bass.wav",                volume = 0.45 },
+	-- R6 (Ei-Schluepf-Animation): PLATZHALTER ohne Klang (leere ID = stumm). Eigene Klaenge
+	-- hochladen und hier als "rbxassetid://<id>" eintragen.
+	hatchAppear     = { id = "", volume = 0.4 },
+	hatchWobble     = { id = "", volume = 0.4 },
+	hatchCrack      = { id = "", volume = 0.5 },
+	hatchBurst      = { id = "", volume = 0.6 },
+	hatchBurstHigh  = { id = "", volume = 0.7 },
+	hatchReveal     = { id = "", volume = 0.5 },
+	hatchRevealHigh = { id = "", volume = 0.7 },
+	-- 20.10. Final-Epilog Prompt 5: Platzhalter (leer = stumm), Prompt 7 fuellt sie.
+	epilog_hit    = { id = "", volume = 0.8 },   -- letzter Treffer, Hit-Freeze
+	epilog_flash  = { id = "", volume = 0.8 },   -- Flash
+	epilog_rise   = { id = "", volume = 0.6 },   -- Aufstieg / Wind
+	epilog_run    = { id = "", volume = 0.5 },   -- Lauf ueber die Bruecke
+	epilog_reveal = { id = "", volume = 0.7 },   -- Insel-Reveal, Musik-Aufbau
+	-- Prompt 6: Knopf-Finale (Platzhalter, Prompt 7 fuellt sie)
+	epilog_press     = { id = "", volume = 0.9 },   -- Knopf gedrueckt (harter Klack)
+	epilog_countdown = { id = "", volume = 0.7 },   -- je Zahl 3 / 2 / 1
+	epilog_launch    = { id = "", volume = 0.9 },   -- Raketenstart
+	epilog_unlock    = { id = "", volume = 0.8 },   -- Welt 2 freigeschaltet (Banner)
 } :: { [string]: SoundDef }
 
 -- Gesamt-Lautstaerke der UI-Klaenge (0 = alles stumm)

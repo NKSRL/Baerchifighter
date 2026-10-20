@@ -19,6 +19,8 @@ local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local Types         = require(ReplicatedStorage.Network.Types)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local RarityBandConfig = require(ReplicatedStorage.Config.RarityBandConfig)  -- HBB Paket 4
+local PanelManager  = require(script.Parent.PanelManager)   -- R1: zentraler Fensterbereich
+local Icons            = require(script.Parent.Icons)
 
 local Theme = {}
 
@@ -57,6 +59,15 @@ Theme.COLORS = {
 
 	-- Ausgegrauter Button (siehe Theme.setEnabled)
 	disabled   = Color3.fromRGB( 84,  80, 104),
+
+	-- Bilderbuch-Palette fuer Ei-Menue und Ei-Baum (passend zu den
+	-- Blender-Texturen in assets/ui, tools/art/render_ui.py)
+	honey      = Color3.fromRGB(255, 186,  52),
+	honeyDeep  = Color3.fromRGB(214, 128,  24),
+	cream      = Color3.fromRGB(255, 244, 220),
+	forest     = Color3.fromRGB( 36,  74,  50),
+	walnut     = Color3.fromRGB( 92,  58,  36),
+	walnutDeep = Color3.fromRGB( 52,  32,  22),
 }
 
 Theme.FONT      = Enum.Font.FredokaOne
@@ -444,8 +455,8 @@ end
 -- Dialoge
 --------------------------------------------------------------------------------
 
--- Ein Dialog laesst mindestens so viel vom Bildschirm frei (Anteil, je Achse).
-local DIALOG_SCREEN_FILL = 0.94
+-- R1: wie viel Platz ein Dialog hat und wo er sitzt, bestimmt allein
+-- PanelManager.getArea (frueher: fester Anteil 0,94 des ganzen Bildschirms).
 
 -- Name des UIScale, mit dem ein Dialog auf kleine Bildschirme passt (siehe
 -- Theme.dialog und Theme.dialogScale).
@@ -489,10 +500,28 @@ function Theme.dialog(name: string, parent: Instance, scale: Vector2, minSize: V
 			-- sie in Oberflaechen-Einheiten um, in denen minSize gemeint ist.
 			local global = screen:FindFirstChild("GlobalScale")
 			local globalScale = if global and global:IsA("UIScale") then math.max(global.Scale, 0.01) else 1
-			local room = screen.AbsoluteSize / globalScale * DIALOG_SCREEN_FILL
-			if room.X <= 0 or room.Y <= 0 then return end
-			fit.Scale = math.min(1, room.X / minSize.X, room.Y / minSize.Y)
+			-- Ein Skin (EggPanelSkin.adopt) haengt den Dialog in sein eigenes Panel um
+			-- und uebernimmt Position und Groesse; dann nichts mehr anfassen.
+			if root.Parent ~= screen then return end
+			local screenUnits = screen.AbsoluteSize / globalScale
+			if screenUnits.X <= 0 or screenUnits.Y <= 0 then return end
+			-- R1: zentraler Fensterbereich (oberhalb der Pet-Leiste); die echte
+			-- Groesse ist Scale-Anteil, begrenzt durch Min/Max. Passt sie nicht
+			-- hinein, schrumpft der ganze Dialog gleichmaessig.
+			local area = PanelManager.getArea(screenUnits)
+			local width  = math.clamp(scale.X * screenUnits.X, minSize.X, maxSize.X)
+			local height = math.clamp(scale.Y * screenUnits.Y, minSize.Y, maxSize.Y)
+			-- Setzt ein Panel seine Groesse spaeter selbst (z.B. Login-Bonus 900x600),
+			-- gilt die echte, unverkleinerte Groesse.
+			local measured = root.AbsoluteSize / (globalScale * math.max(fit.Scale, 0.01))
+			if measured.X > 1 and measured.Y > 1 then
+				width, height = measured.X, measured.Y
+			end
+			fit.Scale = math.min(1, area.size.X / width, area.size.Y / height)
+			root.Position = UDim2.fromOffset(area.center.X, area.center.Y)
 		end
+		PanelManager.onAreaChanged(refit)
+		root:GetPropertyChangedSignal("Size"):Connect(refit)
 		screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
 		-- Die globale UiScale kann nach dem Dialog angelegt werden (Main) und
 		-- aendert sich mit der Fenstergroesse.
@@ -542,6 +571,10 @@ function Theme.closeButton(parent: Instance, onClose: () -> (), color: Color3?):
 	close.TextColor3  = Theme.COLORS.text
 	close.ZIndex      = math.max(close.ZIndex, 12)
 	close.Activated:Connect(onClose)
+	-- 14.10. (UI_HONEY_SKIN): eigenes Kreuz-Bild statt Text-Knopf
+	if require(script.Parent.Icons).skinButton(close, "honey/close_btn") then
+		close.Size = UDim2.new(0, 48, 0, 48)
+	end
 
 	local hit = Instance.new("TextButton")
 	hit.Name                   = "CloseHit"
@@ -678,6 +711,108 @@ Theme.v2 = {
 		confetti  = 1.2,
 	},
 }
+
+--------------------------------------------------------------------------------
+-- Verzierte Rahmen (Ei-Menue, Ei-Baum, Infokarte)
+--------------------------------------------------------------------------------
+
+-- Legt den 9-Slice-Rahmen `kind` ("panel" | "card" | "tile") ueber `frame`.
+-- "panel" und "card" bringen ihre Fuellung mit (Hintergrund wird
+-- durchsichtig), "tile" ist nur ein Zierrand ueber der vorhandenen Farbe.
+--
+-- Ohne hochgeladenes Bild bleibt die Flaeche ein normales Theme.panel, nur in
+-- den Farben der Bilderbuch-Palette — bedienbar und im selben Ton.
+function Theme.ornate(frame: GuiObject, kind: string, sliceScale: number?): ImageLabel?
+	local stroke = frame:FindFirstChildOfClass("UIStroke")
+	local image = Icons.uiImage(frame, "frames/frame_" .. kind, sliceScale)
+	if not image then
+		if stroke then stroke.Color = Theme.COLORS.honeyDeep end
+		if kind == "panel" then
+			frame.BackgroundColor3 = Theme.COLORS.walnutDeep
+		elseif kind == "card" then
+			frame.BackgroundColor3 = Theme.COLORS.forest
+		end
+		return nil
+	end
+	image.Name   = "Ornate"
+	image.Size   = UDim2.fromScale(1, 1)
+	-- ZIndexBehavior = Sibling: der Rahmen ist ein Geschwister von Titel und
+	-- Inhalt und muss UNTER ihnen liegen.
+	image.ZIndex = 0
+	if kind ~= "tile" then
+		frame.BackgroundTransparency = 1
+		if stroke then stroke.Enabled = false end
+	end
+	return image
+end
+
+-- Dialog (Theme.dialog + dialogHeader + dialogBody) im verzierten Rahmen:
+-- Titelband in Honig statt Lila, Kopf und Inhalt ruecken vom Zierrand weg.
+function Theme.ornateDialog(root: Frame)
+	local image = Theme.ornate(root, "panel", 0.5)
+	local band = root:FindFirstChild("TitleBand")
+	if band and band:IsA("Frame") then
+		band.BackgroundColor3 = Theme.COLORS.honeyDeep
+		Theme.gradient(band, Color3.fromRGB(255, 236, 200), Color3.fromRGB(200, 150, 110))
+	end
+	if not image then return end
+	local header = root:FindFirstChild("Header")
+	local body = root:FindFirstChild("Body")
+	if band and band:IsA("GuiObject") then
+		band.Position = UDim2.new(0, 18, 0, 15)
+		band.Size     = UDim2.new(1, -36, 0, 40)
+	end
+	if header and header:IsA("GuiObject") then
+		header.Position = UDim2.new(0, 26, 0, 20)
+		header.Size     = UDim2.new(1, -52, 0, 30)
+	end
+	if body and body:IsA("GuiObject") then
+		body.Position = UDim2.new(0, 22, 0, 62)
+		body.Size     = UDim2.new(1, -44, 1, -82)
+	end
+end
+
+-- Grosser Aktionsknopf als Honigtropfen-Siegel ("Oeffnen"). Ohne Bild ein
+-- honigfarbener bigButton. Die Beschriftung bleibt button.Text (ein
+-- Kind-Label spiegelt sie ueber das Siegelbild), damit Aufrufer und
+-- Theme.setEnabled wie gewohnt arbeiten.
+function Theme.sealButton(name: string, parent: Instance, text: string): TextButton
+	local button = Theme.bigButton(name, parent, text, Theme.COLORS.honey)
+	local image = Icons.uiImage(button, "frames/seal", 0.42)
+	if not image then return button end
+
+	button.BackgroundTransparency = 1
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then stroke.Enabled = false end
+	local shine = button:FindFirstChild("Shine")
+	if shine then shine:Destroy() end
+	image.Name     = "Seal"
+	image.Position = UDim2.new(0, -4, 0, -3)
+	image.Size     = UDim2.new(1, 8, 1, 10)
+	image.ZIndex   = 0
+
+	local label = Theme.label("SealText", button, text)
+	label.Size           = UDim2.new(1, -16, 1, -4)
+	label.Position       = UDim2.fromOffset(8, 1)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.ZIndex         = 2
+	Theme.outlineText(label, 2)
+	button.TextTransparency = 1
+
+	local function sync()
+		label.Text   = button.Text
+		image.ImageColor3 = if button.Active then Color3.new(1, 1, 1) else Color3.fromRGB(130, 124, 120)
+		label.TextTransparency = if button.Active then 0 else 0.35
+		button.TextTransparency = 1
+	end
+	button:GetPropertyChangedSignal("Text"):Connect(sync)
+	button:GetPropertyChangedSignal("Active"):Connect(sync)
+	button:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+		if button.TextTransparency ~= 1 then sync() end
+	end)
+	sync()
+	return button
+end
 
 --------------------------------------------------------------------------------
 -- Formatierung

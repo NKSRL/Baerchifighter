@@ -207,10 +207,10 @@ local function showResult(result: Types.PitRunResult)
 	local parts = {
 		"Tower " .. def.numeral,
 		Loc.tn("msg.tower_cleared", cleared),
-		"+" .. Theme.formatNumber(result.gummiesWon or 0) .. " Gummies",
+		"+" .. Theme.formatNumber(result.gummiesWon or 0) .. " Paw Coins",
 	}
 	if (result.goldGummiesWon or 0) > 0 then
-		table.insert(parts, "+" .. Theme.formatNumber(result.goldGummiesWon) .. " GoldGummies")
+		table.insert(parts, "+" .. Theme.formatNumber(result.goldGummiesWon) .. " Honey Crystals")
 	end
 	if result.newRecord then
 		table.insert(parts, Loc.t("msg.tower_new_record", { stage = result.newRecord }))
@@ -220,7 +220,7 @@ local function showResult(result: Types.PitRunResult)
 	end
 
 	local text = table.concat(parts, "  •  ")
-	-- Gummies/GoldGummies fliegen ueber den Datenstand (UI/Feedback); der
+	-- Gummies/Honey Crystals fliegen ueber den Datenstand (UI/Feedback); der
 	-- neue Rekord ist der Moment, den man sehen soll.
 	Notify.emit("tower_result", function()
 		if cleared > 0 then Toast.success(text) else Toast.info(text) end
@@ -240,8 +240,8 @@ end
 local function showMilestone(reward: Types.TowerMilestoneReward)
 	local def = TowerConfig.get(reward.towerId) or TowerConfig.TOWERS[1]
 	local parts: { string } = {}
-	if reward.gummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.gummies) .. " Gummies") end
-	if reward.goldGummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.goldGummies) .. " GoldGummies") end
+	if reward.gummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.gummies) .. " Paw Coins") end
+	if reward.goldGummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.goldGummies) .. " Honey Crystals") end
 	if reward.eggType and reward.eggs > 0 then
 		table.insert(parts, string.format("+%d %s", reward.eggs, Names.egg(reward.eggType)))
 	end

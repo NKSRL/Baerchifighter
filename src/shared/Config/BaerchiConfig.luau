@@ -141,9 +141,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	RedBaerchi = {
-		id = "RedBaerchi", displayName = "Roter Baerchi", rarity = "Common", path = "Stamm",
+		id = "RedBaerchi", displayName = "Braunbär", rarity = "Common", path = "Stamm",
 		baseStats = { hp = 105, atk = 10, spd = 1.0, pwr = 0.10 },
-		layIntervalSeconds = 240,
+		layIntervalSeconds = 80,
 		eggTable = {
 			{ eggType = "BasicEgg", weight = 100 },
 		},
@@ -152,9 +152,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	},
 
 	GreenBaerchi = {
-		id = "GreenBaerchi", displayName = "Gruener Baerchi", rarity = "Common", path = "Stamm",
+		id = "GreenBaerchi", displayName = "Pandabär", rarity = "Common", path = "Stamm",
 		baseStats = { hp = 130, atk = 8, spd = 0.9, pwr = 0.06 },
-		layIntervalSeconds = 300,
+		layIntervalSeconds = 90,
 		eggTable = {
 			{ eggType = "BasicEgg", weight = 90 },
 			{ eggType = "SugarEgg", weight = 10 },
@@ -164,9 +164,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	},
 
 	YellowBaerchi = {
-		id = "YellowBaerchi", displayName = "Gelber Baerchi", rarity = "Common", path = "Stamm",
+		id = "YellowBaerchi", displayName = "Honigbär", rarity = "Common", path = "Stamm",
 		baseStats = { hp = 93, atk = 12, spd = 1.2, pwr = 0.18 },
-		layIntervalSeconds = 270,
+		layIntervalSeconds = 85,
 		eggTable = {
 			{ eggType = "BasicEgg", weight = 85 },
 			{ eggType = "SugarEgg", weight = 15 },
@@ -180,9 +180,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	BlueBaerchi = {
-		id = "BlueBaerchi", displayName = "Blauer Baerchi", rarity = "Uncommon", path = "Stamm",
+		id = "BlueBaerchi", displayName = "Eisbär", rarity = "Uncommon", path = "Stamm",
 		baseStats = { hp = 156, atk = 14, spd = 1.0, pwr = 0.12 },
-		layIntervalSeconds = 330,
+		layIntervalSeconds = 100,
 		eggTable = {
 			{ eggType = "BasicEgg", weight = 65 },
 			{ eggType = "SugarEgg", weight = 35 },
@@ -192,9 +192,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	},
 
 	OrangeBaerchi = {
-		id = "OrangeBaerchi", displayName = "Oranger Baerchi", rarity = "Uncommon", path = "Stamm",
+		id = "OrangeBaerchi", displayName = "Tigerbär", rarity = "Uncommon", path = "Stamm",
 		baseStats = { hp = 117, atk = 18, spd = 1.1, pwr = 0.22 },
-		layIntervalSeconds = 360,
+		layIntervalSeconds = 105,
 		eggTable = {
 			{ eggType = "BasicEgg", weight = 60 },
 			{ eggType = "SugarEgg", weight = 40 },
@@ -208,29 +208,26 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	SugarBaerchi = {
-		id = "SugarBaerchi", displayName = "Zucker-Baerchi", rarity = "Rare", path = "Stamm",
+		id = "SugarBaerchi", displayName = "Zucker-DJ", rarity = "Rare", path = "Stamm",
 		baseStats = { hp = 205, atk = 20, spd = 1.2, pwr = 0.20 },
-		layIntervalSeconds = 420,
+		layIntervalSeconds = 125,
 		-- v14: oeffnet beide Wege aus dem Stamm (Gold ueber Golden, Void ueber Nebel).
 		eggTable = {
-			{ eggType = "BasicEgg",  weight = 15 },
-			{ eggType = "SugarEgg",  weight = 60 },
-			{ eggType = "GoldenEgg", weight = 13 },
-			{ eggType = "MistEgg",   weight = 12 },
+			{ eggType = "BasicEgg", weight = 20 },
+			{ eggType = "SugarEgg", weight = 80 },
 		},
 		defaultSkill = "SugarStorm", eggSource = {},
 		description = "Smells like candy, hits like a truck.",
 	},
 
 	CrystalBaerchi = {
-		id = "CrystalBaerchi", displayName = "Kristall-Baerchi", rarity = "Rare", path = "Kristall",
+		id = "CrystalBaerchi", displayName = "Detektiv", rarity = "Rare", path = "Kristall",
 		-- v14: Kristall-Profil (Glaskanone, schnell). Vorher 250 HP / 0.9 SPD.
 		baseStats = { hp = 165, atk = 17, spd = 1.45, pwr = 0.34 },
-		layIntervalSeconds = 360,
+		layIntervalSeconds = 120,
 		eggTable = {
-			{ eggType = "SugarEgg",   weight = 45 },
-			{ eggType = "GoldenEgg",  weight = 35 },
-			{ eggType = "CrystalEgg", weight = 20 },
+			{ eggType = "SugarEgg", weight = 70 },
+			{ eggType = "GoldenEgg", weight = 30 },
 		},
 		defaultSkill = "ShardBlast", eggSource = {},
 		description = "Scharfkantig und blitzschnell. Zerbricht leicht.",
@@ -243,28 +240,24 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	GoldenGrizzly = {
 		id = "GoldenGrizzly", displayName = "Goldener Grizzly", rarity = "Epic", path = "Gold",
 		baseStats = { hp = 420, atk = 40, spd = 0.85, pwr = 0.14 },
-		layIntervalSeconds = 540,
+		layIntervalSeconds = 140,
 		eggTable = {
-			{ eggType = "SugarEgg",    weight = 15 },
-			{ eggType = "GoldenEgg",   weight = 62 },
-			{ eggType = "PlatinumEgg", weight = 15 },
-			{ eggType = "CrystalEgg",  weight = 8 },
+			{ eggType = "SugarEgg", weight = 25 },
+			{ eggType = "GoldenEgg", weight = 75 },
 		},
 		defaultSkill = "GoldRush", eggSource = {},
 		description = "Selten, maechtig, und weiss es.",
 	},
 
 	VoidBaerchi = {
-		id = "VoidBaerchi", displayName = "Void-Baerchi", rarity = "Epic", path = "Void",
+		id = "VoidBaerchi", displayName = "Ninja", rarity = "Epic", path = "Void",
 		-- v14: Void-Profil (schwacher Kampf, seltene Eier). Vorher 278/45/1.4/0.30.
 		baseStats = { hp = 290, atk = 32, spd = 1.05, pwr = 0.24 },
-		layIntervalSeconds = 600,
+		layIntervalSeconds = 150,
 		layUpgradeChance = 0.08,
 		eggTable = {
-			{ eggType = "SugarEgg", weight = 15 },
-			{ eggType = "MistEgg",  weight = 55 },
-			{ eggType = "VoidEgg",  weight = 20 },
-			{ eggType = "GoldenEgg", weight = 10 },
+			{ eggType = "SugarEgg", weight = 25 },
+			{ eggType = "MistEgg", weight = 75 },
 		},
 		defaultSkill = "BlackHole", eggSource = {},
 		description = "Kommt aus dem Nichts. Verschwindet genauso.",
@@ -277,11 +270,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	RainbowBaerchi = {
 		id = "RainbowBaerchi", displayName = "Regenbogen-Baerchi", rarity = "Legendary", path = "Kristall",
 		baseStats = { hp = 440, atk = 54, spd = 1.5, pwr = 0.42 },
-		layIntervalSeconds = 540,
+		layIntervalSeconds = 160,
 		eggTable = {
-			{ eggType = "GoldenEgg",    weight = 26 },
-			{ eggType = "CrystalEgg",   weight = 55 },
-			{ eggType = "PrismEgg",     weight = 15 },
+			{ eggType = "GoldenEgg", weight = 35 },
+			{ eggType = "CrystalEgg", weight = 65 },
 		},
 		defaultSkill = "ChromaBlast", eggSource = {},
 		description = "Jede Farbe. Jede Kraft.",
@@ -290,15 +282,13 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	AncientBaerchi = {
 		id = "AncientBaerchi", displayName = "Uralter Baerchi", rarity = "Legendary", path = "Gold",
 		baseStats = { hp = 1000, atk = 56, spd = 0.85, pwr = 0.08 },
-		layIntervalSeconds = 660,
+		layIntervalSeconds = 170,
 		eggTable = {
-			{ eggType = "GoldenEgg",    weight = 30 },
-			{ eggType = "PlatinumEgg",  weight = 50 },
-			{ eggType = "SunEgg",       weight = 12 },
-			{ eggType = "CrystalEgg",   weight = 5 },
+			{ eggType = "GoldenEgg", weight = 35 },
+			{ eggType = "PlatinumEgg", weight = 65 },
 		},
 		defaultSkill = "TitanMode", eggSource = {},
-		description = "War schon da bevor Gummies erfunden wurden.",
+		description = "War schon da bevor Paw Coins erfunden wurden.",
 	},
 
 	-- ============================================================
@@ -310,12 +300,11 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		-- die ID bleibt wegen bestehender Spielstaende.
 		id = "CosmicBaerchi", displayName = "Sternen-Baerchi", rarity = "Mythic", path = "Kosmos",
 		baseStats = { hp = 1100, atk = 80, spd = 1.25, pwr = 0.26 },
-		layIntervalSeconds = 900,
+		layIntervalSeconds = 185,
 		eggTable = {
-			{ eggType = "PlatinumEgg",  weight = 25 },
-			{ eggType = "PrismEgg",     weight = 25 },
-			{ eggType = "VoidEgg",      weight = 25 },
-			{ eggType = "CrystalEgg",   weight = 15 },
+			{ eggType = "GoldenEgg", weight = 20 },
+			{ eggType = "PlatinumEgg", weight = 40 },
+			{ eggType = "CrystalEgg", weight = 40 },
 		},
 		defaultSkill = "BigBang", eggSource = {},
 		description = "Ein Stueck Sternenhimmel mit Fell.",
@@ -324,11 +313,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	PhoenixBaerchi = {
 		id = "PhoenixBaerchi", displayName = "Phoenix-Baerchi", rarity = "Mythic", path = "Gold",
 		baseStats = { hp = 2100, atk = 142, spd = 0.85, pwr = 0.16 },
-		layIntervalSeconds = 840,
+		layIntervalSeconds = 180,
 		eggTable = {
-			{ eggType = "PlatinumEgg",  weight = 40 },
-			{ eggType = "SunEgg",       weight = 45 },
-			{ eggType = "ZenithEgg",    weight = 10 },
+			{ eggType = "PlatinumEgg", weight = 35 },
+			{ eggType = "SunEgg", weight = 65 },
 		},
 		defaultSkill = "PhoenixRebirth", eggSource = {},
 		description = "Faellt einmal. Steht immer wieder auf.",
@@ -337,11 +325,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	GlacierBaerchi = {
 		id = "GlacierBaerchi", displayName = "Gletscher-Baerchi", rarity = "Mythic", path = "Kristall",
 		baseStats = { hp = 880, atk = 84, spd = 1.6, pwr = 0.44 },
-		layIntervalSeconds = 660,
+		layIntervalSeconds = 175,
 		eggTable = {
-			{ eggType = "CrystalEgg",   weight = 25 },
-			{ eggType = "PrismEgg",     weight = 45 },
-			{ eggType = "AuroraEgg",    weight = 25 },
+			{ eggType = "CrystalEgg", weight = 30 },
+			{ eggType = "PrismEgg", weight = 70 },
 		},
 		defaultSkill = "GlacierFrost", eggSource = {},
 		description = "Wo er hinschaut, wird alles langsam.",
@@ -350,12 +337,11 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	PhantomBaerchi = {
 		id = "PhantomBaerchi", displayName = "Phantom-Baerchi", rarity = "Mythic", path = "Void",
 		baseStats = { hp = 980, atk = 70, spd = 1.05, pwr = 0.20 },
-		layIntervalSeconds = 960,
+		layIntervalSeconds = 190,
 		layUpgradeChance = 0.25,
 		eggTable = {
-			{ eggType = "MistEgg",      weight = 10 },
-			{ eggType = "VoidEgg",      weight = 45 },
-			{ eggType = "ShadowEgg",    weight = 40 },
+			{ eggType = "MistEgg", weight = 30 },
+			{ eggType = "VoidEgg", weight = 70 },
 		},
 		defaultSkill = "PhantomOmen", eggSource = {},
 		description = "Man sieht ihn kaum. Seine Eier schon.",
@@ -368,38 +354,35 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	SeraphBaerchi = {
 		id = "SeraphBaerchi", displayName = "Seraph-Baerchi", rarity = "Divine", path = "Gold",
 		baseStats = { hp = 2900, atk = 170, spd = 0.85, pwr = 0.18 },
-		layIntervalSeconds = 1020,
+		layIntervalSeconds = 200,
 		eggTable = {
-			{ eggType = "SunEgg",       weight = 40 },
-			{ eggType = "ZenithEgg",    weight = 50 },
-			{ eggType = "CometEgg",     weight = 5 },
+			{ eggType = "SunEgg", weight = 30 },
+			{ eggType = "ZenithEgg", weight = 70 },
 		},
 		defaultSkill = "SeraphGrace", eggSource = {},
 		description = "Sechs Fluegel, ein Herz aus Honig.",
 	},
 
 	NorthernLightBaerchi = {
-		id = "NorthernLightBaerchi", displayName = "Polarlicht-Baerchi", rarity = "Divine", path = "Kristall",
+		id = "NorthernLightBaerchi", displayName = "Engel", rarity = "Divine", path = "Kristall",
 		baseStats = { hp = 1450, atk = 128, spd = 1.65, pwr = 0.48 },
-		layIntervalSeconds = 780,
+		layIntervalSeconds = 195,
 		eggTable = {
-			{ eggType = "PrismEgg",     weight = 30 },
-			{ eggType = "AuroraEgg",    weight = 60 },
-			{ eggType = "CometEgg",     weight = 5 },
+			{ eggType = "PrismEgg", weight = 30 },
+			{ eggType = "AuroraEgg", weight = 70 },
 		},
 		defaultSkill = "AuroraVeil", eggSource = {},
 		description = "Tanzt ueber den Himmel, schneller als das Auge.",
 	},
 
 	EclipseBaerchi = {
-		id = "EclipseBaerchi", displayName = "Eklipse-Baerchi", rarity = "Divine", path = "Void",
+		id = "EclipseBaerchi", displayName = "Teufel", rarity = "Divine", path = "Void",
 		baseStats = { hp = 1650, atk = 104, spd = 1.05, pwr = 0.22 },
-		layIntervalSeconds = 1140,
+		layIntervalSeconds = 205,
 		layUpgradeChance = 0.12,
 		eggTable = {
-			{ eggType = "ShadowEgg",    weight = 45 },
-			{ eggType = "AbyssEgg",     weight = 45 },
-			{ eggType = "CometEgg",     weight = 5 },
+			{ eggType = "VoidEgg", weight = 30 },
+			{ eggType = "ShadowEgg", weight = 70 },
 		},
 		defaultSkill = "EclipseShroud", eggSource = {},
 		description = "Wenn er auftaucht, wird es mitten am Tag dunkel.",
@@ -410,28 +393,24 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	-- ============================================================
 
 	CometBaerchi = {
-		id = "CometBaerchi", displayName = "Kometen-Baerchi", rarity = "Cosmic", path = "Kosmos",
+		id = "CometBaerchi", displayName = "Astronaut", rarity = "Cosmic", path = "Kosmos",
 		baseStats = { hp = 3800, atk = 205, spd = 1.25, pwr = 0.30 },
-		layIntervalSeconds = 1140,
+		layIntervalSeconds = 220,
 		eggTable = {
-			{ eggType = "ZenithEgg",    weight = 15 },
-			{ eggType = "AuroraEgg",    weight = 15 },
-			{ eggType = "AbyssEgg",     weight = 15 },
-			{ eggType = "CometEgg",     weight = 45 },
-			{ eggType = "NovaEgg",      weight = 5 },
+			{ eggType = "AuroraEgg", weight = 30 },
+			{ eggType = "CometEgg", weight = 70 },
 		},
 		defaultSkill = "CometImpact", eggSource = {},
 		description = "Kommt mit einem Knall. Bleibt mit einem Krater.",
 	},
 
 	NebulaBaerchi = {
-		id = "NebulaBaerchi", displayName = "Nebula-Baerchi", rarity = "Cosmic", path = "Kosmos",
+		id = "NebulaBaerchi", displayName = "UFO-Bärchi", rarity = "Cosmic", path = "Kosmos",
 		baseStats = { hp = 3600, atk = 195, spd = 1.3, pwr = 0.34 },
-		layIntervalSeconds = 1140,
+		layIntervalSeconds = 220,
 		eggTable = {
-			{ eggType = "AbyssEgg",     weight = 20 },
-			{ eggType = "CometEgg",     weight = 55 },
-			{ eggType = "NovaEgg",      weight = 20 },
+			{ eggType = "ShadowEgg", weight = 30 },
+			{ eggType = "AbyssEgg", weight = 70 },
 		},
 		defaultSkill = "NebulaBurn", eggSource = {},
 		description = "Ein Fell aus Sternenstaub, der brennt.",
@@ -440,11 +419,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	PulsarBaerchi = {
 		id = "PulsarBaerchi", displayName = "Pulsar-Baerchi", rarity = "Cosmic", path = "Kosmos",
 		baseStats = { hp = 3700, atk = 200, spd = 1.3, pwr = 0.30 },
-		layIntervalSeconds = 1140,
+		layIntervalSeconds = 220,
 		eggTable = {
-			{ eggType = "AuroraEgg",    weight = 20 },
-			{ eggType = "CometEgg",     weight = 55 },
-			{ eggType = "NovaEgg",      weight = 20 },
+			{ eggType = "ZenithEgg", weight = 30 },
+			{ eggType = "CometEgg", weight = 70 },
 		},
 		defaultSkill = "PulsarPulse", eggSource = {},
 		description = "Tickt wie eine Uhr. Jeder Schlag lauter.",
@@ -457,11 +435,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	ShadeBaerchi = {
 		id = "ShadeBaerchi", displayName = "Schemen-Baerchi", rarity = "Secret", path = "Kosmos",
 		baseStats = { hp = 6200, atk = 310, spd = 1.35, pwr = 0.32 },
-		layIntervalSeconds = 1320,
+		layIntervalSeconds = 240,
 		eggTable = {
-			{ eggType = "CometEgg",     weight = 30 },
-			{ eggType = "NovaEgg",      weight = 55 },
-			{ eggType = "GalaxyEgg",    weight = 10 },
+			{ eggType = "CometEgg", weight = 30 },
+			{ eggType = "NovaEgg", weight = 70 },
 		},
 		defaultSkill = "ShadeSlash", eggSource = {},
 		description = "Niemand hat ihn je ganz gesehen.",
@@ -470,11 +447,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	RiddleBaerchi = {
 		id = "RiddleBaerchi", displayName = "Raetsel-Baerchi", rarity = "Secret", path = "Kosmos",
 		baseStats = { hp = 6400, atk = 295, spd = 1.3, pwr = 0.36 },
-		layIntervalSeconds = 1320,
+		layIntervalSeconds = 240,
 		eggTable = {
-			{ eggType = "CometEgg",     weight = 20 },
-			{ eggType = "NovaEgg",      weight = 60 },
-			{ eggType = "GalaxyEgg",    weight = 15 },
+			{ eggType = "CometEgg", weight = 25 },
+			{ eggType = "NovaEgg", weight = 75 },
 		},
 		defaultSkill = "RiddleBeam", eggSource = {},
 		description = "Beantwortet jede Frage mit einer neuen.",
@@ -487,10 +463,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	TitanBaerchi = {
 		id = "TitanBaerchi", displayName = "Titanen-Baerchi", rarity = "Godly", path = "Kosmos",
 		baseStats = { hp = 11500, atk = 480, spd = 1.2, pwr = 0.30 },
-		layIntervalSeconds = 1500,
+		layIntervalSeconds = 260,
 		eggTable = {
-			{ eggType = "NovaEgg",      weight = 45 },
-			{ eggType = "GalaxyEgg",    weight = 50 },
+			{ eggType = "NovaEgg", weight = 40 },
+			{ eggType = "GalaxyEgg", weight = 60 },
 		},
 		defaultSkill = "TitanFist", eggSource = {},
 		description = "Traegt Berge, als waeren es Gummibaerchen.",
@@ -499,10 +475,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	GenesisBaerchi = {
 		id = "GenesisBaerchi", displayName = "Genesis-Baerchi", rarity = "Godly", path = "Kosmos",
 		baseStats = { hp = 10500, atk = 440, spd = 1.35, pwr = 0.36 },
-		layIntervalSeconds = 1500,
+		layIntervalSeconds = 260,
 		eggTable = {
-			{ eggType = "NovaEgg",      weight = 40 },
-			{ eggType = "GalaxyEgg",    weight = 55 },
+			{ eggType = "NovaEgg", weight = 35 },
+			{ eggType = "GalaxyEgg", weight = 65 },
 		},
 		defaultSkill = "GenesisWave", eggSource = {},
 		description = "Am Anfang war der Baerchi.",
@@ -515,10 +491,10 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	ChronosBaerchi = {
 		id = "ChronosBaerchi", displayName = "Chronos-Baerchi", rarity = "Eternal", path = "Kosmos",
 		baseStats = { hp = 18500, atk = 690, spd = 1.4, pwr = 0.34 },
-		layIntervalSeconds = 1800,
+		layIntervalSeconds = 280,
 		eggTable = {
-			{ eggType = "NovaEgg",      weight = 30 },
-			{ eggType = "GalaxyEgg",    weight = 65 },
+			{ eggType = "NovaEgg", weight = 20 },
+			{ eggType = "GalaxyEgg", weight = 80 },
 		},
 		defaultSkill = "ChronosRift", eggSource = {},
 		description = "Kommt immer genau rechtzeitig.",
@@ -527,10 +503,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	InfinityBaerchi = {
 		id = "InfinityBaerchi", displayName = "Unendlichkeits-Baerchi", rarity = "Eternal", path = "Kosmos",
 		baseStats = { hp = 18000, atk = 660, spd = 1.45, pwr = 0.38 },
-		layIntervalSeconds = 1800,
+		layIntervalSeconds = 280,
 		eggTable = {
-			{ eggType = "NovaEgg",      weight = 25 },
-			{ eggType = "GalaxyEgg",    weight = 70 },
+			{ eggType = "GalaxyEgg", weight = 100 },
 		},
 		defaultSkill = "InfinityBarrage", eggSource = {},
 		description = "Hoert nie auf. Wirklich nie.",
@@ -543,9 +518,9 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 	OmegaBaerchi = {
 		id = "OmegaBaerchi", displayName = "Omega-Baerchi", rarity = "Omega", path = "Kosmos",
 		baseStats = { hp = 31500, atk = 1050, spd = 1.5, pwr = 0.40 },
-		layIntervalSeconds = 2100,
+		layIntervalSeconds = 300,
 		eggTable = {
-			{ eggType = "GalaxyEgg",    weight = 90 },
+			{ eggType = "GalaxyEgg", weight = 100 },
 		},
 		defaultSkill = "OmegaStrike", eggSource = {},
 		description = "Der letzte Baerchi. Danach kommt nichts mehr.",

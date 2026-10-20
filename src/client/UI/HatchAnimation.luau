@@ -42,11 +42,14 @@ local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local Names         = require(ReplicatedStorage.Localization.Names)
 
+local HatchFxConfig   = require(ReplicatedStorage.Config.HatchFxConfig)
+local EggHatch       = require(ReplicatedStorage.VFX.EggHatch)   -- R6: die neue Inszenierung
 local BaerchiMesh   = require(ReplicatedStorage.Modules.BaerchiMesh)   -- Sammel-Update 2.2: Baerchi gross zeigen
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
 local AudioController = require(script.Parent.Parent.Controllers.AudioController)
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
 local EggIcon = require(script.Parent.EggIcon)
 local Toast = require(script.Parent.Toast)
 -- Sammel-Update: fehlte, Notify.emit beim Fehlschlag waere ein Laufzeitfehler.
@@ -85,6 +88,8 @@ type Job = {
 	failed  : string?,     -- Grund, falls der Server abgelehnt hat oder nichts kam
 	silent  : boolean,     -- true = die Meldung hat schon der Toast gezeigt (ActionFailed)
 	started : number,      -- os.clock() beim Klick (fuer den Timeout)
+	batch   : boolean?,    -- 15.10.: "10 oeffnen" (Ergebnis kommt als Liste in `results`)
+	results : { Types.HatchResult }?,
 }
 
 local _screenGui: ScreenGui? = nil
@@ -170,6 +175,7 @@ type Scene = {
 	glow     : Frame,
 	egg      : Frame,
 	eggStroke: UIStroke,
+	art      : ImageLabel?,   -- gemaltes Ei-Bild (falls vorhanden)
 	cracks   : Frame,
 	label    : TextLabel,
 }
@@ -209,10 +215,30 @@ local function buildScene(screenGui: ScreenGui, eggType: Types.EggType): Scene
 	egg.ZIndex = 52
 	round(egg)
 	local stroke = Theme.stroke(egg, Theme.COLORS.outline, 4)
-	Theme.gradient(egg, Theme.shade(eggColor, 0.25), Theme.shade(eggColor, -0.15))
 
-	-- Muster und Glanzpunkt wie auf dem Ei in der Welt (EggIcon/EggLook)
-	EggIcon.decorate(egg, eggType, EGG_SIZE.X / EGG_SIZE.Y, 53)
+	-- 13.10.: Gibt es ein gemaltes Ei-Bild, zeigt die Animation genau dieses
+	-- Bild (wie Menue und Ei-Baum); sonst das gezeichnete Ersatz-Ei.
+	local art: ImageLabel? = nil
+	local imageId = EggIcon.imageId(tostring(eggType))
+	if imageId then
+		egg.BackgroundTransparency = 1
+		stroke.Enabled = false
+		local image = Instance.new("ImageLabel")
+		image.Name                   = "Art"
+		image.BackgroundTransparency = 1
+		image.Image                  = imageId
+		image.ScaleType              = Enum.ScaleType.Fit
+		image.AnchorPoint            = Vector2.new(0.5, 0.5)
+		image.Position               = UDim2.fromScale(0.5, 0.5)
+		image.Size                   = UDim2.fromScale(1.3, 1.08)
+		image.ZIndex                 = 53
+		image.Parent                 = egg
+		art = image
+	else
+		Theme.gradient(egg, Theme.shade(eggColor, 0.25), Theme.shade(eggColor, -0.15))
+		-- Muster und Glanzpunkt wie auf dem Ei in der Welt (EggIcon/EggLook)
+		EggIcon.decorate(egg, eggType, EGG_SIZE.X / EGG_SIZE.Y, 53)
+	end
 
 	local cracks = Instance.new("Frame")
 	cracks.Name                   = "Cracks"
@@ -231,7 +257,7 @@ local function buildScene(screenGui: ScreenGui, eggType: Types.EggType): Scene
 
 	return {
 		root = root, backdrop = backdrop, stage = stage, glow = glow,
-		egg = egg, eggStroke = stroke, cracks = cracks, label = label,
+		egg = egg, eggStroke = stroke, cracks = cracks, label = label, art = art,
 	}
 end
 
@@ -389,8 +415,8 @@ local function buildReveal(scene: Scene, result: Types.HatchResult): Frame
 	view.LightColor             = Color3.fromRGB(255, 250, 235)
 	view.Parent                 = card
 	local okModel, model = pcall(function()
-		return BaerchiMesh.build(Vector3.zero, rarityColor, baerchi.rarity,
-			if mutation then BaerchiConfig.getMutationColor(mutation) else nil)
+		return BaerchiMesh.buildFor(baerchi.configId, Vector3.zero, rarityColor, baerchi.rarity,
+			if mutation then BaerchiConfig.getMutationColor(mutation) else nil, baerchi.configId)
 	end)
 	if okModel and model then
 		model.Parent = view
@@ -411,7 +437,7 @@ local function buildReveal(scene: Scene, result: Types.HatchResult): Frame
 				return
 			end
 			spin += dt * 0.9
-			local dir = Vector3.new(math.sin(spin), 0.3, math.cos(spin)).Unit
+			local dir = Vector3.new(math.sin(spin), 0.3, -math.cos(spin)).Unit   -- R6: Start vorn (-Z)
 			camera.CFrame = CFrame.lookAt(center + dir * distance, center)
 		end)
 	end
@@ -446,7 +472,44 @@ end
 -- Ablauf einer Oeffnung
 --------------------------------------------------------------------------------
 
+-- R6: Einzel-Ei ueber VFX/EggHatch. Das Ergebnis ist vor dem Start bekannt (der Server
+-- hat gerollt); bis es da ist, passiert nichts, bei Timeout kommt die Fehlermeldung.
 local function play(job: Job)
+	local screenGui = _screenGui
+	if not screenGui then return end
+
+	while not job.result and not job.failed do
+		if os.clock() - job.started > RESULT_TIMEOUT then
+			job.failed = Loc.t("err.hatch_timeout")
+			break
+		end
+		RunService.RenderStepped:Wait()
+	end
+	local result = job.result
+	if not result then
+		if not job.silent then
+			Notify.emit("hatch_failed", function()
+				Toast.show(job.failed or Loc.t("err.hatch_failed"), Theme.COLORS.bad)
+			end)
+		end
+		return
+	end
+
+	local baerchi = result.baerchi
+	local handle = EggHatch.play({
+		parent   = screenGui,
+		eggType  = tostring(result.eggType),
+		rarity   = baerchi.rarity,
+		configId = baerchi.configId,
+		level    = baerchi.level,
+		mutation = baerchi.mutation,
+		isNew    = result.isNew == true,
+	})
+	handle.onFinished:Wait()
+end
+
+-- Alte Inszenierung (Ellipse + Karte), nicht mehr benutzt; bleibt als Rueckfall im Code.
+local function playLegacy(job: Job)
 	local screenGui = _screenGui
 	if not screenGui then return end
 
@@ -494,6 +557,7 @@ local function play(job: Job)
 		end
 		tween(scene.backdrop, FADE_SECONDS, { BackgroundTransparency = 1 })
 		tween(scene.egg, FADE_SECONDS, { BackgroundTransparency = 1, Position = UDim2.fromScale(0.5, 1.3) })
+		if scene.art then tween(scene.art, FADE_SECONDS, { ImageTransparency = 1 }) end
 		task.wait(FADE_SECONDS)
 		scene.root:Destroy()
 		return
@@ -522,6 +586,7 @@ local function play(job: Job)
 		scene.glow.BackgroundColor3 = rarityColor
 		tween(scene.glow, CHARGE_SECONDS, { BackgroundTransparency = 0.35, Size = UDim2.fromOffset(EGG_SIZE.X * 2.1, EGG_SIZE.Y * 1.9) })
 		tween(scene.eggStroke, CHARGE_SECONDS, { Color = rarityColor, Thickness = 8 })
+		if scene.art then tween(scene.art, CHARGE_SECONDS, { ImageColor3 = Color3.new(1, 1, 1):Lerp(rarityColor, 0.35) }) end
 		amplitude = intensity.amplitude * 1.4
 		wobbleClock *= 2.5
 		waitSkippable(CHARGE_SECONDS)
@@ -570,6 +635,216 @@ local function play(job: Job)
 	scene.root:Destroy()
 end
 
+--------------------------------------------------------------------------------
+-- 15.10.: "10 oeffnen" — eine kurze Ei-Animation, danach alle Pets in kleinen
+-- Fenstern (2 Reihen x 5), die bis zum Klick auf OK stehen bleiben.
+--------------------------------------------------------------------------------
+
+local GRID_COLS = 5
+
+local function attachSpinningModel(view: ViewportFrame, baerchi: any, rarityColor: Color3)
+	local mutation = baerchi.mutation
+	local okModel, model = pcall(function()
+		return BaerchiMesh.build(Vector3.zero, rarityColor, baerchi.rarity,
+			if mutation then BaerchiConfig.getMutationColor(mutation) else nil, baerchi.configId)
+	end)
+	if not (okModel and model) then return end
+	-- R6: Start in Vorderansicht, dann sanftes Pendeln (frueher: Vollrotation ab +Z = Rueckseite)
+	EggHatch.attachPet(view, model, { sway = true })
+end
+
+local function miniLabel(parent: Instance, name: string, text: string, y: number, h: number, color: Color3, maxSize: number): TextLabel
+	local label = Theme.label(name, parent, text)
+	label.AnchorPoint    = Vector2.new(0.5, 0)
+	label.Position       = UDim2.fromScale(0.5, y)
+	label.Size           = UDim2.fromScale(0.94, h)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextColor3     = color
+	label.TextScaled     = true
+	label.ZIndex         = 59
+	local c = Instance.new("UITextSizeConstraint")
+	c.MaxTextSize = maxSize
+	c.Parent = label
+	return label
+end
+
+local function buildMiniCard(parent: Instance, result: Types.HatchResult, order: number): Frame
+	local baerchi = result.baerchi
+	local mutation = baerchi.mutation
+	local rarityColor = Theme.rarityColor(baerchi.rarity)
+	local color = if mutation then BaerchiConfig.getMutationColor(mutation) else rarityColor
+
+	local card = Theme.panel("Mini" .. order, parent, Theme.COLORS.panelDeep)
+	card.LayoutOrder = order
+	card.ZIndex = 58
+	local stroke = card:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = color
+		stroke.Thickness = 3
+	end
+
+	local view = Instance.new("ViewportFrame")
+	view.Name = "Model"
+	view.AnchorPoint = Vector2.new(0.5, 0)
+	view.Position = UDim2.fromScale(0.5, 0.11)
+	view.Size = UDim2.fromScale(0.92, 0.5)
+	view.BackgroundTransparency = 1
+	view.ZIndex = 59
+	view.Ambient = Color3.fromRGB(200, 200, 210)
+	view.LightColor = Color3.fromRGB(255, 250, 235)
+	view.Parent = card
+	attachSpinningModel(view, baerchi, rarityColor)
+
+	if result.isNew then
+		local new = miniLabel(card, "New", Loc.t("ui.hatch.new"), 0.01, 0.11, Theme.COLORS.goldGummy, 16)
+		Theme.outlineText(new)
+	end
+
+	local title = (if mutation then Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)) .. " " else "")
+		.. Names.baerchi(baerchi.configId)
+	local name = miniLabel(card, "Title", title, 0.63, 0.17, color, 20)
+	Theme.outlineText(name)
+	miniLabel(card, "Rarity", string.upper(Loc.t("rarity." .. baerchi.rarity)), 0.81, 0.11, rarityColor, 14)
+	miniLabel(card, "Level", "Lv " .. tostring(baerchi.level), 0.91, 0.08, Theme.COLORS.textDim, 12)
+
+	return card
+end
+
+local function playBatch(job: Job)
+	local screenGui = _screenGui
+	if not screenGui then return end
+
+	_skip = false
+	-- Ergebnis abwarten (der Server hat gerollt)
+	while not job.results and not job.failed do
+		if os.clock() - job.started > RESULT_TIMEOUT then
+			job.failed = Loc.t("err.hatch_timeout")
+			break
+		end
+		RunService.RenderStepped:Wait()
+	end
+	local results = job.results
+	if not results or #results == 0 then
+		if not job.silent then
+			Notify.emit("hatch_failed", function()
+				Toast.show(job.failed or Loc.t("err.hatch_failed"), Theme.COLORS.bad)
+			end)
+		end
+		return
+	end
+
+	-- Staerkstes Pet bestimmt Farbe und Wucht des Ei-Bursts
+	local best = results[1].baerchi
+	for _, r in results do
+		if BaerchiConfig.getRarityIndex(r.baerchi.rarity) > BaerchiConfig.getRarityIndex(best.rarity) then
+			best = r.baerchi
+		end
+	end
+	local handle = EggHatch.play({
+		parent    = screenGui,
+		eggType   = tostring(job.eggType),
+		rarity    = best.rarity,
+		configId  = best.configId,
+		level     = best.level,
+		mutation  = nil,
+		isNew     = false,
+		burstOnly = true,
+	})
+	-- burstOnly meldet "fertig", sobald das Ei aufgebrochen ist; die Szene bleibt stehen
+	handle.onFinished:Wait()
+	local scene = {
+		root = handle.root,
+		stage = handle.stage,
+		backdrop = handle.root:FindFirstChild("Dim") :: Frame,
+	}
+
+	-- Titel
+	local title = Theme.label("BatchTitle", scene.stage, Loc.t("ui.hatch.batch_title"))
+	title.AnchorPoint = Vector2.new(0.5, 0)
+	title.Position = UDim2.fromScale(0.5, 0.05)
+	title.Size = UDim2.fromOffset(420, 36)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	title.ZIndex = 60
+	Theme.outlineText(title)
+
+	-- Raster: 5 Spalten, bei 10 Pets 2 Reihen
+	local grid = Instance.new("Frame")
+	grid.Name = "BatchGrid"
+	grid.AnchorPoint = Vector2.new(0.5, 0.5)
+	grid.Position = UDim2.fromScale(0.5, 0.47)
+	grid.Size = UDim2.fromScale(0.92, 0.62)
+	grid.BackgroundTransparency = 1
+	grid.ZIndex = 57
+	grid.Parent = scene.stage
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(1100, 600)
+	limit.Parent = grid
+	local layout = Instance.new("UIGridLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.FillDirectionMaxCells = GRID_COLS
+	layout.CellSize = UDim2.new(0.19, 0, 0.47, 0)
+	layout.CellPadding = UDim2.new(0.0125, 0, 0.04, 0)
+	layout.Parent = grid
+
+	for index, result in results do
+		local card = buildMiniCard(grid, result, index)
+		local scale = Instance.new("UIScale")
+		scale.Scale = 0
+		scale.Parent = card
+		task.delay((index - 1) * HatchFxConfig.GENERAL.batchStaggerSeconds, function()
+			if scale.Parent then
+				tween(scale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+			end
+		end)
+	end
+
+	-- OK-Knopf (Honig-Template, sonst Standardknopf)
+	local clicked = false
+	local okButton = Instance.new("TextButton")
+	okButton.Name = "BatchOk"
+	okButton.Text = ""
+	okButton.AutoButtonColor = false
+	okButton.BackgroundTransparency = 1
+	okButton.AnchorPoint = Vector2.new(0.5, 1)
+	okButton.Position = UDim2.fromScale(0.5, 0.96)
+	okButton.Size = UDim2.fromOffset(222, 51)   -- Bildverhaeltnis 855:196
+	okButton.ZIndex = 60
+	okButton.Parent = scene.stage
+	local word = Icons.skinLabelButton(okButton, "honey/res_bar_gold", Loc.t("ui.hatch.batch_ok"))
+	if word then
+		word.AnchorPoint = Vector2.new(0.5, 0.5)
+		word.Position = UDim2.fromScale(0.5, 0.5)
+		word.Size = UDim2.fromScale(0.6, 0.52)
+		word.ZIndex = 62
+	else
+		okButton.Text = Loc.t("ui.hatch.batch_ok")
+		okButton.Font = Enum.Font.FredokaOne
+		okButton.TextSize = 26
+		okButton.TextColor3 = Color3.new(1, 1, 1)
+		okButton.BackgroundTransparency = 0
+		okButton.BackgroundColor3 = Theme.COLORS.good
+		Theme.corner(okButton, 12)
+	end
+	okButton.Activated:Connect(function()
+		clicked = true
+	end)
+
+	task.wait(0.6)
+	while not clicked do
+		RunService.RenderStepped:Wait()
+	end
+
+	tween(scene.backdrop, FADE_SECONDS, { BackgroundTransparency = 1 })
+	grid:Destroy()
+	okButton:Destroy()
+	title:Destroy()
+	task.wait(FADE_SECONDS)
+	handle.destroy()
+end
+
 local function pump()
 	if _running then return end
 	_running = true
@@ -577,7 +852,7 @@ local function pump()
 	task.spawn(function()
 		while #_queue > 0 do
 			local job = _queue[1]
-			local ok, err = pcall(play, job)
+			local ok, err = pcall(if job.batch then playBatch else play, job)
 			if not ok then
 				warn("[HatchAnimation] Abspielen fehlgeschlagen:", err)
 				local gui = _screenGui
@@ -608,13 +883,54 @@ function HatchAnimation.request(eggType: Types.EggType)
 end
 
 -- Die aelteste noch offene Oeffnung, oder nil.
-local function oldestPending(): Job?
+local function oldestPending(batch: boolean?): Job?
+	local wantBatch = batch == true
 	for _, job in _queue do
-		if not job.result and not job.failed then
+		if (job.batch == true) == wantBatch and not job.result and not job.results and not job.failed then
 			return job
 		end
 	end
 	return nil
+end
+
+-- 15.10.: "10 oeffnen". Das Ergebnis liefert spaeter deliverBatch().
+function HatchAnimation.requestBatch(eggType: Types.EggType)
+	table.insert(_queue, {
+		eggType = eggType,
+		result  = nil,
+		failed  = nil,
+		silent  = false,
+		started = os.clock(),
+		batch   = true,
+	})
+	pump()
+end
+
+function HatchAnimation.deliverBatch(payload: any)
+	if typeof(payload) ~= "table" or typeof(payload.results) ~= "table" then return end
+	local job = oldestPending(true)
+	if job then
+		job.results = payload.results
+		return
+	end
+	table.insert(_queue, {
+		eggType = payload.eggType,
+		failed  = nil,
+		silent  = false,
+		started = os.clock(),
+		batch   = true,
+		results = payload.results,
+	})
+	pump()
+end
+
+-- ActionFailed fuer RequestHatchEggs (oder RequestHatchEgg, wenn nur ein Sammel-Job offen ist)
+function HatchAnimation.rejectBatch(reason: string)
+	local job = oldestPending(true)
+	if job then
+		job.failed = reason
+		job.silent = true
+	end
 end
 
 -- Server-Ergebnis eingetroffen. Ohne offene Oeffnung (z.B. ein Debug-Befehl
@@ -640,7 +956,7 @@ end
 -- Die Fehlermeldung zeigt der Toast ohnehin — hier wird nur die Animation
 -- ohne eigene zweite Meldung beendet.
 function HatchAnimation.reject(reason: string)
-	local job = oldestPending()
+	local job = oldestPending() or oldestPending(true)
 	if job then
 		job.failed = reason
 		job.silent = true
@@ -649,6 +965,7 @@ end
 
 function HatchAnimation.init(screenGui: ScreenGui)
 	_screenGui = screenGui
+	EggHatch.preload()   -- R6: Bilder vorladen, damit sie beim ersten Ei schon da sind
 
 	-- Beim Verlassen nichts haengen lassen
 	Players.LocalPlayer.AncestryChanged:Connect(function()

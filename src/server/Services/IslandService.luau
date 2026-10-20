@@ -98,6 +98,14 @@ function IslandService.autoEquipIfNone(data: Types.PlayerData)
 	island.equippedUid = bestUid
 end
 
+-- 14.10. Pull-Hook statt require: PetModeService haengt von IslandService ab
+-- (nicht umgekehrt), kennt aber alle laufenden Bewegungen der Figur.
+local _beforeEquipHook: ((Player) -> boolean)? = nil
+
+function IslandService.setBeforeEquipHook(hook: (Player) -> boolean)
+	_beforeEquipHook = hook
+end
+
 function IslandService.equipBaerchi(player: Player, baerchiUid: string)
 	local data = PlayerService.getData(player)
 	if not data then return end
@@ -111,25 +119,24 @@ function IslandService.equipBaerchi(player: Player, baerchiUid: string)
 		return   -- schon ausgeruestet, nichts zu tun
 	end
 
-	-- Ein Equip-Wechsel ersetzt die Figur, die JETZT auf dem Plot steht. Steckt
-	-- genau die gerade in einer Bewegung (Kampf-Lauf oder Weg zum Honig-Teich,
-	-- beides haelt ActivityLock), wuerde sie mitten im Schritt verschwinden.
-	--
-	-- Anders als beim Verwerten haengt das nicht an der uebergebenen uid: der
-	-- neue Baerchi ist nie der beschaeftigte — der ALTE ist es. Deshalb hier
-	-- kein uid-Vergleich, sondern nur die Frage, ob ueberhaupt gerade eine
-	-- Bewegung laeuft. Ohne ausgeruesteten Baerchi laeuft auch keine, das
-	-- Schloss ist dann frei und der erste Equip geht wie bisher sofort durch.
-	if not ActivityLock.isFree(player) then
-		fail(player, "RequestEquipBaerchi", Loc.msg("err.baerchi_busy"))
-		return
+	-- 14.10. Ausruesten geht JEDERZEIT. Ein Equip-Wechsel ersetzt die Figur, die
+	-- JETZT auf dem Plot steht — und die kann gerade laufen (Kampf, Event, Teich).
+	-- Frueher wurde der Wechsel dann abgelehnt. Jetzt beendet der Hook (gesetzt
+	-- von PetModeService, der alle diese Bewegungen kennt) die Aktivitaet der
+	-- alten Figur sofort: im Kampf zaehlen nur die fertig gespielten Stages, das
+	-- Event/der Weg endet. Der neue Baerchi steht danach zu Hause auf dem Plot.
+	local hook = _beforeEquipHook
+	if hook and not hook(player) then
+		return   -- z.B. UFO-Entfuehrung: der Hook hat den Grund schon gemeldet
 	end
+	ActivityLock.forceRelease(player)
 
 	data.island.equippedUid = baerchiUid
 
-	-- Struktur-Aenderung (es steht jetzt eine ANDERE Figur auf dem Plot),
-	-- kein reiner Zustandswert — deshalb der teurere Neuaufbau.
-	MapService.updateBaerchis(player, data.island)
+	-- Struktur-Aenderung (es steht jetzt eine ANDERE Figur auf dem Plot), kein
+	-- reiner Zustandswert — deshalb der teurere Neuaufbau, und ohne Sperre: das
+	-- Schloss ist eben freigegeben worden.
+	MapService.replaceBaerchis(player, data.island)
 	PlayerService.markDirty(player)
 	PlayerService.saveNow(player)
 

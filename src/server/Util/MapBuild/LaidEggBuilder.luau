@@ -20,6 +20,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local EggConfig        = require(ReplicatedStorage.Config.EggConfig)
 local EggLook          = require(ReplicatedStorage.Modules.EggLook)
 local EggMesh          = require(ReplicatedStorage.Modules.EggMesh)
+local EggModels        = require(ReplicatedStorage.Modules.EggModels)
 local Types            = require(ReplicatedStorage.Network.Types)
 local Names     = require(ReplicatedStorage.Localization.Names)
 local WorldText = require(ReplicatedStorage.Localization.WorldText)
@@ -109,6 +110,11 @@ local function buildEggBody(name: string, eggId: string, origin: CFrame, width: 
 	local sphere = Instance.new("SpecialMesh")
 	sphere.MeshType = Enum.MeshType.Sphere
 	sphere.Parent   = root
+
+	-- 14.10.: Eier mit fertigem Modell (EggModels) setzt der Client darauf; der
+	-- Server baut dann KEINE Gurte/Steine (Teile-Budget, das Modell bringt sie mit).
+	local hasModel = EggModels.has(eggId)
+	root:SetAttribute("EggId", eggId)   -- vor dem Parent, damit der Client es beim Entstehen kennt
 	root.Parent     = parent
 	CollectionService:AddTag(root, "LaidEggBody")
 
@@ -116,7 +122,9 @@ local function buildEggBody(name: string, eggId: string, origin: CFrame, width: 
 
 	-- Gurte an den Naehten (Kanten 2 bis 4 der Stufen)
 	local seams: { number } = {}
-	if look.pattern == "band" then
+	if hasModel then
+		seams = {}
+	elseif look.pattern == "band" then
 		seams = { 3 }
 	elseif look.pattern == "stripes" then
 		seams = { 2, 3, 4 }
@@ -132,7 +140,7 @@ local function buildEggBody(name: string, eggId: string, origin: CFrame, width: 
 	-- Steine / Punkte auf dem Bauch (Hoehe 0,41)
 	local gemColor = if look.pattern == "band" then Color3.fromRGB(235, 40, 60) else look.accent
 	local gemMat   = if look.pattern == "band" or look.neon then Enum.Material.Neon else matte
-	if look.pattern == "spots" or look.neon or look.pattern == "band" then
+	if not hasModel and (look.pattern == "spots" or look.neon or look.pattern == "band") then
 		local count = if look.pattern == "band" then 2 else 3
 		local size  = if look.pattern == "spots" then width * 0.26 elseif look.pattern == "band" then width * 0.15 else width * 0.14
 		local t     = if look.pattern == "band" then 0.41 else 0.38
@@ -195,6 +203,21 @@ end
 -- Ringschluss-Gefahr — siehe _collectHandler), sondern ruft nur den
 -- eingehaengten Handler auf. Der entscheidet autoritativ, ob das Ei noch da
 -- ist und wem es gehoert.
+-- 14.10.: Register aller gelegten Eier (Part -> Besitzer/uid). Damit kann ein Sammel-Sweep
+-- (EggLayService) alle Eier in der Naehe der Figur auf einmal nehmen, statt auf einzelne
+-- Touched-Kontakte zu warten (die bei Tempo/Neuaufbau der Eier oft ausfallen).
+local _registry: { [BasePart]: { owner: Player, uid: string } } = setmetatable({}, { __mode = "k" }) :: any
+
+function LaidEggBuilder.forEachLaid(fn: (part: BasePart, owner: Player, uid: string) -> ())
+	for part, info in _registry do
+		if part.Parent then
+			fn(part, info.owner, info.uid)
+		else
+			_registry[part] = nil
+		end
+	end
+end
+
 function LaidEggBuilder.buildLaidEgg(parent: Instance, egg: Types.LaidEgg, worldFoot: Vector3, owner: Player): Part?
 	local def = EggConfig.data[egg.eggType]
 	if not def then
@@ -217,6 +240,7 @@ function LaidEggBuilder.buildLaidEgg(parent: Instance, egg: Types.LaidEgg, world
 	part.CastShadow = true
 
 	part:SetAttribute(LaidEggBuilder.LAID_EGG_ATTRIBUTE, egg.uid)
+	_registry[part] = { owner = owner, uid = egg.uid }
 
 	-- Nur EIN erfolgreicher Touch-Kontakt darf einsammeln: Touched feuert
 	-- fuer jeden Frame, in dem die Figur noch im Part steckt, erneut. Ohne

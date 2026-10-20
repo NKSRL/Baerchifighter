@@ -206,6 +206,27 @@ local TowerMilestoneReceived = getOrCreateEvent("TowerMilestoneReceived")
 -- (Server → Client, Argument: TowerId). Feier-Moment + "NEU"-Abzeichen.
 local TowerUnlocked = getOrCreateEvent("TowerUnlocked")
 
+-- 20.10. (Final-Epilog, Vertrag der Prompts 1-7). Nur der Server schreibt den
+-- Spielstand; der Client sendet Token, der Server prueft Token + Zustand.
+-- S->C: Sequenz starten. Args: { token: string, mode: "full"|"restore", state: string }
+-- Prompt 5 ergaenzt bei "full": speed (Zeitraffer, 1), startAt (Workspace:GetServerTimeNow),
+-- skipFrom (Sekunde), route { points, summit, dir, island, terminalPos, terminalLook }.
+local EpilogStart = getOrCreateEvent("EpilogStart")
+-- C->S: Insel/Terminal erreicht. Args: token: string
+local EpilogSeen = getOrCreateEvent("EpilogSeen")
+-- C->S: Kamerafahrt uebersprungen. Args: token: string
+local EpilogSkip = getOrCreateEvent("EpilogSkip")
+-- C->S: Knopf gehalten (Prompt 6). Args: token: string
+local RequestPressLaunch = getOrCreateEvent("RequestPressLaunch")
+-- S->C: Ergebnis des Knopfdrucks (Prompt 6). Args: ok: boolean
+local EpilogLaunchResult = getOrCreateEvent("EpilogLaunchResult")
+-- S->C: Welt 2 ist frei (Feier, Prompt 6). Args: worldId: string
+local World2Unlocked = getOrCreateEvent("World2Unlocked")
+-- Prompt 5, nur Debug (epilog audit): S->C { cmd: "audit" }, C->S Bericht (Tabelle aus
+-- Zahlen/Texten/Wahrheitswerten). Der Server nimmt den Bericht nur an, wenn er ihn angefordert hat.
+local EpilogDebug = getOrCreateEvent("EpilogDebug")
+local EpilogDebugReport = getOrCreateEvent("EpilogDebugReport")
+
 -- v15: Login-Bonus ausgezahlt (Toast). Args: Types.DailyBonusResult
 local DailyBonusReceived = getOrCreateEvent("DailyBonusReceived")
 
@@ -414,6 +435,15 @@ return {
 
 	TowerMilestoneReceived = TowerMilestoneReceived,
 	TowerUnlocked          = TowerUnlocked,
+
+	EpilogStart            = EpilogStart,
+	EpilogSeen             = EpilogSeen,
+	EpilogSkip             = EpilogSkip,
+	RequestPressLaunch     = RequestPressLaunch,
+	EpilogLaunchResult     = EpilogLaunchResult,
+	World2Unlocked         = World2Unlocked,
+	EpilogDebug            = EpilogDebug,
+	EpilogDebugReport      = EpilogDebugReport,
 	DailyBonusReceived     = DailyBonusReceived,
 
 	EggTreeUnlocked        = EggTreeUnlocked,
@@ -434,6 +464,11 @@ return {
 	RequestUpgradeRecycler = RequestUpgradeRecycler,
 	RequestFuseBaerchis    = RequestFuseBaerchis,
 	RequestRecycleBaerchi  = RequestRecycleBaerchi,
+	-- 19.10.: Spieler verkauft (loescht) mehrere Baerchis. Args: uids: { string }.
+	-- Inline angelegt, damit die Modul-Ebene keinen weiteren lokalen Namen braucht.
+	RequestSellBaerchis    = getOrCreateEvent("RequestSellBaerchis"),
+	-- Server -> Client: { sold: number, soldUids: { string } } nach erfolgreichem Verkauf.
+	SellResultReceived     = getOrCreateEvent("SellResultReceived"),
 	RequestFeedHoney       = RequestFeedHoney,
 	RequestEquipBaerchi    = RequestEquipBaerchi,
 	RequestRebirth         = RequestRebirth,

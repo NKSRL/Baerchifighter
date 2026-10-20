@@ -117,7 +117,11 @@ local function runEatCycle(player: Player, baerchiUid: string)
 			moved = figure
 			FigureFX.stopIdle(figure)
 
-			local homeFoot = footPosOf(figure)
+			-- 14.10. Hin geht es von dort, wo er JETZT steht; zurueck an den
+			-- kanonischen Heimplatz (MapService.getBaerchiHome), nicht an den
+			-- Punkt, an dem er zufaellig losgelaufen ist.
+			local startFoot = footPosOf(figure)
+			local homeFoot: Vector3 = (MapService.getBaerchiHome(player)) or startFoot
 
 			-- Bricht ab, sobald irgendetwas dem Baerchi das Schloss abnimmt
 			-- (ein Kampf), er von der Karte verschwindet, oder gar nicht mehr
@@ -130,7 +134,7 @@ local function runEatCycle(player: Player, baerchiUid: string)
 					or MapService.getBaerchiModel(player, baerchiUid) ~= figure
 			end
 
-			FigureWalker.walk(figure, homeFoot, pond, {
+			FigureWalker.walk(figure, startFoot, pond, {
 				speed       = MapConfig.WALK_SPEED,
 				isCancelled = cancelled,
 			})

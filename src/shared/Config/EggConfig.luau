@@ -52,6 +52,10 @@ export type EggDef = {
 	-- als "hoechstes Ei" oder Sprung-Ei gewaehlt. Man bekommt es nur direkt
 	-- (Jackpot) und kann es wie jedes Ei aus dem Lager oeffnen.
 	special     : boolean?,
+
+	-- 19.10.: logischer Zweig im Baum ("Left" | "Middle" | "Right"), aus dem Pfad
+	-- abgeleitet (BRANCH_OF_PATH). Sonder-Eier haben keinen.
+	branch      : string?,
 }
 
 --------------------------------------------------------------------------------
@@ -86,20 +90,20 @@ export type EggDef = {
 local RARITY_DIST: { [Types.EggType]: { [string]: number } } = {
 	BasicEgg         = { Common = 70, Uncommon = 25, Rare = 5 },
 	SugarEgg         = { Uncommon = 50, Rare = 38, Epic = 12 },
-	GoldenEgg        = { Rare = 45, Epic = 45, Legendary = 10 },
+	GoldenEgg        = { Rare = 42, Epic = 45, Legendary = 13 },
 	PlatinumEgg      = { Epic = 40, Legendary = 50, Mythic = 10 },
 	SunEgg           = { Legendary = 60, Mythic = 33, Divine = 7 },
-	ZenithEgg        = { Mythic = 70, Divine = 26, Cosmic = 4 },
-	CrystalEgg       = { Epic = 55, Legendary = 40, Mythic = 5 },
-	PrismEgg         = { Legendary = 65, Mythic = 30, Divine = 5 },
-	AuroraEgg        = { Mythic = 72, Divine = 24, Cosmic = 4 },
-	MistEgg          = { Epic = 65, Legendary = 35 },
-	VoidEgg          = { Legendary = 60, Mythic = 36, Divine = 4 },
-	ShadowEgg        = { Mythic = 65, Divine = 30, Cosmic = 5 },
+	ZenithEgg        = { Mythic = 64, Divine = 28, Cosmic = 8 },
+	CrystalEgg       = { Epic = 50, Legendary = 42, Mythic = 8 },
+	PrismEgg         = { Legendary = 63, Mythic = 30, Divine = 7 },
+	AuroraEgg        = { Mythic = 64, Divine = 28, Cosmic = 8 },
+	MistEgg          = { Epic = 55, Legendary = 35, Mythic = 10 },
+	VoidEgg          = { Legendary = 58, Mythic = 36, Divine = 6 },
+	ShadowEgg        = { Mythic = 60, Divine = 32, Cosmic = 8 },
 	AbyssEgg         = { Divine = 70, Cosmic = 25, Secret = 5 },
-	CometEgg         = { Divine = 55, Cosmic = 40, Secret = 5 },
-	NovaEgg          = { Cosmic = 70, Secret = 27, Godly = 3 },
-	GalaxyEgg        = { Secret = 75, Godly = 23, Eternal = 2 },
+	CometEgg         = { Divine = 50, Cosmic = 40, Secret = 10 },
+	NovaEgg          = { Cosmic = 62, Secret = 30, Godly = 8 },
+	GalaxyEgg        = { Secret = 72, Godly = 23, Eternal = 5 },
 	AscensionEgg     = { Legendary = 85, Mythic = 15 },
 	TranscendenceEgg = { Secret = 60, Godly = 38, Eternal = 2 },
 	EternityEgg      = { Godly = 80, Eternal = 19, Omega = 1 },
@@ -114,6 +118,45 @@ local RARITY_DIST: { [Types.EggType]: { [string]: number } } = {
 -- Pfad des Eis passt, sonst 1. Ascensions-Eier sind neutral (alle 1).
 local PATH_MATCH_WEIGHT = 3
 
+--------------------------------------------------------------------------------
+-- 19.10.: ZWEIGE UND ZWEIGSPRUENGE
+--------------------------------------------------------------------------------
+-- Der Baum hat drei logische Zweige (siehe UI/EggTreeLayout):
+--   Middle  Stamm (Basis, Zucker) + Kosmos (Komet, Nova, Galaxie)
+--   Left    Gold + Kristall
+--   Right   Void + Ascension
+local BRANCH_OF_PATH: { [string]: string } = {
+	Stamm = "Middle", Kosmos = "Middle",
+	Gold = "Left", Kristall = "Left",
+	Void = "Right", Ascension = "Right",
+}
+
+-- ZWEIGSPRUNG: ein extrem seltenes Pet in einem Ei eines Zweigs schaltet ein Ei
+-- eines ANDEREN Zweigs frei. Die Pets fallen NUR aus ihrem Quell-Ei und dort nur
+-- mit `chance` Prozent pro Oeffnung (0,1 = jedes 1000. Ei). Sie fallen aus keinem
+-- anderen Ei (auch nicht Komet/Nova/Ufo), sonst waere der Sprung nicht selten.
+-- Die Schluessel-Pets des Ziel-Eis stehen in TREE (keyPets) und muessen mit den
+-- Pets hier uebereinstimmen.
+export type JumpPet = { egg: Types.EggType, pet: string }
+export type JumpDef = {
+	id     : string,
+	from   : string,            -- Zweig, aus dem man springt
+	to     : string,            -- Zweig, in den man springt
+	target : Types.EggType,     -- Ei, das frei wird
+	chance : number,            -- Prozent pro Oeffnung des Quell-Eis
+	pets   : { JumpPet },
+}
+local JUMPS: { JumpDef } = {
+	{
+		id = "LeftToMiddle", from = "Left", to = "Middle", target = "CometEgg", chance = 0.1,
+		pets = {
+			{ egg = "ZenithEgg", pet = "PulsarBaerchi" },
+			{ egg = "AuroraEgg", pet = "CometBaerchi" },
+		},
+	},
+	-- Rechts -> Mitte: noch kein Pet dafuer (braucht ein eigenes Baerchi).
+}
+
 local EGGS: { [Types.EggType]: EggDef } = {
 
 	-- ============================================================
@@ -122,12 +165,12 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	BasicEgg = {
 		id = "BasicEgg", displayName = "Basis-Ei", path = "Stamm", parent = nil, tier = 1, sortOrder = 1,
 		description = "Ein ganz normales Ei. Was wird wohl raus kommen?",
-		color = Color3.fromRGB(238, 232, 214), shortName = "Basis", hatchTable = {},
+		color = Color3.fromRGB(125, 215, 165), shortName = "Basis", hatchTable = {},
 	},
 	SugarEgg = {
 		id = "SugarEgg", displayName = "Zucker-Ei", path = "Stamm", parent = "BasicEgg", tier = 2, sortOrder = 2,
 		description = "Schmeckt suess. Der Inhalt auch.",
-		color = Color3.fromRGB(255, 168, 205), shortName = "Zucker", hatchTable = {},
+		color = Color3.fromRGB(255, 140, 195), shortName = "Zucker", hatchTable = {},
 	},
 
 	-- ============================================================
@@ -136,22 +179,22 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	GoldenEgg = {
 		id = "GoldenEgg", displayName = "Goldenes Ei", path = "Gold", parent = "SugarEgg", tier = 3, sortOrder = 3,
 		description = "Glitzert verdaechtig. Rare oder besser garantiert.",
-		color = Color3.fromRGB(255, 205, 74), shortName = "Gold", hatchTable = {},
+		color = Color3.fromRGB(242, 205, 77), shortName = "Gold", hatchTable = {},
 	},
 	PlatinumEgg = {
 		id = "PlatinumEgg", displayName = "Platin-Ei", path = "Gold", parent = "GoldenEgg", tier = 4, sortOrder = 4,
 		description = "Schwer wie Blei, wertvoller als Gold.",
-		color = Color3.fromRGB(214, 222, 232), shortName = "Platin", hatchTable = {},
+		color = Color3.fromRGB(240, 230, 205), shortName = "Platin", hatchTable = {},
 	},
 	SunEgg = {
-		id = "SunEgg", displayName = "Sonnen-Ei", path = "Gold", parent = "PlatinumEgg", tier = 5, sortOrder = 5,
+		id = "SunEgg", displayName = "Blaze-Ei", path = "Gold", parent = "PlatinumEgg", tier = 5, sortOrder = 5,
 		description = "Warm in der Hand. Sehr warm.",
-		color = Color3.fromRGB(255, 150, 40), shortName = "Sonne", hatchTable = {},
+		color = Color3.fromRGB(235, 90, 45), shortName = "Sonne", hatchTable = {},
 	},
 	ZenithEgg = {
 		id = "ZenithEgg", displayName = "Zenit-Ei", path = "Gold", parent = "SunEgg", tier = 6, sortOrder = 6,
 		description = "Der hoechste Punkt des Gold-Pfads.",
-		color = Color3.fromRGB(255, 236, 140), shortName = "Zenit", hatchTable = {},
+		color = Color3.fromRGB(245, 112, 84), shortName = "Zenit", hatchTable = {},
 	},
 
 	-- ============================================================
@@ -160,17 +203,17 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	CrystalEgg = {
 		id = "CrystalEgg", displayName = "Kristall-Ei", path = "Kristall", parent = "GoldenEgg", tier = 4, sortOrder = 7,
 		description = "Durchsichtig. Man sieht schon fast was drin ist.",
-		color = Color3.fromRGB(150, 226, 255), shortName = "Kristall", hatchTable = {},
+		color = Color3.fromRGB(110, 185, 240), shortName = "Kristall", hatchTable = {},
 	},
 	PrismEgg = {
-		id = "PrismEgg", displayName = "Prisma-Ei", path = "Kristall", parent = "CrystalEgg", tier = 5, sortOrder = 8,
+		id = "PrismEgg", displayName = "Frost-Ei", path = "Kristall", parent = "CrystalEgg", tier = 5, sortOrder = 8,
 		description = "Bricht das Licht in sieben Farben.",
-		color = Color3.fromRGB(190, 160, 255), shortName = "Prisma", hatchTable = {},
+		color = Color3.fromRGB(125, 185, 240), shortName = "Frost", hatchTable = {},
 	},
 	AuroraEgg = {
 		id = "AuroraEgg", displayName = "Aurora-Ei", path = "Kristall", parent = "PrismEgg", tier = 6, sortOrder = 9,
 		description = "Leuchtet wie der Himmel im Norden.",
-		color = Color3.fromRGB(110, 255, 190), shortName = "Aurora", hatchTable = {},
+		color = Color3.fromRGB(140, 220, 150), shortName = "Aurora", hatchTable = {},
 	},
 
 	-- ============================================================
@@ -179,22 +222,22 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	MistEgg = {
 		id = "MistEgg", displayName = "Nebel-Ei", path = "Void", parent = "SugarEgg", tier = 3, sortOrder = 10,
 		description = "Fuehlt sich kalt und feucht an.",
-		color = Color3.fromRGB(170, 175, 200), shortName = "Nebel", hatchTable = {},
+		color = Color3.fromRGB(185, 170, 240), shortName = "Nebel", hatchTable = {},
 	},
 	VoidEgg = {
 		id = "VoidEgg", displayName = "Void-Ei", path = "Void", parent = "MistEgg", tier = 4, sortOrder = 11,
 		description = "Schwaerzer als schwarz.",
-		color = Color3.fromRGB(70, 40, 110), shortName = "Void", hatchTable = {},
+		color = Color3.fromRGB(70, 45, 100), shortName = "Void", hatchTable = {},
 	},
 	ShadowEgg = {
 		id = "ShadowEgg", displayName = "Schatten-Ei", path = "Void", parent = "VoidEgg", tier = 5, sortOrder = 12,
 		description = "Wirft keinen Schatten. Es IST einer.",
-		color = Color3.fromRGB(45, 40, 60), shortName = "Schatten", hatchTable = {},
+		color = Color3.fromRGB(70, 66, 92), shortName = "Schatten", hatchTable = {},
 	},
 	AbyssEgg = {
 		id = "AbyssEgg", displayName = "Abyss-Ei", path = "Void", parent = "ShadowEgg", tier = 6, sortOrder = 13,
 		description = "Ganz unten. Darunter kommt nichts mehr.",
-		color = Color3.fromRGB(20, 30, 70), shortName = "Abyss", hatchTable = {},
+		color = Color3.fromRGB(20, 85, 140), shortName = "Abyss", hatchTable = {},
 	},
 
 	-- ============================================================
@@ -203,17 +246,17 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	CometEgg = {
 		id = "CometEgg", displayName = "Kometen-Ei", path = "Kosmos", parent = nil, tier = 7, sortOrder = 14,
 		description = "Zieht einen Schweif aus Funken hinter sich her.",
-		color = Color3.fromRGB(120, 180, 255), shortName = "Komet", hatchTable = {},
+		color = Color3.fromRGB(80, 70, 215), shortName = "Komet", hatchTable = {},
 	},
 	NovaEgg = {
 		id = "NovaEgg", displayName = "Nova-Ei", path = "Kosmos", parent = "CometEgg", tier = 8, sortOrder = 15,
 		description = "Kurz vor dem Explodieren.",
-		color = Color3.fromRGB(255, 240, 255), shortName = "Nova", hatchTable = {},
+		color = Color3.fromRGB(122, 66, 200), shortName = "Nova", hatchTable = {},
 	},
 	GalaxyEgg = {
 		id = "GalaxyEgg", displayName = "Galaxie-Ei", path = "Kosmos", parent = "NovaEgg", tier = 9, sortOrder = 16,
 		description = "Ein ganzes Universum in einer Schale.",
-		color = Color3.fromRGB(110, 40, 180), shortName = "Galaxie", hatchTable = {},
+		color = Color3.fromRGB(115, 65, 205), shortName = "Galaxie", hatchTable = {},
 	},
 
 	-- ============================================================
@@ -222,22 +265,22 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	AscensionEgg = {
 		id = "AscensionEgg", displayName = "Ascensions-Ei", path = "Ascension", parent = nil, tier = 5, sortOrder = 17,
 		description = "Verdient, nicht gekauft. Legendary garantiert.",
-		color = Color3.fromRGB(196, 128, 255), shortName = "Ascension", hatchTable = {},
+		color = Color3.fromRGB(248, 223, 160), shortName = "Ascension", hatchTable = {},
 	},
 	TranscendenceEgg = {
 		id = "TranscendenceEgg", displayName = "Transzendenz-Ei", path = "Ascension", parent = "AscensionEgg", tier = 9, sortOrder = 18,
 		description = "Jenseits von allem, was man kaufen kann.",
-		color = Color3.fromRGB(255, 200, 255), shortName = "Transz.", hatchTable = {},
+		color = Color3.fromRGB(205, 200, 245), shortName = "Transz.", hatchTable = {},
 	},
 	EternityEgg = {
 		id = "EternityEgg", displayName = "Ewigkeits-Ei", path = "Ascension", parent = "TranscendenceEgg", tier = 10, sortOrder = 19,
 		description = "Es war schon immer da. Es bleibt fuer immer.",
-		color = Color3.fromRGB(255, 120, 40), shortName = "Ewigkeit", hatchTable = {},
+		color = Color3.fromRGB(103, 210, 224), shortName = "Ewigkeit", hatchTable = {},
 	},
 	OmegaEgg = {
 		id = "OmegaEgg", displayName = "Omega-Ei", path = "Ascension", parent = "EternityEgg", tier = 11, sortOrder = 20,
 		description = "Das letzte Ei. 30% Omega.",
-		color = Color3.fromRGB(255, 255, 255), shortName = "Omega", hatchTable = {},
+		color = Color3.fromRGB(115, 60, 170), shortName = "Omega", hatchTable = {},
 	},
 
 	-- ============================================================
@@ -246,7 +289,7 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	UfoJackpotEgg = {
 		id = "UfoJackpotEgg", displayName = "UFO-Jackpot-Ei", path = "Event", parent = nil, tier = 0, sortOrder = 21,
 		description = "Vom UFO abgeworfen. Ein ganz seltener Fund.",
-		color = Color3.fromRGB(255, 214, 60), shortName = "Jackpot", hatchTable = {},
+		color = Color3.fromRGB(96, 214, 98), shortName = "Jackpot", hatchTable = {},
 		special = true,
 	},
 }
@@ -276,6 +319,8 @@ export type HatchReq = { egg: Types.EggType, count: number }
 export type TreeNode = {
 	hatch      : { HatchReq }?,
 	hatchAnyOf : { need: number, of: { HatchReq } }?,
+	keyPets    : { string }?,     -- Balance 15.10.: Schluessel-Pet(s), eines davon ziehen = Ei frei
+	keyNeed    : number?,         -- wie viele davon (Standard 1)
 	index      : { rarity: Types.Rarity, count: number }?,
 	rebirth    : number?,
 	start      : boolean?,        -- von Anfang an frei
@@ -285,30 +330,33 @@ local TREE: { [Types.EggType]: TreeNode } = {
 	BasicEgg    = { start = true },
 	SugarEgg    = { start = true },
 
-	GoldenEgg   = { hatch = { { egg = "SugarEgg",    count = 15 } }, index = { rarity = "Rare",      count = 1 } },
-	PlatinumEgg = { hatch = { { egg = "GoldenEgg",   count = 25 } }, index = { rarity = "Epic",      count = 2 } },
-	SunEgg      = { hatch = { { egg = "PlatinumEgg", count = 25 } }, index = { rarity = "Legendary", count = 2 }, rebirth = 3 },
-	ZenithEgg   = { hatch = { { egg = "SunEgg",      count = 40 } }, index = { rarity = "Mythic",    count = 2 }, rebirth = 6 },
+	-- Balance 15.10.: ein Ei wird frei, sobald man ein SCHLUESSEL-PET gezogen hat
+	-- (keyPets, mindestens keyNeed davon entdeckt). Das Schluessel-Pet stammt aus
+	-- dem Vorgaenger-Ei, ist dort klar seltener und legt das neue Ei selbst.
+	GoldenEgg   = { keyPets = { "GoldenGrizzly" } },
+	MistEgg     = { keyPets = { "VoidBaerchi" } },
+	PlatinumEgg = { keyPets = { "AncientBaerchi" } },
+	CrystalEgg  = { keyPets = { "RainbowBaerchi" } },
+	SunEgg      = { keyPets = { "PhoenixBaerchi" } },
+	PrismEgg    = { keyPets = { "GlacierBaerchi" } },
+	VoidEgg     = { keyPets = { "PhantomBaerchi" } },
+	ZenithEgg   = { keyPets = { "SeraphBaerchi" } },
+	AuroraEgg   = { keyPets = { "NorthernLightBaerchi" } },
+	ShadowEgg   = { keyPets = { "EclipseBaerchi" } },
+	AbyssEgg    = { keyPets = { "NebulaBaerchi" } },
 
-	CrystalEgg  = { hatch = { { egg = "GoldenEgg",   count = 20 } }, index = { rarity = "Legendary", count = 1 } },
-	PrismEgg    = { hatch = { { egg = "CrystalEgg",  count = 30 } }, index = { rarity = "Legendary", count = 2 }, rebirth = 3 },
-	AuroraEgg   = { hatch = { { egg = "PrismEgg",    count = 40 } }, index = { rarity = "Mythic",    count = 2 }, rebirth = 6 },
-
-	MistEgg     = { hatch = { { egg = "SugarEgg",    count = 15 } }, index = { rarity = "Epic",      count = 1 } },
-	VoidEgg     = { hatch = { { egg = "MistEgg",     count = 20 } }, index = { rarity = "Legendary", count = 1 }, rebirth = 2 },
-	ShadowEgg   = { hatch = { { egg = "VoidEgg",     count = 40 } }, index = { rarity = "Mythic",    count = 2 }, rebirth = 6 },
-	AbyssEgg    = { hatch = { { egg = "ShadowEgg",   count = 40 } }, index = { rarity = "Divine",    count = 2 }, rebirth = 8 },
-
+	-- Kometen-Ei: Schluessel-Pets stammen aus Zenit- bzw. Aurora-Ei.
+	-- hatchAnyOf dient nur noch als Vorgaenger-Liste (Blaupause, Lege-Fallback).
 	CometEgg    = {
-		hatchAnyOf = { need = 2, of = {
-			{ egg = "ZenithEgg", count = 30 },
-			{ egg = "AuroraEgg", count = 30 },
-			{ egg = "AbyssEgg",  count = 30 },
+		keyPets = { "PulsarBaerchi", "CometBaerchi" },
+		hatchAnyOf = { need = 1, of = {
+			{ egg = "ZenithEgg", count = 0 },
+			{ egg = "AuroraEgg", count = 0 },
+			{ egg = "AbyssEgg",  count = 0 },
 		} },
-		index = { rarity = "Divine", count = 3 }, rebirth = 10,
 	},
-	NovaEgg     = { hatch = { { egg = "CometEgg", count = 120 } }, index = { rarity = "Cosmic", count = 3 }, rebirth = 15 },
-	GalaxyEgg   = { hatch = { { egg = "NovaEgg",  count = 200 } }, index = { rarity = "Secret", count = 2 }, rebirth = 25 },
+	NovaEgg     = { keyPets = { "RiddleBaerchi", "ShadeBaerchi" } },
+	GalaxyEgg   = { keyPets = { "TitanBaerchi", "GenesisBaerchi" } },
 
 	AscensionEgg     = { rebirth = 1 },
 	TranscendenceEgg = { rebirth = 15 },
@@ -323,6 +371,11 @@ local CHILDREN: { [string]: { Types.EggType } } = {}
 --------------------------------------------------------------------------------
 -- hatchTables BERECHNEN
 --------------------------------------------------------------------------------
+
+local JUMP_PET_EGG: { [string]: string } = {}
+for _, jump in JUMPS do
+	for _, jp in jump.pets do JUMP_PET_EGG[jp.pet] = jp.egg end
+end
 
 local function buildHatchTables()
 	-- Baerchis je Rarity, deterministisch sortiert.
@@ -344,6 +397,7 @@ local function buildHatchTables()
 			local total = 0
 			local weights = {}
 			for _, def in pets do
+				if JUMP_PET_EGG[def.id] then continue end   -- 19.10.: Sprung-Pets nur aus ihrem Quell-Ei
 				local w = 1
 				if egg.path ~= "Ascension" and def.path == egg.path then
 					w = PATH_MATCH_WEIGHT
@@ -351,11 +405,28 @@ local function buildHatchTables()
 				weights[def.id] = w
 				total += w
 			end
+			assert(total > 0, "EggConfig: Rarity " .. rarity .. " hat nur Sprung-Pets (" .. eggId .. ")")
 			for id, w in weights do
 				hatch[id] = (hatch[id] or 0) + percent * w / total
 			end
 		end
+		-- 19.10.: Sprung-Pets des Quell-Eis mit fester Chance (Prozent) einsetzen
+		local jumpTotal = 0
+		for _, jump in JUMPS do
+			for _, jp in jump.pets do
+				if jp.egg == eggId then jumpTotal += jump.chance end
+			end
+		end
+		if jumpTotal > 0 then
+			for id, v in hatch do hatch[id] = v * (100 - jumpTotal) / 100 end
+			for _, jump in JUMPS do
+				for _, jp in jump.pets do
+					if jp.egg == eggId then hatch[jp.pet] = jump.chance end
+				end
+			end
+		end
 		egg.hatchTable = hatch
+		egg.branch = if egg.special then nil else BRANCH_OF_PATH[egg.path]
 	end
 
 	-- eggSource der Baerchis nachtragen (frueher von Hand gepflegt).
@@ -526,10 +597,10 @@ local OFFLINE_MAX_EGGS = 6
 -- Common 240-300 s -> 144-180 s, Uncommon 330-360 s -> ca. 230-250 s,
 -- Rare 360-420 s -> ca. 300-350 s. Ab Epic unveraendert, damit die
 -- Freischalt-Zeiten im Ei-Baum (tools/sim/egg_tree_sim.lua) nicht kippen.
+-- Balance 15.10.: kein Faktor mehr. Die Lege-Zeit steht direkt je Baerchi in
+-- BaerchiConfig (80 s + 20 s pro Rarity-Stufe), kein Extra-Rabatt fuer
+-- niedrige Rarities.
 local LAY_RARITY_FACTOR: { [string]: number } = {
-	Common   = 0.60,
-	Uncommon = 0.70,
-	Rare     = 0.82,
 }
 
 -- Wie viele NICHT eingesammelte Eier gleichzeitig herumliegen duerfen.
@@ -650,6 +721,12 @@ return {
 	PRESS              = PRESS,
 	canPress           = canPress,
 	getOrderedIds      = getOrderedIds,
+	JUMPS              = JUMPS,
+	BRANCH_OF_PATH     = BRANCH_OF_PATH,
+	getBranch          = function(eggType: Types.EggType): string?
+		local egg = EGGS[eggType]
+		return egg and egg.branch
+	end,
 	getChildren        = getChildren,
 	getNextInPath      = getNextInPath,
 	isSpecial          = function(eggType: Types.EggType): boolean

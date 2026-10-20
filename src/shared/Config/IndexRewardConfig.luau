@@ -70,7 +70,7 @@ IndexRewardConfig.PATH_GOLD = {
 	Stamm = 80, Gold = 200, Kristall = 200, Void = 200, Kosmos = 400,
 }
 IndexRewardConfig.PATH_BLUEPRINTS      = 1
-IndexRewardConfig.PATH_INCUBATOR_SLOTS = 1
+IndexRewardConfig.PATH_INCUBATOR_SLOTS = 0   -- 15.10.: Solo-Inkubator hat nur einen Platz
 
 -- Rarity: GoldGummies = RARITY_GOLD_PER_INDEX x Rarity-Index (Common 1 ... Omega 12).
 IndexRewardConfig.RARITY_GOLD_PER_INDEX = 20

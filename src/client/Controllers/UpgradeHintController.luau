@@ -8,7 +8,9 @@
 --
 -- Kontext: HBB Paket 3. Der Ausbau soll in der Welt auffallen, nicht in
 -- einem Menue. Nur Client, berechnet aus dem Datenstand und
--- EconomyConfig.HONEY_UPGRADE_COSTS — kein Remote, keine Wahrheit: ob der
+-- BuildingBehavior.getUpgrade (dieselben Kosten, die der Server bucht; 14.10.:
+-- vorher stand hier eine alte Kostentabelle, deshalb war der Pfeil dauernd
+-- zu sehen) — kein Remote, keine Wahrheit: ob der
 -- Ausbau klappt, entscheidet weiterhin der Server beim Klick.
 --
 -- Die Gebaeude-Koerper erkennt dieses Modul wie WorldController: Attribut
@@ -21,7 +23,8 @@ local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 
-local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
+local EconomyConfig   = require(ReplicatedStorage.Config.EconomyConfig)
+local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 
 local ClientState = require(script.Parent.ClientState)
@@ -87,9 +90,9 @@ local function tick()
 	if active and data then
 		for _, part in ownBuildings() do
 			local level = part:GetAttribute(LEVEL_ATTRIBUTE) :: number
-			local cost = EconomyConfig.HONEY_UPGRADE_COSTS[level + 1]
+			local cost = BuildingBehavior.getUpgrade(part.Name :: any, level + 1)
 			local affordable = cost ~= nil and level < EconomyConfig.MAX_BUILDING_LEVEL
-				and data.gummies >= cost.gummies and data.goldGummies >= cost.goldGummies
+				and data.gummies >= (cost.costGummies or 0) and data.goldGummies >= (cost.costGoldGummies or 0)
 			local gui = hintFor(part)
 			gui.Enabled = affordable
 			seen[part] = true

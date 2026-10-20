@@ -23,7 +23,9 @@ local Loc         = require(ReplicatedStorage.Localization.Loc)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 
 local Theme        = require(script.Parent.Theme)
+local Icons        = require(script.Parent.Icons)
 local PanelManager = require(script.Parent.PanelManager)
+local TouchSafeArea = require(script.Parent.TouchSafeArea)   -- R1
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
 local RebirthButton = {}
@@ -33,9 +35,11 @@ local MARGIN      = 16
 local GLOW_PERIOD = 1.2
 
 local _button: TextButton? = nil
+local _place: (() -> ())? = nil
 local _shown = false
 local _glow: UIStroke? = nil
 local _glowTween: Tween? = nil
+local _art: ImageLabel? = nil   -- Honig-Bild: leuchtet statt des Rahmens
 
 -- Darf der Spieler gerade rebirthen? (gleiche Regel wie der Server)
 local function isReady(data: any): boolean
@@ -62,6 +66,19 @@ local function setGlow(on: boolean)
 		_glowTween:Cancel()
 		_glowTween = nil
 	end
+	local art = _art
+	if art then
+		-- Honig: das Bild pulsiert warm, wenn ein Rebirth moeglich ist
+		art.ImageColor3 = Color3.new(1, 1, 1)
+		if on then
+			local tween = TweenService:Create(art,
+				TweenInfo.new(GLOW_PERIOD * 0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+				{ ImageColor3 = Color3.fromRGB(255, 226, 140) })
+			tween:Play()
+			_glowTween = tween
+		end
+		return
+	end
 	if on then
 		glow.Transparency = 0
 		local tween = TweenService:Create(glow,
@@ -86,6 +103,7 @@ local function refresh()
 	local ready = isReady(data)
 	local show = ready or (data.rebirthCount or 0) >= 1
 	button.Visible = show
+	if _place then _place() end
 	if show and not _shown then
 		popIn(button)
 	end
@@ -101,6 +119,40 @@ function RebirthButton.init(screenGui: ScreenGui)
 	button.Size        = UDim2.fromOffset(SIZE.X, SIZE.Y)
 	button.Visible     = false
 	button.ZIndex      = 5
+
+	-- R1: auf Touch-Geraeten liegt unten rechts der Sprung-Knopf der Standard-
+	-- Steuerung. Der Rebirth-Knopf sitzt dann darueber, und die MenuBar endet
+	-- noch eine Knopfhoehe weiter oben (TouchSafeArea.setRightBottomExtra).
+	local function place()
+		-- Honig-Skin (UI_HONEY_SKIN): der Knopf sitzt oben links unter der
+		-- Knopf-Zeile, nicht mehr unten rechts — dann gibt es nichts zu tun.
+		if _art then
+			TouchSafeArea.setRightBottomExtra(0)
+			return
+		end
+		local jump = TouchSafeArea.jumpReserve(screenGui)
+		if jump then
+			button.Position = UDim2.new(1, -MARGIN, 1, -jump)
+			TouchSafeArea.setRightBottomExtra(if button.Visible then SIZE.Y + MARGIN else 0)
+		else
+			button.Position = UDim2.new(1, -MARGIN, 1, -MARGIN)
+			TouchSafeArea.setRightBottomExtra(0)
+		end
+	end
+	_place = place
+	TouchSafeArea.watch(screenGui, place)
+
+	-- 14.10. (UI_HONEY_SKIN): goldene Baer-Leiste, links auf dem Bildschirm unter den Knoepfen
+	local word, art = Icons.skinLabelButton(button, "honey/res_bar_gold", Loc.t("ui.rebirth.button"))
+	if word and art then
+		Loc.bind(word, "ui.rebirth.button")
+		button.AnchorPoint = Vector2.new(0, 0)
+		-- bündig unter der Knopf-Zeile (HudRow: y 106, 60 hoch, gleiche Luecke wie die Pillen = 6)
+		-- und exakt so breit wie die drei Knoepfe (3 x 60 + 2 x 6), damit es eine Gruppe ist
+		button.Position    = UDim2.new(0.012, 12, 0, (require(game:GetService("ReplicatedStorage").Config.FeatureFlags).isOn("UI_HONEY_SKIN") and 129 or 106) + 60 + 3)
+		button.Size        = UDim2.fromOffset(186, 44)
+		_art = art
+	end
 
 	local glow = Instance.new("UIStroke")
 	glow.Name            = "Glow"

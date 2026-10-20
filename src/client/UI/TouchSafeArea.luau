@@ -70,20 +70,46 @@ function TouchSafeArea.zone(screenGui: ScreenGui): Zone?
 	return { left = left, right = right, width = right - left, center = (left + right) / 2 }
 end
 
--- Wie viel Hoehe rechts unten frei bleiben muss (Oberflaechen-Einheiten):
--- mit Touch-Steuerung der Sprung-Knopf samt Rand und Luft, sonst `fallback`.
--- Fuer alles, was am rechten Rand nach unten waechst (MenuBar).
-function TouchSafeArea.rightBottomReserve(screenGui: ScreenGui, fallback: number): number
+-- R1: weitere Hoehe rechts unten, die ein anderes Element belegt (der feste
+-- Rebirth-Knopf sitzt auf Touch-Geraeten UEBER dem Sprung-Knopf). Die MenuBar
+-- endet dann darueber; setRightBottomExtra meldet die Aenderung an alle
+-- watch-Aufrufer.
+local _rightBottomExtra = 0
+local _changedListeners: { () -> () } = {}
+
+function TouchSafeArea.setRightBottomExtra(units: number)
+	if math.abs(units - _rightBottomExtra) < 0.5 then return end
+	_rightBottomExtra = units
+	for _, callback in _changedListeners do
+		task.spawn(callback)
+	end
+end
+
+-- Hoehe des Sprung-Knopfs samt Rand und Luft (Oberflaechen-Einheiten); nil ohne Touch.
+function TouchSafeArea.jumpReserve(screenGui: ScreenGui): number?
 	if not TouchSafeArea.isTouch() then
-		return fallback
+		return nil
 	end
 	local pixels = screenGui.AbsoluteSize
 	local jump = if math.min(pixels.X, pixels.Y) <= JUMP_SMALL.below then JUMP_SMALL else JUMP_LARGE
-	return math.max(fallback, UiScale.toGui(jump.size + jump.margin) + JUMP_GAP)
+	return UiScale.toGui(jump.size + jump.margin) + JUMP_GAP
+end
+
+-- Wie viel Hoehe rechts unten frei bleiben muss (Oberflaechen-Einheiten):
+-- mit Touch-Steuerung der Sprung-Knopf samt Rand und Luft (plus ein Knopf
+-- darueber, s.o.), sonst `fallback`. Fuer alles, was am rechten Rand nach
+-- unten waechst (MenuBar).
+function TouchSafeArea.rightBottomReserve(screenGui: ScreenGui, fallback: number): number
+	local jump = TouchSafeArea.jumpReserve(screenGui)
+	if not jump then
+		return fallback
+	end
+	return math.max(fallback, jump + _rightBottomExtra)
 end
 
 -- Ruft `callback` jetzt und bei jeder Groessen- oder Eingabeart-Aenderung.
 function TouchSafeArea.watch(screenGui: ScreenGui, callback: () -> ())
+	table.insert(_changedListeners, callback)
 	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(callback)
 	UserInputService:GetPropertyChangedSignal("KeyboardEnabled"):Connect(callback)
 	UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(callback)

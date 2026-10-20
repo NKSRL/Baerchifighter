@@ -97,7 +97,72 @@ local PILL_H = 40
 -- Genre-Vorbildern): so wirkt die Zahl "an" das Symbol gehaengt statt in
 -- einem Kasten zu stehen. Ohne Bild-Asset sitzt stattdessen ein farbiger
 -- Kreis mit Kuerzel dort (Icons.make-Fallback).
-local function makePill(parent: Instance, order: number, iconName: string, fallback: string, iconColor: Color3): (TextLabel, Frame)
+-- 14.10. (UI_HONEY_SKIN): Waehrungsleiste = fertiges Bild (Muenze/Kristall links, cremefarbenes
+-- Zahlenfeld, gruenes +). Feste Groesse im Bildverhaeltnis, nichts wird verzerrt.
+-- Zahlenfeld und Plus-Knopf als Anteile der Bildbreite/-hoehe (aus dem Bild gemessen).
+local BAR_W = 240
+local BARS = {
+	["honey/paw_coin_bar"]      = { h = 55, fx = 0.28, fw = 0.50, fy = 0.32, fh = 0.45 },
+	["honey/honey_crystal_bar"] = { h = 58, fx = 0.28, fw = 0.50, fy = 0.32, fh = 0.45 },
+}
+
+local function makeBarPill(parent: Instance, order: number, barName: string): (TextLabel?, Frame?)
+	local spec = BARS[barName]
+	if not (spec and FeatureFlags.isOn("UI_HONEY_SKIN") and Icons.hasUi(barName)) then return nil end
+	local pill = Instance.new("Frame")
+	pill.Name = "Pill"
+	pill.BackgroundTransparency = 1
+	pill.BorderSizePixel = 0
+	pill.Size = UDim2.fromOffset(BAR_W, spec.h)
+	pill.LayoutOrder = order
+	pill.Parent = parent
+
+	local art = Instance.new("ImageLabel")
+	art.Name = "Bar"
+	art.BackgroundTransparency = 1
+	art.Image = Icons.ui(barName) :: string
+	art.ScaleType = Enum.ScaleType.Stretch
+	art.Size = UDim2.fromScale(1, 1)
+	art.ZIndex = 2
+	art.Parent = pill
+
+	local value = Theme.label("Value", pill, "0")
+	value.Position = UDim2.fromScale(spec.fx, spec.fy)
+	value.Size = UDim2.fromScale(spec.fw, spec.fh)
+	value.TextXAlignment = Enum.TextXAlignment.Center
+	value.TextColor3 = Color3.fromRGB(110, 70, 36)
+	value.TextScaled = true
+	value.ZIndex = 4
+	local cap = Instance.new("UITextSizeConstraint")
+	cap.MaxTextSize = 28
+	cap.MinTextSize = 8
+	cap.Parent = value
+	for _, c in value:GetChildren() do
+		if c:IsA("UIStroke") then c:Destroy() end
+	end
+	value.TextStrokeTransparency = 1
+
+	-- gruenes + rechts im Bild: oeffnet den Shop
+	local plus = Instance.new("TextButton")
+	plus.Name = "PlusHit"
+	plus.BackgroundTransparency = 1
+	plus.Text = ""
+	plus.AnchorPoint = Vector2.new(0.5, 0.5)
+	plus.Position = UDim2.fromScale(0.858, 0.5)
+	plus.Size = UDim2.fromScale(0.16, 0.9)
+	plus.ZIndex = 5
+	plus.Parent = pill
+	plus.Activated:Connect(function()
+		PanelManager.toggle("Shop")
+	end)
+	return value, pill
+end
+
+local function makePill(parent: Instance, order: number, iconName: string, fallback: string, iconColor: Color3, barName: string?): (TextLabel, Frame)
+	if barName then
+		local v, p = makeBarPill(parent, order, barName)
+		if v and p then return v, p end
+	end
 	local pill = Theme.panel("Pill", parent, Theme.COLORS.panelDeep)
 	pill.Size        = UDim2.new(1, 0, 0, PILL_H)
 	pill.LayoutOrder = order
@@ -215,18 +280,21 @@ function Hud.init(screenGui: ScreenGui)
 	-- +12 nach rechts: das Icon ragt links aus der Pille heraus
 	left.Position    = UDim2.new(0.012, 12, 0, 12)
 	left.Size        = UDim2.new(0.21, 0, 0, PILL_H * 2 + 6)
+	if FeatureFlags.isOn("UI_HONEY_SKIN") and Icons.hasUi("honey/paw_coin_bar") then
+		left.Size = UDim2.fromOffset(BAR_W, 55 + 58 + 2)
+	end
 
 	local leftConstraint = Instance.new("UISizeConstraint")
-	leftConstraint.MinSize = Vector2.new(150, 0)
+	leftConstraint.MinSize = Vector2.new(if FeatureFlags.isOn("UI_HONEY_SKIN") then BAR_W else 150, 0)
 	leftConstraint.MaxSize = Vector2.new(260, math.huge)
 	leftConstraint.Parent  = left
 
-	local leftLayout = Theme.listLayout(left, 6)
+	local leftLayout = Theme.listLayout(left, if FeatureFlags.isOn("UI_HONEY_SKIN") then 2 else 6)
 	leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
 	local gummyPill, goldPill
-	_gummyLabel, gummyPill = makePill(left, 1, "gummy", "G", Theme.COLORS.gummy)
-	_goldLabel, goldPill   = makePill(left, 2, "goldgummy", "$", Theme.COLORS.goldGummy)
+	_gummyLabel, gummyPill = makePill(left, 1, "gummy", "G", Theme.COLORS.gummy, "honey/paw_coin_bar")
+	_goldLabel, goldPill   = makePill(left, 2, "goldgummy", "$", Theme.COLORS.goldGummy, "honey/honey_crystal_bar")
 	_pills.gummies     = gummyPill
 	_pills.goldGummies = goldPill
 
@@ -243,6 +311,10 @@ function Hud.init(screenGui: ScreenGui)
 
 	local rightLayout = Theme.listLayout(right, 6)
 	rightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+
+	-- 14.10.: Rang-Leiste und Rebirth-Multiplikator oben rechts sind auf Wunsch ausgeblendet
+	-- (Rebirth bleibt ueber den Knopf unten rechts erreichbar).
+	right.Visible = not FeatureFlags.isOn("UI_HONEY_SKIN")
 
 	local rankPill
 	_rankLabel, rankPill = makePill(right, 1, "crown", "R", Theme.COLORS.accent)
@@ -275,7 +347,7 @@ function Hud.init(screenGui: ScreenGui)
 	-- Zeigt das Kuerzel der aktiven Sprache und oeffnet die Auswahl.
 	local languageButton = Theme.button("Language", screenGui, string.upper(Loc.getLanguage()), Theme.COLORS.panelLight)
 	languageButton.AnchorPoint = Vector2.new(0, 0)
-	languageButton.Position    = UDim2.new(0.012, 12, 0, 106)
+	languageButton.Position    = UDim2.new(0.012, 12, 0, (require(game:GetService("ReplicatedStorage").Config.FeatureFlags).isOn("UI_HONEY_SKIN") and 129 or 106))
 	languageButton.Size        = UDim2.new(0, 70, 0, 30)
 	languageButton.TextColor3  = Theme.COLORS.text
 	languageButton.TextXAlignment = Enum.TextXAlignment.Right
@@ -305,6 +377,11 @@ function Hud.init(screenGui: ScreenGui)
 		languageButton.Size = UDim2.new(0, 30, 0, 30)
 		local padding = languageButton:FindFirstChildOfClass("UIPadding")
 		if padding then padding.PaddingRight = UDim.new(0, 0) end
+	end
+
+	-- 14.10. (UI_HONEY_SKIN): Zahnrad als eigenes Bild
+	if Icons.skinButton(languageButton, "honey/settings") then
+		languageButton.Size = UDim2.new(0, 40, 0, 40)
 	end
 
 	-- Sofort mit dem aktuellen Stand fuellen, danach bei jeder Aenderung

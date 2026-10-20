@@ -18,6 +18,8 @@ local Remotes = require(ReplicatedStorage.Network.Remotes)
 local Loc     = require(ReplicatedStorage.Localization.Loc)
 local Theme   = require(script.Parent.Theme)
 local Notify  = require(script.Parent.Notify)
+local Icons   = require(script.Parent.Icons)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 
 local Toast = {}
 
@@ -60,6 +62,67 @@ function Toast.show(message: string | Types.LocMsg, color: Color3?)
 	end
 
 	_order += 1
+
+	-- Honig-Skin: die Meldung ist ein Bild-Knopf (dunkel = Fehler, hell = Erfolg/Info), 9-Slice
+	-- gedehnt auf Textbreite. Ohne Schalter/Bild bleibt der alte Kasten (Rueckfall unten).
+	local isError = (color == nil) or (color == Theme.COLORS.bad)
+	local artName = if isError then "honey/btn_dark" else "honey/btn_light"
+	if FeatureFlags.isOn("UI_HONEY_SKIN") and Icons.hasUi(artName) then
+		local HEIGHT = 56
+		local honeyToast = Instance.new("Frame")
+		honeyToast.Name                   = "Toast"
+		honeyToast.BackgroundTransparency = 1
+		honeyToast.BorderSizePixel        = 0
+		honeyToast.Size                   = UDim2.new(1, 0, 0, HEIGHT)
+		honeyToast.LayoutOrder            = _order
+		honeyToast.Parent                 = container
+
+		-- Bildausschnitt wie in Icons.CROPS (btn_dark 1011x262 ab (4,116), btn_light 1008x265 ab (8,116))
+		local cropOffset = if isError then Vector2.new(4, 116) else Vector2.new(8, 116)
+		local cropSize   = if isError then Vector2.new(1011, 262) else Vector2.new(1008, 265)
+		local art = Icons.honeyImage(honeyToast, artName,
+			Rect.new(120, 60, cropSize.X - 120, cropSize.Y - 60), HEIGHT / cropSize.Y, cropOffset, cropSize)
+		if art then
+			art.ZIndex = 1
+
+			local honeyLabel = Instance.new("TextLabel")
+			honeyLabel.Name                   = "Text"
+			honeyLabel.BackgroundTransparency = 1
+			honeyLabel.Position               = UDim2.new(0, 26, 0, 6)
+			honeyLabel.Size                   = UDim2.new(1, -52, 1, -12)
+			honeyLabel.Font                   = Enum.Font.FredokaOne
+			honeyLabel.Text                   = text
+			honeyLabel.TextScaled             = true
+			honeyLabel.TextColor3             = Color3.new(1, 1, 1)
+			honeyLabel.TextStrokeColor3       = Color3.fromRGB(60, 30, 10)
+			honeyLabel.TextStrokeTransparency = 0.2
+			honeyLabel.ZIndex                 = 2
+			honeyLabel.Parent                 = honeyToast
+			local limit = Instance.new("UITextSizeConstraint")
+			limit.MaxTextSize = 22
+			limit.MinTextSize = 10
+			limit.Parent      = honeyLabel
+
+			table.insert(_active, honeyToast)
+
+			art.ImageTransparency            = 1
+			honeyLabel.TextTransparency      = 1
+			honeyLabel.TextStrokeTransparency = 1
+			TweenService:Create(art, TweenInfo.new(0.15), { ImageTransparency = 0 }):Play()
+			TweenService:Create(honeyLabel, TweenInfo.new(0.15), { TextTransparency = 0, TextStrokeTransparency = 0.2 }):Play()
+
+			task.delay(LIFETIME, function()
+				if honeyToast.Parent == nil then return end
+				local fade = TweenService:Create(art, TweenInfo.new(0.25), { ImageTransparency = 1 })
+				TweenService:Create(honeyLabel, TweenInfo.new(0.25), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+				fade:Play()
+				fade.Completed:Wait()
+				removeToast(honeyToast)
+			end)
+			return
+		end
+		honeyToast:Destroy()
+	end
 
 	local toast = Theme.panel("Toast", container, Theme.COLORS.panelDeep)
 	toast.Size         = UDim2.new(1, 0, 0, 34)

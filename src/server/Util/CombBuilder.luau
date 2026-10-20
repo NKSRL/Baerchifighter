@@ -20,6 +20,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CombConfig = require(ReplicatedStorage.Config.CombConfig)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 
 local CombBuilder = {}
 
@@ -29,6 +30,50 @@ export type CombParts = {
 }
 
 local SQRT3 = math.sqrt(3)
+
+-- NEW_MODELS_V3: Mesh-Waben aus ReplicatedStorage.Assets.Combs. EIN MeshPart
+-- pro Wabe, vier Varianten auf demselben Mesh. Aus = alte Platten-Optik.
+-- Mesh ist 3.3 x 1.0 x 3.0 Studs gross (alte Wabe: 2.7 x 0.55).
+local NEW_WORLD_SCALE = 1.2    -- ~4 Studs im Pit (alt: 3.9)
+local NEW_STACK_SCALE = 0.85   -- ~2.8 Studs ueber dem Kopf (alt: 2.7)
+local THEME_VARIANT = { HotEgg = "Comb_Lava", WaspQueen = "Comb_RoyalJelly" }
+
+local function newTemplate(isGold: boolean, themeId: string?): Model?
+	if not FeatureFlags.isOn("NEW_MODELS_V3") then
+		return nil
+	end
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local folder = assets and assets:FindFirstChild("Combs")
+	if not folder then
+		return nil
+	end
+	local name = (themeId and THEME_VARIANT[themeId]) or (if isGold then "Comb_Gold" else "Comb_Normal")
+	local tpl = folder:FindFirstChild(name)
+	if tpl and tpl:IsA("Model") then
+		return tpl
+	end
+	return nil
+end
+
+-- Klon der Vorlage als sauberes Model; Teile bleiben so, wie sie sind.
+local function cloneComb(tpl: Model, name: string, scale: number): Model
+	local model = tpl:Clone()
+	model.Name = name
+	model.WorldPivot = tpl.WorldPivot
+	if scale ~= 1 then
+		model:ScaleTo(scale)
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanTouch   = false
+			d.CanQuery   = false
+			d.CastShadow = false
+			d.Massless   = true
+		end
+	end
+	return model
+end
 
 local function basePart(name: string, size: Vector3, color: Color3, material: Enum.Material): Part
 	local part = Instance.new("Part")
@@ -127,6 +172,22 @@ function CombBuilder.buildWorldComb(position: Vector3, yaw: number, isGold: bool
 	model:SetAttribute("Pos", center)
 	model:SetAttribute("Yaw", yaw)
 
+	local tpl = newTemplate(isGold, themeId)
+	if tpl then
+		local mesh = cloneComb(tpl, "Comb", NEW_WORLD_SCALE)
+		mesh:PivotTo(CFrame.new(center) * CFrame.Angles(0, yaw, 0))
+		for _, d in mesh:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = true
+			end
+		end
+		mesh.PrimaryPart = mesh:FindFirstChildWhichIsA("BasePart", true)
+		for k, v in model:GetAttributes() do
+			mesh:SetAttribute(k, v)
+		end
+		return mesh
+	end
+
 	local parts = CombBuilder.createParts(isGold, CombConfig.WORLD_SCALE, themeId)
 	local placed = CombBuilder.place(
 		parts,
@@ -180,6 +241,27 @@ function CombBuilder.buildStackComb(head: BasePart, slot: number, isGold: boolea
 	-- Der Kopf dreht sich mit dem Charakter; der Stapel soll aufrecht bleiben.
 	-- Deshalb Schweissung relativ zum Kopf und die Wabe in Kopf-Ausrichtung
 	-- platziert: Kopf-CFrame * offset, dann WeldConstraint (behaelt den Versatz).
+	local tpl = newTemplate(isGold, themeId)
+	if tpl then
+		local mesh = cloneComb(tpl, "CombStackItem", NEW_STACK_SCALE)
+		-- Unterseite sitzt auf dem Stapelpunkt: Mesh-Hoehe/2 nach oben.
+		local half = select(2, mesh:GetBoundingBox()).Y * 0.5
+		mesh:PivotTo(head.CFrame * offset * CFrame.new(0, half - CombConfig.COMB_HEIGHT * 0.5, 0))
+		mesh.Parent = parent
+		model:Destroy()
+		for _, d in mesh:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = false
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0  = head
+				weld.Part1  = d
+				weld.Parent = d
+			end
+		end
+		mesh.PrimaryPart = mesh:FindFirstChildWhichIsA("BasePart", true)
+		return mesh
+	end
+
 	local parts  = CombBuilder.createParts(isGold, 1, themeId)
 	local placed = CombBuilder.place(parts, head.CFrame * offset)
 

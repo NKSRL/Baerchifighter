@@ -69,6 +69,10 @@ local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local RecyclerBuilder = require(MapBuild.RecyclerBuilder)
 local IncubatorBuilder = require(MapBuild.IncubatorBuilder)   -- Sammel-Update Paket 8
 local TerminalBuilder  = require(MapBuild.TerminalBuilder)    -- 08.10. Tower-Terminal
+local EpilogSummitBuilder = require(MapBuild.EpilogSummitBuilder)   -- 20.10. Final-Epilog: Gipfel
+local EpilogIslandBuilder = require(MapBuild.EpilogIslandBuilder)   -- 20.10. Final-Epilog: Insel + Bruecke
+local EpilogTerminalBuilder = require(MapBuild.EpilogTerminalBuilder)   -- 20.10. Final-Epilog: Start-Terminal
+local EpilogFinaleBuilder = require(MapBuild.EpilogFinaleBuilder)   -- 20.10. Final-Epilog P6: Rakete
 
 --------------------------------------------------------------------------------
 -- Interner Zustand
@@ -104,6 +108,11 @@ local _islandDataProvider: ((Player) -> Types.IslandData?)? = nil
 -- IslandData) — PlotDisplayService setzt beides; gemerkt wird es hier, damit
 -- ein Neuaufbau des Plots (Rebirth) Turm und Symbol sofort wieder mitbaut.
 local _showcase: { [Player]: ArenaBuilder.ShowcaseView } = {}
+
+-- 20.10. Final-Epilog (Prompt 2): Etagenzahl, auf der der Run-Turm stehen BLEIBT
+-- (Gipfel). Solange gesetzt, kann setPitTowerLevel den Turm nicht unter diese
+-- Hoehe abbauen. nil = Verhalten wie immer.
+local _towerHold: { [Player]: number } = {}
 -- Sammel-Update Paket 8: Platz-Zahl des Inkubators (siehe setIncubatorSlotProvider)
 local _incubatorSlots: (Player) -> number = function(_player: Player): number return 1 end
 type Badge = { text: string, color: Color3 }
@@ -129,6 +138,23 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 
 	ArenaBuilder.buildBridge(plotModel, slot)
 	ArenaBuilder.buildPit(plotModel, slot)
+	-- 20.10. Final-Epilog: ein Neuaufbau (Ausbau, Rebirth) darf den gehaltenen
+	-- Turm samt Gipfel nicht verlieren.
+	local hold = _towerHold[owner]
+	if hold then
+		local pit = plotModel:FindFirstChild("PitPlatform")
+		local tower = if pit then pit:FindFirstChild("Tower") else nil
+		if tower and tower:IsA("Folder") then
+			local center = MapParts.pitCenter(slot)
+			for i = 1, hold do
+				ArenaBuilder.buildTowerRing(tower, center, i)
+			end
+		end
+		EpilogSummitBuilder.build(plotModel, slot, owner, { animate = false })
+		-- Prompt 3: Insel und Bruecke wieder auf den Stand von vorher bringen
+		EpilogIslandBuilder.restoreAfterRebuild(plotModel)
+		EpilogTerminalBuilder.restoreAfterRebuild(plotModel)   -- Prompt 4
+	end
 	PondBuilder.buildPond(plotModel, slot, islandData)
 	RecyclerBuilder.build(plotModel, slot, islandData.recycler)
 	-- Sammel-Update Paket 8: Inkubator (Plaetze liefert der Daten-Lieferant,
@@ -224,6 +250,10 @@ function MapService.despawnIsland(player: Player)
 	_badge[player] = nil
 	_crown[player] = nil
 	_terminal[player] = nil
+	_towerHold[player] = nil
+	EpilogTerminalBuilder.destroy(player)
+	EpilogIslandBuilder.destroy(player)
+	EpilogSummitBuilder.destroy(player)
 
 	local model = _plotModels[player]
 	if model then
@@ -396,6 +426,49 @@ function MapService.updateBaerchis(player: Player, islandData: Types.IslandData)
 	LaidEggBuilder.renderLaidEggs(model, slot, islandData, player)
 end
 
+-- 14.10. (Befehle jederzeit): Baut die Figur SOFORT neu — ohne auf eine laufende
+-- Bewegung zu warten. Nur fuer den Fall, dass der Aufrufer die Bewegung vorher
+-- selbst beendet hat (Ausruesten eines anderen Baerchis: die alte Figur wird
+-- verworfen, die neue steht am Heimplatz). Alle anderen Aenderungen laufen ueber
+-- updateBaerchis bzw. updateBaerchiLabels und fassen die Figur nicht an.
+function MapService.replaceBaerchis(player: Player, islandData: Types.IslandData)
+	local model = _plotModels[player]
+	if not model then return end
+
+	local slot = _playerSlot[player]
+	if not slot then return end
+
+	FigureBuilder.renderBaerchis(model, slot, islandData)
+	LaidEggBuilder.renderLaidEggs(model, slot, islandData, player)
+end
+
+-- 14.10.: Namensschild (Level, Mutations-Kuerzel) der stehenden Figur nachziehen.
+-- Billig und ohne ActivityLock-Pruefung: die Figur wird nicht bewegt oder
+-- ersetzt, ein Level-Aufstieg darf also auch mitten auf einem Weg sichtbar werden.
+function MapService.updateBaerchiLabels(player: Player, islandData: Types.IslandData)
+	local model = _plotModels[player]
+	if not model then return end
+
+	local folder = model:FindFirstChild("Baerchis")
+	if not folder then return end
+
+	for _, baerchi in islandData.baerchis do
+		local figure = folder:FindFirstChild("Baerchi_" .. baerchi.uid)
+		if figure and figure:IsA("Model") then
+			FigureBuilder.writeBaerchiName(figure, baerchi)
+		end
+	end
+end
+
+-- 14.10.: Heimplatz des ausgeruesteten Baerchis (Fusspunkt, Plot-Ausrichtung).
+-- Davon laufen alle Wege aus und dorthin kehren sie zurueck — unabhaengig davon,
+-- wo die Figur gerade steht, wenn ein Weg beginnt (Umlenken mitten im Lauf).
+function MapService.getBaerchiHome(player: Player): (Vector3?, CFrame?)
+	local slot = _playerSlot[player]
+	if not slot then return nil, nil end
+	return FigureBuilder.homeFoot(slot)
+end
+
 -- Baut die herumliegenden Eier eines Spielers neu.
 --
 -- Anders als updateBaerchis KEINE ActivityLock-Pruefung: Eier bewegen sich
@@ -417,6 +490,11 @@ end
 -- beim Start von EggLayService aufgerufen (Pull-Callback statt require:
 -- EggLayService requiret bereits MapService, der umgekehrte Weg waere ein
 -- Ringschluss). Ohne Handler sammelt Beruehren einfach nichts ein.
+-- 14.10.: alle gelegten Eier (Part, Besitzer, uid) durchlaufen (fuer den Sammel-Sweep).
+function MapService.forEachLaidEgg(fn: (BasePart, Player, string) -> ())
+	LaidEggBuilder.forEachLaid(fn)
+end
+
 function MapService.setEggCollectHandler(handler: (Player, string) -> ())
 	LaidEggBuilder.setCollectHandler(handler)
 end
@@ -476,6 +554,15 @@ end
 function MapService.getPondPosition(player: Player): Vector3?
 	local slot = _playerSlot[player]
 	if not slot then return nil end
+	-- NEW_MODELS_V3: der Baerchi trinkt vom Steg des Brunnen-Meshs, mitten
+	-- ueber dem Honig (Steg liegt ~1.5 Studs hoch, Mitte bei 6.3 von der
+	-- Beckenmitte). Heimplatz bleibt vor dem Steg (MapLayout.baerchiHomeOffset).
+	local RS = game:GetService("ReplicatedStorage")
+	if require(RS.Config.FeatureFlags).isOn("NEW_MODELS_V3")
+		and RS:FindFirstChild("Assets") and RS.Assets:FindFirstChild("Fountains") then
+		local k = PondBuilder.standFactor(_plotModels[player])
+		return (PondBuilder.pondGround(slot) * CFrame.new(0, 1.5 * k, -6.3 * k)).Position
+	end
 	return PondBuilder.pondStand(slot).Position
 end
 
@@ -539,7 +626,7 @@ function MapService.updateIncubator(player: Player, islandData: Types.IslandData
 	local slot  = _playerSlot[player]
 	if not model or not slot then return end
 	local existing = model:FindFirstChild(IncubatorConfig.MODEL_NAME)
-	if existing and existing:IsA("Model") then
+	if existing and existing:IsA("Model") and not IncubatorBuilder.needsRebuild(existing, islandData.incubator) then
 		IncubatorBuilder.writeState(existing, islandData.incubator, slotCount, islandData.baerchis)
 	else
 		IncubatorBuilder.build(model, slot, islandData.incubator, slotCount, islandData.baerchis)
@@ -835,6 +922,12 @@ end
 -- damit sie ueber dem gewachsenen Turm haengen bleibt statt mittendrin zu
 -- stecken.
 function MapService.setPitTowerLevel(player: Player, level: number)
+	-- 20.10. Final-Epilog: ein gehaltener Turm wird nie unter die Haltehoehe abgebaut.
+	local hold = _towerHold[player]
+	if hold then
+		level = math.max(math.floor(level), hold)
+	end
+
 	local slot  = _playerSlot[player]
 	local model = _plotModels[player]
 	if not slot or not model then return end
@@ -861,6 +954,11 @@ function MapService.setPitTowerLevel(player: Player, level: number)
 		end
 	end
 
+	-- 12.10.: Hoehe fuer das Flugfeld am Arena-Rand (TowerFlightController):
+	-- der Client schiesst den eigenen Charakter auf die Turm-Spitze.
+	container:SetAttribute("TowerLevel", wanted)
+	container:SetAttribute("TowerTopY", MapService.getPitTowerFloorY(wanted))
+
 	local anchor = container:FindFirstChild("PitBannerAnchor")
 	if anchor and anchor:IsA("BasePart") then
 		local topY = MapConfig.PLATFORM_TOP_Y
@@ -868,6 +966,214 @@ function MapService.setPitTowerLevel(player: Player, level: number)
 			+ MapConfig.PIT_BANNER_HEIGHT
 		anchor.CFrame = CFrame.new(center.X, topY, center.Z)
 	end
+end
+
+-- 20.10. Final-Epilog (Prompt 2) ---------------------------------------------
+
+-- Etagen, auf denen der Turm gehalten wird (nil = nicht gehalten).
+function MapService.getTowerHold(player: Player): number?
+	return _towerHold[player]
+end
+
+-- Gipfel an/aus. An: der Run-Turm bleibt auf `EpilogSummitBuilder.holdFloors()`
+-- Etagen stehen (fehlende Etagen werden ergaenzt), der Gipfel wird gebaut (mit
+-- `animate` in 1,5 s). Aus: Sperre fort, Gipfel weg, Turm faehrt auf 0 (wie ein
+-- normaler Lauf-Abschluss). Gibt false zurueck, wenn der Spieler keinen Plot hat.
+function MapService.setSummit(player: Player, on: boolean, animate: boolean?): boolean
+	local model = _plotModels[player]
+	local slot  = _playerSlot[player]
+	if not model or not slot then return false end
+
+	if on then
+		local floors = EpilogSummitBuilder.holdFloors()
+		_towerHold[player] = floors
+		MapService.setPitTowerLevel(player, floors)
+		EpilogSummitBuilder.build(model, slot, player, { animate = animate == true })
+	else
+		_towerHold[player] = nil
+		EpilogTerminalBuilder.destroy(player)
+		EpilogIslandBuilder.destroy(player)   -- Prompt 3: Insel/Bruecke zuerst, sie haengen am Gipfel
+		EpilogSummitBuilder.destroy(player)
+		MapService.setPitTowerLevel(player, 0)
+	end
+	return true
+end
+
+function MapService.hasSummit(player: Player): boolean
+	return EpilogSummitBuilder.exists(player)
+end
+
+-- Avatar + Begleiter-Baerchi (Uid) auf den Gipfel setzen.
+function MapService.teleportToSummit(player: Player, companionUid: string?): boolean
+	local companion = if companionUid then MapService.getBaerchiModel(player, companionUid) else nil
+	return EpilogSummitBuilder.teleportPlayerToSummit(player, companion)
+end
+
+-- Finale (Prompt 6): der Turm faehrt in PIT_TOWER_FALL_SECONDS x 3 ab, der
+-- Spieler steht als Lift darauf. Blockiert bis zum Ende; danach fehlt Gipfel
+-- UND Sperre. false = kein Gipfel.
+function MapService.lowerSummit(player: Player, companionUid: string?, seconds: number?): boolean
+	local hold = _towerHold[player]
+	if not hold or not EpilogSummitBuilder.exists(player) then return false end
+	EpilogTerminalBuilder.destroy(player)
+	EpilogIslandBuilder.destroy(player)   -- Prompt 3: falls Insel/Bruecke noch stehen (Prompt 6 baut sie vorher ab)
+	local companion = if companionUid then MapService.getBaerchiModel(player, companionUid) else nil
+	local ok = EpilogSummitBuilder.lowerWithPlayer(player, hold, function(level: number)
+		_towerHold[player] = if level > 0 then level else nil
+		MapService.setPitTowerLevel(player, level)
+	end, { seconds = seconds, companion = companion })
+	_towerHold[player] = nil
+	if _plotModels[player] then MapService.setPitTowerLevel(player, 0) end
+	return ok
+end
+
+-- `epilog scan`: liegt ein Ordner Epilog im Plot, obwohl weder Gipfel noch
+-- Haltesperre bestehen? (Reste nach einem Abbau)
+function MapService.epilogLeftover(player: Player): boolean
+	local model = _plotModels[player]
+	if not model then return false end
+	local folder = model:FindFirstChild("Epilog")
+	return folder ~= nil and not EpilogSummitBuilder.exists(player) and _towerHold[player] == nil
+		and not EpilogIslandBuilder.exists(player) and #folder:GetChildren() > 0
+end
+
+-- Prompt 3: Insel und Bruecke --------------------------------------------------
+-- Alle Aufrufe gehen ueber den Plot des Spielers; die Regeln (Zustand, Radius)
+-- prueft EpilogIslandBuilder selbst.
+
+function MapService.buildIsland(player: Player, animate: boolean?): boolean
+	local model = _plotModels[player]
+	if not model then return false end
+	return EpilogIslandBuilder.buildIsland(model, { animate = animate == true }) ~= nil
+end
+
+function MapService.growBridge(player: Player, onDone: (() -> ())?): (boolean, string)
+	local model = _plotModels[player]
+	if not model then return false, "no_plot" end
+	return EpilogIslandBuilder.growBridge(model, onDone)
+end
+
+function MapService.buildBridgeInstant(player: Player): (boolean, string)
+	local model = _plotModels[player]
+	if not model then return false, "no_plot" end
+	return EpilogIslandBuilder.buildBridgeInstant(model)
+end
+
+function MapService.removeIsland(player: Player, animated: boolean, onDone: (() -> ())?)
+	local model = _plotModels[player]
+	if not model then
+		EpilogIslandBuilder.destroy(player)
+		if onDone then task.defer(onDone) end
+		return
+	end
+	EpilogIslandBuilder.removeAll(model, animated, onDone)
+end
+
+function MapService.teleportToIsland(player: Player, companionUid: string?): boolean
+	local companion = if companionUid then MapService.getBaerchiModel(player, companionUid) else nil
+	return EpilogIslandBuilder.teleportPlayerToIsland(player, companion)
+end
+
+function MapService.getBridgeWaypoints(player: Player): { Vector3 }
+	local model = _plotModels[player]
+	return if model then EpilogIslandBuilder.getBridgeWaypoints(model) else {}
+end
+
+-- Prompt 5: Kamera-/Laufdaten fuer den Client (Zahlen-Tabellen, siehe EpilogIslandBuilder.getRouteInfo)
+function MapService.getEpilogRoute(player: Player): any
+	local model = _plotModels[player]
+	return if model then EpilogIslandBuilder.getRouteInfo(model) else nil
+end
+
+function MapService.getTerminalMount(player: Player): CFrame?
+	local model = _plotModels[player]
+	return if model then EpilogIslandBuilder.getTerminalMount(model) else nil
+end
+
+function MapService.hasIsland(player: Player): boolean
+	return EpilogIslandBuilder.exists(player)
+end
+
+function MapService.isBridgeComplete(player: Player): boolean
+	return EpilogIslandBuilder.isComplete(player)
+end
+
+function MapService.isBridgeGrowing(player: Player): boolean
+	return EpilogIslandBuilder.isGrowing(player)
+end
+
+-- Prompt 4: Start-Terminal auf der Insel ---------------------------------------
+
+function MapService.buildTerminal(player: Player, startState: string?): boolean
+	local model = _plotModels[player]
+	if not model then return false end
+	return EpilogTerminalBuilder.build(model, startState) ~= nil
+end
+
+function MapService.setTerminalState(player: Player, state: string): boolean
+	return EpilogTerminalBuilder.setState(player, state)
+end
+
+function MapService.getTerminalState(player: Player): string?
+	return EpilogTerminalBuilder.getState(player)
+end
+
+function MapService.hasTerminal(player: Player): boolean
+	return EpilogTerminalBuilder.exists(player)
+end
+
+function MapService.setTerminalCountdown(player: Player, number: number): boolean
+	return EpilogTerminalBuilder.setCountdown(player, number)
+end
+
+-- Prompt 6: Rakete im Schacht neben dem Terminal; `launch` zuendet die Emitter.
+function MapService.buildRocket(player: Player): boolean
+	local model = _plotModels[player]
+	if not model then return false end
+	return EpilogFinaleBuilder.build(model, player) ~= nil
+end
+
+function MapService.launchRocket(player: Player, on: boolean)
+	EpilogFinaleBuilder.launch(player, on)
+end
+
+function MapService.getRocketBase(player: Player): { number }?
+	return EpilogFinaleBuilder.getBase(player)
+end
+
+function MapService.destroyRocket(player: Player)
+	EpilogFinaleBuilder.destroy(player)
+end
+
+function MapService.countRocketParts(player: Player): number
+	return EpilogFinaleBuilder.countParts(player)
+end
+
+-- Avatar auf den Plot setzen (Spawn des Plots), falls er weiter als `maxDistance` davon
+-- steht. true = bewegt.
+function MapService.placeOnPlotIfFar(player: Player, maxDistance: number): boolean
+	local character = player.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	local spawn = player.RespawnLocation
+	if not (character and root and root:IsA("BasePart") and spawn) then return false end
+	if (root.Position - spawn.Position).Magnitude <= maxDistance then return false end
+	character:PivotTo(spawn.CFrame + Vector3.new(0, 4, 0))
+	root.AssemblyLinearVelocity = Vector3.zero
+	return true
+end
+
+function MapService.countTerminalParts(player: Player): number
+	return EpilogTerminalBuilder.countParts(player)
+end
+
+-- (Teile Insel, Teile Bruecke) fuer `epilog scan`.
+function MapService.countIslandParts(player: Player): (number, number)
+	return EpilogIslandBuilder.countParts(player)
+end
+
+-- Teile des Gipfels (fuer `epilog scan`).
+function MapService.countSummitParts(player: Player): number
+	return EpilogSummitBuilder.countParts(player)
 end
 
 -- Hoehe (Y ueber PLATFORM_TOP_Y) der Kampfflaeche bei `level` bereits

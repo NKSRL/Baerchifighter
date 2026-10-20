@@ -31,6 +31,8 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	RequestUpgradeRecycler = 0.50,   -- v15: Waben-Recycler
 	RequestFuseBaerchis    = 1.00,
 	RequestRecycleBaerchi  = 0.25,
+	-- 19.10.: Verkaufen loescht unwiderruflich (mehrere auf einmal) — bewusst traege.
+	RequestSellBaerchis    = 1.00,
 	-- Fuettern ist die haeufigste Aktion im Spiel (ein Klick pro Honig) —
 	-- deshalb bewusst kurz, aber nicht null.
 	RequestFeedHoney       = 0.15,
@@ -91,6 +93,13 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- aus dem Speicher; die Bremse schuetzt nur vor Spam.
 	GetLeaderboard         = 1.00,
 	GetPlayerProfile       = 1.00,
+
+	-- 20.10. Final-Epilog: einmalige Meldungen, kein Takt noetig. Die Bremse
+	-- schuetzt nur vor Spam; Token und Zustand prueft EpilogService.
+	EpilogSeen             = 1.00,
+	EpilogSkip             = 1.00,
+	RequestPressLaunch     = 1.00,
+	EpilogDebugReport      = 0.50,   -- Prompt 5, nur auf Anforderung des Servers
 }
 
 -- Fuer Remotes die (noch) keinen eigenen Eintrag haben

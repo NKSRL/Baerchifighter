@@ -181,12 +181,20 @@ function RebirthDialog.init(screenGui: ScreenGui)
 	)
 	_root = root
 
+	-- 14.10. (UI_HONEY_SKIN): dunkles Honig-Fenster (daily_window), verkleinert auf 660 x 440
+	local honey = Icons.honeyWindow(root, "honey/daily_window", 660, 440) ~= nil
+
 	local title = Theme.dialogHeader(root, "", function()
 		PanelManager.close(PANEL_NAME)
 	end)
 	Loc.bind(title, "ui.rebirth.title")
 
 	local body = Theme.dialogBody(root)
+	if honey then
+		Icons.honeyHeader(root, Rect.new(60, 30, 584, 77), 614, 40, 44)
+		body.Position = UDim2.fromOffset(58, 100)
+		body.Size     = UDim2.fromOffset(544, 250)
+	end
 
 	local status = Theme.label("Status", body, "")
 	status.Size = UDim2.new(1, -8, 0, 24)
@@ -230,6 +238,22 @@ function RebirthDialog.init(screenGui: ScreenGui)
 	cancel.Activated:Connect(function()
 		PanelManager.close(PANEL_NAME)
 	end)
+
+	-- Honig: Zeilen etwas luftiger und groesser lesbar
+	if honey then
+		status.Size   = UDim2.new(1, -8, 0, 30)
+		cost.Position = UDim2.new(0, 0, 0, 38)
+		cost.Size     = UDim2.new(1, -8, 0, 28)
+		loss.Position = UDim2.new(0, 2, 0, 78)
+		loss.Size     = UDim2.new(1, -8, 0, 56)
+		loss.TextSize = 15
+		reward.Position = UDim2.new(0, 0, 0, 146)
+		reward.Size     = UDim2.new(1, -8, 0, 30)
+		for i, y in { 0, 37, 146 } do
+			local icon = _rowIcons[i]
+			if icon then icon.Position = UDim2.new(0, 0, 0, y) end
+		end
+	end
 
 	local confirm = Theme.button("Confirm", body, "", Theme.COLORS.gummy)
 	Loc.bind(confirm, "ui.rebirth.confirm")

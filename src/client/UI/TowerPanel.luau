@@ -79,6 +79,10 @@ local function reserve(screen: Vector2): Kit.Reserve
 	return { top = 12, bottom = 96, left = left, right = 112 }
 end
 local _compact = false
+-- 14.10. (UI_HONEY_SKIN): Fenster = Bild (tower_window, 900 x 600): Tabs oben, Liste in der
+-- Mitte, unten Gummy-Pille und die drei Einstiegs-Knoepfe sitzen auf den Bild-Feldern.
+local _honey = false
+local HONEY_W, HONEY_H = 900, 600
 
 type CardView = {
 	def      : TowerConfig.TowerDef,
@@ -130,7 +134,7 @@ end
 local function cardState(def: TowerConfig.TowerDef, data: Types.PlayerDataUpdate): string
 	local towers = data.towers
 	if not towers then return if def.id == TowerConfig.FIRST_TOWER then "active" else "locked" end
-	local open = TowerConfig.isOpen(data.rebirthCount, def.id, towers.records, (towers :: any).unlocked)
+	local open = TowerConfig.isOpen(data.rebirthCount, def.id, TowerConfig.unlockRecords(towers, data.island), (towers :: any).unlocked)
 	if not open then return "locked" end
 	if towers.selected == def.id then return "active" end
 	if TowerConfig.isNew(def.id, towers :: any) then return "new" end
@@ -304,7 +308,7 @@ local function refreshCard(view: CardView, data: Types.PlayerDataUpdate)
 
 	-- Gesperrt: gedaempft, aber lesbar
 	if locked then
-		local prev, have, need = TowerConfig.getUnlockProgress(def.id, if towers then towers.records else nil)
+		local prev, have, need = TowerConfig.getUnlockProgress(def.id, TowerConfig.unlockRecords(towers, data.island))
 		local lockText = view.lockChip:FindFirstChild("Text") :: TextLabel
 		lockText.Text = if prev
 			then Loc.t("ui.tower2.unlock_by", { tower = towerName(prev) })
@@ -349,8 +353,8 @@ local function refreshStatus(data: Types.PlayerDataUpdate)
 	-- Naechste Freischaltung
 	local nextText = Loc.t("ui.tower2.status_all_open")
 	for _, other in TowerConfig.TOWERS do
-		if not TowerConfig.isOpen(data.rebirthCount, other.id, if towers then towers.records else nil, if towers then (towers :: any).unlocked else nil) then
-			local prev, have, need = TowerConfig.getUnlockProgress(other.id, if towers then towers.records else nil)
+		if not TowerConfig.isOpen(data.rebirthCount, other.id, TowerConfig.unlockRecords(towers, data.island), if towers then (towers :: any).unlocked else nil) then
+			local prev, have, need = TowerConfig.getUnlockProgress(other.id, TowerConfig.unlockRecords(towers, data.island))
 			if prev then
 				nextText = Loc.t("ui.tower2.status_next", { tower = towerName(other.id), have = have, need = need })
 			end
@@ -365,6 +369,18 @@ end
 local function layoutFooter(showSkip: boolean, passOwned: boolean, footerWidth: number)
 	local primary, skip, premium = _primary, _skip, _premium
 	if not primary or not skip or not premium then return end
+	if _honey then
+		-- feste Felder im Bild: gruen (Start), blau (Skip), gelb (Pass); alle immer sichtbar
+		skip.button.Visible = true
+		premium.button.Visible = true
+		primary.button.Position = UDim2.fromOffset(326, 488)
+		primary.button.Size     = UDim2.fromOffset(162, 63)
+		skip.button.Position    = UDim2.fromOffset(522, 488)
+		skip.button.Size        = UDim2.fromOffset(143, 63)
+		premium.button.Position = UDim2.fromOffset(698, 488)
+		premium.button.Size     = UDim2.fromOffset(145, 63)
+		return
+	end
 	local gap = T.space.s
 	local inner = footerWidth - PAD * 2
 	if passOwned and showSkip then
@@ -427,7 +443,7 @@ local function refreshFooter(data: Types.PlayerDataUpdate)
 	skip.label.Text = Loc.t("ui.tower2.skip", { stage = stage })
 	skip.sub.Text = Loc.t("ui.tower2.price", { price = Kit.formatCompact(price) })
 	skip.sub.Visible = true
-	skip.setEnabled(price <= data.gummies)
+	skip.setEnabled(showSkip and price <= data.gummies)
 
 	-- Premium / Pass
 	if passOwned and showSkip then
@@ -594,16 +610,49 @@ end
 function TowerPanel.init(screenGui: ScreenGui)
 	if not FeatureFlags.isOn("TOWER_PANEL_V2") then return end
 
+	_honey = Icons.hasUi("honey/tower_window")
+	local honey = _honey
 	local window = Kit.window("TowerPanel", screenGui, {
-		design = DESIGN, minHeight = MIN_HEIGHT, reserve = reserve,
+		design = if honey then Vector2.new(HONEY_W, HONEY_H) else DESIGN,
+		minHeight = if honey then HONEY_H else MIN_HEIGHT,
+		reserve = reserve,
 	})
 	_window = window
-	Kit.mascot(window, 74)
+	if not honey then Kit.mascot(window, 74) end
 	local title = Kit.header(window, Loc.t("ui.tower.title"), HEADER_H)
 	Loc.bind(title, "ui.tower.title")
 	Kit.closeButton(window, function()
 		PanelManager.close(PANEL_NAME)
 	end)
+
+	if honey then
+		-- altes Aussehen weg, Bild dahinter
+		for _, child in window.body:GetChildren() do
+			if child:IsA("UIStroke") or child:IsA("UIGradient") or child:IsA("UICorner") then child:Destroy() end
+		end
+		window.body.BackgroundTransparency = 1
+		local shadow = window.holder:FindFirstChild("Shadow")
+		if shadow and shadow:IsA("GuiObject") then shadow.Visible = false end
+		local art = Icons.honeyImage(window.holder, "honey/tower_window")
+		if art then art.ZIndex = 21 end
+		-- Titel in die Titelleiste des Bildes, Band darunter aus
+		if window.header then window.header.Visible = false end
+		title.Parent = window.holder
+		title.AnchorPoint = Vector2.new(0.5, 0.5)
+		title.Position = UDim2.fromOffset(498, 83)
+		title.Size = UDim2.fromOffset(520, 52)
+		title.ZIndex = 30
+		title.TextScaled = false
+		title.TextSize = 36
+		-- Kreuz unsichtbar auf das Kreuz im Bild
+		local close = window.close
+		if close then
+			close.Position = UDim2.fromOffset(839, 56)
+			close.Size = UDim2.fromOffset(56, 56)
+			local skin = close:FindFirstChild("HoneySkin")
+			if skin and skin:IsA("GuiObject") then skin.Visible = false end
+		end
+	end
 
 	local content = window.content
 
@@ -625,6 +674,33 @@ function TowerPanel.init(screenGui: ScreenGui)
 	local nextChip = Kit.chip("Next", statusRow, "")
 	nextChip.LayoutOrder = 3
 	_status = { selected = selectedChip, record = recordChip, nextOpen = nextChip }
+	if honey then
+		-- die drei Tabs des Bildes (x 63-231, 239-401, 407-575, y 136-177)
+		statusRow.Position = UDim2.fromOffset(63, 136)
+		statusRow.Size = UDim2.fromOffset(512, 41)
+		statusLayout.Padding = UDim.new(0, 6)
+		for i, chip in { selectedChip, recordChip, nextChip } do
+			chip.AutomaticSize = Enum.AutomaticSize.None
+			chip.Size = UDim2.fromOffset(({ 169, 163, 168 })[i], 41)
+			chip.BackgroundTransparency = 1
+			for _, c in chip:GetChildren() do
+				if c:IsA("UIStroke") or c:IsA("UICorner") then c:Destroy() end
+				if c:IsA("UIPadding") then c.PaddingLeft = UDim.new(0, 8); c.PaddingRight = UDim.new(0, 8) end
+			end
+			local label = chip:FindFirstChild("Text")
+			if label and label:IsA("TextLabel") then
+				label.AutomaticSize = Enum.AutomaticSize.None
+				label.Size = UDim2.fromScale(1, 1)
+				label.TextScaled = true
+				label.TextWrapped = true
+				label.TextXAlignment = Enum.TextXAlignment.Center
+				local limit = Instance.new("UITextSizeConstraint")
+				limit.MaxTextSize = 15
+				limit.MinTextSize = 8
+				limit.Parent = label
+			end
+		end
+	end
 
 	-- Kartenliste
 	local list = Kit.scroller("List", content)
@@ -691,15 +767,19 @@ function TowerPanel.init(screenGui: ScreenGui)
 		PanelManager.close(PANEL_NAME)
 	end)
 	_primary = primary
-	local freeBadge = Kit.badge("Free", primary.button, Loc.t("ui.tower2.free"), T.color.gummy, 8)
+	local freeBadge = Kit.badge("Free", primary.button, Loc.t("ui.tower2.free"), T.color.gummy, 4)
 	-- Oben rechts INNERHALB des Knopfs: links steht die Gummy-Pille, rechts
 	-- daneben der naechste Knopf, in der Mitte die Beschriftung.
-	freeBadge.AnchorPoint = Vector2.new(1, 0.5)
-	freeBadge.Position = UDim2.new(1, -10, 0, 2)
+	-- 13.10. (Playtest "Buttons ueberschneiden sich"): vorher mittig auf der
+	-- Oberkante (y = 2) und damit halb ueber dem Knopfrand und dem Nachbarn.
+	-- Jetzt ganz INNEN, unterhalb der Oberkante, mit Abstand zum rechten Rand.
+	freeBadge.AnchorPoint = Vector2.new(1, 0)
+	freeBadge.Position = UDim2.new(1, -12, 0, 8)
 	freeBadge.ZIndex = 44
 	local freeLabel = freeBadge:FindFirstChild("Text") :: TextLabel
 	freeLabel.ZIndex = 45
 	_freeBadge = freeBadge
+	if honey then freeBadge:Destroy(); _freeBadge = nil end
 
 	local skip = Kit.button("Skip", footer, "secondary", "", 20)
 	skip.label.Size = UDim2.new(1, -12, 0, 24)
@@ -737,9 +817,50 @@ function TowerPanel.init(screenGui: ScreenGui)
 	end)
 	_premium = premium
 
+	if honey then
+		-- Leiste wird durchsichtig und deckt das ganze Fenster; Pille und Knoepfe sitzen auf dem Bild
+		footer.BackgroundTransparency = 1
+		footer.AnchorPoint = Vector2.new(0, 0)
+		footer.Position = UDim2.fromOffset(0, 0)
+		footer.Size = UDim2.fromScale(1, 1)
+		for _, c in footer:GetChildren() do
+			if c:IsA("UICorner") or c:IsA("UIGradient") or c:IsA("UIStroke") then c:Destroy() end
+		end
+		footerTop.Visible = false
+		footerLine.Visible = false
+		hint.Visible = false
+		-- Gummy-Pille: der Baer im Bild ist das Symbol, nur die Zahl bleibt
+		gummyChip.BackgroundTransparency = 1
+		gummyChip.AnchorPoint = Vector2.new(0, 0.5)
+		gummyChip.Position = UDim2.fromOffset(120, 521)
+		gummyIcon.Visible = false
+		if gummyPad then gummyPad.PaddingLeft = UDim.new(0, 0) end
+		for _, c in gummyChip:GetChildren() do
+			if c:IsA("UIStroke") or c:IsA("UICorner") then c:Destroy() end
+		end
+		-- Knoepfe: Flaeche und Kante aus, Text direkt auf den Knopf (das Bild liefert die Farbe)
+		for _, b in { primary, skip, premium } do
+			b.face.Visible = false
+			local edge = b.button:FindFirstChild("Edge")
+			if edge and edge:IsA("GuiObject") then edge.Visible = false end
+			b.label.Parent = b.button
+			b.sub.Parent = b.button
+			b.sub.Position = UDim2.new(0.5, 0, 1, -12)
+		end
+		primary.label.Position = UDim2.new(0.5, 0, 0, 8)
+		-- Liste in die Flaeche des Bildes
+		list.Position = UDim2.fromOffset(58, 194)
+		list.Size = UDim2.fromOffset(784, 264)
+		layoutFooter(true, false, HONEY_W)
+	end
+
 	-- Groesse: Liste fuellt den Platz zwischen Status und Leiste; auf
 	-- niedrigen Fenstern die kompakte Anordnung.
 	window.setSize = function(size: Vector2)
+		if honey then
+			if _isOpen then TowerPanel.refresh() end
+			return
+		end
 		_compact = size.Y < COMPACT_BELOW
 		local headerH = if _compact then HEADER_H_COMPACT else HEADER_H
 		local statusH = if _compact then 0 else STATUS_H

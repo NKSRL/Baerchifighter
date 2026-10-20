@@ -57,6 +57,7 @@ local function render(card: Types.PlayerProfileCard?)
 		Loc.t("ui.profile.tower", { tower = def.numeral, stage = card.towerRecord }),
 		Loc.t("ui.profile.rebirths", { n = card.rebirths }),
 		Loc.t("ui.profile.index", { have = card.indexCount, total = card.indexTotal }),
+		if card.world2 == true then Loc.t("ui.profile.world2") else "",
 		"",
 		Loc.t("ui.profile.top"),
 	}

@@ -9,16 +9,17 @@
 -- ============================================================
 -- WURF-REGEL (verbindlich, hier dokumentiert)
 -- ============================================================
---   1. Ein Wurf betrifft ALLE Slots, die freigeschaltet UND nicht gesperrt
---      sind — genau wie in der Vorlage ("rerolls every slot you have not
---      locked"). Deshalb kostet ein WURF, nicht ein Slot.
+--   1. Ein Wurf betrifft ALLE acht Slots, die nicht gesperrt sind — auch die,
+--      die die aktuelle Promotion noch nicht freischaltet (14.10.). Wirksam
+--      sind im Kampf trotzdem nur die freigeschalteten (CombatCalculator).
 --   2. Jeder betroffene Slot wuerfelt zweimal unabhaengig: erst eine Rarity
 --      (CharmConfig.RARITY_ODDS), dann einen Stat-Typ (CharmConfig.STAT_POOL).
 --      Ein Slot ist NICHT an einen Stat-Typ gebunden.
 --   3. Freigeschaltet wird ueber den Promotions-Stand des Baerchis
 --      (CharmConfig.SLOT_UNLOCK_PROMOTION). Ohne Promotion ist genau Slot I
 --      offen.
---   4. Ein Wurf kostet CharmConfig.ROLL_COST_GOLD_GUMMIES GoldGummies.
+--   4. Ein Wurf kostet CharmConfig.getRollCost(gesperrte Slots) GoldGummies:
+--      der Grundpreis plus ein Aufschlag je gesperrtem Slot.
 --      KEINE eigene Waehrung — "Charm Dust" gibt es in Baerchi Fighter
 --      bewusst nicht (siehe CharmConfig, Kopf-Kommentar).
 --   5. Sind ALLE freigeschalteten Slots gesperrt, wird der Wurf abgelehnt
@@ -92,11 +93,9 @@ function CharmService.getRollableSlots(baerchi: Types.Baerchi): { number }
 	local slots: { number } = {}
 
 	for slot = 1, CharmConfig.SLOT_COUNT do
-		if CharmConfig.isSlotUnlocked(slot, baerchi.promotionLevel or 0) then
-			local existing = findCharm(baerchi, slot)
-			if not (existing and existing.locked) then
-				table.insert(slots, slot)
-			end
+		local existing = findCharm(baerchi, slot)
+		if not (existing and existing.locked) then
+			table.insert(slots, slot)
 		end
 	end
 
@@ -127,7 +126,7 @@ function CharmService.rollCharms(player: Player, baerchiUid: string, requestedRo
 		return
 	end
 
-	local cost = CharmConfig.ROLL_COST_GOLD_GUMMIES
+	local cost = CharmConfig.getRollCost(CharmConfig.countLocked(baerchi.charms))
 
 	if data.goldGummies < cost then
 		fail(player, "RequestRollCharms", Loc.msg("err.charm_roll_cost", { cost = cost, have = data.goldGummies }))
@@ -138,6 +137,9 @@ function CharmService.rollCharms(player: Player, baerchiUid: string, requestedRo
 	local spent = 0
 
 	for _ = 1, rolls do
+		-- Preis je Wurf neu: die Sperren aendern sich im Paket nicht, aber so
+		-- stimmt er auch dann, wenn es einmal anders waere.
+		cost = CharmConfig.getRollCost(CharmConfig.countLocked(baerchi.charms))
 		if data.goldGummies < cost then
 			break   -- Paket endet hier, der Rest verfaellt
 		end

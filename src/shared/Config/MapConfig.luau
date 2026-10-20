@@ -1571,6 +1571,10 @@ return {
 		footprint      = 3.6,    -- Radius um den Grundriss (Abstands-Test)
 		screenPart     = "Bildschirm",
 		lampPart       = "Lampe",
+		nosePart       = "Knopf",
+		eyeParts       = { "Licht1", "Licht2" },
+		noseColors = { locked = Color3.fromRGB(255, 70, 70), ready = Color3.fromRGB(90, 255, 120), normal = Color3.fromRGB(255, 150, 190) },
+		eyeColors  = { locked = Color3.fromRGB(110, 60, 60), ready = Color3.fromRGB(90, 255, 120), normal = Color3.fromRGB(120, 255, 200) },
 		screenPixels   = Vector2.new(420, 240),   -- SurfaceGui-Aufloesung
 		markerHeight   = 6.4,    -- "!" ueber der Lampe (Studs ueber der Bildschirm-Mitte)
 		promptDistance = 12,

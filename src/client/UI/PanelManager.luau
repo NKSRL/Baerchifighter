@@ -68,6 +68,56 @@ end
 PanelManager.ARENA_PANEL = "Combat"
 
 --------------------------------------------------------------------------------
+-- R1: der eine Fensterbereich
+--------------------------------------------------------------------------------
+-- ALLE Fenster (Theme.dialog, Kit.window, auch kuenftige) werden in diesem
+-- Bereich zentriert und, wenn sie nicht hineinpassen, gleichmaessig verkleinert
+-- (Seitenverhaeltnis bleibt). Es gibt keine Einzelpositionen pro Panel.
+--
+-- Der Bereich reicht von oben bis knapp ueber die Pet-Leiste (Event/Fight):
+-- die beiden Knoepfe bleiben bei offenem Fenster sichtbar und antippbar. Wie
+-- hoch die Leiste ist, meldet sie selbst (setBottomReserve) — dieses Modul
+-- kennt keine UI-Bausteine.
+--
+-- Alle Masse in Oberflaechen-Einheiten (nach der globalen UiScale).
+PanelManager.AREA = {
+	top          = 12,     -- Luft nach oben (unter der Roblox-Topbar)
+	sideFraction = 0.03,   -- Luft links/rechts als Anteil der Breite
+	bottomMin    = 12,     -- Luft unten, wenn keine Pet-Leiste gemeldet wurde
+}
+
+export type Area = {
+	center : Vector2,   -- Mitte des freien Bereichs
+	size   : Vector2,   -- Breite/Hoehe des freien Bereichs
+}
+
+local _bottomReserve = 0
+local _areaListeners: { () -> () } = {}
+
+-- Die Pet-Leiste meldet, wie viel Hoehe unten (Rand + Leiste + Luft) belegt ist.
+function PanelManager.setBottomReserve(units: number)
+	if math.abs(units - _bottomReserve) < 0.5 then return end
+	_bottomReserve = units
+	for _, callback in _areaListeners do
+		task.spawn(callback)
+	end
+end
+
+-- Wird gerufen, wenn sich der Bereich aendert (Fenster rechnen sich neu).
+function PanelManager.onAreaChanged(callback: () -> ())
+	table.insert(_areaListeners, callback)
+end
+
+-- `screen` = Bildschirmgroesse in Oberflaechen-Einheiten.
+function PanelManager.getArea(screen: Vector2): Area
+	local top = PanelManager.AREA.top
+	local side = screen.X * PanelManager.AREA.sideFraction
+	local bottom = math.max(PanelManager.AREA.bottomMin, _bottomReserve)
+	local size = Vector2.new(math.max(1, screen.X - side * 2), math.max(1, screen.Y - top - bottom))
+	return { center = Vector2.new(screen.X * 0.5, top + size.Y * 0.5), size = size }
+end
+
+--------------------------------------------------------------------------------
 -- Anmeldung
 --------------------------------------------------------------------------------
 
@@ -152,6 +202,24 @@ local KEEP_OPEN: { [string]: boolean } = { Hatch = true, Rebirth = true }
 
 local _tapStart: { [any]: { at: number, pos: Vector3 } } = {}
 
+-- R1: Bereiche, die nie als "ausserhalb" zaehlen (Pet-Leiste inkl. der Luecke
+-- zwischen den Knoepfen, die selbst kein Knopf ist). Der Besitzer meldet per
+-- Funktion, ob ein Bildschirm-Punkt (Pixel, wie InputObject.Position) darin liegt.
+local _tapGuards: { (Vector2) -> boolean } = {}
+
+function PanelManager.addTapGuard(isProtected: (Vector2) -> boolean)
+	table.insert(_tapGuards, isProtected)
+end
+
+local function isGuarded(position: Vector3): boolean
+	local point = Vector2.new(position.X, position.Y)
+	for _, guard in _tapGuards do
+		local ok, result = pcall(guard, point)
+		if ok and result then return true end
+	end
+	return false
+end
+
 local function isTapInput(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch
@@ -170,6 +238,7 @@ UserInputService.InputEnded:Connect(function(input: InputObject, _processed: boo
 	if not name or KEEP_OPEN[name] then return end
 	if os.clock() - start.at > TAP_SECONDS then return end
 	if (input.Position - start.pos).Magnitude > TAP_MOVE_PX then return end
+	if isGuarded(input.Position) then return end
 	PanelManager.close(name)
 end)
 

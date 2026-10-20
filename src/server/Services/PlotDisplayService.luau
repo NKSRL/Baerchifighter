@@ -41,6 +41,12 @@
 --         LOOK, nicht am Level — ein Ausbau innerhalb eines Looks schreibt nur
 --         das Schild (GEBAEUDE oben).
 --
+--   STUFE      (Welt aufwerten, Paket D: Insel-Stufe 1..4 aus Towern und
+--               Rebirths, Modules/IslandStage)
+--       → Attribut "IslandStage" am Player (ueberlebt jeden Insel-Neuaufbau).
+--         Die Deko baut nur der Client (PlotLifeController), der Server baut
+--         dafuer kein einziges Teil.
+--
 --   TOWER      (v15: Look + Etagen + Schildtext des Tower-Turms)
 --       → MapService.updateTowerShowcase (Neuaufbau des Turms, Show nur beim
 --         Look-Wechsel) und MapService.setOwnerBadge (Symbol am Plot-Schild).
@@ -76,21 +82,25 @@ local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local IncubatorRules = require(ReplicatedStorage.Modules.IncubatorRules)   -- Paket 8
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local Loc       = require(ReplicatedStorage.Localization.Loc)
+local IslandStage      = require(ReplicatedStorage.Modules.IslandStage)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService    = require(ServerScriptService.Services.MapService)
+local WorldService  = require(ServerScriptService.Services.WorldService)   -- 20.10. Final-Epilog P6: Welt-2-Abzeichen
 
 local PlotDisplayService = {}
 
 type Signatures = {
 	incubator : string,   -- Sammel-Update Paket 8
 	structure : string,
+	labels    : string,   -- 14.10. Level im Namensschild, live waehrend der Bewegung
 	state     : string,
 	buildings : string,
 	eggs      : string,
 	recycler  : string,
 	looks     : string,
 	tower     : string,
+	stage     : string,
 	terminal  : string,   -- 08.10. Tower-Terminal
 }
 
@@ -114,14 +124,26 @@ local _signatures: { [Player]: Signatures } = {}
 -- (EventParticipationService) kann sie aber mitten im Spiel anheben, und ohne
 -- diesen Eintrag liefe die Figur bis zum naechsten Insel-Neuaufbau in der
 -- alten Farbe weiter.
+--
+-- 14.10. Nur noch die Identitaet des AUSGERUESTETEN Baerchis: nur er hat eine
+-- Figur. Fuettern/Befoerdern darf die laufende Figur nicht neu bauen (das
+-- Level steht im Schild, siehe labelSignature).
 local function structureSignature(data: Types.PlayerData): string
-	local parts: { string } = {}
-	for uid, baerchi in data.island.baerchis do
-		table.insert(parts, string.format("%s:%d:%s:%s", uid, baerchi.level, baerchi.mutation or "-", baerchi.rarity))
+	local equipped = data.island.equippedUid and data.island.baerchis[data.island.equippedUid]
+	if not equipped then
+		return "equipped:"
 	end
-	table.sort(parts)
-	table.insert(parts, "equipped:" .. (data.island.equippedUid or ""))
-	return table.concat(parts, "|")
+	-- R3: die Baerchi-ID gehoert dazu — sie bestimmt Look und Zubehoer der Figur.
+	return string.format("equipped:%s|%s|%s|%s", data.island.equippedUid, equipped.rarity, equipped.mutation or "-", equipped.configId)
+end
+
+-- Level des ausgeruesteten Baerchis: nur die Beschriftung aendert sich.
+local function labelSignature(data: Types.PlayerData): string
+	local equipped = data.island.equippedUid and data.island.baerchis[data.island.equippedUid]
+	if not equipped then
+		return ""
+	end
+	return string.format("%s:%d", data.island.equippedUid, equipped.level)
 end
 
 -- Was sich aendern muss, damit die Beschriftung neu geschrieben wird.
@@ -176,13 +198,14 @@ local function lookSignature(data: Types.PlayerData): string
 end
 
 -- v15: Tower-Turm: hoechster Tower (Look) und Rekord darin (Etagen + Schild).
-local function towerSignature(data: Types.PlayerData): string
+local function towerSignature(player: Player, data: Types.PlayerData): string
 	local towerId, record = TowerConfig.bestRecord(data.towers)
 	local highest = data.towers.highestTower
 	if TowerConfig.getIndex(highest) > TowerConfig.getIndex(towerId) then
 		towerId, record = highest, data.towers.records[highest] or 0
 	end
-	return string.format("%s:%d", towerId, record)
+	-- Prompt 6: Welt 2 frei -> Plot-Abzeichen bekommt "Welt 2" (Signatur-Anhang)
+	return string.format("%s:%d%s", towerId, record, if WorldService.isWorld2Unlocked(player) then ":W2" else "")
 end
 
 -- Sammel-Update Paket 8: Inkubator — belegte Plaetze (Ei + Zeitmarken),
@@ -190,11 +213,9 @@ end
 local function incubatorSignature(data: Types.PlayerData): string
 	local incubator = data.island.incubator
 	if not incubator then return "" end
-	local parts: { string } = { tostring(incubator.level), tostring(IncubatorRules.slotCountFor(data)) }
-	for _, entry in incubator.slots do
-		table.insert(parts, string.format("%d=%s@%d", entry.slot, entry.eggType, entry.finishAt))
-	end
-	-- INCUBATOR_BREED: Baerchis in den Plaetzen (Figur, Takt, letzte Brut)
+	-- 15.10. Solo-Inkubator: Stufe (Modell), Lager-Fuellstand, Baerchi (Figur,
+	-- Takt, letzte Brut)
+	local parts: { string } = { tostring(IncubatorRules.levelOf(incubator)), tostring(IncubatorRules.storedTotal(incubator)) }
 	for _, entry in incubator.breeders or {} do
 		local baerchi = data.island.baerchis[entry.uid]
 		table.insert(parts, string.format("b%d=%s:%s:%s@%d", entry.slot, entry.uid,
@@ -204,21 +225,29 @@ local function incubatorSignature(data: Types.PlayerData): string
 	return table.concat(parts, "|")
 end
 
+-- Paket D: Stufe der Insel-Deko
+local function stageSignature(data: Types.PlayerData): string
+	return tostring(IslandStage.compute(data.towers and data.towers.records, data.rebirthCount or 0))
+end
+
 -- 08.10.: Tower-Terminal — Zustand, gewaehlter Tower, Rekord, Fortschritt.
 local function terminalView(data: Types.PlayerData): { state: string, tower: string, record: number, nextTower: string, newTower: string, progress: number, needed: number }
 	local towers = data.towers
+	-- 12.10.: Freischaltung pro Leben (TOWER_UNLOCK_PER_LIFE) — nach einem
+	-- Rebirth zeigt das Terminal wieder "Schaffe Tower I x/30".
+	local progressRecords = TowerConfig.unlockRecords(towers, data.island)
 	local nextTower, newTower = "", ""
 	for _, def in TowerConfig.TOWERS do
 		if newTower == "" and TowerConfig.isNew(def.id, towers) then
 			newTower = def.id
 		end
-		if nextTower == "" and not TowerConfig.isUnlockedByClear(def.id, towers.records, towers.unlocked) then
+		if nextTower == "" and not TowerConfig.isUnlockedByClear(def.id, progressRecords, towers.unlocked) then
 			nextTower = def.id
 		end
 	end
-	local _, progress, needed = TowerConfig.getUnlockProgress(nextTower, towers.records)
+	local _, progress, needed = TowerConfig.getUnlockProgress(nextTower, progressRecords)
 	return {
-		state     = TowerConfig.terminalState(towers),
+		state     = TowerConfig.terminalState(towers, progressRecords),
 		tower     = towers.selected,
 		record    = towers.records[towers.selected] or 0,
 		nextTower = nextTower,
@@ -233,23 +262,26 @@ local function terminalSignature(data: Types.PlayerData): string
 	return string.format("%s|%s|%d|%s|%s|%d|%d", v.state, v.tower, v.record, v.nextTower, v.newTower, v.progress, v.needed)
 end
 
-local function allSignatures(data: Types.PlayerData): Signatures
+local function allSignatures(player: Player, data: Types.PlayerData): Signatures
 	return {
 		terminal  = terminalSignature(data),
 		incubator = incubatorSignature(data),
 		structure = structureSignature(data),
+		labels    = labelSignature(data),
 		state     = stateSignature(data),
 		buildings = buildingSignature(data),
 		eggs      = eggSignature(data),
 		recycler  = recyclerSignature(data),
 		looks     = lookSignature(data),
-		tower     = towerSignature(data),
+		tower     = towerSignature(player, data),
+		stage     = stageSignature(data),
 	}
 end
 
 -- Turm und Plot-Symbol aus dem Tower-Stand (Signatur "Tower:Rekord").
 local function applyTower(player: Player, signature: string, show: boolean)
-	local towerId, recordText = string.match(signature, "^([^:]+):(%d+)$")
+	local towerId, recordText = string.match(signature, "^([^:]+):(%d+)")
+	local world2 = string.sub(signature, -3) == ":W2"
 	local def = TowerConfig.get(towerId or "") or TowerConfig.TOWERS[1]
 	local record = tonumber(recordText) or 0
 
@@ -261,9 +293,12 @@ local function applyTower(player: Player, signature: string, show: boolean)
 		}),
 		color  = def.color,
 	}, show)
-	MapService.setOwnerBadge(player, Loc.msg("ui.world.owner_badge", {
+	local badge = if world2 then Loc.msg("ui.world.owner_badge_w2", {
+		tower = Loc.msg("ui.petbar.tower", { n = def.numeral }), record = record, world = Loc.msg("epilog.world2.badge"),
+	}) else Loc.msg("ui.world.owner_badge", {
 		tower = Loc.msg("ui.petbar.tower", { n = def.numeral }), record = record,
-	}), def.color)
+	})
+	MapService.setOwnerBadge(player, badge, def.color)
 end
 
 --------------------------------------------------------------------------------
@@ -271,7 +306,7 @@ end
 --------------------------------------------------------------------------------
 
 local function refresh(player: Player, data: Types.PlayerData)
-	local current  = allSignatures(data)
+	local current  = allSignatures(player, data)
 	local previous = _signatures[player]
 
 	if not previous then
@@ -292,6 +327,10 @@ local function refresh(player: Player, data: Types.PlayerData)
 
 	elseif previous.state ~= current.state then
 		MapService.updateBaerchiStates(player, data.island)
+	end
+
+	if previous.labels ~= current.labels then
+		MapService.updateBaerchiLabels(player, data.island)
 	end
 
 	if previous.buildings ~= current.buildings then
@@ -319,6 +358,10 @@ local function refresh(player: Player, data: Types.PlayerData)
 	-- komplett neu gebaut, updateBuildingLooks findet nichts mehr zu tun.
 	if previous.looks ~= current.looks then
 		MapService.updateBuildingLooks(player, data.island, true)
+	end
+
+	if previous.stage ~= current.stage then
+		player:SetAttribute("IslandStage", tonumber(current.stage))
 	end
 
 	if previous.terminal ~= current.terminal then
@@ -365,8 +408,9 @@ function PlotDisplayService.init()
 		MapService.updateRecycler(player, data.island)
 		MapService.updateIncubator(player, data.island, IncubatorRules.slotCountFor(data))
 
-		local signatures = allSignatures(data)
+		local signatures = allSignatures(player, data)
 		applyTower(player, signatures.tower, false)
+		player:SetAttribute("IslandStage", tonumber(signatures.stage))
 		MapService.updateTerminal(player, terminalView(data))
 
 		_signatures[player] = signatures

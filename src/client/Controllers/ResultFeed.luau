@@ -126,8 +126,8 @@ function ResultFeed.init()
 		if typed.eggs > 0 and typed.eggType then
 			table.insert(parts, string.format("+%d %s", typed.eggs, Loc.name("egg." .. typed.eggType .. ".name", typed.eggType)))
 		end
-		if typed.gummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.gummies) .. " Gummies") end
-		if typed.goldGummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.goldGummies) .. " GoldGummies") end
+		if typed.gummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.gummies) .. " Paw Coins") end
+		if typed.goldGummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.goldGummies) .. " Honey Crystals") end
 		if typed.blueprints > 0 then table.insert(parts, Loc.t("ui.index_reward.blueprint", { n = typed.blueprints })) end
 		if typed.incubatorSlots > 0 then table.insert(parts, Loc.t("ui.index_reward.slot", { n = typed.incubatorSlots })) end
 		Notify.emit("index_reward", function()
@@ -160,9 +160,9 @@ function ResultFeed.init()
 	-- Sammel-Update 05.10. (Paket 8): Inkubator — kurze Bestaetigung beim Einlegen
 	Remotes.IncubatorChanged.OnClientEvent:Connect(function(info: any)
 		if typeof(info) ~= "table" then return end
-		if info.kind == "start" or info.kind == "speedup" or info.kind == "upgrade" then
+		if info.kind == "collect" or info.kind == "upgrade" then
 			Notify.emit("incubator", function()
-				Toast.info(Loc.t("msg.incubator." .. tostring(info.kind)))
+				Toast.info(Loc.t("msg.incubator." .. tostring(info.kind), { n = info.count or 0 }))
 			end)
 		end
 	end)

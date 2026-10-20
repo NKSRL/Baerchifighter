@@ -106,10 +106,18 @@ function ShopPanel.init(screenGui: ScreenGui)
 	local root = Theme.dialog("ShopPanel", screenGui, Vector2.new(0.56, 0.6), Vector2.new(360, 340), Vector2.new(640, 480))
 	_root = root
 
+	-- 14.10. (UI_HONEY_SKIN): das Fenster ist ein Bild (shop_window, 900 x 600 Einheiten)
+	local honey = Icons.honeyWindow(root, "honey/shop_window", 900, 600) ~= nil
+
 	Theme.dialogHeader(root, Loc.t("ui.shop.title"), function()
 		PanelManager.close(PANEL_NAME)
 	end)
 	local body = Theme.dialogBody(root)
+	if honey then
+		Icons.honeyHeader(root, Rect.new(82, 41, 797, 105), 837, 55, 58)
+		body.Position = UDim2.fromOffset(70, 125)
+		body.Size     = UDim2.fromOffset(765, 385)
+	end
 
 	-- Gratis-Griff: grosse Karte oben
 	local free = Theme.panel("Free", body, Theme.COLORS.goldGummy)
@@ -167,6 +175,7 @@ function ShopPanel.init(screenGui: ScreenGui)
 		soon.Position = UDim2.new(0, 0, 0.54, 0)
 		soon.Size = UDim2.new(1, 0, 0, 40)
 		soon.TextXAlignment = Enum.TextXAlignment.Center
+		if honey then soon.TextColor3 = Color3.fromRGB(122, 84, 53) end
 	end
 
 	PanelManager.register(PANEL_NAME, {

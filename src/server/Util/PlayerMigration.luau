@@ -31,6 +31,8 @@ local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local HoneyPondMode    = require(ReplicatedStorage.Modules.HoneyPondMode)
+local EpilogConfig     = require(ReplicatedStorage.Config.EpilogConfig)   -- v18
+local EpilogRules      = require(ReplicatedStorage.Modules.EpilogRules)   -- v18
 
 local PlayerMigration = {}
 
@@ -470,7 +472,13 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	for _, def in TowerConfig.TOWERS do
 		local wasOpen = (data.version or 0) < 17
 			and TowerConfig.getLegacyStageCap(rebirths, def.id, towers.records) > 0
-		if wasOpen or TowerConfig.isUnlockedByClear(def.id, towers.records, nil) then
+		-- 12.10.: mit TOWER_UNLOCK_PER_LIFE oeffnet nach v17 nur, was in DIESEM
+		-- Leben geschafft ist (sonst oeffnete jeder Join die Tower nach einem
+		-- Rebirth ueber die Rekorde wieder). Der einmalige Bestandsschutz
+		-- v16 -> v17 zaehlt weiter die Rekorde.
+		local progress = if (data.version or 0) < 17 then towers.records
+			else TowerConfig.unlockRecords(towers, (data :: any).island)
+		if wasOpen or TowerConfig.isUnlockedByClear(def.id, progress, nil) then
 			unlocked[def.id] = true
 		end
 	end
@@ -478,6 +486,19 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	if not TowerConfig.isValidId(towers.selected) then
 		towers.selected = TowerConfig.FIRST_TOWER
 	end
+
+	-- v18 (20.10., Final-Epilog): Endless ist offen, sobald Final 100 geschafft
+	-- ist — hier abgesichert, egal wie der Spielstand dorthin kam. Dazu
+	-- epilog/worlds: Bestandsspieler mit Final-Rekord >= 100 bekommen "pending"
+	-- (Epilog nachholen). Nur wenn das Feld noch fehlt bzw. kaputt ist; ein
+	-- gueltiger Stand (seen/launched) bleibt unangetastet.
+	local finalDef = TowerConfig.get(EpilogConfig.TOWER_ID)
+	local finalStages = if finalDef then finalDef.stages else math.huge
+	local finalRecord = tonumber(towers.records[EpilogConfig.TOWER_ID]) or 0
+	if finalRecord >= finalStages and TowerConfig.get("Endless") then
+		unlocked.Endless = true
+	end
+	EpilogRules.migrate(data, finalRecord, finalStages, os.time())
 
 	-- Fortsetzen pro Tower (ersetzt pitProgress) und Erstattungs-Feld.
 	if typeof(legacyIsland.towerProgress) ~= "table" then
@@ -687,12 +708,14 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	end
 	local incubator = (island :: any).incubator
 	if typeof(incubator) ~= "table" then
-		island.incubator = { level = 1, slots = {}, breeders = {} }
+		island.incubator = { level = 1, slots = {}, breeders = {}, stored = {} }
 	else
 		if typeof(incubator.level) ~= "number" or incubator.level < 1 then incubator.level = 1 end
 		if typeof(incubator.slots) ~= "table" then incubator.slots = {} end
 		-- INCUBATOR_BREED: Liste der bruetenden Baerchis (fehlt in v16-Staenden)
 		if typeof(incubator.breeders) ~= "table" then incubator.breeders = {} end
+		-- 15.10. Solo-Inkubator: Lager fuer gebruetete Eier
+		if typeof(incubator.stored) ~= "table" then incubator.stored = {} end
 	end
 	if typeof((data :: any).indexClaimed) ~= "table" then
 		data.indexClaimed = {}

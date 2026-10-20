@@ -15,7 +15,8 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService      = game:GetService("TweenService")
 
-local EggMesh = require(ReplicatedStorage.Modules.EggMesh)
+local EggMesh   = require(ReplicatedStorage.Modules.EggMesh)
+local EggModels = require(ReplicatedStorage.Modules.EggModels)
 
 local LaidEggMeshController = {}
 
@@ -51,8 +52,66 @@ local function popIn(body: BasePart, mesh: MeshPart)
 	task.delay(1.5, function() sparks:Destroy() end)
 end
 
+-- 14.10.: Eier mit fertigem Modell (Assets.Eggs). Der Server-Koerper bleibt als
+-- unsichtbare Huelle (Touch, Attribut, Beschriftung), das Modell sitzt darauf.
+-- Gibt true zurueck, wenn das Modell gesetzt wurde.
+local function dressModel(body: BasePart): boolean
+	local eggId = body:GetAttribute("EggId")
+	if type(eggId) ~= "string" then return false end
+
+	-- Assets koennen beim Beitritt kurz nach den Eiern ankommen: einmal warten.
+	if EggModels.has(eggId) and not EggModels.getTemplate(eggId) then
+		local assets = ReplicatedStorage:WaitForChild("Assets", 10)
+		if assets then assets:WaitForChild("Eggs", 10) end
+	end
+	local template = EggModels.getTemplate(eggId)
+	if not template or not template.PrimaryPart then return false end
+	if body:FindFirstChild("EggModel") then return true end
+
+	local model = template:Clone()
+	model.Name = "EggModel"
+	local baseHeight = (template.PrimaryPart :: BasePart).Size.Y
+	EggModels.place(model, baseHeight, body, 1)
+	model.Parent = body
+	body.Transparency = 1
+
+	local uid = body:GetAttribute("LaidEggUid")
+	if type(uid) == "string" then
+		local isNew = _settled and not _seen[uid]
+		_seen[uid] = true
+		if isNew then
+			-- Pop wie beim Mesh-Ei: Groesse mit Ueberschwingen, Fuss bleibt am Boden.
+			local value = Instance.new("NumberValue")
+			value.Value = POP_START
+			EggModels.place(model, baseHeight, body, POP_START)
+			value.Changed:Connect(function(factor: number)
+				if model.Parent then EggModels.place(model, baseHeight, body, factor) end
+			end)
+			local tween = TweenService:Create(value,
+				TweenInfo.new(POP_TIME, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Value = 1 })
+			tween.Completed:Once(function() value:Destroy() end)
+			tween:Play()
+
+			local sparks = Instance.new("ParticleEmitter")
+			sparks.Texture       = "rbxasset://textures/particles/sparkles_main.dds"
+			sparks.Color         = ColorSequence.new(Color3.new(1, 1, 1))
+			sparks.Size          = NumberSequence.new(0.3, 0)
+			sparks.Lifetime      = NumberRange.new(0.5, 0.9)
+			sparks.Speed         = NumberRange.new(2, 4)
+			sparks.SpreadAngle   = Vector2.new(180, 180)
+			sparks.LightEmission = 1
+			sparks.Rate          = 0
+			sparks.Parent        = body
+			sparks:Emit(SPARK_COUNT)
+			task.delay(1.5, function() sparks:Destroy() end)
+		end
+	end
+	return true
+end
+
 local function dress(body: Instance)
 	if not body:IsA("BasePart") or body:FindFirstChild("EggMesh") then return end
+	if dressModel(body) then return end
 
 	local template = EggMesh.getTemplate()
 	if not template then return end   -- Server-Kugel bleibt sichtbar

@@ -27,12 +27,19 @@
 --   ToPit      auf dem Weg in die eigene Arena  InPit    im Kampf
 --   Returning  auf dem Heimweg (von Event oder PIT)
 --
--- Ein Klick (RequestPetMode "Event"/"Fight"):
---   - gleicher Modus aktiv         -> zurueckholen
+-- Ein Klick (RequestPetMode "Event"/"Fight"/"Home"):
+--   - gleicher Modus aktiv         -> zurueckholen (von JEDEM Standort aus)
 --   - zu Hause                     -> hinschicken
---   - anderer Modus aktiv/Heimweg  -> Ziel vormerken, anderen zurueckholen;
---                                     zu Hause startet das Ziel automatisch.
---                                     Nochmal klicken bricht den Wechsel ab.
+--   - anderer Modus, unterwegs     -> SOFORT umlenken (14.10.): der Baerchi
+--                                     laeuft von dort, wo er gerade steht,
+--                                     direkt zum neuen Ziel — kein Umweg ueber
+--                                     den Plot. Einzige Ausnahme: mitten im
+--                                     Kampf beendet er erst die laufende Stage
+--                                     (Ziel wird vorgemerkt; nochmal klicken
+--                                     bricht den Wechsel ab).
+--
+-- Ausruesten eines anderen Baerchis (IslandService.equipBaerchi) ruft vorher
+-- den Hook dieses Services: alles, was die alte Figur gerade tut, endet sofort.
 
 local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
@@ -44,6 +51,8 @@ local Loc     = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 2
 local PlayerService             = require(ServerScriptService.Services.PlayerService)
 local CombatService             = require(ServerScriptService.Services.CombatService)
 local PitArenaService           = require(ServerScriptService.Services.PitArenaService)
+local IslandService             = require(ServerScriptService.Services.IslandService)
+local ActivityLock              = require(ServerScriptService.Util.ActivityLock)
 local EventParticipationService = require(ServerScriptService.Services.EventParticipationService)
 local RateLimiter               = require(ServerScriptService.Util.RateLimiter)
 local FunnelService = require(ServerScriptService.Services.FunnelService)  -- HBB: Messpunkte
@@ -104,7 +113,7 @@ local function recall(player: Player, mode: Mode)
 	if mode == "Event" then
 		EventParticipationService.recall(player)
 	else
-		PitArenaService.requestRecall(player)
+		PitArenaService.requestRecall(player, false)
 	end
 end
 
@@ -153,9 +162,69 @@ local function broadcast(player: Player, force: boolean?)
 	})
 end
 
+-- 14.10. Startet das Ziel von der AKTUELLEN Position der Figur aus. Scheitert
+-- der Start (z.B. erschoepft, kein Geld fuer die Fortsetzung), laeuft sie heim,
+-- statt mitten in der Welt stehenzubleiben.
+local function startOrGoHome(player: Player, mode: Mode, resume: CombatService.ResumeChoice?)
+	if not start(player, mode, resume) then
+		EventParticipationService.walkHome(player)
+	end
+end
+
+-- 14.10. Anderes Ziel waehrend die Figur unterwegs ist: sofort umlenken.
+local function switchTo(player: Player, wanted: Mode, resume: CombatService.ResumeChoice?, state: string, from: Mode?)
+	local pending = _pending[player]
+
+	-- Zweiter Klick auf das vorgemerkte Ziel: Wechsel abbrechen, der Baerchi
+	-- kaempft einfach weiter.
+	if pending and pending.mode == wanted then
+		_pending[player] = nil
+		if from == "Fight" then
+			PitArenaService.cancelRecall(player)
+		end
+		return
+	end
+
+	if from == "Fight" then
+		if state == "InPit" then
+			-- Mitten im Kampf: die laufende Stage wird zu Ende gespielt, dann
+			-- geht es OHNE Umweg zum neuen Ziel (siehe PitArenaService.handoff).
+			_pending[player] = { mode = wanted, resume = resume }
+			PitArenaService.requestRecall(player, true)
+		else
+			-- Hinweg oder Heimweg: Lauf sofort beenden (nichts gespielt bzw.
+			-- schon abgerechnet), Figur bleibt, wo sie steht.
+			_pending[player] = nil
+			PitArenaService.releaseFigure(player)
+			startOrGoHome(player, wanted, resume)
+		end
+		return
+	end
+
+	-- Event-Seite (Hinweg, am Event, Heimweg).
+	_pending[player] = nil
+	if EventParticipationService.isAbducting(player) then
+		Remotes.ActionFailed:FireClient(player, "RequestPetMode", Loc.msg("err.event_ufo"))
+		return
+	end
+
+	if wanted == "Fight" then
+		-- ERST starten, DANN die Event-Seite loslassen: scheitert der Kampfstart,
+		-- laeuft die Figur ungestoert weiter. Der Start nimmt das Schloss per
+		-- forceAcquire, der Event-Weg bricht damit selbst ab.
+		if start(player, "Fight", resume) then
+			EventParticipationService.releaseFigure(player)
+		end
+	else
+		-- Event-Heimweg, Event gewuenscht: umdrehen statt erst heimzulaufen.
+		EventParticipationService.releaseFigure(player)
+		startOrGoHome(player, "Event", resume)
+	end
+end
+
 -- Ein Knopfdruck aus der Pet-Leiste.
 function PetModeService.request(player: Player, mode: string, resume: CombatService.ResumeChoice?)
-	local state = readState(player)
+	local state, _, from = readState(player)
 	local active = activeMode(state)
 
 	if mode == "Home" then
@@ -172,26 +241,55 @@ function PetModeService.request(player: Player, mode: string, resume: CombatServ
 	if wanted == "Event" then FunnelService.step(player, "F08_EventButtonPressed") end
 
 	if active == wanted then
-		-- Gleicher Knopf nochmal: zurueckholen.
+		local pending = _pending[player]
 		_pending[player] = nil
-		recall(player, wanted)
+		if pending and from == "Fight" then
+			-- Ein Wechsel war vorgemerkt: der Klick auf den aktuellen Modus
+			-- nimmt ihn zurueck, der Baerchi kaempft weiter.
+			PitArenaService.cancelRecall(player)
+		else
+			-- Gleicher Knopf nochmal: zurueckholen.
+			recall(player, wanted)
+		end
 
 	elseif state == "Home" then
 		_pending[player] = nil
 		start(player, wanted, resume)
 
 	else
-		-- Anderer Modus aktiv oder Heimweg: Wechsel vormerken bzw. abbrechen.
-		local pending = _pending[player]
-		if pending and pending.mode == wanted then
-			_pending[player] = nil
-		else
-			_pending[player] = { mode = wanted, resume = resume }
-			if active then recall(player, active) end
-		end
+		switchTo(player, wanted, resume, state, from)
 	end
 
 	broadcast(player)
+end
+
+-- 14.10. Uebergabe nach der Stage: PitArenaService ruft das, sobald der Baerchi
+-- das Pit verlassen hat, ohne heimzulaufen.
+local function onPitHandoff(player: Player)
+	local pending = _pending[player]
+	_pending[player] = nil
+
+	if pending then
+		startOrGoHome(player, pending.mode, pending.resume)
+	else
+		EventParticipationService.walkHome(player)
+	end
+	broadcast(player)
+end
+
+-- 14.10. Vor jedem Ausruesten: alles beenden, was die ALTE Figur gerade tut.
+-- Die neue steht danach zu Hause. false = nicht jetzt moeglich (UFO).
+local function beforeEquip(player: Player): boolean
+	_pending[player] = nil
+	PitArenaService.releaseFigure(player)
+	if not EventParticipationService.releaseFigure(player) then
+		return false
+	end
+	-- Autopilot (Teich) und alles andere: Schloss weg, die Besitzer erkennen
+	-- das an ihrem Besitzer-Check und brechen ab.
+	ActivityLock.forceRelease(player)
+	broadcast(player)
+	return true
 end
 
 local function tick()
@@ -216,6 +314,9 @@ end
 --------------------------------------------------------------------------------
 
 function PetModeService.init()
+	PitArenaService.setHandoffHandler(onPitHandoff)
+	IslandService.setBeforeEquipHook(beforeEquip)
+
 	RateLimiter.connect(Remotes.RequestPetMode, "RequestPetMode", function(player, mode: any, resume: any)
 		if typeof(mode) ~= "string" then return end
 

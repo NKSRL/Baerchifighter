@@ -23,6 +23,7 @@ local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local RateLimiter   = require(ServerScriptService.Util.RateLimiter)
+local WorldService = require(ServerScriptService.Services.WorldService)   -- 20.10. Final-Epilog P6
 
 local ProfileService = {}
 
@@ -88,6 +89,7 @@ function ProfileService.buildCard(target: Player): Types.PlayerProfileCard?
 		rebirths     = data.rebirthCount,
 		indexCount   = indexCount,
 		indexTotal   = indexTotal(),
+		world2       = WorldService.isWorld2Unlocked(target),   -- Prompt 6 (nur lesen)
 		top          = top,
 	}
 end

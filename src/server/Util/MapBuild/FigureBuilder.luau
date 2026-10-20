@@ -84,6 +84,38 @@ function FigureBuilder.writeBaerchiState(model: Model, baerchi: Types.Baerchi, m
 	FigureBuilder.writeFigureState(model, baerchi.currentHp, maxHp)
 end
 
+-- Schreibt Name, Level und Mutations-Kuerzel auf das Namensschild einer bereits
+-- stehenden Figur. 14.10.: eigene Funktion, damit ein Level-Aufstieg (Fuettern)
+-- das Schild sofort aendert, ohne die Figur neu zu bauen — der Baerchi kann dabei
+-- mitten auf einem Weg sein. Als Nachricht: jeder Spieler liest den Namen in
+-- seiner Sprache (WorldText).
+function FigureBuilder.writeBaerchiName(model: Model, baerchi: Types.Baerchi)
+	local billboard = model:FindFirstChild("Label", true)
+	local name = if billboard then billboard:FindFirstChild("Name") else nil
+	if not (name and name:IsA("TextLabel")) then return end
+
+	WorldText.set(name, Loc.msg("ui.world.figure_name", {
+		badge = if baerchi.mutation then BaerchiConfig.getMutationBadge(baerchi.mutation) .. " " else "",
+		name  = Names.msg.baerchi(baerchi.configId),
+		level = baerchi.level,
+	}))
+
+	if baerchi.mutation then
+		name.TextColor3 = BaerchiConfig.getMutationColor(baerchi.mutation)
+	end
+end
+
+-- Wo der ausgeruestete Baerchi zu Hause steht (Fusspunkt, Blickrichtung des Plots).
+-- Einzige Quelle fuer "Heimplatz": renderBaerchis stellt die Figur dorthin, und
+-- alle Wege (Event, Kampf, Honig-Teich) laufen hierher zurueck — egal, wo die
+-- Figur gerade steht, wenn der Weg beginnt.
+function FigureBuilder.homeFoot(slot: number): (Vector3, CFrame)
+	local plotCFrame = MapParts.plotCFrame(slot)
+	local home       = MapLayout.baerchiHomeOffset()
+	local foot       = (plotCFrame * CFrame.new(home.X, MapParts.plotSurfaceOffset() + home.Y, home.Z)).Position
+	return foot, plotCFrame
+end
+
 -- Eine Baerchi-Figur: das geklonte Pet-Mesh aus BaerchiMesh.build. Welches
 -- Modell das ist (eigenes fuer diese Rarity oder der gemeinsame Platzhalter)
 -- und ob es eingefaerbt wird, entscheidet BaerchiMesh selbst.
@@ -107,7 +139,7 @@ function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerc
 		then BaerchiConfig.getMutationColor(baerchi.mutation)
 		else nil
 
-	local model = BaerchiMesh.build(footPos, color, baerchi.rarity, mutationColor)
+	local model = BaerchiMesh.build(footPos, color, baerchi.rarity, mutationColor, baerchi.configId)
 	if not model then
 		return nil
 	end
@@ -252,16 +284,7 @@ function FigureBuilder.buildBaerchiFigure(parent: Instance, baerchi: Types.Baerc
 		-- Rarity mit ungewohnter Palette nicht eindeutig genug waere —
 		-- und weil ein Spieler lesen koennen soll, WELCHE der acht Stufen
 		-- es genau ist (die Farbe allein verraet das nicht zuverlaessig).
-		-- Als Nachricht: jeder Spieler liest den Namen in seiner Sprache (WorldText)
-		WorldText.set(name, Loc.msg("ui.world.figure_name", {
-			badge = if baerchi.mutation then BaerchiConfig.getMutationBadge(baerchi.mutation) .. " " else "",
-			name  = Names.msg.baerchi(baerchi.configId),
-			level = baerchi.level,
-		}))
-
-		if baerchi.mutation then
-			name.TextColor3 = BaerchiConfig.getMutationColor(baerchi.mutation)
-		end
+		FigureBuilder.writeBaerchiName(model, baerchi)
 
 		MapParts.newTextLabel("Health", billboard, UDim2.fromScale(1, 0.28), UDim2.fromScale(0, 0.34))
 
@@ -303,9 +326,7 @@ function FigureBuilder.renderBaerchis(plotModel: Model, slot: number, islandData
 		return
 	end
 
-	local plotCFrame = MapParts.plotCFrame(slot)
-	local home       = MapLayout.baerchiHomeOffset()   -- HONEY_POND_V2: am Becken
-	local footPos    = (plotCFrame * CFrame.new(home.X, MapParts.plotSurfaceOffset() + home.Y, home.Z)).Position
+	local footPos, plotCFrame = FigureBuilder.homeFoot(slot)   -- HONEY_POND_V2: am Becken
 
 	local figure = FigureBuilder.buildBaerchiFigure(folder, equipped, footPos, plotCFrame)
 	if figure then

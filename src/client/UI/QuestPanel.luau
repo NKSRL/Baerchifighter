@@ -21,6 +21,8 @@ local QuestConfig = require(ReplicatedStorage.Config.QuestConfig)
 local Theme        = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
+local Icons        = require(script.Parent.Icons)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 
 local QuestPanel = {}
 
@@ -70,7 +72,133 @@ end
 -- Zeile
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- 14.10. Honig-UI (UI_HONEY_SKIN): quest-bar.png als Zeile, quest-window.png als Fenster
+--------------------------------------------------------------------------------
+
+local HONEY_ROW_H = 80
+local HONEY_WIN_W, HONEY_WIN_H = 900, 408   -- quest-window.png 1442 x 654 (2,205 : 1), unverzerrt
+
+local function honeyOn(): boolean
+	return FeatureFlags.isOn("UI_HONEY_SKIN") and Icons.hasUi("honey/quest_bar") and Icons.hasUi("honey/quest_window")
+end
+
+local function honeyLabel(name: string, parent: Instance, text: string, size: number): TextLabel
+	local label = Theme.label(name, parent, text)
+	label.TextScaled     = false
+	label.TextSize       = size
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextTruncate   = Enum.TextTruncate.AtEnd
+	label.ZIndex         = 4
+	Theme.outlineText(label, 2)
+	return label
+end
+
+local function buildHoneyRow(parent: Instance, order: number, entry: Types.QuestEntry)
+	local done = entry.progress >= entry.target
+	-- Das Bild (1408 x 296) wird nie verzerrt: feste Groesse im Originalverhaeltnis,
+	-- alle Positionen sind Pixel des Originals mal S.
+	local S = HONEY_ROW_H / 296
+	local function px(v: number): number return math.floor(v * S + 0.5) end
+
+	local row = Instance.new("Frame")
+	row.Name                   = "Quest_" .. entry.id
+	row.BackgroundTransparency = 1
+	row.BorderSizePixel        = 0
+	row.Size                   = UDim2.fromOffset(px(1408), HONEY_ROW_H)
+	row.LayoutOrder            = order
+	row.Parent                 = parent
+
+	local skin = Icons.honeyImage(row, "honey/quest_bar")
+	if skin then skin.ZIndex = 1 end
+
+	-- Orange Leiste (x 150-873, y 52-143): Titel
+	local title = honeyLabel("Title", row, QuestPanel.title(entry.id), 16)
+	title.Position = UDim2.fromOffset(px(150), px(52))
+	title.Size     = UDim2.fromOffset(px(873 - 150), px(143 - 52))
+
+	-- Untere Leiste (x 72-845, y 163-227): Fortschritt, Belohnung links, Zaehler rechts
+	local track = Instance.new("Frame")
+	track.Name                   = "Track"
+	track.BackgroundTransparency = 1
+	track.Position               = UDim2.fromOffset(px(72), px(163))
+	track.Size                   = UDim2.fromOffset(px(845 - 72), px(227 - 163))
+	track.ZIndex                 = 2
+	track.Parent                 = row
+
+	local fraction = math.clamp(entry.progress / math.max(1, entry.target), 0, 1)
+	if fraction > 0 then
+		local fill = Instance.new("Frame")
+		fill.Name                   = "Fill"
+		fill.BackgroundColor3       = if done then Theme.COLORS.good else Color3.fromRGB(255, 190, 50)
+		fill.BackgroundTransparency = 0.4
+		fill.BorderSizePixel        = 0
+		fill.Size                   = UDim2.fromScale(fraction, 1)
+		fill.ZIndex                 = 2
+		fill.Parent                 = track
+		Theme.corner(fill, 8)
+	end
+
+	local reward = honeyLabel("Reward", track, QuestPanel.rewardText(entry.id), 11)
+	reward.Position   = UDim2.new(0, 6, 0, 0)
+	reward.Size       = UDim2.new(1, -52, 1, 0)
+	reward.TextColor3 = Theme.COLORS.goldGummy
+
+	local count = honeyLabel("Count", track, Loc.formatNumber(entry.progress) .. " / " .. Loc.formatNumber(entry.target), 12)
+	count.AnchorPoint    = Vector2.new(1, 0)
+	count.Position       = UDim2.new(1, -6, 0, 0)
+	count.Size           = UDim2.new(0, 46, 1, 0)
+	count.TextXAlignment = Enum.TextXAlignment.Right
+
+	-- Graues Oval rechts (x 930-1330, y 92-225) = Platz fuer "Claim"
+	local plateX, plateY = px(930), px(92)
+	local plateW, plateH = px(1330 - 930), px(225 - 92)
+
+	if entry.claimed then
+		local tag = honeyLabel("Done", row, Loc.t("ui.quest.claimed"), 16)
+		tag.Position       = UDim2.fromOffset(plateX, plateY)
+		tag.Size           = UDim2.fromOffset(plateW, plateH)
+		tag.TextXAlignment = Enum.TextXAlignment.Center
+		tag.TextColor3     = Theme.COLORS.good
+	else
+		local glow = Instance.new("Frame")
+		glow.Name                   = "ClaimGlow"
+		glow.BackgroundColor3       = Theme.COLORS.good
+		glow.BackgroundTransparency = 0.25
+		glow.BorderSizePixel        = 0
+		glow.Position               = UDim2.fromOffset(plateX, plateY)
+		glow.Size                   = UDim2.fromOffset(plateW, plateH)
+		glow.Visible                = done
+		glow.ZIndex                 = 2
+		glow.Parent                 = row
+		Theme.corner(glow, plateH)
+
+		local button = Instance.new("TextButton")
+		button.Name                   = "Claim"
+		button.BackgroundTransparency = 1
+		button.AutoButtonColor        = false
+		button.Position               = glow.Position
+		button.Size                   = glow.Size
+		button.Text                   = Loc.t("ui.quest.claim_short")
+		button.Font                   = Theme.FONT
+		button.TextSize               = 16
+		button.TextColor3             = if done then Color3.new(1, 1, 1) else Color3.fromRGB(205, 190, 180)
+		button.TextStrokeColor3       = Theme.COLORS.outline
+		button.TextStrokeTransparency = if done then 0 else 0.4
+		button.Active                 = done
+		button.ZIndex                 = 5
+		button.Parent                 = row
+		button.Activated:Connect(function()
+			if done then QuestPanel.claim(entry) end
+		end)
+	end
+end
+
 local function buildRow(parent: Instance, order: number, entry: Types.QuestEntry)
+	if honeyOn() then
+		buildHoneyRow(parent, order, entry)
+		return
+	end
 	local done = entry.progress >= entry.target
 
 	local row = Theme.panel("Quest_" .. entry.id, parent, Theme.COLORS.panel)
@@ -175,9 +303,28 @@ end
 --------------------------------------------------------------------------------
 
 function QuestPanel.init(screenGui: ScreenGui)
-	local root = Theme.dialog("QuestPanel", screenGui,
-		Vector2.new(0.46, 0.7), Vector2.new(300, 320), Vector2.new(480, 560))
+	local honey = honeyOn()
+	local root = if honey
+		then Theme.dialog("QuestPanel", screenGui, Vector2.new(0.6, 0.8), Vector2.new(HONEY_WIN_W, HONEY_WIN_H), Vector2.new(HONEY_WIN_W, HONEY_WIN_H))
+		else Theme.dialog("QuestPanel", screenGui,
+			Vector2.new(0.46, 0.7), Vector2.new(300, 320), Vector2.new(480, 560))
 	_root = root
+
+	-- 14.10.: das Fenster ist ein Bild (quest-window.png, 1442 x 654, Titelleiste und
+	-- Kreuz sind schon drin). Das alte Panel-Aussehen verschwindet.
+	if honey then
+		root.BackgroundTransparency = 1
+		for _, child in root:GetChildren() do
+			if child:IsA("UIStroke") or child:IsA("UIGradient") or child:IsA("UICorner") then
+				child:Destroy()
+			elseif child:IsA("GuiObject") then
+				child.Visible = false
+			end
+		end
+		root.Size = UDim2.fromOffset(HONEY_WIN_W, HONEY_WIN_H)   -- FitScale des Dialogs verkleinert bei Bedarf
+		local frame = Icons.honeyImage(root, "honey/quest_window")
+		if frame then frame.ZIndex = 0 end
+	end
 
 	local title = Theme.dialogHeader(root, "", function()
 		PanelManager.close(PANEL_NAME)
@@ -186,11 +333,38 @@ function QuestPanel.init(screenGui: ScreenGui)
 
 	local body = Theme.dialogBody(root)
 
+	if honey then
+		-- Titel in die Pille, Kreuz auf das Sechseck, Liste in den dunklen Teil
+		local band = root:FindFirstChild("TitleBand")
+		if band and band:IsA("GuiObject") then band.Visible = false end
+		local header = root:FindFirstChild("Header")
+		if header and header:IsA("GuiObject") then
+			header.Position = UDim2.fromOffset(190, 40)
+			header.Size     = UDim2.fromOffset(540, 56)
+			local close = header:FindFirstChild("Close")
+			if close and close:IsA("GuiObject") then
+				close.Parent      = root
+				close.AnchorPoint = Vector2.new(0.5, 0.5)
+				close.Position    = UDim2.fromOffset(820, 69)   -- Mitte des Sechsecks im Bild
+				close.Size        = UDim2.fromOffset(72, 72)
+				local skin = close:FindFirstChild("HoneySkin")
+				if skin and skin:IsA("GuiObject") then skin.Visible = false end
+			end
+		end
+		body.Position = UDim2.fromOffset(30, 132)
+		body.Size     = UDim2.fromOffset(HONEY_WIN_W - 60, HONEY_WIN_H - 132 - 26)
+	end
+
 	local scroller = Theme.scroller("List", body)
 	scroller.Size = UDim2.fromScale(1, 1)
 	_scroller = scroller
 	local layout = Theme.listLayout(scroller, 6)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	if honey then
+		layout.FillDirection = Enum.FillDirection.Horizontal   -- Abschnitte sind volle Breite, Quest-Zeilen stehen zu zweit
+		layout.Wraps = true
+		layout.VerticalAlignment = Enum.VerticalAlignment.Top
+	end
 
 	PanelManager.register(PANEL_NAME, {
 		open = function()

@@ -53,6 +53,8 @@ type View = {
 	line    : TextLabel,
 	bar     : Kit.Progress,
 	lamp    : BasePart?,
+	nose    : BasePart?,
+	eyes    : { BasePart },
 	marker  : BillboardGui,
 	prompt  : ProximityPrompt?,
 	badgeKey: string,
@@ -194,10 +196,18 @@ local function buildScreen(model: Model): View?
 	bang.Size = UDim2.fromScale(1, 1)
 
 	local lamp = model:FindFirstChild(CFG.lampPart)
+	local nose = model:FindFirstChild(CFG.nosePart)
+	local eyes: { BasePart } = {}
+	for _, eyeName in CFG.eyeParts do
+		local eye = model:FindFirstChild(eyeName)
+		if eye and eye:IsA("BasePart") then table.insert(eyes, eye) end
+	end
 	local view: View = {
 		model = model, screen = gui, bg = bg, badgeHolder = badgeHolder, lock = lock,
 		title = title, line = line, bar = bar,
 		lamp = if lamp and lamp:IsA("BasePart") then lamp else nil,
+		nose = if nose and nose:IsA("BasePart") then nose else nil,
+		eyes = eyes,
 		marker = marker, prompt = nil, badgeKey = "",
 	}
 
@@ -263,6 +273,16 @@ local function blink()
 				lamp.Color = color
 			end
 		end
+		-- Nase und Augen: gleiche Zustandsfarben wie die Lampe, "ready" blinkt gruen
+		local state = attr(model, "State", "locked") :: string
+		local noseColor = CFG.noseColors[state] or CFG.noseColors.normal
+		local eyeColor = CFG.eyeColors[state] or CFG.eyeColors.normal
+		if state == "ready" and not on then
+			noseColor = Theme.shade(noseColor, -0.6)
+			eyeColor = Theme.shade(eyeColor, -0.6)
+		end
+		if view.nose then view.nose.Color = noseColor end
+		for _, eye in view.eyes do eye.Color = eyeColor end
 		if view.marker.Enabled then
 			view.marker.StudsOffsetWorldSpace = Vector3.new(0, CFG.markerHeight + math.sin(os.clock() * 4) * 0.4, 0)
 		end

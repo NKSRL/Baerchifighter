@@ -5,9 +5,8 @@
 -- Einzige Zustaendigkeit:
 --   - Einen Baerchi endgueltig verwerten und dafuer Gummies gutschreiben
 --
--- Rueckgabe-Formel (alle Zahlen aus EconomyConfig):
---   wert    = getBaerchiBaseValue(rarity, level)   -- Rarity-Basiswert * Level-Bonus
---   gummies = floor(wert * RECYCLE_RETURN)
+-- Rueckgabe-Formel: EconomyConfig.getRecycleValue (dort auch fuer die UI)
+--   gummies = floor(getBaerchiBaseValue(rarity, level) * RECYCLE_RETURN)
 --
 -- Seit v4 gibt es kein Recycler-Gebaeude mehr (die Gebaeude produzieren nur
 -- noch Honig): die Rueckgabequote ist fest, und die frueher levelabhaengige
@@ -35,11 +34,10 @@ local function fail(player: Player, reason: Types.LocMsg?)
 	Remotes.ActionFailed:FireClient(player, "RequestRecycleBaerchi", reason or Loc.msg("err.unknown"))
 end
 
--- Wie viele Gummies dieser Baerchi beim Verwerten bringt.
--- Oeffentlich, damit die UI denselben Wert anzeigt den der Server auszahlt.
+-- Wie viele Gummies dieser Baerchi beim Verwerten bringt (Formel in
+-- EconomyConfig, die UI rechnet mit derselben Funktion).
 function RecycleService.getRecycleValue(baerchi: Types.Baerchi): number
-	local baseValue = EconomyConfig.getBaerchiBaseValue(baerchi.rarity, baerchi.level)
-	return math.floor(baseValue * EconomyConfig.RECYCLE_RETURN)
+	return EconomyConfig.getRecycleValue(baerchi.rarity, baerchi.level)
 end
 
 function RecycleService.recycle(player: Player, baerchiUid: string)

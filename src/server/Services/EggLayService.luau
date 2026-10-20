@@ -329,6 +329,35 @@ function EggLayService.collect(player: Player, eggUid: string)
 	PlayerService.saveNow(player)
 end
 
+-- 14.10.: mehrere Eier in EINEM Zug einsammeln (ein Ergebnis, ein Speichern).
+function EggLayService.collectMany(player: Player, uids: { string })
+	local data = PlayerService.getData(player)
+	if not data then return end
+	local last: Types.EggType? = nil
+	local count = 0
+	for _, uid in uids do
+		local eggType = takeEgg(data, uid)
+		if eggType then
+			last = eggType
+			count += 1
+		end
+	end
+	if count == 0 then return end
+	local result: Types.EggCollectResult = {
+		eggUid  = if count == 1 then uids[1] else "",
+		eggType = last :: Types.EggType,
+		inStock = if count == 1 then (data.island.eggStock[last :: Types.EggType] or 0) else count,
+	}
+	Remotes.EggCollectedReceived:FireClient(player, result)
+	PlayerService.markDirty(player)
+	PlayerService.saveNow(player)
+end
+
+-- Sammel-Sweep: alle 0.15 s nimmt jeder Spieler die eigenen Eier im Umkreis seiner Figur mit.
+local SWEEP_INTERVAL = 0.15
+local SWEEP_RADIUS   = 3     -- Studs (vorher: nur exakte Beruehrung des Ei-Koerpers)
+local SWEEP_HEIGHT   = 8
+
 function EggLayService.collectAll(player: Player)
 	local data = PlayerService.getData(player)
 	if not data then return end
@@ -445,15 +474,31 @@ function EggLayService.init()
 	-- Einsammeln per Beruehrung: MapService baut an jedem gelegten Ei einen
 	-- Touched-Handler, kennt aber EggLayService nicht (Ringschluss-Gefahr,
 	-- siehe MapService._eggCollectHandler). Deshalb haengt sich hier die
-	-- eigentliche Sammel-Funktion ein — derselbe Weg fuehrt seit jeher zum
-	-- Klick-Remote unten, nur der Ausloeser ist jetzt Beruehren statt Klicken.
+	-- eigentliche Sammel-Funktion ein. (Das fruehere Klick-Remote
+	-- RequestCollectEgg ist seit dem Beruehren-Weg entfallen, 12.10.2026.)
 	MapService.setEggCollectHandler(function(player: Player, eggUid: string)
 		EggLayService.collect(player, eggUid)
 	end)
 
-	RateLimiter.connect(Remotes.RequestCollectEgg, "RequestCollectEgg", function(player, eggUid: any)
-		if typeof(eggUid) ~= "string" then return end
-		EggLayService.collect(player, eggUid)
+	task.spawn(function()
+		while true do
+			task.wait(SWEEP_INTERVAL)
+			local near: { [Player]: { string } } = {}
+			MapService.forEachLaidEgg(function(part, owner, uid)
+				local character = owner.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				if not (root and root:IsA("BasePart")) then return end
+				local d = part.Position - root.Position
+				if math.abs(d.Y) <= SWEEP_HEIGHT and Vector3.new(d.X, 0, d.Z).Magnitude <= SWEEP_RADIUS then
+					local list = near[owner]
+					if not list then list = {}; near[owner] = list end
+					table.insert(list, uid)
+				end
+			end)
+			for owner, list in near do
+				EggLayService.collectMany(owner, list)
+			end
+		end
 	end)
 
 	RateLimiter.connect(Remotes.RequestCollectAllEggs, "RequestCollectAllEggs", function(player)

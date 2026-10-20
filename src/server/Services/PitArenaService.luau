@@ -83,6 +83,7 @@ local RateLimiter     = require(ServerScriptService.Util.RateLimiter)   -- Paket
 local FigureFX        = require(ServerScriptService.Util.FigureFX)
 local ActivityLock    = require(ServerScriptService.Util.ActivityLock)
 local FightBars       = require(ServerScriptService.Util.FightBars)
+local PlotRoutes      = require(ServerScriptService.Util.PlotRoutes)   -- 14.10.: ein Wegeplaner fuer alle
 
 -- Name unter dem PitArenaService das Bewegungs-Schloss haelt (siehe
 -- ActivityLock) — verhindert dass BaerchiAutopilotService den Baerchi
@@ -102,6 +103,10 @@ end
 local function arenaBobPerStud(): number
 	return MapConfig.WALK_BOB_PER_STUD * MapConfig.WALK_SPEED / arenaWalkSpeed()
 end
+
+-- 14.10.: Die Wege Plot <-> Arena plant PlotRoutes.route (von JEDEM Punkt der
+-- Achse zu jedem anderen, auch mitten auf dem Steg oder vom Event aus). Frueher
+-- hatte dieser Service eine eigene, nur fuer Heimplatz <-> Arena taugliche Kette.
 
 -- Laufende Wiedergabe pro Spieler. Startet ein neuer Lauf, wird der alte
 -- Token ungueltig und die alte Schleife beendet sich beim naechsten Schritt.
@@ -132,18 +137,25 @@ type Active = {
 	settled : Types.PitRunResult?,
 	sent    : boolean,
 	entered : number,
+	completed : number,   -- 14.10.: VOLLSTAENDIG gespielte Stages (harter Abbruch rechnet nur diese ab)
 	recall  : boolean,
+	handoff : boolean,    -- 14.10.: Zurueckholen = Uebergabe an ein anderes Ziel, nicht heimlaufen
+	onStage : ((number) -> ())?,   -- 14.10.: nach JEDER fertigen Stage (Auszahlung je Stage)
 	beats   : { { Types.FightBeat } }?,   -- v15: Zuege je Stage (Index = Stage im Lauf)
 	phase   : string,     -- "ToPit" | "InPit" | "Returning"
 	stage   : number?,
 }
 local _active: { [Player]: Active } = {}
 
--- Wo die gerade kaempfende Figur auf dem Plot hingehoert. homeFoot ist der
--- Fusspunkt VOR dem Loslaufen (fuer den Weg zurueck), pivot der exakte
--- Ausgangszustand (fuer den abschliessenden Snap in restoreHome).
-type Home = { model: Model, pivot: CFrame, homeFoot: Vector3 }
+-- Wo die gerade kaempfende Figur auf dem Plot hingehoert: der KANONISCHE
+-- Heimplatz (MapService.getBaerchiHome), nicht der Punkt, an dem sie zufaellig
+-- losgelaufen ist — sie kann ja von einem Event oder vom Teich kommen.
+type Home = { model: Model, homeFoot: Vector3, facing: CFrame }
 local _home: { [Player]: Home } = {}
+
+-- 14.10.: wer die Figur nach einer Uebergabe (handoff) weiterfuehrt. Gesetzt von
+-- PetModeService (Pull-Hook statt require — der haengt schon von uns ab).
+local _handoffHandler: ((Player) -> ())? = nil
 
 -- Sammel-Update 05.10. (Paket 4.3, "schnell den Tower hochfliegen"): Tempo
 -- der Wiedergabe je Spieler (1, 2, 4 oder 0 = "Ergebnis sofort"). Die
@@ -164,7 +176,7 @@ end
 -- Bringt eine noch in der Arena stehende Figur an ihren Platz auf dem Plot
 -- zurueck und raeumt ihren Kampf-Balken weg. Idempotent: zweimal aufrufen
 -- schadet nicht.
-local function restoreHome(player: Player)
+local function restoreHome(player: Player, keepPosition: boolean?)
 	local home = _home[player]
 	if not home then return end
 
@@ -180,11 +192,15 @@ local function restoreHome(player: Player)
 		-- die Arena-Position. Ein spaeteres Abmelden wuerde sie genau dorthin
 		-- zuruecksetzen und die Heimkehr wieder zunichtemachen.
 		FigureFX.stopIdle(model)
-		model:PivotTo(home.pivot)
 
-		-- Zuhause angekommen und wieder in Ruhe: `home.pivot` ist garantiert
-		-- die saubere Ruhelage, weil startPlayback das Atmen VOR dem Merken
-		-- abgeschaltet hat.
+		-- 14.10. Uebergabe an ein anderes Ziel: die Figur bleibt, wo sie steht —
+		-- der naechste Weg startet von hier. Das Atmen setzt der naechste
+		-- Besitzer der Figur.
+		if keepPosition then
+			return
+		end
+
+		FigurePlacement.place(model, home.homeFoot, home.facing)
 		FigureFX.idleBob(model, {
 			height = MapConfig.IDLE_BOB_HEIGHT,
 			rate   = MapConfig.IDLE_BOB_RATE,
@@ -192,7 +208,7 @@ local function restoreHome(player: Player)
 	end
 end
 
--- Alle Gegner-Figuren aus der Arena raeumen.
+
 local function clearFighters(player: Player)
 	local fighters = MapService.getFighterFolder(player)
 	if not fighters then return end
@@ -362,7 +378,7 @@ local function rideTower(
 	return stillValid(player, token, figure, fighters)
 end
 
-local function startPlayback(player: Player, run: Types.PitRunResult, settle: SettleFn?, beats: { { Types.FightBeat } }?)
+local function startPlayback(player: Player, run: Types.PitRunResult, settle: SettleFn?, beats: { { Types.FightBeat } }?, onStage: ((number) -> ())?)
 	-- Das Hochzaehlen des Tokens steht ganz oben und vor allem, was fehlschlagen
 	-- kann. Ab hier gehoert die Wiedergabe fuer diesen Spieler UNS — und nur
 	-- deshalb darf die Fehlerbehandlung in play() bedenkenlos aufraeumen. Stuende
@@ -384,7 +400,10 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 		settled = nil,
 		sent    = false,
 		entered = 0,
+		completed = 0,
 		recall  = false,
+		handoff = false,
+		onStage = onStage,
 		beats   = beats,
 		phase   = "ToPit",
 		stage   = nil,
@@ -406,6 +425,12 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 	restoreHome(player)
 	refreshState(player)
 	clearFighters(player)
+	-- 20.10. Final-Epilog: ein neuer Lauf waehrend der Sequenz beendet den
+	-- Gipfel (der Turm muss wieder wachsen koennen). Der Epilog-Stand bleibt
+	-- gespeichert; EpilogService.restore baut den Gipfel bei Bedarf neu.
+	if MapService.getTowerHold(player) then
+		MapService.setSummit(player, false)
+	end
 	MapService.setPitTowerLevel(player, 0)
 	MapService.clearPitBanner(player)
 
@@ -461,8 +486,13 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 	-- selbst auf ihre Ruhelage zurueck.
 	FigureFX.stopIdle(figure)
 
-	local homeFoot = FigurePlacement.footOf(figure)   -- Sammel-Update 1.2
-	_home[player] = { model = figure, pivot = figure:GetPivot(), homeFoot = homeFoot }
+	-- 14.10. Der Lauf startet dort, wo die Figur JETZT steht (vom Event, vom
+	-- Teich, mitten im Weg) — heim geht es aber zum kanonischen Heimplatz.
+	local startFoot = FigurePlacement.footOf(figure)   -- Sammel-Update 1.2
+	local hf, hc = MapService.getBaerchiHome(player)
+	local homeFoot: Vector3 = hf or startFoot
+	local homeFacing: CFrame = hc or figure:GetPivot()
+	_home[player] = { model = figure, homeFoot = homeFoot, facing = homeFacing }
 
 	local maxHp = math.max(1, run.maxHp)
 
@@ -481,6 +511,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 
 	-- Die beiden Kaempfer stehen sich quer zur Bruecke gegenueber, damit man
 	-- sie beim Herueberlaufen von der Seite sieht statt hintereinander.
+	local laneFrame: CFrame = plotCFrame   -- 12.10.: fuer die Laufwege (arenaRoute)
 	local side     = plotCFrame.RightVector
 	local selfPos  = center - side * MapConfig.FIGHT_SPACING
 	local enemyPos = center + side * MapConfig.FIGHT_SPACING
@@ -496,6 +527,10 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 	-- bevor der erste Gegner ueberhaupt erscheint.
 	MapService.setFigureState(figure, run.hpBefore, maxHp)
 
+	-- 14.10. true, sobald die Figur bewusst NICHT heimgelaufen ist (Uebergabe):
+	-- dann stellt die Aufraeum-Phase sie nicht auf den Heimplatz zurueck.
+	local handedOff = false
+
 	task.spawn(function()
 		local selfFill: Frame? = nil
 		local chargeFill: Frame? = nil
@@ -505,7 +540,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			-- Baerchi an der Plattform angekommen ist, nicht durch einen
 			-- Teleport. FigureWalker haelt den Fusspunkt waehrenddessen exakt
 			-- auf Plot-/Bruecken-Hoehe.
-			FigureWalker.walk(figure, homeFoot, selfPos, {
+			FigureWalker.walkPath(figure, PlotRoutes.route(laneFrame, startFoot, selfPos), {
 				speed       = arenaWalkSpeed(),
 				bobPerStud  = arenaBobPerStud(),
 				isCancelled = function()
@@ -522,9 +557,16 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			-- dann von hier aus heimlaufen.
 			if recallWanted(player, token) then
 				sendResult(player, token)
+				local pending = _active[player]
+				if pending and pending.token == token and pending.handoff then
+					-- 14.10. Anderes Ziel gewaehlt: nicht heimlaufen, die Figur
+					-- bleibt genau hier und wird dort weitergefuehrt.
+					handedOff = true
+					return
+				end
 				setPhase(player, token, "Returning", nil)
 				local here = FigurePlacement.footOf(figure)
-				FigureWalker.walk(figure, here, homeFoot, {
+				FigureWalker.walkPath(figure, PlotRoutes.route(laneFrame, here, homeFoot), {
 					speed       = arenaWalkSpeed(),
 					bobPerStud  = arenaBobPerStud(),
 					isCancelled = function() return not stillValid(player, token, figure, fighters) end,
@@ -742,8 +784,14 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 							task.wait(MapConfig.FIGHT_BEAT_SECONDS * tempo)
 						end
 					else
-						-- Faehigkeit: Leiste leuchtet voll auf, die Show laeuft,
-						-- dann der wuchtige Stoss.
+						-- Faehigkeit mit Show (v15.1): die Show IST der Angriff.
+						-- Leisten, Treffer-Blitz und Rueckstoss des Gegners
+						-- kommen im Einschlag-Moment der Show
+						-- (SkillFXConfig.getImpactTime), danach gibt es keinen
+						-- zweiten Stoss mehr. Gesamtdauer wie in
+						-- tools/sim/fight_timeline.lua:
+						-- max(Show-Ende, Einschlag + Zugdauer).
+						local showPlayed = false
 						if isSkill and isSelf then
 							FightBars.setCharge(chargeFill, 1, 0.1)
 							local showId = beat.skillId or fxSkillId
@@ -751,6 +799,7 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 								-- Paket 4.3: im Schnelldurchlauf nur das kurze Echo
 								local full = not fxShownFull and fast <= 1
 								fxShownFull = true
+								local scale = if full then 1 else tempo
 								Remotes.SkillFXPlay:FireAllClients({
 									owner    = player.UserId,
 									skillId  = showId,
@@ -758,14 +807,35 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 									attacker = figure,
 									target   = enemy,
 									center   = (stageSelfPos + stageEnemyPos) / 2,
+									-- Finisher/Opener hat gegriffen (Client: violetter
+									-- Schnitt, staerkerer Komet). Nur Optik.
+									bonus    = beat.bonus == true,
 								})
-								task.wait(SkillFXConfig.getDuration(showId, full) * (if full then 1 else tempo))
+								local showSeconds   = SkillFXConfig.getDuration(showId, full) * scale
+								local impactSeconds = math.min(SkillFXConfig.getImpactTime(showId, full) * scale, showSeconds)
+								task.wait(impactSeconds)
 								if not stillValid(player, token, figure, fighters) then return end
+
+								local recoilSeconds = FightTimeline.beatSeconds(beat) * tempo
+								if enemy and enemy.Parent ~= nil then
+									onImpact()
+									FigureFX.recoil(enemy, stageEnemyPos, stageSelfPos,
+										MapConfig.FIGHT_SKILL_KNOCKBACK, MapConfig.FIGHT_HOP_HEIGHT * 1.6, recoilSeconds)
+								else
+									onImpact()
+									task.wait(recoilSeconds)
+								end
+								local rest = showSeconds - impactSeconds - recoilSeconds
+								if rest > 0 then task.wait(rest) end
+								if not stillValid(player, token, figure, fighters) then return end
+								showPlayed = true
 							end
 						end
 
 						local seconds = FightTimeline.beatSeconds(beat) * tempo
-						if attacker then
+						if showPlayed then
+							-- Treffer kam schon in der Show (siehe oben).
+						elseif attacker then
 							FigureFX.clash(attacker, target, attackerHome, targetHome, {
 								seconds   = seconds,
 								gap       = MapConfig.FIGHT_CONTACT_GAP,
@@ -788,6 +858,20 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 				-- ausgelassen wurden, stimmt so trotzdem alles).
 				FightBars.tweenFill(selfFill, stage.hpAfter / maxHp, 0.15)
 				FightBars.tweenFill(enemyFill, if stage.won then 0 else stageBeats[#stageBeats].enemyHp, 0.15)
+
+				-- 14.10. Diese Stage ist FERTIG gespielt: sofort abrechnen (Gummies
+				-- gehen gleich an den Spieler, nicht erst am Ende des Laufs).
+				local doneNow = _active[player]
+				if doneNow and doneNow.token == token and _runToken[player] == token then
+					doneNow.completed = index
+					local hook = doneNow.onStage
+					if hook then
+						local okHook, errHook = pcall(hook, index)
+						if not okHook then
+							warn("[PitArenaService] Stage-Auszahlung fehlgeschlagen:", errHook)
+						end
+					end
+				end
 
 				if stage.won then
 					cleared += 1
@@ -851,7 +935,9 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			-- Gefecht und steht einfach wieder normal auf dem Plot — die
 			-- anschliessende restoreHome() setzt ihn dafuer direkt zurueck,
 			-- ganz ohne Lauf-Animation.
-			if finalRun.hpAfter > 0 then
+			-- 20.10. Final-Epilog: bleibt der Turm stehen (Gipfel), faehrt der Baerchi
+			-- nicht mit ihm hinunter; restoreHome unten setzt ihn heim.
+			if finalRun.hpAfter > 0 and not MapService.getTowerHold(player) then
 				setPhase(player, token, "Returning", nil)
 
 				-- Vor dem eigenen PivotTo abmelden: sonst zoegen Idle-Loop und
@@ -869,7 +955,15 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 					finalSelfPos = selfPos
 				end
 
-				FigureWalker.walk(figure, finalSelfPos, homeFoot, {
+				local current = _active[player]
+				if current and current.token == token and current.handoff then
+					-- 14.10. Uebergabe an ein anderes Ziel: Stage zu Ende gespielt,
+					-- Turm runter — aber nicht heim.
+					handedOff = true
+					return
+				end
+
+				FigureWalker.walkPath(figure, PlotRoutes.route(laneFrame, finalSelfPos, homeFoot), {
 					speed       = arenaWalkSpeed(),
 					bobPerStud  = arenaBobPerStud(),
 					isCancelled = function() return not stillValid(player, token, figure, fighters) end,
@@ -891,7 +985,9 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 		-- sonst wuerde man einem bereits gestarteten neuen Lauf die Figur
 		-- unter den Fuessen wegziehen.
 		if _runToken[player] == token then
-			restoreHome(player)
+			local ending = _active[player]
+			local wantsHandoff = ending ~= nil and ending.token == token and ending.handoff
+			restoreHome(player, handedOff)
 			clearFighters(player)
 			MapService.setPitTowerLevel(player, 0)
 			MapService.clearPitBanner(player)
@@ -899,6 +995,13 @@ local function startPlayback(player: Player, run: Types.PitRunResult, settle: Se
 			ActivityLock.release(player, LOCK_HOLDER)
 			if _active[player] and _active[player].token == token then
 				_active[player] = nil
+			end
+
+			-- 14.10. Das Ziel der Uebergabe uebernimmt JETZT (gleicher Frame: das
+			-- Schloss ist frei, aber noch niemand hat es sich geholt).
+			local handler = _handoffHandler
+			if wantsHandoff and handler then
+				task.spawn(handler, player)
 			end
 		end
 	end)
@@ -943,8 +1046,8 @@ end
 -- ausgenommen.
 -- v15: `beats` = die Zuege je Stage (Index wie run.stages). Fehlen sie, wird
 -- jede Stage als ein einziger Stoss gezeigt.
-function PitArenaService.play(player: Player, run: Types.PitRunResult, settle: SettleFn?, beats: { { Types.FightBeat } }?)
-	local ok, err = pcall(startPlayback, player, run, settle, beats)
+function PitArenaService.play(player: Player, run: Types.PitRunResult, settle: SettleFn?, beats: { { Types.FightBeat } }?, onStage: ((number) -> ())?)
+	local ok, err = pcall(startPlayback, player, run, settle, beats, onStage)
 	if ok then return end
 
 	warn("[PitArenaService] Wiedergabe konnte nicht starten:", err)
@@ -971,13 +1074,62 @@ end
 -- v12: Spieler holt den Baerchi zurueck (Pet-Leiste). Auf dem Hinweg kehrt
 -- er sofort um; im Kampf endet der Lauf nach der laufenden Stage. Auf dem
 -- Rueckweg ist nichts mehr zu tun. true = Anfrage angenommen.
-function PitArenaService.requestRecall(player: Player): boolean
+function PitArenaService.requestRecall(player: Player, handoff: boolean?): boolean
 	local active = _active[player]
 	if not active or active.phase == "Returning" then
 		return false
 	end
-	active.recall = true
+	active.recall  = true
+	-- 14.10. handoff = der Spieler hat ein ANDERES Ziel gewaehlt: nach der
+	-- laufenden Stage geht der Baerchi nicht heim, sondern direkt dorthin.
+	-- Ein spaeteres "Heim" nimmt den Wunsch wieder zurueck (handoff = false).
+	active.handoff = handoff == true
 	return true
+end
+
+-- 14.10. Ein vorgemerktes Zurueckholen widerrufen (Spieler drueckt das Ziel noch
+-- einmal): nur solange es noch nicht gegriffen hat, also zwischen den Stages
+-- noch nicht abgerechnet wurde. true = der Baerchi kaempft einfach weiter.
+function PitArenaService.cancelRecall(player: Player): boolean
+	local active = _active[player]
+	if not active or active.phase ~= "InPit" or active.settled ~= nil then
+		return false
+	end
+	active.recall  = false
+	active.handoff = false
+	return true
+end
+
+-- 14.10. Harte Uebergabe: der Lauf endet SOFORT (Equip, direkter Wechsel auf
+-- dem Hin- oder Rueckweg). Abgerechnet wird nur, was VOLLSTAENDIG gespielt
+-- wurde — die angefangene Stage zaehlt nicht. Die Figur bleibt, wo sie steht.
+function PitArenaService.releaseFigure(player: Player)
+	local active = _active[player]
+	if not active then return end
+
+	local token = active.token
+	_runToken[player] = token + 1   -- die alte Wiedergabe-Schleife endet beim naechsten Schritt
+
+	-- Das Ergebnis geht HIER raus, nicht ueber den Fallback der alten Schleife
+	-- (der wuerde mit den begonnenen statt den fertigen Stages abrechnen). Die
+	-- Abrechnung yieldet (Speichern): `sent` vorher setzen.
+	active.sent = true
+	local result = settleActive(active, active.completed, true)
+	if player.Parent ~= nil then
+		Remotes.CombatResultReceived:FireClient(player, result)
+	end
+
+	restoreHome(player, true)
+	clearFighters(player)
+	MapService.setPitTowerLevel(player, 0)
+	MapService.clearPitBanner(player)
+	refreshState(player)
+	ActivityLock.release(player, LOCK_HOLDER)
+	_active[player] = nil
+end
+
+function PitArenaService.setHandoffHandler(handler: (Player) -> ())
+	_handoffHandler = handler
 end
 
 -- v12: Phase des laufenden Laufs fuer die Pet-Leiste: "ToPit", "InPit",

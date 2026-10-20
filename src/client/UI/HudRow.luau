@@ -28,8 +28,10 @@ local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 
 local HudRow = {}
 
-local SIZE = 38
-local GAP  = 6
+-- 14.10. (UI_HONEY_SKIN): die neuen Knopf-Bilder sind etwas groesser
+local HONEY = FeatureFlags.isOn("UI_HONEY_SKIN")
+local SIZE = if HONEY then 60 else 38
+local GAP  = 3
 
 type Button = { button: TextButton, alert: Frame }
 local _quests: Button? = nil
@@ -50,12 +52,14 @@ local function makeAlert(parent: GuiObject): Frame
 	return alert
 end
 
-local function makeButton(parent: Instance, name: string, order: number, icon: string, fallback: string, color: Color3, onClick: () -> ()): Button
+local function makeButton(parent: Instance, name: string, order: number, icon: string, fallback: string, color: Color3, onClick: () -> (), honeyName: string?): Button
 	local button = Theme.button(name, parent, fallback, color)
 	button.Size        = UDim2.fromOffset(SIZE, SIZE)
 	button.LayoutOrder = order
 	button.TextColor3  = Theme.COLORS.outline
-	if Icons.has(icon) then
+	if honeyName and Icons.skinButton(button, honeyName) then
+		-- fertiges Bild des Spielers ersetzt Farbe und Icon
+	elseif Icons.has(icon) then
 		button.Text = ""
 		local image = Icons.make(button, icon)
 		image.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -96,7 +100,7 @@ function HudRow.init(screenGui: ScreenGui)
 
 	local row = Theme.container("HudRow", screenGui)
 	-- Gleiche Stelle wie vorher das Zahnrad (Hud), Pixel-Offset wie dort.
-	row.Position = UDim2.new(0.012, 12, 0, 106)
+	row.Position = UDim2.new(0.012, 12, 0, (require(game:GetService("ReplicatedStorage").Config.FeatureFlags).isOn("UI_HONEY_SKIN") and 129 or 106))
 	row.Size     = UDim2.fromOffset(SIZE * 3 + GAP * 2 + 8, SIZE)
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection     = Enum.FillDirection.Horizontal
@@ -116,14 +120,14 @@ function HudRow.init(screenGui: ScreenGui)
 	-- 2) Quests
 	_quests = makeButton(row, "QuestButton", 2, "scroll", "📜", Theme.COLORS.panelLight, function()
 		PanelManager.toggle("Quests")
-	end)
+	end, "honey/scroll_btn")
 
 	-- 3) Shop (erscheint wie die alte Kachel erst ab der 2. Sitzung, UnlockRules)
 	if FeatureFlags.isOn("SHOP_V1") then
 		_shop = makeButton(row, "ShopButton", 3, "goldgummy", "GG", Theme.COLORS.goldGummy, function()
 			Unlock.markSeen("tile_shop")
 			PanelManager.toggle("Shop")
-		end)
+		end, "honey/shop_btn")
 	end
 
 	-- Quest-Karte verstecken (sie bleibt fuer ihre Toasts gebaut)

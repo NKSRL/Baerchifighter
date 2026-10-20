@@ -29,8 +29,9 @@
 -- gespeichert (IslandData.recycler).
 --
 -- BALANCE-HINWEIS: ein voller Stapel (MAX_CARRY) bringt auf Recycler-Level 1
--- etwa 75 Gummies, auf Level 10 etwa 6.000, auf Level 60 rund 1,4 Mio (vor dem
--- Rebirth-Multiplikator). Zum Vergleich: Tower I zahlt auf Stage 1 10 Gummies
+-- 250 Gummies, auf Level 10 etwa 20.000, auf Level 60 rund 5,7 Mio (vor dem
+-- Rebirth-Multiplikator; 12.10.: Grundwert 10 x Multiplikator, sofort; seit 14.10.
+-- Grundwert 25, also alle Zahlen hier x2,5). Zum Vergleich: Tower I zahlt auf Stage 1 10 Gummies
 -- (TowerConfig). Die Ausbaukosten kommen aus EconomyConfig.HONEY_UPGRADE_COSTS,
 -- dieselbe Kurve wie bei den Honig-Gebaeuden (v15: Level 1-60).
 
@@ -385,13 +386,69 @@ function CombConfig.clampLevel(level: number): number
 	return math.clamp(math.floor(level), 1, CombConfig.RECYCLER_MAX_LEVEL)
 end
 
--- Gummies pro Wabeneinheit auf diesem Level, vor dem Rebirth-Multiplikator.
-function CombConfig.getPayPerUnit(level: number): number
-	local clamped = CombConfig.clampLevel(level)
+-- 12.10. (Playtest "Recycler viel zu schwach, soll nur einen
+-- Geldmultiplikator zeigen"): Jede Wabeneinheit hat einen GRUNDWERT, das
+-- Recycler-Level ist ein MULTIPLIKATOR darauf. Die Kurve bleibt die alte
+-- (PAY_PER_UNIT / PAY_GROWTH, geteilt durch den alten Level-1-Wert 3),
+-- der Grundwert steigt von 3 auf BASE_PAY_PER_UNIT: alles x3,3. ANNAHME —
+-- progression_pacing.lua rechnet den Recycler nicht mit; im Playtest pruefen.
+-- 14.10. ("Recycler noch ein bisschen zu schwach"): 10 -> 25 (x2,5 auf alle
+-- Level). Ein voller Stapel bringt damit auf Level 1 625, auf Level 10 50.000,
+-- auf Level 30 rund 480.000 (vor dem Rebirth-Multiplikator). Zum Vergleich: eine
+-- Stage in Tower II zahlt 140.000 bis 2,4 Mio.
+CombConfig.BASE_PAY_PER_UNIT = 25
+
+-- Auszahlung SOFORT bei der Abgabe statt nach und nach (Warteschlange,
+-- getSpeed). Aus = alter Ablauf ueber Zeitmarke.
+CombConfig.INSTANT_PAYOUT = true
+
+local function legacyPay(clamped: number): number
 	local fixed = CombConfig.PAY_PER_UNIT[clamped]
 	if fixed then return fixed end
 	local last = CombConfig.PAY_PER_UNIT[10] or 1
-	return math.floor(last * CombConfig.PAY_GROWTH ^ (clamped - 10) + 0.5)
+	return last * CombConfig.PAY_GROWTH ^ (clamped - 10)
+end
+
+-- Balance 15.10. ("Recycler im Verhaeltnis klar zu schwach", Ziel: ein voller
+-- Stapel ~ 25 % des Tower-Einkommens im gleichen Fortschritt). Die alte Kurve
+-- (x1,12 je Level) wuchs viel langsamer als Tower-Einkommen und Ausbaukosten
+-- (x1,22 bis x1,33 je Level): auf Level 60 war der Stapel nur ~5 % einer
+-- Tower-Stage. Deshalb ein Booster auf den Multiplikator:
+--   Level 1-10   x1,0 (Einstieg unveraendert)
+--   Level 10-30  linear bis x1,6
+--   ab Level 30  x1,07 je Level (Level 60 ca. x12)
+-- Ein voller Stapel liegt damit bei Level 20/30/40/60 etwa bei 0,2 / 0,8 / 4,7 /
+-- 175 Mio (vor Rebirth-Multiplikator).
+local function boost(level: number): number
+	if level <= 10 then return 1 end
+	if level <= 30 then return 1 + 0.6 * (level - 10) / 20 end
+	return 1.6 * 1.07 ^ (level - 30)
+end
+
+-- Multiplikator auf den Grundwert bei diesem Level (Level 1 = x1). Unter 10
+-- auf eine Nachkommastelle, darueber ganze Zahlen — so steht er auch am Schild.
+function CombConfig.getMultiplier(level: number): number
+	local clamped = CombConfig.clampLevel(level)
+	local raw = legacyPay(clamped) / (CombConfig.PAY_PER_UNIT[1] or 1) * boost(clamped)
+	if raw < 10 then
+		return math.floor(raw * 10 + 0.5) / 10
+	end
+	return math.floor(raw + 0.5)
+end
+
+-- Gummies pro Wabeneinheit auf diesem Level, vor dem Rebirth-Multiplikator:
+-- Grundwert x Multiplikator.
+function CombConfig.getPayPerUnit(level: number): number
+	return math.floor(CombConfig.BASE_PAY_PER_UNIT * CombConfig.getMultiplier(level) + 0.5)
+end
+
+-- Anzeige "x12" / "x2,5" (sprachneutral, Komma nur bei Nachkommastelle).
+function CombConfig.formatMultiplier(level: number): string
+	local m = CombConfig.getMultiplier(level)
+	if m >= 1e6 then return (string.format("×%.1fM", m / 1e6):gsub("%.0M", "M")) end
+	if m >= 1e4 then return string.format("×%dK", math.floor(m / 1000 + 0.5)) end
+	if m == math.floor(m) then return string.format("×%d", m) end
+	return (string.format("×%.1f", m):gsub("%.", ","))
 end
 
 -- Wabeneinheiten pro Sekunde: linear Level 1 -> 10, danach linear 10 -> 60.

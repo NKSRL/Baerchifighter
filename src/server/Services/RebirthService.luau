@@ -43,6 +43,7 @@ local Types            = require(ReplicatedStorage.Network.Types)
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local EconomyConfig    = require(ReplicatedStorage.Config.EconomyConfig)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)   -- 12.10.: Tower pro Leben
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)   -- Paket 4.1: Rebirth nach Stage
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
@@ -140,17 +141,22 @@ function RebirthService.rebirth(player: Player)
 	freshIsland.eggStock = keptStock
 	freshIsland.baerchis    = keptBaerchis
 	freshIsland.equippedUid = keptEquippedUid
-	-- Sammel-Update Paket 8: Eier im Inkubator bleiben (wie das Ei-Lager),
-	-- das Ausbau-Level faellt zurueck (Geldsenke vor dem Rebirth). Plaetze
-	-- ueber der neuen Platz-Zahl lassen sich noch abholen, aber nicht neu belegen.
-	local oldIncubator = data.island.incubator
-	if oldIncubator and freshIsland.incubator then
-		freshIsland.incubator.slots = oldIncubator.slots
-		-- INCUBATOR_BREED: die Baerchis bleiben sitzen (die Sammlung bleibt
-		-- beim Rebirth); IncubatorService raeumt fehlende im naechsten Takt.
-		freshIsland.incubator.breeders = oldIncubator.breeders or {}
+	-- 15.10. Solo-Inkubator: der GANZE Stand bleibt beim Rebirth — Stufe
+	-- (Ausbauten brauchen ja Rebirths), gesammelte Eier und der Baerchi darin
+	-- (die Sammlung bleibt). IncubatorService raeumt fehlende im naechsten Takt.
+	if data.island.incubator then
+		freshIsland.incubator = data.island.incubator
 	end
 	data.island = freshIsland
+
+	-- 12.10. (TOWER_UNLOCK_PER_LIFE): die Tower-Freischaltung gilt pro Leben.
+	-- Der Baerchi faellt auf Level 1 — er beginnt wieder in Tower I und
+	-- schaltet II, III ... durch erneutes Schaffen frei (TowerService).
+	-- Rekorde und Meilensteine bleiben.
+	if FeatureFlags.isOn("TOWER_UNLOCK_PER_LIFE") then
+		data.towers.unlocked = { [TowerConfig.FIRST_TOWER] = true }
+		data.towers.selected = TowerConfig.FIRST_TOWER
+	end
 
 	-- Progression hochzaehlen
 	data.rebirthCount += 1

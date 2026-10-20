@@ -92,7 +92,7 @@ local function fillViewport(vp: ViewportFrame, configId: string, discovered: boo
 	if not def then return false end
 
 	local ok, model = pcall(function()
-		return BaerchiMesh.build(Vector3.zero, Theme.rarityColor(def.rarity), def.rarity, nil)
+		return BaerchiMesh.build(Vector3.zero, Theme.rarityColor(def.rarity), def.rarity, nil, def.id)
 	end)
 	if not ok or not model then return false end
 
@@ -106,8 +106,9 @@ local function fillViewport(vp: ViewportFrame, configId: string, discovered: boo
 	camera.FieldOfView = 30
 	local radius = math.max(size.X, size.Y, size.Z)
 	local distance = radius / (2 * math.tan(math.rad(camera.FieldOfView / 2))) * 1.15
-	-- Leicht von vorne-oben, damit man Gesicht und Koerper sieht.
-	local dir = Vector3.new(0.35, 0.25, 1).Unit
+	-- Leicht von vorne-oben, damit man Gesicht und Koerper sieht. Die Figur blickt nach -Z
+	-- (Pivot-LookVector): die Kamera steht DAVOR (R6: frueher +Z = Rueckseite).
+	local front = model:GetPivot().LookVector local face for _, p in ipairs(model:GetDescendants()) do if p:IsA("BasePart") then local nm = p.Name:lower() if nm:sub(-4) == "nose" or nm:sub(-5) == "snout" then face = p break end end end if face then local f = (face.Position - cf.Position) * Vector3.new(1, 0, 1) if f.Magnitude > 0.05 then front = f.Unit end end local dir = (front + front:Cross(Vector3.yAxis) * 0.25 + Vector3.yAxis * 0.25).Unit
 	camera.CFrame = CFrame.lookAt(cf.Position + dir * distance, cf.Position)
 	camera.Parent = vp
 	vp.CurrentCamera = camera

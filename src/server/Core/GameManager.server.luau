@@ -41,6 +41,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Welt und Darstellung
 	{ name = "MapService",              module = ServerScriptService.Services.MapService },
 	{ name = "PlotDisplayService",      module = ServerScriptService.Services.PlotDisplayService },
+	-- Welt aufwerten, Paket G: grosse Momente eines Spielers an alle melden
+	{ name = "WorldMomentService",      module = ServerScriptService.Services.WorldMomentService },
 	{ name = "BaerchiAutopilotService", module = ServerScriptService.Services.BaerchiAutopilotService },
 
 	-- Insel, Honig, Eier
@@ -53,6 +55,7 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Sammel-Update 05.10.: Inkubator (Paket 8), Index-Belohnungen (Paket 7),
 	-- besondere Meilensteine (Paket 6.2)
 	{ name = "IncubatorService",        module = ServerScriptService.Services.IncubatorService },
+	{ name = "GiftService",             module = ServerScriptService.Services.GiftService },
 	{ name = "IndexRewardService",      module = ServerScriptService.Services.IndexRewardService },
 	{ name = "SpecialMilestoneService", module = ServerScriptService.Services.SpecialMilestoneService },
 
@@ -62,6 +65,9 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "PetModeService",  module = ServerScriptService.Services.PetModeService },
 	-- v15: Tower-Fortschritt (ersetzt das PIT-Level)
 	{ name = "TowerService",    module = ServerScriptService.Services.TowerService },
+	-- 20.10. Final-Epilog (Prompt 1): Zustandsautomat nach Final 100. Die
+	-- Reihenfolge ist egal (TowerService ruft ihn nur zur Laufzeit auf).
+	{ name = "EpilogService",   module = ServerScriptService.Services.EpilogService },
 	{ name = "GamepassService", module = ServerScriptService.Services.GamepassService },   -- 08.10. Paket C
 
 	-- Events
@@ -77,6 +83,7 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	-- Baerchis veraendern
 	{ name = "FusionService",    module = ServerScriptService.Services.FusionService },
 	{ name = "RecycleService",   module = ServerScriptService.Services.RecycleService },
+	{ name = "PetSellService",   module = ServerScriptService.Services.PetSellService },   -- 19.10.: Verkaufsmodus
 	{ name = "PromotionService", module = ServerScriptService.Services.PromotionService },
 	{ name = "CharmService",     module = ServerScriptService.Services.CharmService },
 	{ name = "RebirthService",   module = ServerScriptService.Services.RebirthService },

@@ -97,15 +97,68 @@ local FLAGS: { [string]: boolean } = {
 	-- wieder sofort auf (kein Brueten von Eiern mehr). Aus = Ei-Inkubator wie
 	-- im Sammel-Update.
 	INCUBATOR_BREED   = true,
+	-- Welt aufwerten (08.10.2026), je Paket ein Schalter. Reine Client-Optik.
+	-- Paket A (Tageslauf) haengt am Schalter AmbienceConfig.DAY_CYCLE.
+	-- Bericht: claude/WELT_AUFGEWERTET_UMGESETZT_2026-10-09.md
+	WORLD_B_WATER     = true,   -- Glitzern, Schaum, Arena-Kueste, Fisch, Bojen
+	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
+	WORLD_D_PLOTS     = true,   -- Insel-Stufen, Teich-Glanz/Ueberlauf, eigene Insel, leere Inseln
+	WORLD_E_ARENA     = true,   -- Steg-Laternen, Torbogen, Zuschauer, Flagge am Schau-Turm
+	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
+	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
+	WORLD_H_SOUND     = true,   -- Klang-Kulisse nach Zonen (laeuft nur mit gepruefter Sound-ID)
+	WORLD_I_ZONES     = true,   -- Licht-Feinschliff nach Zonen (Insel / Arena / Turm)
 
 	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
 	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
 	-- begrenzt dann nichts mehr. Aus = alte Regel (STAGE_CAP_BY_REBIRTH).
 	TOWER_UNLOCK_BY_CLEAR = true,
+	-- 12.10. (Playtest): die Freischaltung gilt pro LEBEN. Ein Rebirth setzt
+	-- sie zurueck (towers.unlocked = { I }), gezaehlt wird die beste Stage
+	-- dieses Lebens (island.stageBest), nicht der Rekord. Sonst kaempft ein
+	-- Level-1-Baerchi direkt nach dem Rebirth in Tower II. Aus = Rekorde
+	-- oeffnen fuer immer (Stand 08.10.).
+	TOWER_UNLOCK_PER_LIFE = true,
+	-- 12.10. (Playtest): Fusion vorerst nur von der Karte des einzelnen
+	-- Baerchis ("Staerker machen"). Aus = kein "Fusion: an/aus"-Knopf in der
+	-- Sammlung; waehrend einer Fusions-Auswahl steht dort "Abbrechen".
+	FUSION_INVENTORY_TOGGLE = false,
 	-- 08.10.: Tower-Terminal an der Bruecke (Paket B2)
 	TOWER_TERMINAL    = true,
 	-- 08.10.: neues Tower-Panel im Look Theme.v2 (Paket D); aus = altes CombatPanel
 	TOWER_PANEL_V2    = true,
+
+	-- 13.10.: neue Mesh-Modelle (Waben, Recycler, Honig-Brunnen) aus
+	-- ReplicatedStorage.Assets. Aus = alte Parts-Optik aus den Buildern.
+	NEW_MODELS_V3     = true,
+
+	-- 14.10.: neues Honig-UI mit den eigenen Bildern (Menue-Knoepfe, Schliessen-
+	-- Knopf, Zahnrad, Quest-Fenster/-Leiste, Baerchi-Leiste). Aus = altes UI.
+	UI_HONEY_SKIN     = true,
+
+	-- 14.10.: fertige Ei-Modelle (GLB-Import, ReplicatedStorage.Assets.Eggs) fuer
+	-- gelegte Eier in der Welt. Aus = alter Look (EggMesh + Gurte/Steine).
+	-- Modelle und Zuordnung: Modules/EggModels.
+	EGG_MODELS_V1     = true,
+
+	-- R3 (16.10.): Baerchi-Baukasten (Looks: Fellfarbe, Muster, Zubehoer an Andockpunkten).
+	-- Aus = heutiger Look (Rarity-Faerbung). Daten: Config/BaerchiLooks.
+	BAERCHI_KIT_V1    = false,
+
+	-- 19.10.: Pet-Limit (Config/PetLimitConfig): bei vollem Baerchi-Lager lassen
+	-- sich keine Eier mehr oeffnen. Aus = unbegrenzt wie vorher.
+	PET_LIMIT_V1      = true,
+	-- 19.10.: Verkaufsmodus im Baerchis-Menue (markieren, bestaetigen, loeschen).
+	-- Aus = kein Knopf, der Server lehnt RequestSellBaerchis ab.
+	PET_SELL_MODE_V1  = true,
+
+	-- 20.10. (Final-Epilog, Prompt 1): Sieg ueber Final 100 speichert Endless
+	-- und epilog.state = "pending" atomar, startet die Sequenz (EpilogStart) und
+	-- haelt die Endless-Meldung zurueck. Aus = Verhalten wie vor dem Epilog
+	-- (die Daten-Migration v18 laeuft trotzdem, sie aendert kein Verhalten).
+	-- Bleibt AUS, bis Prompt 2-7 stehen; in Studio: D:Invoke("epilog","on").
+	-- Bericht: docs/HBB_EPILOG_P1_2026-10-20.md
+	FINAL_EPILOG      = false,
 }
 
 local FeatureFlags = {}

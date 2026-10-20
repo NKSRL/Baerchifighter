@@ -19,6 +19,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
+local GuiService        = game:GetService("GuiService")
 local FeatureFlags      = require(ReplicatedStorage.Config.FeatureFlags)
 
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
@@ -41,9 +42,15 @@ local Unlock          = require(script.Parent.Unlock)
 
 local PetBar = {}
 
-local BUTTON_WIDTH  = 210
-local BUTTON_HEIGHT = 68    -- Mindesthoehe 56 px fuer Touch
+-- 14.10. (UI_HONEY_SKIN): Fight- und Event-Knopf sind Bilder (inaktiv/aktiv), Text daneben
+local HONEY = FeatureFlags.isOn("UI_HONEY_SKIN") and Icons.hasUi("honey/fight_btn") and Icons.hasUi("honey/event_btn")
+local ART   = 104
+local BUTTON_WIDTH  = if HONEY then 124 else 210
+local BUTTON_HEIGHT = if HONEY then 112 else 68    -- Mindesthoehe 56 px fuer Touch (Honig: Bild + ein Wort darunter)
 local GAP           = 14
+local BAR_MARGIN    = 14    -- Abstand der Leiste zum unteren Rand
+local WINDOW_GAP    = 10    -- R1: Luft zwischen Fenster-Unterkante und Leiste
+local TAP_GUARD_PAD = 6     -- R1: Pixel um die Leiste, die nie "ausserhalb" sind
 
 local EVENT_COLOR = Color3.fromRGB(120, 190, 255)
 local FIGHT_COLOR = Color3.fromRGB(255,  96,  96)
@@ -149,6 +156,14 @@ local function paint(view: ButtonView, title: string, sub: string, mode: "normal
 	view.title.Text = title
 	view.sub.Text   = sub
 
+	local art = view.button:FindFirstChild("Art")
+	if art and art:IsA("ImageLabel") then
+		local key = art:GetAttribute("Key") :: string
+		art.Image = Icons.ui(if mode == "active" or mode == "waiting" then key .. "_active" else key) or art.Image
+		art.ImageColor3 = if mode == "disabled" then Color3.fromRGB(150, 150, 150) else Color3.new(1, 1, 1)
+		view.title.TextTransparency = if mode == "disabled" then 0.35 else 0
+	end
+
 	if mode == "disabled" then
 		view.button.Active           = false
 		view.button.AutoButtonColor  = false
@@ -199,6 +214,7 @@ local function setEventIcon(view: ButtonView, eventId: string?)
 	icon.Position    = old.Position
 	icon.Size        = old.Size
 	icon.ZIndex      = old.ZIndex
+	icon.Visible     = old.Visible
 	old:Destroy()
 	view.icon = icon
 end
@@ -240,7 +256,11 @@ local function refresh()
 		-- HBB Paket 6: Icon des kommenden bzw. laufenden Events + Restzeit,
 		-- keine Woerter.
 		setEventIcon(event, _eventId or _nextEventId)
-		paint(event, clock(_phaseEndsAt - os.clock()), bossLine(), "normal")
+		if HONEY then
+			paint(event, eventTitle, "", "normal")
+		else
+			paint(event, clock(_phaseEndsAt - os.clock()), bossLine(), "normal")
+		end
 	else
 		paint(event, eventTitle, eventLine(), "normal")
 	end
@@ -342,12 +362,34 @@ end
 -- Aufbau
 --------------------------------------------------------------------------------
 
-local function buildButton(parent: Instance, name: string, color: Color3, order: number, onClick: () -> (), iconName: string, fallback: string): ButtonView
+local function buildButton(parent: Instance, name: string, color: Color3, order: number, onClick: () -> (), iconName: string, fallback: string, honeyKey: string?): ButtonView
 	local button = Theme.bigButton(name, parent, "", color)
 	button.Size        = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT)
 	button.LayoutOrder = order
 
 	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
+	local honeyOn = HONEY and honeyKey ~= nil
+	if honeyOn then
+		-- fertiges Bild statt Farbflaeche: Rahmen, Verlauf, Ecken weg; paint() stellt nur noch das Bild um
+		button.BackgroundTransparency = 1
+		for _, child in button:GetChildren() do
+			if child:IsA("UIStroke") or child:IsA("UIGradient") or child:IsA("UICorner") or child:IsA("GuiObject") then child:Destroy() end
+		end
+		stroke = Instance.new("UIStroke")   -- Platzhalter (ohne Parent), paint() darf darauf schreiben
+		local art = Instance.new("ImageLabel")
+		art.Name = "Art"
+		art.BackgroundTransparency = 1
+		art.BorderSizePixel = 0
+		art.Image = Icons.ui(honeyKey :: string) or ""
+		art:SetAttribute("Key", honeyKey)
+		art.ScaleType = Enum.ScaleType.Fit
+		art.AnchorPoint = Vector2.new(0.5, 0)
+		art.Position = UDim2.fromScale(0.5, 0)
+		art.Size = UDim2.fromOffset(ART, ART)
+		art.ZIndex = 3
+		art.Active = false
+		art.Parent = button
+	end
 
 	-- Icon links, ragt oben ueber den Knopf hinaus
 	local icon = Icons.make(button, iconName, fallback)
@@ -355,6 +397,7 @@ local function buildButton(parent: Instance, name: string, color: Color3, order:
 	icon.Position    = UDim2.new(0, 6, 0.5, -6)
 	icon.Size        = UDim2.fromOffset(60, 60)
 	icon.ZIndex      = 4
+	if honeyOn then icon.Visible = false end
 
 	-- Beschriftung setzt refresh() (in der Spielersprache); `name` ist nur der Instanz-Name
 	local title = Theme.label("Title", button, "")
@@ -373,6 +416,15 @@ local function buildButton(parent: Instance, name: string, color: Color3, order:
 	sub.Font           = Theme.FONT_BODY
 	sub.TextColor3     = Theme.COLORS.outline
 	sub.TextTruncate   = Enum.TextTruncate.AtEnd
+	if honeyOn then
+		-- Text steht frei neben dem Bild: weiss mit dunkler Kontur
+		-- Das Bild IST der Knopf; darunter nur ein Wort (kein Timer, kein Boss, keine HP)
+		title.Position = UDim2.new(0, 0, 0, ART - 18)
+		title.Size     = UDim2.new(1, 0, 0, 22)
+		title.TextColor3 = Color3.new(1, 1, 1)
+		title.ZIndex = 4
+		sub.Visible = false
+	end
 
 	button.Activated:Connect(function()
 		if not button.Active then return end
@@ -385,7 +437,7 @@ end
 function PetBar.init(screenGui: ScreenGui)
 	local bar = Theme.container("PetBar", screenGui)
 	bar.AnchorPoint = Vector2.new(0.5, 1)
-	bar.Position    = UDim2.new(0.5, 0, 1, -14)
+	bar.Position    = UDim2.new(0.5, 0, 1, -BAR_MARGIN)
 	bar.Size        = UDim2.fromOffset(BUTTON_WIDTH * 2 + GAP, BUTTON_HEIGHT)
 	bar.ZIndex      = 5
 
@@ -399,21 +451,34 @@ function PetBar.init(screenGui: ScreenGui)
 	local function rescale()
 		local zone = TouchSafeArea.zone(screenGui)
 		if zone then
-			bar.Position = UDim2.new(0, zone.center, 1, -14)
+			bar.Position = UDim2.new(0, zone.center, 1, -BAR_MARGIN)
 			scale.Scale  = math.clamp(zone.width / barWidth, 0.5, 1)
 		else
 			local width = UiScale.toGui(screenGui.AbsoluteSize.X)
-			bar.Position = UDim2.new(0.5, 0, 1, -14)
+			bar.Position = UDim2.new(0.5, 0, 1, -BAR_MARGIN)
 			scale.Scale  = math.clamp((width - 32) / barWidth, 0.6, 1)
 		end
+		-- R1: den Fenstern sagen, wie viel Hoehe unten belegt ist (Rand + Leiste
+		-- + Luft), damit sie oberhalb zentriert werden und Event/Fight frei bleiben.
+		PanelManager.setBottomReserve(BAR_MARGIN + BUTTON_HEIGHT * scale.Scale + WINDOW_GAP)
 	end
 	TouchSafeArea.watch(screenGui, rescale)
+	UiScale.onChanged(rescale)
+
+	-- R1: ein Tipp auf die Leiste (auch zwischen den Knoepfen) zaehlt nie als
+	-- "ausserhalb" und schliesst das offene Fenster nicht.
+	PanelManager.addTapGuard(function(point: Vector2): boolean
+		local inset = GuiService:GetGuiInset()
+		local pos, size = bar.AbsolutePosition + inset, bar.AbsoluteSize
+		return point.X >= pos.X - TAP_GUARD_PAD and point.X <= pos.X + size.X + TAP_GUARD_PAD
+			and point.Y >= pos.Y - TAP_GUARD_PAD and point.Y <= pos.Y + size.Y + TAP_GUARD_PAD
+	end)
 
 	local layout = Theme.listLayout(bar, GAP, true)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO")
-	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X")
+	_event = buildButton(bar, "Event", EVENT_COLOR, 1, onEventClicked, "ufo", "UFO", "honey/event_btn")
+	_fight = buildButton(bar, "Fight", FIGHT_COLOR, 2, onFightClicked, "swords", "X", "honey/fight_btn")
 
 	-- Sammel-Update 05.10. (Paket 4.3): Tempo-Knopf ueber dem Fight-Knopf,
 	-- nur waehrend der Baerchi im Tower kaempft. Ein Tipp schaltet
@@ -446,6 +511,7 @@ function PetBar.init(screenGui: ScreenGui)
 	towerTap.Position = UDim2.new(1, 0, 1, 0)
 	towerTap.Size = UDim2.new(1, -64, 0, 30)
 	towerTap.ZIndex = 7
+	towerTap.Visible = not HONEY   -- Honig: unter dem Bild steht nur ein Wort, kein Tower-Name
 	towerTap.Parent = _fight.button
 	towerTap.Activated:Connect(function()
 		if _state == "ToPit" or _state == "InPit" then

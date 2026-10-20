@@ -45,6 +45,15 @@ function ActivityLock.forceAcquire(player: Player, holder: string)
 	_owner[player] = holder
 end
 
+-- Nimmt das Schloss dem aktuellen Halter weg, ohne es selbst zu halten.
+-- Fuer Befehle, die die Figur sofort freigeben muessen (Ausruesten waehrend
+-- eines Wegs, Umlenken): der alte Halter bemerkt den Verlust ueber sein
+-- isCancelled (owner ~= holder) und raeumt selbst auf. Sein spaeteres
+-- release() ist wirkungslos, weil es nur den eigenen Namen freigibt.
+function ActivityLock.forceRelease(player: Player)
+	_owner[player] = nil
+end
+
 -- Gibt das Schloss frei — aber nur wenn `holder` es tatsaechlich noch haelt.
 function ActivityLock.release(player: Player, holder: string)
 	if _owner[player] == holder then

@@ -29,7 +29,7 @@ export type TreeInput = {
 }
 
 export type Condition = {
-	kind  : string,         -- "hatch" | "hatchAny" | "index" | "rebirth" | "blueprint"
+	kind  : string,         -- "hatch" | "hatchAny" | "index" | "rebirth" | "blueprint" | "keyPet"
 	egg   : Types.EggType?, -- bei hatch
 	rarity: Types.Rarity?,  -- bei index
 	have  : number,
@@ -38,6 +38,8 @@ export type Condition = {
 	-- nur bei hatchAny: die einzelnen Eier
 	parts : { { egg: Types.EggType, have: number, need: number, done: boolean } }?,
 	needParts : number?,
+	-- nur bei keyPet: die Schluessel-Pets und ob sie entdeckt sind
+	pets      : { { id: string, done: boolean } }?,
 }
 
 export type NodeProgress = {
@@ -114,6 +116,21 @@ function EggTree.getProgress(input: TreeInput, eggType: Types.EggType): NodeProg
 	local conditions: { Condition } = {}
 
 	if not node.start then
+		-- Balance 15.10.: Schluessel-Pet gezogen = Ei frei (statt Hatch-Zaehler + Index).
+		if node.keyPets and not bypassed then
+			local pets, doneCount = {}, 0
+			for _, id in node.keyPets do
+				local done = input.discovered ~= nil and input.discovered[id] == true
+				if done then doneCount += 1 end
+				table.insert(pets, { id = id, done = done })
+			end
+			local need = node.keyNeed or 1
+			table.insert(conditions, {
+				kind = "keyPet", have = math.min(doneCount, need), need = need,
+				done = doneCount >= need, pets = pets,
+			})
+		end
+
 		if node.hatch and not bypassed then
 			for _, req in node.hatch do
 				local have = hatchedOf(state, req.egg)
@@ -124,7 +141,7 @@ function EggTree.getProgress(input: TreeInput, eggType: Types.EggType): NodeProg
 			end
 		end
 
-		if node.hatchAnyOf and not bypassed then
+		if node.hatchAnyOf and not node.keyPets and not bypassed then
 			local parts = {}
 			local doneCount = 0
 			for _, req in node.hatchAnyOf.of do
@@ -206,7 +223,7 @@ function EggTree.canUseBlueprint(input: TreeInput, eggType: Types.EggType): bool
 	local node = EggConfig.TREE[eggType]
 	local egg = EggConfig.data[eggType]
 	if not node or not egg or node.start then return false end
-	if not node.hatch and not node.hatchAnyOf then return false end
+	if not node.hatch and not node.hatchAnyOf and not node.keyPets then return false end
 	if egg.parent then
 		return state.unlocked[egg.parent] == true
 	end

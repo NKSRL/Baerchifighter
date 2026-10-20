@@ -58,6 +58,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MapConfig = require(ReplicatedStorage.Config.MapConfig)
 local Types      = require(ReplicatedStorage.Network.Types)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)   -- R3
+local BaerchiLooks = require(ReplicatedStorage.Config.BaerchiLooks)   -- R3
 
 local BaerchiMesh = {}
 
@@ -77,6 +79,34 @@ local FUR_PART_NAMES: { [string]: boolean } = {
 	leg_left  = true,
 	leg_right = true,
 }
+
+-- Einzelmodelle (ReplicatedStorage.Assets.BaerchiModels, Zuordnung in Config.BaerchiModels)
+local function isFurName(n: string): boolean
+	return string.sub(n, -5) == '_body' or string.sub(n, -5) == '_ears' or string.sub(n, -5) == '_feet' or string.sub(n, -10) == '_cute_tail'
+end
+local function findBodyPart(model: Model): BasePart?
+	for _, d in model:GetDescendants() do
+		if d:IsA('BasePart') and string.sub(d.Name, -5) == '_body' then return d end
+	end
+	return nil
+end
+local _byId: { [string]: Model } = {}
+local function resolveById(id: string?): Model?
+	if not id then return nil end
+	local cached = _byId[id]
+	if cached then return cached end
+	local cfg = ReplicatedStorage:FindFirstChild('Config')
+	local mod = cfg and cfg:FindFirstChild('BaerchiModels')
+	if not (mod and mod:IsA('ModuleScript')) then return nil end
+	local ok, data = pcall(require, mod)
+	if not ok or type(data) ~= 'table' then return nil end
+	local name = (data :: any).MODEL_BY_ID[id]
+	local assets = ReplicatedStorage:FindFirstChild('Assets')
+	local folder = assets and assets:FindFirstChild('BaerchiModels')
+	local m = name and folder and folder:FindFirstChild(name)
+	if m and m:IsA('Model') then _byId[id] = m return m end
+	return nil
+end
 
 type Resolved = { model: Model, isDedicated: boolean }
 local _resolved: { [string]: Resolved } = {}
@@ -132,7 +162,7 @@ local function cloneAndPrepare(template: Model, furColor: Color3?): Model
 			-- solide Baerchi-Figuren (z.B. eigener Baerchi und PIT-Gegner)
 			-- koennen sich deshalb trotzdem ueberlappend positionieren, ohne
 			-- dass sich beide gegenseitig wegschieben.
-			descendant.CanCollide = true
+			descendant.CanCollide = not (string.find(descendant.Name, "_acc_", 1, true) or string.find(descendant.Name, "_cute_", 1, true))
 
 			if furColor and FUR_PART_NAMES[descendant.Name] then
 				descendant.Color = furColor
@@ -144,9 +174,30 @@ local function cloneAndPrepare(template: Model, furColor: Color3?): Model
 	-- zusaetzliche Zwischen-Gruppe (z.B. "blocky_bear_pet"), "body" ist also
 	-- meist kein direktes Kind des Root-Models.
 	if not model.PrimaryPart then
-		local body = model:FindFirstChild("body", true)
+		local body = model:FindFirstChild("body", true) or findBodyPart(model)
 		if body and body:IsA("BasePart") then
+			-- 20.10. (Pivot-Fix): Das Model-Pivot der importierten Figuren ist
+			-- korrekt (aufrecht, Blick -Z). Wird der body zum PrimaryPart, gilt aber
+			-- body.CFrame * body.PivotOffset, und das ist bei diesen Importen um 90 Grad
+			-- gekippt: FigurePlacement.place (setzt die Drehung absolut) stellte die Figur
+			-- dann auf das Gesicht, z. B. nach dem Trinken am Brunnen. Darum den
+			-- bisherigen Pivot ueber den PivotOffset des body erhalten.
+			local pivotBefore = model:GetPivot()
 			model.PrimaryPart = body
+			body.PivotOffset = body.CFrame:ToObjectSpace(pivotBefore)
+		end
+	end
+
+	-- Blickrichtung (10.10.2026): Alle Lauf- und Kampf-Bewegungen drehen die
+	-- Figur ueber ihren Pivot (FigurePlacement/FigureWalker: -Z = vorwaerts).
+	-- Liegt die Schnauze eines importierten Modells hinter dem Pivot (+Z),
+	-- liefe jede Figur rueckwaerts. Dann den Pivot um 180 Grad drehen —
+	-- die Teile selbst bleiben, wo sie sind.
+	local face = model:FindFirstChild("snout", true) or model:FindFirstChild("nose", true)
+	local primary = model.PrimaryPart
+	if face and face:IsA("BasePart") and primary then
+		if model:GetPivot():PointToObjectSpace(face.Position).Z > 0 then
+			primary.PivotOffset = primary.PivotOffset * CFrame.Angles(0, math.pi, 0)
 		end
 	end
 
@@ -212,9 +263,60 @@ end
 -- Mutation auch ueber ein eigenes Modell hinweg.
 local function markMutation(model: Model, mutationColor: Color3)
 	for _, descendant in model:GetDescendants() do
-		if descendant:IsA("BasePart") and FUR_PART_NAMES[descendant.Name] then
+		if descendant:IsA("BasePart") and (FUR_PART_NAMES[descendant.Name] or isFurName(descendant.Name)) then
 			descendant.Color    = mutationColor
 			descendant.Material = Enum.Material.Neon
+		end
+	end
+end
+
+-- R3 (Baerchi-Baukasten): wendet den Look einer Baerchi-ID auf die geklonte Figur
+-- an — Fellfarbe, Muster (Textur auf dem Koerper) und Zubehoer an den
+-- Andockpunkten ("Slot_<Name>"-Attachments am Koerper). `rel` = Massstab der
+-- Figur gegenueber dem Template (Zubehoer ist fuer Massstab 1 gebaut).
+-- Mutation faerbt nur Fell/Koerper (markMutation); Zubehoer behaelt seine
+-- Farbe, bekommt bei einer Mutation aber Neon als Akzent.
+local function applyLook(model: Model, configId: string, rel: number, mutated: boolean)
+	local look = BaerchiLooks.get(configId)
+	if not look then return end   -- kein Eintrag: Rueckfall auf die Rarity-Faerbung
+
+	local body = model.PrimaryPart
+	if not body then return end
+
+	if look.furColor then
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and FUR_PART_NAMES[d.Name] then
+				d.Color = look.furColor
+			end
+		end
+	end
+
+	local pattern = if look.pattern then BaerchiLooks.PATTERNS[look.pattern] else nil
+	if pattern and pattern.texture ~= "" and body:IsA("MeshPart") then
+		body.TextureID = pattern.texture
+	end
+
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local folder = assets and assets:FindFirstChild("Accessories")
+	if not folder then return end
+	for slot, accId in look.accessories or {} do
+		local def = BaerchiLooks.ACCESSORIES[accId]
+		local template = folder:FindFirstChild(accId)
+		local attachment = model:FindFirstChild("Slot_" .. slot, true)
+		if def and template and template:IsA("Model") and attachment and attachment:IsA("Attachment") then
+			local acc = template:Clone()
+			acc.Name = "Zubehoer_" .. slot
+			acc:ScaleTo(acc:GetScale() * (def.scale or 1) * rel)
+			acc:PivotTo(attachment.WorldCFrame * CFrame.new((def.offset or Vector3.zero) * rel))
+			for _, d in acc:GetDescendants() do
+				if d:IsA("BasePart") then
+					d.Anchored, d.CanCollide, d.CanTouch, d.CanQuery, d.CastShadow = true, false, false, false, false
+					if mutated and not d.Name:find("Outline") then
+						d.Material = Enum.Material.Neon
+					end
+				end
+			end
+			acc.Parent = model
 		end
 	end
 end
@@ -231,8 +333,17 @@ function BaerchiMesh.build(
 	footPos: Vector3,
 	rarityColor: Color3,
 	rarity: Types.Rarity,
-	mutationColor: Color3?
+	mutationColor: Color3?,
+	configId: string?   -- R3: Baerchi-ID fuer den Look (nil = kein Look)
 ): Model?
+	local own = resolveById(configId)
+	if own then
+		local ownModel = cloneAndPrepare(own, nil)
+		ownModel:ScaleTo(ownModel:GetScale() * BAERCHI_SCALE)
+		if mutationColor then markMutation(ownModel, mutationColor) end
+		standOn(ownModel, footPos)
+		return ownModel
+	end
 	local template, isDedicated = resolveTemplate(rarity)
 	if not template then
 		if not _warnedMissing[rarity] then
@@ -247,7 +358,15 @@ function BaerchiMesh.build(
 	end
 
 	local model = cloneAndPrepare(template, if isDedicated then nil else rarityColor)
+	local templateScale = template:GetScale()
 	model:ScaleTo(model:GetScale() * BAERCHI_SCALE)   -- relativ: das Template traegt schon einen eigenen Massstab
+
+	if configId and FeatureFlags.isOn("BAERCHI_KIT_V1") then
+		local ok, err = pcall(applyLook, model, configId, model:GetScale() / math.max(templateScale, 1e-4), mutationColor ~= nil)
+		if not ok then
+			warn("[BaerchiMesh] Look fehlgeschlagen:", configId, err)
+		end
+	end
 
 	if mutationColor then
 		markMutation(model, mutationColor)
@@ -255,6 +374,22 @@ function BaerchiMesh.build(
 
 	standOn(model, footPos)
 
+	return model
+end
+
+-- Baut die Figur eines bestimmten Baerchi: nimmt sein eigenes Modell aus
+-- Assets.BaerchiModels (Config.BaerchiModels), sonst wie bisher build().
+function BaerchiMesh.buildFor(baerchiId: string?, footPos: Vector3, rarityColor: Color3, rarity: Types.Rarity, mutationColor: Color3?): Model?
+	local template = resolveById(baerchiId)
+	if not template then
+		return BaerchiMesh.build(footPos, rarityColor, rarity, mutationColor, baerchiId)
+	end
+	local model = cloneAndPrepare(template, nil)
+	model:ScaleTo(model:GetScale() * BAERCHI_SCALE)
+	if mutationColor then
+		markMutation(model, mutationColor)
+	end
+	standOn(model, footPos)
 	return model
 end
 

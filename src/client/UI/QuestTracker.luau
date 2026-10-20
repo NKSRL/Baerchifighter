@@ -178,7 +178,7 @@ end
 
 function QuestTracker.init(screenGui: ScreenGui)
 	local card = Theme.panel("QuestTracker", screenGui, Theme.COLORS.panelDeep)
-	card.Position = UDim2.new(0.012, 12, 0, 148)
+	card.Position = UDim2.new(0.012, 12, 0, 148 + ((require(game:GetService("ReplicatedStorage").Config.FeatureFlags).isOn("UI_HONEY_SKIN") and 129 or 106) - 106))
 	card.Size     = UDim2.new(0, CARD_W, 0, CARD_H)
 	card.ZIndex   = 2
 	_card = card

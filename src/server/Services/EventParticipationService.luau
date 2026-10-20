@@ -443,6 +443,74 @@ function EventParticipationService.recall(player: Player): boolean
 	return true
 end
 
+-- 19.10. Nachtrag: diese beiden Funktionen fehlten im Place, PetModeService ruft sie
+-- beim Ausruesten und Umlenken (das war der Grund, warum Ausruesten nichts tat).
+-- releaseFigure beendet SOFORT alles, was die Figur auf der Event-Seite tut
+-- (Teilnahme, Hin- und Rueckweg). Die Figur bleibt, wo sie steht. false = UFO.
+function EventParticipationService.releaseFigure(player: Player): boolean
+	local presence = _present[player]
+	if presence then
+		if presence.abducting then
+			fail(player, "RequestPetMode", Loc.msg("err.event_ufo"))
+			return false
+		end
+		presence.cancelWalk = true
+		_present[player] = nil
+		notifyPresence(player, false, presence.baerchiUid)
+	end
+	_recallPending[player] = nil
+	_cancelTo[player] = nil
+	_walking[player] = nil
+	_walkDir[player] = nil
+	ActivityLock.release(player, LOCK_HOLDER)
+	return true
+end
+
+-- walkHome: die ausgeruestete Figur laeuft von dort, wo sie steht, zum Heimplatz.
+function EventParticipationService.walkHome(player: Player)
+	if _present[player] or _walking[player] then
+		EventParticipationService.recall(player)
+		return
+	end
+	local data = PlayerService.getData(player)
+	local uid = if data then data.island.equippedUid else nil
+	if not uid then return end
+	local figure = MapService.getBaerchiModel(player, uid)
+	local homeFoot = MapService.getBaerchiHome(player)
+	if not figure or not homeFoot then return end
+	if (footPosOf(figure) - homeFoot).Magnitude < 1 then return end
+	if not ActivityLock.tryAcquire(player, LOCK_HOLDER) then return end
+
+	_walking[player] = true
+	_walkDir[player] = "back"
+	task.spawn(function()
+		local ok, err = pcall(function()
+			FigureFX.stopIdle(figure)
+			local function cancelled(): boolean
+				return ActivityLock.owner(player) ~= LOCK_HOLDER
+					or player.Parent == nil
+					or figure.Parent == nil
+			end
+			FigureWalker.walk(figure, footPosOf(figure), homeFoot, {
+				speed       = EVENT_WALK_SPEED,
+				isCancelled = cancelled,
+			})
+			if cancelled() then return end
+			FigurePlacement.place(figure, homeFoot, figure:GetPivot().Rotation)
+			FigureFX.idleBob(figure, {
+				height = MapConfig.IDLE_BOB_HEIGHT,
+				rate   = MapConfig.IDLE_BOB_RATE,
+			})
+		end)
+		_walking[player] = nil
+		_walkDir[player] = nil
+		ActivityLock.release(player, LOCK_HOLDER)
+		if not ok then
+			warn("[EventParticipationService] Heimweg fehlgeschlagen:", err)
+		end
+	end)
+end
+
 --------------------------------------------------------------------------------
 -- Belohnung am Event-Ende
 --------------------------------------------------------------------------------

@@ -28,6 +28,7 @@ local AudioController = require(script.Parent.Parent.Controllers.AudioController
 
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
+local PanelManager = require(script.Parent.PanelManager)   -- R1: zentraler Fensterbereich
 
 local Kit = {}
 
@@ -322,18 +323,20 @@ function Kit.window(name: string, screenGui: ScreenGui, options: WindowOptions):
 		local g = if global and global:IsA("UIScale") then math.max(global.Scale, 0.01) else 1
 		local screen = screenGui.AbsoluteSize / g
 		if screen.X <= 0 or screen.Y <= 0 then return end
-		local r = options.reserve(screen)
-		local roomX = screen.X - r.left - r.right
-		local roomY = screen.Y - r.top - r.bottom
+		-- R1: der zentrale Fensterbereich (PanelManager.getArea) ersetzt die
+		-- Einzel-Raender; `options.reserve` wird nicht mehr ausgewertet.
+		local area = PanelManager.getArea(screen)
+		local roomX, roomY = area.size.X, area.size.Y
 		local width = options.design.X
 		local height = math.clamp(roomY, options.minHeight, options.design.Y)
 		local scale = math.min(1, roomX / width, roomY / height)
 		root.Size = UDim2.fromOffset(width, height)
 		fit.Scale = scale
 		-- Mitte des freien Bereichs
-		root.Position = UDim2.fromOffset(r.left + roomX * 0.5, r.top + roomY * 0.5)
+		root.Position = UDim2.fromOffset(area.center.X, area.center.Y)
 		window.setSize(Vector2.new(width, height))
 	end
+	PanelManager.onAreaChanged(refit)
 	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
 	screenGui.ChildAdded:Connect(function(child)
 		if child.Name == "GlobalScale" and child:IsA("UIScale") then
@@ -457,6 +460,9 @@ function Kit.closeButton(window: Window, onClose: () -> ()): TextButton
 	hit.Text = ""
 	hit.ZIndex = 42
 	hit.Parent = button
+
+	-- 14.10. (UI_HONEY_SKIN): eigenes Kreuz-Bild statt Verlauf + Text
+	Icons.skinButton(button, "honey/close_btn")
 
 	Kit.pressable(button)
 	local function fire()

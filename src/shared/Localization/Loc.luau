@@ -221,9 +221,47 @@ end
 -- Zahlen
 --------------------------------------------------------------------------------
 
--- 1234567 → "1.234.567" (de/es), "1,234,567" (en), "1 234 567" (fr)
+-- 19.10.: Millionen werden ueberall als M gekuerzt (3600000 → "3,6M"), darueber B/T.
+-- Bis 999.999 bleibt alles ausgeschrieben. Die exakte Schreibweise gibt es weiter
+-- als Loc.formatExact (z.B. fuer Stellen, an denen jede Ziffer zaehlt).
+local COMPACT_STEPS = { { 1e12, "T" }, { 1e9, "B" }, { 1e6, "M" } }
+
 function Loc.formatNumber(value: number): string
-	local rounded = math.floor(value)
+	local rounded = math.floor(value + 1e-6)
+	local magnitude = math.abs(rounded)
+	if magnitude < 1e6 then
+		return Loc.formatExact(value)
+	end
+
+	for index, step in COMPACT_STEPS do
+		if magnitude >= step[1] then
+			local n = rounded / step[1]
+			local digits = if math.abs(n) >= 100 then 0 else 1
+			local factor = 10 ^ digits
+			local shown = math.floor(math.abs(n) * factor + 0.5) / factor
+			-- 999,96M rundet auf 1000M: dann gleich in die naechste Einheit (1B)
+			if shown >= 1000 and index > 1 then
+				step = COMPACT_STEPS[index - 1]
+				n = rounded / step[1]
+				digits = 1
+				shown = math.floor(math.abs(n) * 10 + 0.5) / 10
+			end
+			local text = Loc.formatDecimal(shown, digits)
+			-- "3,0M" → "3M" (nur wenn die Nachkommastelle eine Null ist)
+			if digits > 0 then
+				text = string.gsub(text, "[%.,]0$", "")
+			end
+			return (if rounded < 0 then "-" else "") .. text .. step[2]
+		end
+	end
+	return Loc.formatExact(value)
+end
+
+-- 1234567 → "1.234.567" (de/es), "1,234,567" (en), "1 234 567" (fr)
+function Loc.formatExact(value: number): string
+	-- Kleine Toleranz: 6129638.999999998 (Gleitkomma-Rest) soll 6.129.639 zeigen, nicht ...638;
+	-- 15708000.000000002 soll 15.708.000 bleiben.
+	local rounded = math.floor(value + 1e-6)
 	-- Schneller Pfad: die allermeisten Zahlen im UI sind kleiner als 1000
 	if rounded > -1000 and rounded < 1000 then
 		return tostring(rounded)
@@ -333,10 +371,9 @@ function resolveArg(value: any): string
 	if kind == "string" then
 		return value
 	elseif kind == "number" then
-		if value == math.floor(value) then
-			return Loc.formatNumber(value)
-		end
-		return tostring(value)
+		-- Nie Nachkommastellen im UI: auch 12.5 oder 1.0000000002 werden als Ganzzahl gezeigt
+		-- (Multiplikatoren nutzen ausdruecklich {x:d2} und kommen hier nicht vorbei).
+		return Loc.formatNumber(value)
 	elseif kind == "table" then
 		return Loc.resolve(value)
 	end

@@ -28,6 +28,7 @@ local Loc = require(ReplicatedStorage.Localization.Loc)
 
 local Theme           = require(script.Parent.Theme)
 local Icons           = require(script.Parent.Icons)
+local Kit             = require(script.Parent.Kit)   -- 12.10.: kurze Zahlen (4,8M)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
 local ClientState     = require(script.Parent.Parent.Controllers.ClientState)
 
@@ -37,6 +38,7 @@ FightStartPrompt.AUTO_SECONDS = 7
 
 local _root: Frame? = nil
 local _resume: TextButton? = nil
+local _resumeText: TextLabel? = nil   -- 12.10.: eigene Beschriftung (links)
 local _cost: TextLabel? = nil
 local _bar: Frame? = nil
 local _onChoose: ((PitResumeDialog.Choice) -> ())? = nil
@@ -73,11 +75,20 @@ function FightStartPrompt.open(onChoose: (PitResumeDialog.Choice) -> ()): boolea
 
 	local stage, price = PitResumeDialog.offer(data, "Last")
 	local pass = PitResumeDialog.hasSkipPass()
-	resume.Text = if pass
+	-- 12.10.: Preis kurz und hinter dem Text (vorher lag die lange Zahl
+	-- ueber dem Wort "weiter")
+	local label = _resumeText
+	local text = if pass
 		then Loc.t("ui.fight.resume_pass", { stage = stage })
-		else Loc.t("ui.fight.resume", { stage = stage })
-	cost.Text = if pass then "" else Theme.formatNumber(price)
-	Theme.setEnabled(resume, price <= data.gummies)
+		else "⏩ " .. Loc.t("ui.fight.resume", { stage = stage })
+	if label then label.Text = text end
+	cost.Text = if pass then "" else Kit.formatCompact(price)
+	local affordable = price <= data.gummies
+	Theme.setEnabled(resume, affordable)
+	-- Auch zu teuer bleibt die Schrift lesbar (nur etwas gedaempft); der
+	-- Preis wird rot, damit klar ist, warum der Knopf nicht geht.
+	if label then label.TextColor3 = if affordable then Theme.COLORS.text else Color3.fromRGB(205, 200, 215) end
+	cost.TextColor3 = if affordable then Theme.COLORS.text else Color3.fromRGB(255, 120, 120)
 	local coin = resume:FindFirstChild("Icon")
 	if coin and coin:IsA("GuiObject") then coin.Visible = not pass end
 
@@ -98,7 +109,11 @@ end
 function FightStartPrompt.init(screenGui: ScreenGui, anchorAbove: GuiObject)
 	local root = Theme.panel("FightStartPrompt", screenGui, Theme.COLORS.panelDeep)
 	root.AnchorPoint = Vector2.new(0.5, 1)
-	root.Size = UDim2.fromOffset(300, 104)
+	-- 12.10. (Playtest "unter dem Start-Knopf liegt ein Knopf, den man nicht
+	-- erkennt"): drei klare Zeilen statt Knopf + Balken nebeneinander —
+	-- gruener Gratis-Start, darunter der bezahlte Einstieg ueber die ganze
+	-- Breite (Text links, Preis rechts, nichts ueberlappt), unten der Balken.
+	root.Size = UDim2.fromOffset(320, 126)
 	root.Visible = false
 	root.ZIndex = 6
 	_root = root
@@ -130,32 +145,39 @@ function FightStartPrompt.init(screenGui: ScreenGui, anchorAbove: GuiObject)
 	Loc.bind(fresh, "ui.fight.fresh_free")
 	fresh.Activated:Connect(function() finish("Fresh") end)
 
-	-- Sekundaer: der bezahlte Einstieg (klein, gedaempft, kein Glanz)
+	-- Sekundaer: der bezahlte Einstieg (ganze Breite, ruhiger, kein Glanz)
 	local resume = Theme.button("Resume", root, "", Theme.COLORS.panelLight)
 	resume.Position = UDim2.new(0, 8, 0, 62)
-	resume.Size = UDim2.new(0.62, 0, 0, 30)
+	resume.Size = UDim2.new(1, -16, 0, 40)
 	resume.TextColor3 = Theme.COLORS.text
-	resume.TextXAlignment = Enum.TextXAlignment.Left
 	local shine = resume:FindFirstChild("Shine")
 	if shine then shine:Destroy() end
-	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 8)
-	pad.PaddingRight = UDim.new(0, 64)
-	pad.Parent = resume
+	-- Beschriftung als eigenes Feld links, Preis rechts: feste Bereiche statt
+	-- einer Polsterung, ueber die Preis und Text sich nicht ueberlappen koennen
+	local resumeText = Theme.label("Text", resume, "")
+	resumeText.AnchorPoint = Vector2.new(0, 0.5)
+	resumeText.Position = UDim2.new(0, 10, 0.5, 0)
+	resumeText.Size = UDim2.new(1, -110, 0, 26)
+	resumeText.TextXAlignment = Enum.TextXAlignment.Left
+	resumeText.TextScaled = true
+	Theme.outlineText(resumeText, 2)
+	_resumeText = resumeText
 	resume.Activated:Connect(function()
 		if resume.Active then finish("Last") end
 	end)
 	_resume = resume
 
-	-- Kosten rechts im Knopf: Gummi-Icon + Zahl
+	-- Kosten rechts im Knopf: Zahl + Gummi-Icon
 	local coin = Icons.make(resume, "gummy", "G")
 	coin.AnchorPoint = Vector2.new(1, 0.5)
-	coin.Position = UDim2.new(1, 62, 0.5, 0)
-	coin.Size = UDim2.fromOffset(20, 20)
+	coin.Position = UDim2.new(1, -8, 0.5, 0)
+	coin.Size = UDim2.fromOffset(24, 24)
 	local cost = Theme.label("Cost", resume, "")
 	cost.AnchorPoint = Vector2.new(1, 0.5)
-	cost.Position = UDim2.new(1, 40, 0.5, 0)
-	cost.Size = UDim2.fromOffset(44, 20)
+	cost.Position = UDim2.new(1, -36, 0.5, 0)
+	cost.Size = UDim2.fromOffset(58, 24)
+	cost.TextXAlignment = Enum.TextXAlignment.Right
+	Theme.outlineText(cost, 2)
 	_cost = cost
 
 	-- Ablaufbalken: zeigt, dass es gleich von selbst bei Stage 1 losgeht
@@ -163,16 +185,16 @@ function FightStartPrompt.init(screenGui: ScreenGui, anchorAbove: GuiObject)
 	track.Name = "Timer"
 	track.BackgroundColor3 = Theme.COLORS.panelLight
 	track.BorderSizePixel = 0
-	track.Position = UDim2.new(0.62, 16, 0, 72)
-	track.Size = UDim2.new(0.38, -24, 0, 10)
+	track.Position = UDim2.new(0, 12, 0, 110)
+	track.Size = UDim2.new(1, -24, 0, 8)
 	track.Parent = root
-	Theme.corner(track, 5)
+	Theme.corner(track, 4)
 	local bar = Instance.new("Frame")
 	bar.BackgroundColor3 = Theme.COLORS.good
 	bar.BorderSizePixel = 0
 	bar.Size = UDim2.fromScale(1, 1)
 	bar.Parent = track
-	Theme.corner(bar, 5)
+	Theme.corner(bar, 4)
 	_bar = bar
 
 	RunService.RenderStepped:Connect(function()

@@ -19,6 +19,7 @@ local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local Loc          = require(ReplicatedStorage.Localization.Loc)
 
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
 local TouchSafeArea = require(script.Parent.TouchSafeArea)
 
 local HomeButton = {}
@@ -34,6 +35,12 @@ function HomeButton.init(screenGui: ScreenGui)
 	Loc.bind(button, "ui.home.button")
 	button.AnchorPoint = Vector2.new(0, 1)
 	button.Size        = UDim2.fromOffset(SIZE.X, SIZE.Y)
+	-- 14.10. (UI_HONEY_SKIN): fertige rosa Baer-Leiste statt Farbknopf
+	local word = Icons.skinLabelButton(button, "honey/res_bar_pink", Loc.t("ui.home.button"))
+	if word then
+		button.Size = UDim2.fromOffset(200, 48)
+		Loc.bind(word, "ui.home.button")
+	end
 
 	-- Am PC unten links. Auf Touch-Geraeten liegt dort der Bewegungs-Stick
 	-- (Playtest 07.10.) — dann im freien Streifen (TouchSafeArea) ueber der

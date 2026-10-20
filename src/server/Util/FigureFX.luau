@@ -567,6 +567,42 @@ function FigureFX.clash(attacker: Model, target: Model?, attackerHome: Vector3, 
 	if resumeB then resumeB() end
 end
 
+-- Rueckstoss ohne Anlauf: der Getroffene fliegt von `fromPosition` weg nach
+-- hinten (kleiner Huepfer, nach hinten gekippt) und trottet zurueck.
+-- Fuer Faehigkeiten mit Show: die Show IST der Angriff, der Angreifer rennt
+-- nicht mehr los — nur der Treffer kommt im Einschlag-Moment an.
+-- Gleiche Anteile wie der Rueckstoss-Teil von `clash`, damit es gleich wirkt.
+-- Blockiert bis die Bewegung durch ist.
+local RECOIL_PUSH_END = 0.38
+
+function FigureFX.recoil(target: Model, home: Vector3, fromPosition: Vector3, knockback: number, hop: number, seconds: number)
+	local resume = takeOver(target)
+	local facing = target:GetPivot().Rotation
+
+	local flat = Vector3.new(home.X - fromPosition.X, 0, home.Z - fromPosition.Z)
+	local dir = if flat.Magnitude > EPSILON then flat.Unit else -facing.LookVector
+	local pushed = home + dir * knockback
+	local stepHop = hop * CLASH_STEP_HOP
+
+	animate(target, seconds, function(t)
+		if target.Parent == nil then return end
+		if t < RECOIL_PUSH_END then
+			local k = t / RECOIL_PUSH_END
+			local ease = 1 - (1 - k) * (1 - k)
+			local lift = math.sin(k * math.pi) * hop * CLASH_RECOIL_HOP
+			placeLeaning(target, home:Lerp(pushed, ease), lift, facing, -CLASH_LEAN_DEGREES * math.sin(k * math.pi))
+		else
+			local k = (t - RECOIL_PUSH_END) / (1 - RECOIL_PUSH_END)
+			placeLeaning(target, pushed:Lerp(home, smooth(k)), stepLift(k, CLASH_BACK_STEPS - 1, stepHop * 0.5), facing, 0)
+		end
+	end)
+
+	if target.Parent ~= nil then
+		FigurePlacement.place(target, home, facing)
+	end
+	if resume then resume() end
+end
+
 -- Taumeln (betaeubt): die Figur wankt kurz hin und her, Fuesse bleiben
 -- stehen. Blockiert bis die Bewegung durch ist.
 local STAGGER_DEGREES = 12

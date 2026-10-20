@@ -34,6 +34,7 @@ local TouchSafeArea = require(script.Parent.TouchSafeArea)
 local UiScale      = require(script.Parent.UiScale)
 local PanelManager = require(script.Parent.PanelManager)
 local Icons        = require(script.Parent.Icons)
+local EggIcon      = require(script.Parent.EggIcon)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local Unlock       = require(script.Parent.Unlock)
 
@@ -47,6 +48,12 @@ local TILE_ELEMENT: { [string]: string } = {
 
 local MenuBar = {}
 
+-- 14.10.: Kachel (Panel-Name) → Bild des neuen Honig-UI (Icons "honey/...")
+local HONEY_TILE: { [string]: string } = {
+	Hatch = "honey/eggs_btn", Inventory = "honey/bears_btn", EggTree = "honey/egg_tree_btn",
+	Leaderboard = "honey/leaderboard_btn", DailyBonus = "honey/daily_btn",
+}
+
 -- Groessen. TILE ist gleichzeitig die Antippflaeche — darunter wird es auf dem
 -- Handy zur Geduldsprobe.
 -- HUD_ROW_V2: weniger Kacheln (Verbessern, Inkubator und Shop sind weg),
@@ -56,6 +63,9 @@ local TILE   = if BIG then 70 else 54
 local LABEL  = if BIG then 18 else 16
 local GAP    = if BIG then 8 else 6
 local WIDTH  = if BIG then 94 else 76
+-- R1: unter diesem Verkleinerungsfaktor entfaellt auf Touch-Geraeten die
+-- Beschriftung unter den Kacheln (siehe MenuBar.init)
+local LABEL_MIN_SCALE = 0.85
 
 -- Was eine Kachel anzeigt: `value` ist die Beschriftung IN der Kachel,
 -- `alert` laesst das rote Ausrufezeichen erscheinen.
@@ -184,15 +194,31 @@ local function buildTile(parent: Instance, order: number, entry: Entry): Tile
 	button.TextColor3  = Theme.COLORS.outline
 	Theme.gradient(button, Theme.shade(entry.color, 0.34), Theme.shade(entry.color, -0.16))
 
-	-- Bild-Icon gross in die Kachel. Ohne Asset bleibt das Text-Kuerzel stehen.
-	local hasImage = Icons.has(entry.icon)
-	if hasImage then
+	-- Eier-Kachel im Bilderbuch-Stil wie Ei-Fenster und Ei-Baum: Zierrahmen
+	-- und das gezeichnete Basis-Ei auf einem Sockel. Erst wenn die Bilder
+	-- hochgeladen sind (Icons.luau); bis dahin die normale Kachel.
+	local storybook = entry.panel == "Hatch" and EggIcon.imageId("BasicEgg") ~= nil
+	local hasImage = storybook or Icons.has(entry.icon)
+	if storybook then
+		button.Text = ""
+		Theme.gradient(button, Theme.COLORS.cream, Theme.shade(Theme.COLORS.honey, -0.05))
+		Theme.ornate(button, "tile", 0.3)
+		local egg = EggIcon.make(button, "BasicEgg", 38, 3, { idle = true, pedestal = true })
+		egg.AnchorPoint = Vector2.new(0.5, 0)
+		egg.Position    = UDim2.new(0.5, 0, 0, 2)
+	elseif hasImage then
 		button.Text = ""
 		local icon = Icons.make(button, entry.icon)
 		icon.AnchorPoint = Vector2.new(0.5, 0.5)
 		icon.Position    = UDim2.fromScale(0.5, 0.52)
 		icon.Size        = UDim2.fromScale(0.86, 0.86)
 		icon.ZIndex      = 3
+	end
+
+	-- 14.10. (UI_HONEY_SKIN): fertige Bilder des Spielers als ganze Kachel
+	local honeyName = HONEY_TILE[entry.panel]
+	if honeyName and Icons.skinButton(button, honeyName) then
+		hasImage = true
 	end
 
 	button.Activated:Connect(function()
@@ -314,26 +340,54 @@ function MenuBar.init(screenGui: ScreenGui)
 	local MIN_TOUCH_SCALE = 0.7
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
+
+	-- R1: Rechnet fuer `room` (Hoehe in Oberflaechen-Einheiten) die Spaltenzahl
+	-- und den Verkleinerungsfaktor, mit oder ohne Beschriftung unter den Kacheln.
+	local function plan(room: number, withLabels: boolean): (number, number, number, number)
+		local slotHeight = TILE + (if withLabels then LABEL else 0) + 2
+		local function heightFor(columns: number): number
+			local rows = math.ceil(#entries / columns)
+			return rows * slotHeight + (rows - 1) * GAP
+		end
+		local columns = 1
+		if TouchSafeArea.isTouch() and room / heightFor(1) < MIN_TOUCH_SCALE then
+			columns = 2
+		end
+		local gridHeight = heightFor(columns)
+		return columns, gridHeight, math.clamp(room / gridHeight, 0.4, 1), slotHeight
+	end
+
 	local function rescale()
 		local bottom = TouchSafeArea.rightBottomReserve(screenGui, 12)
 		local room = UiScale.toGui(screenGui.AbsoluteSize.Y) - 108 - bottom
 
-		local columns = 1
-		if TouchSafeArea.isTouch() and room / height < MIN_TOUCH_SCALE then
-			columns = 2
+		-- Beschriftung: bleibt, solange die Kacheln dabei gross genug bleiben.
+		-- Auf dem Handy, wo der Platz knapp wird, entfaellt sie (die Kachel
+		-- traegt ihr Bild) — dafuer bleiben die Kacheln gross und antippbar.
+		local columns, gridHeight, factor, slotHeight = plan(room, true)
+		local labels = true
+		if TouchSafeArea.isTouch() and factor < LABEL_MIN_SCALE then
+			local c2, h2, f2, s2 = plan(room, false)
+			if f2 > factor then
+				columns, gridHeight, factor, slotHeight, labels = c2, h2, f2, s2, false
+			end
 		end
-		local rows = math.ceil(#entries / columns)
-		local gridHeight = rows * slot + (rows - 1) * GAP
+		for _, tile in _tiles do
+			tile.label.Visible = labels
+		end
 
+		grid.CellSize              = UDim2.fromOffset(WIDTH, slotHeight)
 		grid.FillDirectionMaxCells = columns
 		root.Size   = UDim2.fromOffset(columns * WIDTH + (columns - 1) * GAP, gridHeight)
-		scale.Scale = math.clamp(room / gridHeight, 0.4, 1)
+		scale.Scale = factor
 	end
 	TouchSafeArea.watch(screenGui, rescale)
+	UiScale.onChanged(rescale)
 
 	for order, entry in entries do
 		table.insert(_tiles, buildTile(root, order, entry))
 	end
+	rescale()   -- R1: erst jetzt gibt es die Kacheln, deren Beschriftung ggf. entfaellt
 
 	ClientState.onChanged(refresh)
 

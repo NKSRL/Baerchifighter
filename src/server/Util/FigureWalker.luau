@@ -111,4 +111,59 @@ function FigureWalker.walk(model: Model, fromFoot: Vector3, toFoot: Vector3, opt
 	FigurePlacement.place(model, flatTo, facing)
 end
 
+-- 12.10. (Playtest "laeuft durch die Bruecke"): Laeuft eine Kette von
+-- Fusspunkten ab. Anders als walk() folgt hier auch die HOEHE den Punkten
+-- (linear je Abschnitt): vom Beet (2 Studs) hinunter auf Wiese und Steg und
+-- weiter in die Arena, statt auf Beet-Hoehe ueber den Steg zu schweben bzw.
+-- auf dem Rueckweg durch das Beet zu laufen. Das Huepfen laeuft ueber alle
+-- Abschnitte durch (kein Ruck an den Ecken). Endet IMMER auf dem letzten
+-- Punkt, auch nach einem Abbruch.
+function FigureWalker.walkPath(model: Model, points: { Vector3 }, options: WalkOptions)
+	if #points == 0 then return end
+	local last = points[#points]
+	if #points == 1 then
+		FigurePlacement.place(model, last, model:GetPivot().Rotation)
+		return
+	end
+
+	local speed       = math.max(options.speed, 1)
+	local bobHeight   = options.bobHeight or MapConfig.WALK_BOB_HEIGHT
+	local bobPerStud  = math.max(options.bobPerStud or MapConfig.WALK_BOB_PER_STUD, 1e-3)
+	local leanRad     = math.rad(options.leanDegrees or MapConfig.WALK_LEAN_DEGREES)
+	local isCancelled = options.isCancelled
+
+	local facing = model:GetPivot().Rotation
+	local traveledTotal = 0
+	local cancelled = false
+
+	for index = 1, #points - 1 do
+		local from, to = points[index], points[index + 1]
+		local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+		local distance = (to - from).Magnitude
+		if distance > 1e-2 then
+			-- Blickrichtung nur waagerecht; reine Hoehenschritte behalten sie
+			if flat.Magnitude > 1e-2 then
+				facing = CFrame.lookAt(Vector3.new(), flat.Unit)
+			end
+			local duration = distance / speed
+			local elapsed = 0
+			while elapsed < duration do
+				if isCancelled and isCancelled() then
+					cancelled = true
+					break
+				end
+				local dt = RunService.Heartbeat:Wait()
+				elapsed += dt
+				local t = math.clamp(elapsed / duration, 0, 1)
+				local bob = math.abs(math.sin((traveledTotal + distance * t) * bobPerStud * math.pi)) * bobHeight
+				FigurePlacement.place(model, from:Lerp(to, t) + Vector3.new(0, bob, 0), facing * CFrame.Angles(leanRad, 0, 0))
+			end
+			traveledTotal += distance
+		end
+		if cancelled then break end
+	end
+
+	FigurePlacement.place(model, last, facing)
+end
+
 return FigureWalker

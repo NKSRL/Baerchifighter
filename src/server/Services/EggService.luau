@@ -7,6 +7,9 @@
 --   - Den Kauf eines Basis-Eis beim versteckten Haendler abrechnen
 --   - v17: Eier als Belohnung ins Lager legen (grantEggs, z.B. UFO-Abwurf),
 --     damit Event-Code nie selbst in island.eggStock schreibt
+--   - 19.10. (PET_LIMIT_V1): bei vollem Baerchi-Lager (PetCapacity) wird kein
+--     Ei geoeffnet. Das ist die EINZIGE Stelle, an der ein Ei zum Baerchi wird
+--     (Einzel, xN, Haendler); das Ei bleibt im Lager, nichts geht verloren.
 --
 -- Seit v12 (Ei-Baum-Konzept, Block A) gibt es KEINE Brutzeit mehr: ein Klick
 -- auf "Oeffnen" nimmt ein Ei aus island.eggStock und liefert sofort das
@@ -30,6 +33,7 @@ local IncubatorRules = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sa
 local BaerchiConfig  = require(ReplicatedStorage.Config.BaerchiConfig)
 local GachaRoller    = require(ReplicatedStorage.Modules.GachaRoller)
 local BaerchiFactory = require(ReplicatedStorage.Modules.BaerchiFactory)
+local PetCapacity    = require(ReplicatedStorage.Modules.PetCapacity)   -- 19.10.: Pet-Limit
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
@@ -56,7 +60,9 @@ end
 -- Inkubator auf (IncubatorRules.requiresIncubator). Der Inkubator selbst ruft
 -- diese Funktion beim Abholen mit `fromIncubator = true` — das Schluepfen
 -- (Gacha, Mutation, Index, Quests, Auto-Ausruesten) bleibt so an EINER Stelle.
-function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubator: boolean?): Types.HatchResult?
+-- `quiet` (15.10., "10 oeffnen"): kein eigenes Ergebnis-Event und kein Speichern;
+-- der Aufrufer (openEggs) sammelt die Ergebnisse und speichert einmal.
+function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubator: boolean?, quiet: boolean?): Types.HatchResult?
 	local data = PlayerService.getData(player)
 	if not data then return nil end
 
@@ -74,6 +80,15 @@ function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubato
 	local stock = data.island.eggStock[eggType] or 0
 	if stock <= 0 then
 		fail(player, "RequestHatchEgg", Loc.msg("err.egg_none_in_stock", { egg = Loc.msg("egg." .. eggType .. ".name") }))
+		return nil
+	end
+
+	-- 19.10. (PET_LIMIT_V1): Lager voll -> nichts oeffnen. Die Pruefung steht VOR
+	-- dem Wurf und dem Abziehen des Eis, damit kein halber Zustand entsteht. Sie
+	-- gilt auch fuer jeden anderen Aufrufer (Haendler, Debug) und ist zugleich der
+	-- Schutz gegen ein direkt aufgerufenes Remote.
+	if PetCapacity.isFull(data) then
+		fail(player, "RequestHatchEgg", Loc.msg("err.pet_limit_full"))
 		return nil
 	end
 
@@ -132,16 +147,65 @@ function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubato
 		isNew   = isNew,
 	}
 
-	Remotes.HatchResultReceived:FireClient(player, result)
+	if not quiet then
+		Remotes.HatchResultReceived:FireClient(player, result)
+	end
 	FunnelService.step(player, "F03_FirstEggOpened")
 	PlayerService.markDirty(player)
-	PlayerService.saveNow(player)
+	if not quiet then
+		PlayerService.saveNow(player)
+	end
 
 	print("[EggService]", player.Name, "oeffnet", eggType, "->", wonConfigId, "(", newBaerchi.rarity, ")",
 		isNew and "| NEU" or "",
 		mutation and ("| MUTATION: " .. mutation) or "")
 
 	return result
+end
+
+-- 15.10.: bis zu BATCH_MAX Eier derselben Sorte auf einmal oeffnen. Jedes Ei
+-- laeuft durch dieselbe openEgg-Logik (Roll, Mutation, Index, Quests); die
+-- Ergebnisse gehen gesammelt in EINEM Event an den Client, gespeichert wird einmal.
+local BATCH_MAX = 10
+
+function EggService.openEggs(player: Player, eggType: Types.EggType, count: number): { Types.HatchResult }
+	local results: { Types.HatchResult } = {}
+	local wanted = math.clamp(math.floor(count), 1, BATCH_MAX)
+	local data = PlayerService.getData(player)
+	local stock = if data then (data.island.eggStock[eggType] or 0) else 0
+	wanted = math.max(1, math.min(wanted, stock))
+
+	-- 19.10. (PET_LIMIT_V1): nur so viele Eier oeffnen, wie Platz im Lager ist.
+	-- Der Rest bleibt im Eier-Lager; eine Meldung sagt es dem Spieler. Ist gar
+	-- kein Platz, wird wie beim Einzel-Oeffnen abgelehnt (ohne Animation).
+	local limited = false
+	if data then
+		local free = PetCapacity.getFree(data)
+		if free <= 0 then
+			fail(player, "RequestHatchEggs", Loc.msg("err.pet_limit_full"))
+			return results
+		end
+		if wanted > free then
+			wanted = free
+			limited = true
+		end
+	end
+
+	for _ = 1, wanted do
+		local result = EggService.openEgg(player, eggType, false, true)
+		if not result then break end
+		table.insert(results, result)
+	end
+	if #results > 0 then
+		Remotes.HatchBatchReceived:FireClient(player, { eggType = eggType, results = results })
+		PlayerService.saveNow(player)
+		if limited then
+			-- Anderer Aktionsname als RequestHatchEggs: die laufende Animation
+			-- soll NICHT abgebrochen werden, nur die Meldung kommen.
+			fail(player, "RequestHatchEggsLimit", Loc.msg("err.pet_limit_partial", { n = #results }))
+		end
+	end
+	return results
 end
 
 --------------------------------------------------------------------------------
@@ -154,6 +218,13 @@ end
 function EggService.buyFromMerchant(player: Player): boolean
 	local data = PlayerService.getData(player)
 	if not data then return false end
+
+	-- 19.10. (PET_LIMIT_V1): bei vollem Lager gar nicht erst kaufen — das Ei
+	-- wuerde sofort geoeffnet und das ginge nicht; so wird nichts abgebucht.
+	if PetCapacity.isFull(data) then
+		fail(player, "BuyBasicEgg", Loc.msg("err.pet_limit_full"))
+		return false
+	end
 
 	local merchant = EggConfig.MERCHANT
 	local ok, reason = EconomyService.spendGummies(player, merchant.priceGummies)
@@ -207,6 +278,16 @@ function EggService.init()
 		end
 
 		EggService.openEgg(player, eggType :: Types.EggType)
+	end)
+
+	RateLimiter.connect(Remotes.RequestHatchEggs, "RequestHatchEggs", function(player, eggType: any, count: any)
+		if typeof(eggType) ~= "string" or typeof(count) ~= "number" then return end
+		if count ~= count then return end   -- NaN
+		if not EggConfig.data[eggType :: Types.EggType] then
+			fail(player, "RequestHatchEggs", Loc.msg("err.egg_unknown_type"))
+			return
+		end
+		EggService.openEggs(player, eggType :: Types.EggType, count)
 	end)
 
 	print("[EggService] Initialisiert")
