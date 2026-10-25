@@ -28,7 +28,16 @@
 -- "tower": zum Terminal an der Bruecke, dort zur Karte von Tower II. Fertig,
 -- sobald ein anderer Tower gewaehlt ist oder dort schon gekaempft wurde.
 -- Ausnahme von der Veteranen-Regel (siehe towerSwitchPending).
-export type Step = "hatch" | "fight" | "collect" | "merchant" | "combs" | "upgrade" | "event" | "tower"
+--
+-- 21.10. (Playtest): zwei neue Schritte.
+--   "incubator": nach MINDESTENS 1 Kampf UND 6 geoeffneten Eiern, solange der
+--     Inkubator noch nie benutzt wurde -> Strahl zum Inkubator auf dem Plot.
+--   "tower3": Tower II geschafft (Tower III frei) und noch nicht dort gewesen
+--     -> Strahl zum Computer. Der Spieler soll merken, dass es weitergeht.
+--     (Fuer Tower II bleibt es beim Schritt "tower".)
+export type Step = "hatch" | "fight" | "collect" | "merchant" | "combs" | "upgrade" | "event" | "tower" | "tower3" | "incubator"
+
+-- 21.10.: ab so vielen geoeffneten Eiern fuehrt das Tutorial zum Inkubator
 
 -- Nur die Felder, die hier gelesen werden. PlayerDataUpdate (Client) und
 -- PlayerData (Server) passen beide hinein.
@@ -41,10 +50,11 @@ export type View = {
 		towerProgress : { [string]: number }?,
 		buildings     : { [string]: { level: number } }?,   -- Sammel-Update 3.5
 		recycler      : { level: number }?,
+		incubator     : { slots: { any }?, breeders: { any }?, stored: { [string]: number }? }?,   -- 21.10.
 	},
 	towers : { records: { [string]: number }, selected: string?, unlocked: { [string]: boolean }? }?,
 	quests : { chainDone: number }?,
-	stats  : { totalEventsCompleted: number?, totalCombsDelivered: number? }?,
+	stats  : { totalEventsCompleted: number?, totalCombsDelivered: number?, totalHatched: number? }?,
 	gummies : number?,
 }
 
@@ -56,6 +66,9 @@ export type Options = {
 }
 
 local GuideSteps = {}
+
+-- 21.10.: ab so vielen geoeffneten Eiern fuehrt das Tutorial zum Inkubator
+GuideSteps.INCUBATOR_AFTER_HATCHED = 6
 
 -- Ab hier gilt ein Spielstand nicht mehr als neu: kein Schritt mehr.
 GuideSteps.VETERAN_CHAIN_DONE = 4
@@ -119,10 +132,44 @@ function GuideSteps.towerSwitchPending(view: View): boolean
 	return true
 end
 
+-- 21.10.: Tower III ist frei (Tower II geschafft), aber dort wurde noch nie
+-- gekaempft und er ist nicht gewaehlt. Nur ohne Rebirth.
+function GuideSteps.tower3Pending(view: View): boolean
+	if (view.rebirthCount or 0) > 0 then return false end
+	local towers = view.towers
+	if not towers or not towers.unlocked or towers.unlocked.III ~= true then return false end
+	if towers.selected == "III" then return false end
+	return (towers.records.III or 0) <= 0
+end
+
+-- 21.10.: hat der Spieler schon einmal etwas in den Inkubator gestellt?
+function GuideSteps.hasUsedIncubator(view: View): boolean
+	local inc = view.island.incubator
+	if not inc then return false end
+	return not isEmpty(inc.slots :: any) or not isEmpty(inc.breeders :: any) or not isEmpty(inc.stored :: any)
+end
+
+-- 21.10.: 1 Kampf UND genug Eier geoeffnet, Inkubator noch ungenutzt (nur ohne Rebirth).
+function GuideSteps.incubatorPending(view: View): boolean
+	if (view.rebirthCount or 0) > 0 then return false end
+	if not GuideSteps.hasFought(view) then return false end
+	local stats = view.stats
+	if not stats or (stats.totalHatched or 0) < GuideSteps.INCUBATOR_AFTER_HATCHED then return false end
+	return not GuideSteps.hasUsedIncubator(view)
+end
+
 -- Der aktuelle Schritt oder nil (fertig bzw. kein neuer Spieler).
 function GuideSteps.current(view: View, options: Options?): Step?
 	if GuideSteps.towerSwitchPending(view) then
 		return "tower"
+	end
+	-- 21.10.: Tower III hat Vorrang vor dem Inkubator (Terminal-Weg ist der groessere Schritt)
+	if GuideSteps.tower3Pending(view) then
+		return "tower3"
+	end
+	-- 21.10.: vor der Veteranen-Regel, weil "4 Ketten-Quests" schon nach wenigen Kaempfen gilt
+	if GuideSteps.incubatorPending(view) then
+		return "incubator"
 	end
 	if GuideSteps.isVeteran(view) then
 		return nil

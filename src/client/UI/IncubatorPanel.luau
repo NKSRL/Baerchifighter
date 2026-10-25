@@ -24,6 +24,7 @@ local Names           = require(ReplicatedStorage.Localization.Names)
 local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local IncubatorRules  = require(ReplicatedStorage.Modules.IncubatorRules)
+local TowerConfig     = require(ReplicatedStorage.Config.TowerConfig)   -- 20.10. P5a
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local EggCalculator   = require(ReplicatedStorage.Modules.EggCalculator)
 
@@ -278,13 +279,15 @@ local function rebuild()
 	effect.TextWrapped = true
 	if cost then
 		local rebirths = data.rebirthCount or 0
-		local rebirthOk = rebirths >= cost.rebirths
+		local rebirthOk, gateTower = IncubatorRules.gate(level + 1, rebirths, data.towers and data.towers.records)
 		effect.Text = Loc.t("ui.incubator.upgrade_effect2", {
 			capNow    = capacity,
 			capNext   = IncubatorRules.capacity(level + 1),
 			speedNow  = Loc.formatDecimal(IncubatorRules.speed(level), 2),
 			speedNext = Loc.formatDecimal(IncubatorRules.speed(level + 1), 2),
-		}) .. "\n" .. Loc.t("ui.incubator.upgrade_need", { n = cost.rebirths })
+		}) .. "\n" .. (if gateTower
+			then Loc.t("ui.incubator.upgrade_need_tower", { tower = (TowerConfig.get(gateTower) or { numeral = gateTower }).numeral })
+			else Loc.t("ui.incubator.upgrade_need", { n = cost.rebirths }))
 		local up = Theme.bigButton("Up", upRow, Loc.t("ui.incubator.upgrade_cost2", { gummies = cost.gummies }), Theme.COLORS.gummy)
 		up.AnchorPoint = Vector2.new(1, 0.5)
 		up.Position = UDim2.new(1, -8, 0.5, 0)
@@ -454,6 +457,7 @@ local function applyPick()
 	H.stored.Visible = not _pick
 	H.storedEmpty.Visible = (not _pick) and (H.storedCount or 0) == 0
 	H.pick.Visible = _pick
+	if H.pickBg then H.pickBg.Visible = _pick end
 	H.pickEmpty.Visible = _pick and (H.pickCount or 0) == 0
 	H.swapLabel.Text = Loc.t(if _pick then "ui.incubator.h_back" elseif H.hasSitter then "ui.incubator.h_swap" else "ui.incubator.h_put")
 end
@@ -567,12 +571,15 @@ local function rebuildHoney()
 	-- Ausbau (dunkle Leiste oben rechts)
 	local cost = IncubatorRules.upgradeCost(level + 1)
 	local rebirths = data.rebirthCount or 0
+	local gateOkH, gateTowerH = IncubatorRules.gate(level + 1, rebirths, data.towers and data.towers.records)
 	if not cost then
 		H.upLabel.Text = Loc.t("ui.incubator.h_max")
 		H.upLabel.TextColor3 = INK_DIM
 		H.upButton.Active = false
-	elseif rebirths < cost.rebirths then
-		H.upLabel.Text = Loc.t("ui.incubator.h_need_rebirth", { level = level + 1, n = cost.rebirths })
+	elseif not gateOkH then
+		H.upLabel.Text = if gateTowerH
+			then Loc.t("ui.incubator.h_need_tower", { level = level + 1, tower = (TowerConfig.get(gateTowerH) or { numeral = gateTowerH }).numeral })
+			else Loc.t("ui.incubator.h_need_rebirth", { level = level + 1, n = cost.rebirths })
 		H.upLabel.TextColor3 = INK_DIM
 		H.upButton.Active = true
 	else
@@ -816,6 +823,27 @@ local function buildHoney(root: Frame)
 	grid.Parent = H.stored
 	H.storedEmpty = hlabel(root, "StoredEmpty", 640, 300, 1370, 400, 22)
 	H.storedEmpty.TextColor3 = INK_DIM
+
+	-- 21.10. Playtest: Hinter der Baerchi-Auswahl schimmerten die acht Ei-Kacheln des Fensterbildes
+	-- durch und sahen neben der Liste falsch aus. Darum bekommt die Auswahl einen eigenen,
+	-- deckenden Hintergrund (liegt ueber dem Bild, unter der Liste).
+	local pickBg = Instance.new("Frame")
+	pickBg.Name                   = "PickBackground"
+	pickBg.BackgroundColor3       = Color3.fromRGB(46, 24, 10)
+	pickBg.BackgroundTransparency = 0
+	pickBg.BorderSizePixel        = 0
+	pickBg.ZIndex                 = 5
+	pickBg.Visible                = false
+	pickBg.Parent                 = root
+	place(pickBg, 590, 188, 1418, 510)
+	local pickBgCorner = Instance.new("UICorner")
+	pickBgCorner.CornerRadius = UDim.new(0, hx(22))
+	pickBgCorner.Parent = pickBg
+	local pickBgStroke = Instance.new("UIStroke")
+	pickBgStroke.Color     = HONEY
+	pickBgStroke.Thickness = 2
+	pickBgStroke.Parent    = pickBg
+	H.pickBg = pickBg
 
 	H.pick = hscroll(root, "Pick", 597, 195, 1411, 503)
 	H.pick.Visible = false

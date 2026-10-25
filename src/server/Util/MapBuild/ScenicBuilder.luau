@@ -28,6 +28,7 @@ local MapConfig      = require(ReplicatedStorage.Config.MapConfig)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 local MapMeshes = require(ServerScriptService.Util.MapBuild.MapMeshes)
+local HubPlazaBuilder = require(ServerScriptService.Util.MapBuild.HubPlazaBuilder)
 local MapStyleConfig = require(ReplicatedStorage.Config.MapStyleConfig)
 local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 
@@ -128,24 +129,7 @@ end
 --------------------------------------------------------------------------------
 
 local function buildPaths(parent: Instance)
-	local fromRadius = MapConfig.EVENT_PIT_RADIUS - 1
-	local toRadius   = MapConfig.PLATFORM_RADIUS - 4
-	local length     = toRadius - fromRadius
-	local y          = MapConfig.PLATFORM_TOP_Y + AmbienceConfig.PATH_LIFT
-
-	for slot = 1, MapConfig.PLOT_COUNT do
-		local outward = MapParts.outwardDirection(slot)
-		local mid     = MapConfig.CENTER + outward * ((fromRadius + toRadius) * 0.5)
-		local at      = Vector3.new(mid.X, y, mid.Z)
-
-		decorPart(
-			"Path_" .. slot, parent,
-			Vector3.new(AmbienceConfig.PATH_WIDTH, 0.1, length),
-			CFrame.lookAt(at, at + outward),
-			AmbienceConfig.PATH_COLOR,
-			Enum.Material.Cobblestone
-		)
-	end
+	HubPlazaBuilder.buildAvenuePaths(parent)
 end
 
 local function buildLamps(parent: Instance, placed: { Placed })
@@ -158,68 +142,17 @@ local function buildLamps(parent: Instance, placed: { Placed })
 				local p = MapConfig.CENTER + outward * radius + side * (sign * AmbienceConfig.LAMP_SIDE)
 				local baseY = MapConfig.PLATFORM_TOP_Y
 
-				pole("LampPole", parent, p.X, baseY, p.Z, AmbienceConfig.LAMP_HEIGHT, 0.8,
-					AmbienceConfig.LAMP_POLE_COLOR, Enum.Material.Wood)
-				ball("LampGlow", parent, Vector3.new(2.2, 2.2, 2.2),
-					CFrame.new(p.X, baseY + AmbienceConfig.LAMP_HEIGHT + 0.7, p.Z),
-					AmbienceConfig.LAMP_GLOW_COLOR, Enum.Material.Neon)
+				HubPlazaBuilder.buildBeekeeperLamp(parent, Vector3.new(p.X, baseY, p.Z), -side * sign)
 
-				table.insert(placed, { x = p.X, z = p.Z, r = 2 })
+				table.insert(placed, { x = p.X, z = p.Z, r = 2.4 })
 			end
 		end
 	end
 end
 
--- Pfosten mit Leuchtkappe an beiden Enden jedes inneren Stegs (Hauptinsel → Plot).
--- Die aeusseren Kampf-Stege (Plot → Arena) entstehen erst mit dem Spieler-Plot
--- in ArenaBuilder.buildBridge, damit bei freien Slots nichts ueber dem Wasser schwebt.
+-- Portale mit Slot-Kristall und Wimpel an beiden Enden jedes inneren Stegs (Hauptinsel → Plot).
 local function buildBridgePosts(parent: Instance)
-	local deckTop = MapConfig.PLATFORM_TOP_Y - MapConfig.BRIDGE_SINK
-	local sideOffset = (MapConfig.BRIDGE_WIDTH + MapConfig.BRIDGE_RAIL_WIDTH) * 0.5
-
-	local fromRadius = MapConfig.PLATFORM_RADIUS
-	local toRadius   = MapConfig.PLOT_RING_RADIUS - MapConfig.PLOT_ISLAND_RADIUS
-	local inset      = AmbienceConfig.BRIDGE_POST_INSET
-	local laneColors = AmbienceConfig.LANE_COLORS
-
-	for slot = 1, MapConfig.PLOT_COUNT do
-		local outward   = MapParts.outwardDirection(slot)
-		local side      = Vector3.new(-outward.Z, 0, outward.X)
-		local laneColor = (laneColors and laneColors[slot]) or AmbienceConfig.LAMP_GLOW_COLOR
-
-		-- Innere Bruecke (Hauptinsel -> Plot): farbcodierte Kappen + fest montierte Wimpel am Brueckenkopf
-		for idx, radius in { fromRadius + inset, toRadius - inset } do
-			for _, sign in { -1, 1 } do
-				local p = MapConfig.CENTER + outward * radius + side * (sign * sideOffset)
-
-				pole("BridgePost", parent, p.X, deckTop, p.Z, AmbienceConfig.BRIDGE_POST_HEIGHT, 1.3,
-					MapConfig.BRIDGE_RAIL_COLOR, Enum.Material.Wood)
-				ball("BridgeCap", parent, Vector3.new(1.9, 1.9, 1.9),
-					CFrame.new(p.X, deckTop + AmbienceConfig.BRIDGE_POST_HEIGHT + 0.5, p.Z),
-					laneColor, Enum.Material.Neon)
-
-				if idx == 1 then
-					local barPos = p + side * (sign * 1.0) + Vector3.new(0, deckTop + AmbienceConfig.BRIDGE_POST_HEIGHT - 0.25, 0)
-					decorPart(
-						"LaneCrossbar", parent,
-						Vector3.new(2.1, 0.35, 0.35),
-						CFrame.lookAt(barPos, barPos + outward),
-						MapConfig.BRIDGE_RAIL_COLOR,
-						Enum.Material.Wood
-					)
-
-					local flagPos = p + side * (sign * 1.25) + Vector3.new(0, deckTop + AmbienceConfig.BRIDGE_POST_HEIGHT - 1.45, 0)
-					decorPart(
-						"LanePennant", parent,
-						Vector3.new(1.5, 2.3, 0.22),
-						CFrame.lookAt(flagPos, flagPos + outward),
-						laneColor,
-						Enum.Material.SmoothPlastic
-					)
-				end
-			end
-		end
-	end
+	HubPlazaBuilder.buildBridgePortals(parent)
 end
 
 --------------------------------------------------------------------------------
@@ -343,8 +276,6 @@ end
 -- Plot-Inseln: Randdeko
 --------------------------------------------------------------------------------
 
--- Felsen und Buesche in einem schmalen Ring am Inselrand, AUSSERHALB des Beets
--- und der Gebaeude. Die Stegachse (zur Mitte und zur Arena) bleibt frei.
 local function buildPlotRims(parent: Instance)
 	local random = Random.new(AmbienceConfig.SCENERY_SEED + 1)
 	local styleOn = MapMeshes.enabled()
@@ -402,8 +333,6 @@ end
 -- Einstieg
 --------------------------------------------------------------------------------
 
--- `isOnLane` kommt von WorldBuilder (isOnBridgeLane); als Parameter statt
--- require, damit die beiden Module sich nicht gegenseitig laden.
 local function buildAll(folder: Folder, isOnLane: (Vector3, number) -> boolean)
 	local placed: { Placed } = {}
 
@@ -436,10 +365,6 @@ function ScenicBuilder.build(platform: Instance, isOnLane: (Vector3, number) -> 
 	folder.Parent = platform
 end
 
--- Nur Studio-Debug (D:Invoke("mapstyle")): tauscht Baeume/Buesche/Felsen nach dem Schalter
--- MAP_STYLE_V2 aus, ohne den Ordner "Scenery" neu anzulegen (Client-Controller halten ihn).
--- Die ganze Deko wird in einen Wegwerf-Ordner gebaut (gleicher Seed = gleiche Positionen)
--- und nur die Vegetations-Teile wandern in den echten Ordner.
 function ScenicBuilder.restyle(platform: Instance, isOnLane: (Vector3, number) -> boolean): number
 	local scenery = platform:FindFirstChild("Scenery")
 	if not scenery then return 0 end

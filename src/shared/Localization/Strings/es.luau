@@ -18,6 +18,8 @@ return {
 	["ui.audio.music"] = "Música",
 	["ui.audio.sfx"] = "Efectos",
 	["ui.audio.mute"] = "Silencio",
+	["ui.lowend.on"] = "Dispositivo lento: Sí",
+	["ui.lowend.off"] = "Dispositivo lento: No",
 
 	----------------------------------------------------------------------------
 	-- Tiempo
@@ -114,6 +116,15 @@ return {
 	["ui.pets.limit.full_hint"]       = "Vende Baerchis para hacer sitio",
 	["ui.pets.sell.toggle"]           = "Vender",
 	["ui.pets.sell.toggle_active"]    = "Listo",
+	["ui.mut.title"] = "Mutaciones",
+	["ui.mut.button"] = "Mutaciones",
+	["ui.mut.intro"] = "Cada osito que sale del huevo tiene en total un {pct} de probabilidad de mutar. Cuanto más fuerte, más rara.",
+	["ui.mut.col_name"] = "Mutación",
+	["ui.mut.col_power"] = "Poder",
+	["ui.mut.col_chance"] = "Probabilidad",
+	["ui.mut.odds"] = "1 de cada {n}",
+	["ui.mut.per_hatch"] = "{pct} por eclosión",
+	["ui.mut.note"] = "El poder se aplica a PV, ATK y velocidad de huevo. VEL y POD solo reciben un tercio del bonus. Al fusionar se conserva la mutación más alta.",
 	["ui.pets.sell.hint"]             = "Toca Baerchis para marcarlos para vender",
 	["ui.pets.sell.sell_button.one"]   = "Vender {n} Baerchi",
 	["ui.pets.sell.sell_button.other"] = "Vender {n} Baerchis",
@@ -402,6 +413,10 @@ return {
 	["skill.ShadeSlash.name"] = "Tajo Sombrío",
 	["skill.RiddleBeam.name"] = "Rayo Enigma",
 	["skill.TitanFist.name"] = "Puño de Titán",
+	["skill.RubberSmash.name"] = "Golpe Elástico",
+	["skill.SpiralDash.name"] = "Carrera en Espiral",
+	["skill.StarBlast.name"] = "Destello Estelar",
+	["skill.PlaidSlash.name"] = "Corte a Cuadros",
 	["skill.GenesisWave.name"] = "Ola Génesis",
 	["skill.ChronosRift.name"] = "Grieta Temporal",
 	["skill.InfinityBarrage.name"] = "Ráfaga Infinita",
@@ -426,8 +441,11 @@ return {
 	-- v17: Eventos vivos (lanzamientos del OVNI, panales de lava, Reina Avispa)
 	----------------------------------------------------------------------------
 	["egg.UfoJackpotEgg.name"]  = "Huevo Jackpot del OVNI",
+	["egg.AnimeEgg.name"]  = "Huevo Anime",
 	["path.Event"]              = "Evento",
 	["path.Event.goal"]         = "Huevos especiales de eventos",
+	["path.Anime"]              = "Anime",
+	["path.Anime.goal"]         = "Desde el mundo 2",
 	["msg.ufo.patrol"]          = "¡El OVNI patrulla! Cada 30 s suelta una caja — corre a atraparla",
 	["msg.ufo.drop_picked"]     = "Caja atrapada: +1 {egg}",
 	["msg.ufo.jackpot_drop"]    = "¡JACKPOT! ¡El OVNI suelta una caja dorada!",
@@ -505,6 +523,12 @@ return {
 	["ui.profile.unavailable"]         = "Perfil no disponible (jugador no está en este servidor)",
 	["ui.profile.equipped"]            = "Equipado: {baerchi}",
 	["ui.profile.tower"]               = "Mejor torre: {tower} · etapa {stage}",
+	["ui.badge.rookie"]                = "Novato",
+	["ui.badge.tower"]                 = "Torre {tower} · {stage}",
+	["ui.badge.final"]                 = "Final · {stage}",
+	["ui.badge.endless"]               = "Sin fin · {stage}",
+	["ui.badge.rebirth"]               = "R{n}",
+	["ui.badge.hint"]                  = "Rango: mejor torre con etapa · R = renacimientos. Toca para ver el perfil.",
 	["ui.profile.rebirths"]            = "Rebirths: {n}",
 	["ui.profile.index"]               = "Índice: {have}/{total}",
 	["ui.profile.top"]                 = "Mejores Baerchis:",
@@ -678,6 +702,7 @@ return {
 	["ui.hatch.open"] = "Abrir",
 	["ui.hatch.open_n"] = "Abrir ×{n}",
 	["ui.hatch.batch_ok"] = "OK",
+	["ui.hatch.fallback"] = "Resultado: {list}",
 	["ui.hatch.batch_title"] = "Has conseguido",
 	["ui.hatch.to_incubator"] = "A la incubadora",
 	["ui.hatch.empty"] = "No hay huevos en el almacén.\nTu Baerchi equipado pone algunos en tu parcela — solo recógelos.",
@@ -714,8 +739,12 @@ return {
 	["guide.collect"] = "Recoge los huevos puestos en tu parcela.",
 	["guide.merchant"] = "Compra un huevo nuevo en el vendedor.",
 	["guide.combs"] = "Coge panales del centro y llévalos a tu reciclador — eso da Paw Coins.",
-	["guide.upgrade"] = "Mejora tu edificio de miel: más miel = más XP para tu Baerchi.",
+	["guide.upgrade"] = "Mejora tu fuente: más miel = más XP para tu Baerchi.",
 	["guide.event"] = "Evento en el centro: allí tu Baerchi se hace más fuerte.",
+	["guide.incubator"] = "Pon huevos en la incubadora de tu parcela: allí eclosionan solos.",
+	["guide.tower3"] = "¡Torre II superada! La Torre III te espera en el ordenador: la aventura continúa.",
+	["guide.tower"] = "¡Torre I superada! Elige la siguiente torre en el ordenador.",
+	["guide.charms_tip"] = "Consejo: en la ventana de Baerchis puedes tirar Charms para tus Baerchis con Honey Crystals.",
 	["ui.menu.building"] = "Mejorar",
 	-- Sammel-Update 05.10.2026
 	["hint.gummies"] = "¡Paw Coins! Sirven para mejorar edificios y la incubadora.",
@@ -837,6 +866,7 @@ return {
 	["egg.EternityEgg.desc"]              = "Siempre estuvo aquí. Se queda para siempre.",
 	["egg.OmegaEgg.desc"]                 = "El último huevo. 30 % Omega.",
 	["egg.UfoJackpotEgg.desc"]            = "Lanzado por el OVNI. Un hallazgo rarísimo.",
+	["egg.AnimeEgg.desc"]            = "Un huevo de otro mundo. Heroico.",
 	["egg.BasicEgg.short"]                = "Básico",
 	["egg.SugarEgg.short"]                = "Azúcar",
 	["egg.GoldenEgg.short"]               = "Oro",
@@ -858,6 +888,7 @@ return {
 	["egg.EternityEgg.short"]             = "Eternidad",
 	["egg.OmegaEgg.short"]                = "Omega",
 	["egg.UfoJackpotEgg.short"]           = "Jackpot",
+	["egg.AnimeEgg.short"]           = "Anime",
 	["skill.BearHug.name"]                = "Abrazo de oso",
 	["skill.Revive.name"]                 = "Resurrección",
 	["skill.BasicPunch.desc"]             = "Un golpe sencillo. Siempre ahí.",
@@ -886,6 +917,10 @@ return {
 	["skill.ShadeSlash.desc"]             = "Con menos del 30 % de HP enemigo, el tajo golpea con 4x ATK.",
 	["skill.RiddleBeam.desc"]             = "Un rayo de símbolos, 2.6x de daño.",
 	["skill.TitanFist.desc"]              = "Un puño caído del cielo, 3.6x de daño.",
+	["skill.RubberSmash.desc"]            = "Un golpe estirado, 3x de daño.",
+	["skill.SpiralDash.desc"]            = "Cada carrera golpea más fuerte que la anterior.",
+	["skill.StarBlast.desc"]            = "Un rayo concentrado, 2.9x de daño.",
+	["skill.PlaidSlash.desc"]            = "Con menos del 30% de PV enemigos, el corte golpea con 3.6x ATK.",
 	["skill.GenesisWave.desc"]            = "Cada ola se suma a la anterior.",
 	["skill.ChronosRift.desc"]            = "Rasga el tiempo, 3x de daño.",
 	["skill.InfinityBarrage.desc"]        = "Cinco golpes seguidos, 0.6x ATK cada uno.",
@@ -916,6 +951,10 @@ return {
 	["skill.ShadeSlash.drawback"]         = "Solo normal contra enemigos con la vida llena.",
 	["skill.RiddleBeam.drawback"]         = "Cooldown 4.",
 	["skill.TitanFist.drawback"]          = "Cooldown 6.",
+	["skill.RubberSmash.drawback"]        = "Enfriamiento 5.",
+	["skill.SpiralDash.drawback"]        = "Inicio débil.",
+	["skill.StarBlast.drawback"]        = "Enfriamiento 5.",
+	["skill.PlaidSlash.drawback"]        = "Solo normal contra enemigos con vida completa.",
 	["skill.GenesisWave.drawback"]        = "Necesita combates largos.",
 	["skill.ChronosRift.drawback"]        = "Cooldown 5.",
 	["skill.InfinityBarrage.drawback"]    = "Cooldown 5.",
@@ -1238,4 +1277,32 @@ return {
 	["world.rocket.ready"] = "¡La Torre final está vencida! Ve a la cumbre.",   -- 20.10. P4 Raketen-Insel
 	["world.rocket.launched"] = "El mundo 2 está abierto.",   -- 20.10. P4 Raketen-Insel
 	["world.rocket.progress"] = "Torre final: piso {stage}/{total}",   -- 20.10. P4 Raketen-Insel
+	["ui.rebirth.locked_world2"] = "El Rebirth se desbloquea al llegar al Mundo 2: ¡lanza el cohete!",   -- 20.10. P5a
+	["ui.pad.confirm"] = "Elegir",   -- 20.10. P6d (Controller-Legende)
+	["ui.pad.back"] = "Atrás",
+	["ui.pad.menu"] = "Menú",
+	["err.rebirth_world2"] = "El Rebirth solo es posible después del Mundo 2: lanza el cohete en la isla del cohete.",   -- 20.10. P5a
+	["ui.incubator.upgrade_need_tower"] = "Completa la Torre {tower} entera",   -- 20.10. P5a
+	["err.incubator_needs_tower"] = "Necesitas completar la Torre {tower} entera para esta mejora",   -- 20.10. P5a
+	["ui.incubator.h_need_tower"] = "Nivel {level}: completa la Torre {tower}",   -- 20.10. P5a
+	["ui.power.roll"] = "Tirada: {grade}",   -- 20.10. P5b
+	["ui.power.grade.weak"] = "débil",   -- 20.10. P5b
+	["ui.power.grade.average"] = "media",   -- 20.10. P5b
+	["ui.power.grade.good"] = "buena",   -- 20.10. P5b
+	["ui.power.grade.great"] = "muy buena",   -- 20.10. P5b
+	["ui.power.grade.outstanding"] = "sobresaliente",   -- 20.10. P5b
+	["baerchi.AscendantBaerchi.name"] = "Baerchi Ascendente",   -- 20.10. P5d
+	["baerchi.AscendantBaerchi.desc"] = "Quien lo encuentra sigue ascendiendo.",
+	["baerchi.GummiPirateBaerchi.name"] = "Pirata Elástico",
+	["baerchi.GummiPirateBaerchi.desc"] = "Su brazo llega al horizonte.",
+	["baerchi.OrangeNinjaBaerchi.name"] = "Ninja Naranja",
+	["baerchi.OrangeNinjaBaerchi.desc"] = "Rápido, ruidoso y siempre hambriento.",
+	["baerchi.StarWarriorBaerchi.name"] = "Guerrero Estelar",
+	["baerchi.StarWarriorBaerchi.desc"] = "Su pelo desafía la gravedad.",
+	["baerchi.PlaidHunterBaerchi.name"] = "Cazador a Cuadros",
+	["baerchi.PlaidHunterBaerchi.desc"] = "Una espada, una capa, una promesa.",
+	["ui.tree.cond_world2"] = "Mundo 2 abierto",
+	["skill.AscendingLight.name"] = "Luz ascendente",   -- 20.10. P5d
+	["skill.AscendingLight.desc"] = "Cada luz sube más alto y golpea más fuerte.",
+	["skill.AscendingLight.drawback"] = "Necesita combates largos.",
 }

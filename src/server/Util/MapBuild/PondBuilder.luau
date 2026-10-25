@@ -22,6 +22,7 @@ local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
+local Welt2Builder = require(ServerScriptService.Util.MapBuild.Welt2Builder)   -- 21.10. Welt-2-Look
 
 local PondBuilder = {}
 
@@ -166,6 +167,17 @@ function PondBuilder.fountainFolder(): Instance?
 end
 
 function PondBuilder.buildFountain(parent: Instance, ground: CFrame, islandData: Types.IslandData): Model?
+	-- 21.10. Welt 2: Brunnen aus ServerStorage.Assets.Welt2 (additive Look-Stufen 1..6).
+	-- Heisst bewusst nicht "Fountain": growFountain/standFactor skalieren nur das alte Modell.
+	if Welt2Builder.enabled(parent.Parent) then
+		local pondBuilding = islandData.buildings["HoneyPond" :: any]
+		local pondLook = BuildingBehavior.getLook(if pondBuilding then pondBuilding.level else 1)
+		local w2 = Welt2Builder.place(parent, "Brunnen", ground, pondLook, "FountainW2")
+		if w2 then
+			Welt2Builder.addBuildingBeam(w2, "Brunnen", ground, pondLook)
+			return w2
+		end
+	end
 	local folder = PondBuilder.fountainFolder()
 	if not folder then return nil end
 

@@ -27,6 +27,7 @@ local Loc       = require(ReplicatedStorage.Localization.Loc)
 local WorldText = require(ReplicatedStorage.Localization.WorldText)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local Welt2Builder = require(ServerScriptService.Util.MapBuild.Welt2Builder)   -- 21.10. Welt-2-Look
 
 local RecyclerBuilder = {}
 
@@ -55,6 +56,7 @@ end
 local function fitModel(body: BasePart, level: number)
 	local mesh = body:FindFirstChild("RecyclerModel")
 	if not mesh or not mesh:IsA("Model") then return end
+	if mesh:GetAttribute("Welt2") then return end   -- 21.10. Welt-2-Modell hat feste Groesse
 	local target = RecyclerBuilder.modelScale(level)
 	if math.abs(mesh:GetScale() - target) < 0.001 then return end
 	mesh:ScaleTo(target)
@@ -71,7 +73,7 @@ function RecyclerBuilder.writeState(body: BasePart, recycler: Types.RecyclerData
 	fitModel(body, recycler.level)
 	body:SetAttribute("RecyclerQueued", recycler.queued)
 
-	local lamp = body:FindFirstChild("Lampe")
+	local lamp = body:FindFirstChild("Lampe", true)
 	if lamp and lamp:IsA("BasePart") then
 		lamp.Color = if recycler.queued > 0 then CombConfig.LAMP_ACTIVE_COLOR else CombConfig.LAMP_IDLE_COLOR
 	end
@@ -120,7 +122,9 @@ function RecyclerBuilder.build(plotModel: Model, slot: number, recycler: Types.R
 	local offset = CombConfig.RECYCLER_OFFSET
 	local size   = CombConfig.RECYCLER_BODY_SIZE
 
-	local ground = plotCFrame * CFrame.new(offset.X, groundOffset() + offset.Y, offset.Z)
+	-- Welt 2: der neue Boden liegt auf Beet-Hoehe auch ausserhalb des Beets
+	local groundY = if Welt2Builder.enabled(plotModel) then MapConfig.PLOT_SIZE.Y else groundOffset()
+	local ground = plotCFrame * CFrame.new(offset.X, groundY + offset.Y, offset.Z)
 
 	local body = MapParts.newPart(
 		CombConfig.RECYCLER_NAME,
@@ -139,7 +143,14 @@ function RecyclerBuilder.build(plotModel: Model, slot: number, recycler: Types.R
 	-- (Look 1..6 -> Stage 0..4). Haengt unter dem Koerper, wird mit ihm
 	-- zerstoert; Aus oder Vorlage fehlt = alte Deko aus CombConfig.
 	local newTop: number? = nil
-	if FeatureFlags.isOn("NEW_MODELS_V3") then
+	if Welt2Builder.enabled(plotModel) then
+		local w2 = Welt2Builder.place(body, "Recycler", ground, look, "RecyclerModel")
+		if w2 then
+			newTop = select(2, w2:GetBoundingBox()).Y
+			Welt2Builder.addBuildingBeam(w2, "Recycler", ground, look)
+		end
+	end
+	if newTop == nil and FeatureFlags.isOn("NEW_MODELS_V3") then
 		local assets = ReplicatedStorage:FindFirstChild("Assets")
 		local folder = assets and assets:FindFirstChild("Recyclers")
 		local tpl = folder and folder:FindFirstChild("Recycler_Stage" .. math.clamp(look - 1, 0, 4))

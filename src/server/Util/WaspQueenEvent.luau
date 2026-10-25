@@ -52,13 +52,19 @@ local CombService = require(ServerScriptService.Services.CombService)
 local WaspQueenEvent = {}
 
 --------------------------------------------------------------------------------
--- Optik (keine Balance)
+-- Optik (keine Balance): Suesse, kinderfreundliche Chibi-Wespenkoenigin
 --------------------------------------------------------------------------------
 
-local QUEEN_YELLOW   = Color3.fromRGB(255, 196,  40)
-local QUEEN_BLACK    = Color3.fromRGB( 40,  32,  28)
-local QUEEN_WING     = Color3.fromRGB(210, 235, 255)
-local QUEEN_CROWN    = Color3.fromRGB(255, 225,  90)
+local QUEEN_YELLOW   = Color3.fromRGB(255, 204,  58)
+local QUEEN_PLUM     = Color3.fromRGB( 56,  42,  76)
+local QUEEN_GOLD     = Color3.fromRGB(246, 196,  62)
+local QUEEN_CREAM    = Color3.fromRGB(250, 242, 224)
+local QUEEN_WING     = Color3.fromRGB(212, 240, 255)
+local QUEEN_CROWN    = Color3.fromRGB(255, 222,  82)
+local QUEEN_EYE_DARK = Color3.fromRGB( 24,  16,  38)
+local QUEEN_SHINE    = Color3.fromRGB(255, 255, 255)
+local QUEEN_BLUSH    = Color3.fromRGB(255, 128, 152)
+local QUEEN_CUSHION  = Color3.fromRGB(245,  96, 132)
 local QUEEN_SCALE    = 1.6
 
 -- Reihenfolge der Attacken (Phase 2 nimmt dieselbe Reihenfolge, nur schneller).
@@ -101,35 +107,215 @@ local function flatUnit(v: Vector3): Vector3
 end
 
 -- Baut die Koenigin als EIN Model, Drehpunkt = ihre Pose zu `pose`.
+-- Suesse, kinderfreundliche Chibi-Wespenkoenigin (grosse Kulleraugen mit
+-- Glanzlichtern, rosa Pausbaeckchen, flauschiger Koenigskragen, Kroenchen mit
+-- Perlen & Kissen, kurze Stummelpfoten mit Goldschuhen und runde Feenfluegel).
 local function buildQueen(parent: Instance, pose: CFrame): Model
 	local model = Instance.new("Model")
 	model.Name = "WaspQueen"
 
 	local s = QUEEN_SCALE
-	local function piece(props: { [string]: any }, offset: CFrame)
+	local function piece(props: { [string]: any }, offset: CFrame): BasePart
 		props.CFrame = pose * offset
-		EventKit.fxPart(props, model)
+		return EventKit.fxPart(props, model)
 	end
 
-	-- Hinterleib (gelb, zwei schwarze Streifen, Stachel), Brust, Kopf, Krone, Fluegel
-	piece({ Name = "Abdomen", Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
-		Color = QUEEN_YELLOW, Size = Vector3.new(6, 6, 9) * s }, CFrame.new(0, 0, 5 * s))
-	piece({ Name = "Stripe1", Shape = Enum.PartType.Cylinder, Material = Enum.Material.SmoothPlastic,
-		Color = QUEEN_BLACK, Size = Vector3.new(1, 6.2, 6.2) * s }, CFrame.new(0, 0, 4 * s) * CFrame.Angles(0, math.rad(90), 0))
-	piece({ Name = "Stripe2", Shape = Enum.PartType.Cylinder, Material = Enum.Material.SmoothPlastic,
-		Color = QUEEN_BLACK, Size = Vector3.new(1, 5.4, 5.4) * s }, CFrame.new(0, 0, 6.6 * s) * CFrame.Angles(0, math.rad(90), 0))
-	piece({ Name = "Stinger", Material = Enum.Material.Neon,
-		Color = QUEEN_BLACK, Size = Vector3.new(0.8, 0.8, 3) * s }, CFrame.new(0, -0.5 * s, 10 * s))
+	-- 1. Optionaler FBX-Mesh-Pfad (falls Wespenkoenigin_Boss.fbx in ReplicatedStorage.Assets importiert wurde)
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local bossFolder = assets and (assets:FindFirstChild("Boss") or assets:FindFirstChild("Map"))
+	local meshChitin = bossFolder and bossFolder:FindFirstChild("WaspQueen_ChitinSchwarz", true)
+	if meshChitin and meshChitin:IsA("BasePart") then
+		local meshSpecs = {
+			{ name = "WaspQueen_ChitinSchwarz", color = QUEEN_PLUM,    mat = Enum.Material.SmoothPlastic, trans = 0 },
+			{ name = "WaspQueen_PanzerGelb",    color = QUEEN_YELLOW,  mat = Enum.Material.SmoothPlastic, trans = 0 },
+			{ name = "WaspQueen_KroneGold",     color = QUEEN_GOLD,    mat = Enum.Material.Metal,         trans = 0 },
+			{ name = "WaspQueen_AugenGlut",     color = QUEEN_SHINE,   mat = Enum.Material.Neon,          trans = 0 },
+			{ name = "WaspQueen_GiftNeon",      color = QUEEN_CUSHION, mat = Enum.Material.SmoothPlastic, trans = 0 },
+			{ name = "WaspQueen_KoenigsGlut",   color = QUEEN_CROWN,   mat = Enum.Material.Neon,          trans = 0 },
+			{ name = "WingL",                   color = QUEEN_WING,    mat = Enum.Material.Glass,         trans = 0.35 },
+			{ name = "WingR",                   color = QUEEN_WING,    mat = Enum.Material.Glass,         trans = 0.35 },
+			{ name = "WingBackL",               color = QUEEN_WING,    mat = Enum.Material.Glass,         trans = 0.42 },
+			{ name = "WingBackR",               color = QUEEN_WING,    mat = Enum.Material.Glass,         trans = 0.42 },
+		}
+		local refPos = meshChitin.Position
+		for _, spec in meshSpecs do
+			local src = bossFolder:FindFirstChild(spec.name, true)
+			if src and src:IsA("BasePart") then
+				local clone = src:Clone()
+				clone.Name         = spec.name
+				clone.Color        = spec.color
+				clone.Material     = spec.mat
+				clone.Transparency = spec.trans
+				clone.Anchored     = true
+				clone.CanCollide   = false
+				clone.CanQuery     = false
+				clone.CanTouch     = false
+				clone.CastShadow   = false
+				local rel = src.Position - refPos
+				clone.CFrame = pose * CFrame.new(rel.X, rel.Y, rel.Z) * src.CFrame.Rotation
+				clone.Parent = model
+			end
+		end
+		piece({ Name = "Head", Transparency = 1, Size = Vector3.new(2, 2, 2) * s }, CFrame.new(0, 1.2 * s, -3.45 * s))
+		model.WorldPivot = pose
+		model.Parent = parent
+		return model
+	end
+
+	local function limb(name: string, p0: Vector3, p1: Vector3, radius: number, color: Color3, mat: Enum.Material)
+		local v0 = p0 * s
+		local v1 = p1 * s
+		local mid = (v0 + v1) * 0.5
+		local len = (v1 - v0).Magnitude
+		if len < 1e-3 then return end
+		local look = CFrame.lookAt(mid, v1) * CFrame.Angles(0, math.rad(90), 0)
+		piece({
+			Name = name,
+			Shape = Enum.PartType.Cylinder,
+			Material = mat,
+			Color = color,
+			Size = Vector3.new(len, radius * 2 * s, radius * 2 * s),
+		}, look)
+	end
+
+	-- 2. KUSCHELIGER CHIBI-THORAX, FLAUSCHIGER KOENIGSKRAGEN & HERZ-BROSCHE
 	piece({ Name = "Thorax", Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
-		Color = QUEEN_BLACK, Size = Vector3.new(4.5, 4.5, 4.5) * s }, CFrame.new(0, 0.4 * s, 0))
+		Color = QUEEN_PLUM, Size = Vector3.new(5.1, 4.9, 5.5) * s }, CFrame.new(0, 0.45 * s, 0))
+	piece({ Name = "ThoraxGoldBelt", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Metal,
+		Color = QUEEN_GOLD, Size = Vector3.new(0.42, 4.1, 4.1) * s },
+		CFrame.new(0, 0.28 * s, 1.95 * s) * CFrame.Angles(0, math.rad(90), 0))
+
+	-- Flauschiger Creme-Koenigskragen aus runden Pluesch-Bommeln rund um den Hals
+	for i = 0, 9 do
+		local ra = i * (math.pi * 2 / 10)
+		local px = math.cos(ra) * 2.15
+		local py = 0.72 + math.sin(ra) * 2.05
+		local pz = -1.95 + math.sin(ra) * 0.25
+		piece({ Name = "NeckFluff" .. i, Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
+			Color = QUEEN_CREAM, Size = Vector3.new(1.55, 1.55, 1.35) * s }, CFrame.new(px * s, py * s, pz * s))
+	end
+
+	-- Goldene Koenigs-Brosche vorne am Kragen
+	piece({ Name = "BroochGold", Shape = Enum.PartType.Ball, Material = Enum.Material.Metal,
+		Color = QUEEN_GOLD, Size = Vector3.new(1.35, 1.35, 0.70) * s }, CFrame.new(0, -0.85 * s, -2.65 * s))
+	piece({ Name = "BroochGem", Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+		Color = QUEEN_CUSHION, Size = Vector3.new(0.88, 0.88, 0.50) * s }, CFrame.new(0, -0.92 * s, -2.85 * s))
+
+	-- 3. KUGELIGER HUMMEL-BAUCH (Abdomen) & SUESSER RUNDER MINI-STACHEL
+	piece({ Name = "Abdomen", Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
+		Color = QUEEN_YELLOW, Size = Vector3.new(7.1, 6.9, 8.9) * s },
+		CFrame.new(0, 0.10 * s, 5.85 * s) * CFrame.Angles(math.rad(-6), 0, 0))
+
+	local tummyRings = {
+		{ name = "Stripe1",   z = 3.85, y = 0.28,  d = 6.2, w = 1.05, col = QUEEN_PLUM, mat = Enum.Material.SmoothPlastic },
+		{ name = "GoldBand1", z = 4.48, y = 0.22,  d = 6.6, w = 0.32, col = QUEEN_GOLD, mat = Enum.Material.Metal },
+		{ name = "Stripe2",   z = 5.85, y = 0.10,  d = 7.2, w = 1.15, col = QUEEN_PLUM, mat = Enum.Material.SmoothPlastic },
+		{ name = "GoldBand2", z = 6.55, y = 0.02,  d = 6.9, w = 0.32, col = QUEEN_GOLD, mat = Enum.Material.Metal },
+		{ name = "Stripe3",   z = 7.85, y = -0.12, d = 6.0, w = 1.05, col = QUEEN_PLUM, mat = Enum.Material.SmoothPlastic },
+		{ name = "GoldBand3", z = 8.48, y = -0.18, d = 5.0, w = 0.30, col = QUEEN_GOLD, mat = Enum.Material.Metal },
+	}
+	for _, r in tummyRings do
+		piece({ Name = r.name, Shape = Enum.PartType.Cylinder, Material = r.mat,
+			Color = r.col, Size = Vector3.new(r.w, r.d, r.d) * s },
+			CFrame.new(0, r.y * s, r.z * s) * CFrame.Angles(math.rad(-6), math.rad(90), 0))
+	end
+
+	-- Harmloser, runder goldener Stachel-Knopf am Po
+	piece({ Name = "StingerButton", Shape = Enum.PartType.Ball, Material = Enum.Material.Metal,
+		Color = QUEEN_GOLD, Size = Vector3.new(1.9, 1.9, 1.5) * s }, CFrame.new(0, -0.35 * s, 10.15 * s))
+	limb("Stinger", Vector3.new(0, -0.38, 10.45), Vector3.new(0, -0.52, 11.55), 0.38, QUEEN_CROWN, Enum.Material.Neon)
+	piece({ Name = "StingerBall", Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+		Color = QUEEN_CROWN, Size = Vector3.new(0.55, 0.55, 0.55) * s }, CFrame.new(0, -0.53 * s, 11.62 * s))
+
+	-- 4. GROSSER RUNDER CHIBI-KOPF (Head), KULLERAUGEN, PAUSBAECKCHEN & BOMMEL-FUEHLER
 	piece({ Name = "Head", Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
-		Color = QUEEN_YELLOW, Size = Vector3.new(4, 3.6, 3.6) * s }, CFrame.new(0, 0.8 * s, -3.5 * s))
-	piece({ Name = "Crown", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon,
-		Color = QUEEN_CROWN, Size = Vector3.new(1.2, 2.6, 2.6) * s }, CFrame.new(0, 3 * s, -3.5 * s) * CFrame.Angles(0, 0, math.rad(90)))
-	piece({ Name = "WingL", Material = Enum.Material.Glass, Transparency = 0.35,
-		Color = QUEEN_WING, Size = Vector3.new(9, 0.3, 4) * s }, CFrame.new(-5 * s, 3 * s, 1 * s) * CFrame.Angles(0, 0, math.rad(20)))
-	piece({ Name = "WingR", Material = Enum.Material.Glass, Transparency = 0.35,
-		Color = QUEEN_WING, Size = Vector3.new(9, 0.3, 4) * s }, CFrame.new(5 * s, 3 * s, 1 * s) * CFrame.Angles(0, 0, math.rad(-20)))
+		Color = QUEEN_YELLOW, Size = Vector3.new(5.1, 4.7, 4.5) * s }, CFrame.new(0, 0.95 * s, -3.45 * s))
+
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "L" else "R"
+		-- Grosse dunkle Kulleraugen
+		piece({ Name = "Eye" .. tag, Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
+			Color = QUEEN_EYE_DARK, Size = Vector3.new(1.36, 1.64, 0.70) * s },
+			CFrame.new(side * 1.15 * s, 1.08 * s, -5.32 * s) * CFrame.Angles(math.rad(8), math.rad(side * -16), math.rad(side * -12)))
+		-- Zwei weisse Glanzlichter pro Auge (macht den Blick sofort lieb & lebendig)
+		piece({ Name = "EyeShineBig" .. tag, Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+			Color = QUEEN_SHINE, Size = Vector3.new(0.44, 0.48, 0.24) * s },
+			CFrame.new(side * 0.98 * s, 1.38 * s, -5.62 * s))
+		piece({ Name = "EyeShineSmall" .. tag, Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+			Color = QUEEN_SHINE, Size = Vector3.new(0.22, 0.22, 0.16) * s },
+			CFrame.new(side * 1.32 * s, 0.82 * s, -5.58 * s))
+
+		-- Sanfte Augenbrauen
+		limb("Brow" .. tag, Vector3.new(side * 0.65, 2.02, -5.42), Vector3.new(side * 1.55, 1.92, -5.12), 0.12, QUEEN_PLUM, Enum.Material.SmoothPlastic)
+
+		-- Rosa Pausbaeckchen
+		piece({ Name = "Blush" .. tag, Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
+			Color = QUEEN_BLUSH, Size = Vector3.new(0.96, 0.60, 0.44) * s },
+			CFrame.new(side * 1.62 * s, 0.38 * s, -5.05 * s) * CFrame.Angles(0, math.rad(side * -24), 0))
+
+		-- Kleines freundliches Laecheln (:3)
+		limb("Smile" .. tag, Vector3.new(0, 0.38, -5.62), Vector3.new(side * 0.38, 0.50, -5.55), 0.08, QUEEN_PLUM, Enum.Material.SmoothPlastic)
+
+		-- Runde Bommelfuehler
+		local a0 = Vector3.new(side * 0.75, 2.85, -4.25)
+		local a1 = Vector3.new(side * 1.35, 3.85, -4.65)
+		local a2 = Vector3.new(side * 1.95, 4.45, -4.45)
+		limb("Antenna1" .. tag, a0, a1, 0.15, QUEEN_PLUM, Enum.Material.SmoothPlastic)
+		limb("Antenna2" .. tag, a1, a2, 0.13, QUEEN_PLUM, Enum.Material.SmoothPlastic)
+		piece({ Name = "AntennaPom" .. tag, Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+			Color = QUEEN_CROWN, Size = Vector3.new(0.84, 0.84, 0.84) * s }, CFrame.new(a2 * s))
+	end
+
+	-- 5. SUESSES KOENIGSKROENCHEN MIT SAMTKISSEN & LEUCHTPERLEN
+	local cz, cy = -3.35, 3.15
+	piece({ Name = "Crown", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Metal,
+		Color = QUEEN_GOLD, Size = Vector3.new(0.75, 2.95, 2.95) * s },
+		CFrame.new(0, (cy + 0.18) * s, cz * s) * CFrame.Angles(0, 0, math.rad(90)))
+	piece({ Name = "CrownCushion", Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic,
+		Color = QUEEN_CUSHION, Size = Vector3.new(2.35, 1.30, 2.35) * s },
+		CFrame.new(0, (cy + 0.45) * s, cz * s))
+	piece({ Name = "CrownTopGem", Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+		Color = QUEEN_CROWN, Size = Vector3.new(0.76, 0.90, 0.76) * s },
+		CFrame.new(0, (cy + 1.15) * s, cz * s))
+
+	for i = 0, 5 do
+		local ca = i * (math.pi / 3)
+		local sx0, sz0 = math.sin(ca) * 1.42, cz - math.cos(ca) * 1.42
+		local sx1, sz1 = math.sin(ca) * 1.62, cz - math.cos(ca) * 1.62
+		local sh = if i % 2 == 0 then 0.85 else 0.62
+		limb("CrownPoint" .. i, Vector3.new(sx0, cy + 0.42, sz0), Vector3.new(sx1, cy + 0.42 + sh, sz1), 0.18, QUEEN_GOLD, Enum.Material.Metal)
+		piece({ Name = "CrownPearl" .. i, Shape = Enum.PartType.Ball, Material = Enum.Material.Neon,
+			Color = if i % 2 == 1 then QUEEN_SHINE else QUEEN_CROWN,
+			Size = Vector3.new(0.44, 0.44, 0.44) * s }, CFrame.new(sx1 * s, (cy + 0.48 + sh) * s, sz1 * s))
+	end
+
+	-- 6. VIER SUESSE KURZE STUMMELPFOTEN MIT GOLDSCHUHEN
+	for _, paw in { { tag = "F", x = 1.55, z = -0.85, y = -1.75 }, { tag = "B", x = 1.65, z = 1.05, y = -1.85 } } do
+		for _, side in { -1, 1 } do
+			local nameTag = paw.tag .. (if side < 0 then "L" else "R")
+			local hip  = Vector3.new(side * paw.x * 0.82, paw.y + 0.85, paw.z)
+			local foot = Vector3.new(side * paw.x,        paw.y,        paw.z)
+			limb("PawLeg" .. nameTag, hip, foot, 0.44, QUEEN_PLUM, Enum.Material.SmoothPlastic)
+			piece({ Name = "PawShoe" .. nameTag, Shape = Enum.PartType.Ball, Material = Enum.Material.Metal,
+				Color = QUEEN_GOLD, Size = Vector3.new(1.04, 0.84, 1.30) * s },
+				CFrame.new(side * paw.x * s, (paw.y - 0.15) * s, (paw.z - 0.15) * s))
+		end
+	end
+
+	-- 7. RUNDE FEEN-/HONIGFLUEGEL (WingL/WingR & WingBackL/WingBackR)
+	piece({ Name = "WingL", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Glass, Transparency = 0.35,
+		Color = QUEEN_WING, Size = Vector3.new(0.22, 7.8, 7.8) * s },
+		CFrame.new(-5.0 * s, 3.0 * s, 0.6 * s) * CFrame.Angles(0, math.rad(-14), math.rad(20)))
+	piece({ Name = "WingR", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Glass, Transparency = 0.35,
+		Color = QUEEN_WING, Size = Vector3.new(0.22, 7.8, 7.8) * s },
+		CFrame.new(5.0 * s, 3.0 * s, 0.6 * s) * CFrame.Angles(0, math.rad(14), math.rad(-20)))
+
+	piece({ Name = "WingBackL", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Glass, Transparency = 0.42,
+		Color = QUEEN_WING, Size = Vector3.new(0.18, 5.4, 5.4) * s },
+		CFrame.new(-3.8 * s, 2.1 * s, 2.2 * s) * CFrame.Angles(0, math.rad(-24), math.rad(12)))
+	piece({ Name = "WingBackR", Shape = Enum.PartType.Cylinder, Material = Enum.Material.Glass, Transparency = 0.42,
+		Color = QUEEN_WING, Size = Vector3.new(0.18, 5.4, 5.4) * s },
+		CFrame.new(3.8 * s, 2.1 * s, 2.2 * s) * CFrame.Angles(0, math.rad(24), math.rad(-12)))
 
 	model.WorldPivot = pose
 	model.Parent = parent

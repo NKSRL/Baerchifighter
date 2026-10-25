@@ -12,6 +12,8 @@ local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local PromotionConfig = require(ReplicatedStorage.Config.PromotionConfig)
 local CharmConfig     = require(ReplicatedStorage.Config.CharmConfig)
 local Types           = require(ReplicatedStorage.Network.Types)
+local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)   -- 20.10. P5b
+local PowerRules      = require(ReplicatedStorage.Modules.PowerRules)
 
 local CombatCalculator = {}
 
@@ -161,6 +163,16 @@ function CombatCalculator.getEffectiveStats(baerchi: Types.Baerchi, baseDef: { [
 	local baseAtk  = (override and override.atk) or baseDef.atk
 	local baseSpd  = (override and override.spd) or baseDef.spd
 	local basePwr  = (override and override.pwr) or baseDef.pwr or 0
+
+	-- 20.10. P5b (Flag POWER_MODEL_V2): Rarity-Basis * individueller Wurf statt fester Pet-Werte.
+	if FeatureFlags.isOn("POWER_MODEL_V2") then
+		local def = BaerchiConfig.getById(baerchi.configId)
+		if def then
+			local v2 = PowerRules.applyV2({ hp = baseHp, atk = baseAtk, spd = baseSpd, pwr = basePwr },
+				BaerchiConfig.getRarityIndex(def.rarity) - 1, baerchi.uid)
+			baseHp, baseAtk, baseSpd, basePwr = v2.hp, v2.atk, v2.spd, v2.pwr
+		end
+	end
 
 	-- 2. Mutation: wirkt direkt auf die Basiswerte, vor allem anderen.
 	-- getMutationBonus liefert fuer baerchi.mutation == nil einen Nullbonus,

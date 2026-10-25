@@ -58,6 +58,12 @@ local CHECK_INTERVAL = 3
 -- sie einfach abzuwarten.
 local EAT_PAUSE_SECONDS = 1.2
 
+-- 21.10. Epilog: solange Gipfel, Insel oder Terminal stehen, bleibt der Baerchi dort, wo der
+-- Epilog ihn hingestellt hat. Sonst lief der Autopilot (Honigteich) mitten in der End-Animation los.
+local function epilogActive(player: Player): boolean
+	return MapService.hasSummit(player) or MapService.hasIsland(player) or MapService.hasTerminal(player)
+end
+
 local function footPosOf(model: Model): Vector3
 	return FigurePlacement.footOf(model)   -- Sammel-Update 1.2
 end
@@ -129,15 +135,28 @@ local function runEatCycle(player: Player, baerchiUid: string)
 			-- Figur ausgetauscht).
 			local function cancelled(): boolean
 				return ActivityLock.owner(player) ~= LOCK_HOLDER
+					or epilogActive(player)
 					or player.Parent == nil
 					or figure.Parent == nil
 					or MapService.getBaerchiModel(player, baerchiUid) ~= figure
 			end
 
-			FigureWalker.walk(figure, startFoot, pond, {
-				speed       = MapConfig.WALK_SPEED,
-				isCancelled = cancelled,
-			})
+			-- 20.10.: mit Rampe auf den Steg (siehe MapService.getPondRampPoints); ohne Steg wie vorher
+			local ramp = MapService.getPondRampPoints(player)
+			if #ramp > 0 then
+				local there: { Vector3 } = { startFoot }
+				for _, point in ramp do table.insert(there, point) end
+				table.insert(there, pond)
+				FigureWalker.walkPath(figure, there, {
+					speed       = MapConfig.WALK_SPEED,
+					isCancelled = cancelled,
+				})
+			else
+				FigureWalker.walk(figure, startFoot, pond, {
+					speed       = MapConfig.WALK_SPEED,
+					isCancelled = cancelled,
+				})
+			end
 			if cancelled() then return end
 
 			-- HoneyService.feed prueft selbst nochmal ob es sich noch lohnt
@@ -155,10 +174,20 @@ local function runEatCycle(player: Player, baerchiUid: string)
 			FigureFX.leanForward(figure, MapConfig.EAT_LEAN_DEGREES, EAT_PAUSE_SECONDS)
 			if cancelled() then return end
 
-			FigureWalker.walk(figure, pond, homeFoot, {
-				speed       = MapConfig.WALK_SPEED,
-				isCancelled = cancelled,
-			})
+			if #ramp > 0 then
+				local back: { Vector3 } = { pond }
+				for i = #ramp, 1, -1 do table.insert(back, ramp[i]) end
+				table.insert(back, homeFoot)
+				FigureWalker.walkPath(figure, back, {
+					speed       = MapConfig.WALK_SPEED,
+					isCancelled = cancelled,
+				})
+			else
+				FigureWalker.walk(figure, pond, homeFoot, {
+					speed       = MapConfig.WALK_SPEED,
+					isCancelled = cancelled,
+				})
+			end
 		end)
 
 		if not ok then
@@ -192,7 +221,7 @@ local function tick()
 		local baerchi = data.island.baerchis[uid]
 		if not baerchi then continue end
 
-		if ActivityLock.isFree(player) and shouldEat(data, baerchi) then
+		if ActivityLock.isFree(player) and not epilogActive(player) and shouldEat(data, baerchi) then
 			runEatCycle(player, uid)
 		end
 	end

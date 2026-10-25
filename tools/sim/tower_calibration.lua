@@ -130,7 +130,17 @@ check("L50 Max Common schafft Tower I locker", maxP.Common.I >= 30, maxP.Common.
 check("L50 Max Legendaer: Tower III mit Muehe (40-60)", maxP.Legendary.III >= 38 and maxP.Legendary.III <= 60, maxP.Legendary.III)
 check("L50 Max Mythisch: Tower III mit Muehe (45-60)", maxP.Mythic.III >= 45, maxP.Mythic.III)
 local FeatureFlags = require(RS.Config.FeatureFlags)
-if FeatureFlags.isOn("TOWER_F_EASIER") then
+if FeatureFlags.isOn("TOWER_BALANCE_V3") then
+	-- 21.10. (V3): III mit Mythic schaffbar, Final 100 = Divine mit gutem Ausbau, Mythic nur mit Max-Ausbau
+	local p5 = results["L50 P5 C S50"]
+	check("L50 Max Epic: Final knapp verfehlt (60-90)", maxP.Epic.Final >= 60 and maxP.Epic.Final <= 90, maxP.Epic.Final)
+	check("L50 Max Mythisch schafft Final 100", maxP.Mythic.Final >= 100, maxP.Mythic.Final)
+	check("L50 P5 Mythisch kommt nicht durch Final (< 100)", p5.Mythic.Final < 100, p5.Mythic.Final)
+	check("L50 P5 Divine schafft Final 100", p5.Divine.Final >= 100, p5.Divine.Final)
+	check("L25 P5 Mythisch scheitert an Final (< 40)", results["L25 P5 C S50"].Mythic.Final < 40, results["L25 P5 C S50"].Mythic.Final)
+	check("L50 P5 Epic: Tower III fast (>= 30)", p5.Epic.III >= 30, p5.Epic.III)
+	check("L50 P5 Mythisch schafft Tower III", p5.Mythic.III >= 60, p5.Mythic.III)
+elseif FeatureFlags.isOn("TOWER_F_EASIER") then
 	-- 20.10. (P2): Final 100 mit Legendaer/Mythisch-Team knapp, Epic scheitert, Omega locker
 	local p5 = results["L50 P5 C S50"]
 	check("L50 Max Epic scheitert an Final 100 (70-95)", maxP.Epic.Final >= 70 and maxP.Epic.Final <= 95, maxP.Epic.Final)

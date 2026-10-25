@@ -28,6 +28,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 
 local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
@@ -110,6 +111,9 @@ end
 
 local function buildArch(arena: Arena)
 	if not WorldFXKit.enabled("arenaArch") then return end
+	-- 25.10. (PIT_V2): das Honig-Kolosseum hat eigene Tore; der Bogen waere doppelt
+	-- und stuende in der Flugbahn vom Turm-Flugfeld.
+	if FeatureFlags.isOn("PIT_V2") then return end
 	local cfg = WorldFXConfig.ARENA_ARCH
 	local slot = arena.slot
 	local pit = MapLayout.pitCenter(slot)

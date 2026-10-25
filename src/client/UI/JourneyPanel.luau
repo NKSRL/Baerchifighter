@@ -92,7 +92,10 @@ local function refresh(data: any)
 	bar.text.Text = if target > 1 then (Loc.formatNumber(cur) .. " / " .. Loc.formatNumber(target)) else ""
 	claim.Visible = done
 	claim.Text = Loc.t("ui.journey.claim") .. " +" .. tostring(stage.reward.goldGummies or stage.reward.gummies or 0)
-	skip.Visible = not done
+	-- 21.10. Playtest: Kein "Spaeter"-Knopf. Wer eine Etappe wegklickt, kommt nie wieder zu ihr
+	-- zurueck. Der Server versteht "skip" weiterhin (nichts geloescht), der Knopf wird nur nicht
+	-- mehr gezeigt.
+	skip.Visible = false
 	claim:SetAttribute("StageId", id)
 	skip:SetAttribute("StageId", id)
 	setIcon(stage.icon)
@@ -115,7 +118,8 @@ function JourneyPanel.init(screenGui: ScreenGui)
 	if _root then return end
 	local root = Theme.panel("JourneyPanel", screenGui, Theme.COLORS.panel)
 	root.AnchorPoint = Vector2.new(0, 0.5)
-	root.Position = UDim2.new(0, 12, 0.5, -40)
+	-- 21.10. (Playtest 2): tiefer, damit das Fenster nicht in die Knopf-Zeile oben ragt
+	root.Position = UDim2.new(0, 12, 0.5, 100)
 	root.Size = UDim2.fromOffset(WIDTH, HEIGHT_OPEN)
 	root.Visible = false
 	root.ZIndex = 5
@@ -132,7 +136,7 @@ function JourneyPanel.init(screenGui: ScreenGui)
 
 	local title = Theme.label("Title", root, "")
 	title.Position = UDim2.fromOffset(44, 4)
-	title.Size = UDim2.new(1, -44 - 84, 0, 32)
+	title.Size = UDim2.new(1, -44 - 56, 0, 32)
 	_title = title
 
 	local toggle = Theme.button("Toggle", root, "–", Theme.COLORS.panelLight)
@@ -143,6 +147,9 @@ function JourneyPanel.init(screenGui: ScreenGui)
 		applySize(true)
 	end)
 	_toggle = toggle
+	-- 21.10. (Playtest 2): kein Minimieren-Knopf, nur Schliessen (Code bleibt, Knopf ist aus)
+	toggle.Visible = false
+	_collapsed = false
 
 	-- Ausblenden: Schliessen-Knopf (Server merkt es, bleibt nach Rejoin erhalten)
 	local hide = Theme.closeButton(root, function()

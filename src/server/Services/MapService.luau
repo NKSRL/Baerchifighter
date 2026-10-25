@@ -63,16 +63,19 @@ local WorldBuilder   = require(MapBuild.WorldBuilder)
 local PlotBuilder    = require(MapBuild.PlotBuilder)
 local PondBuilder    = require(MapBuild.PondBuilder)
 local ArenaBuilder   = require(MapBuild.ArenaBuilder)
+local RocketIslandBuilder = require(MapBuild.RocketIslandBuilder)   -- W1-P2 Raketen-Insel je Plot
 local FigureBuilder  = require(MapBuild.FigureBuilder)
 local LaidEggBuilder = require(MapBuild.LaidEggBuilder)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local RecyclerBuilder = require(MapBuild.RecyclerBuilder)
 local IncubatorBuilder = require(MapBuild.IncubatorBuilder)   -- Sammel-Update Paket 8
 local TerminalBuilder  = require(MapBuild.TerminalBuilder)    -- 08.10. Tower-Terminal
+local Welt2Builder     = require(MapBuild.Welt2Builder)       -- 21.10. Welt-2-Look
 local EpilogSummitBuilder = require(MapBuild.EpilogSummitBuilder)   -- 20.10. Final-Epilog: Gipfel
 local EpilogIslandBuilder = require(MapBuild.EpilogIslandBuilder)   -- 20.10. Final-Epilog: Insel + Bruecke
 local EpilogTerminalBuilder = require(MapBuild.EpilogTerminalBuilder)   -- 20.10. Final-Epilog: Start-Terminal
 local EpilogFinaleBuilder = require(MapBuild.EpilogFinaleBuilder)   -- 20.10. Final-Epilog P6: Rakete
+local HubPlazaBuilder    = require(MapBuild.HubPlazaBuilder)       -- 22.10. Welt-1-Hub Redesign
 
 --------------------------------------------------------------------------------
 -- Interner Zustand
@@ -129,8 +132,20 @@ end
 -- Plot-Inhalt
 --------------------------------------------------------------------------------
 
+-- 21.10. Welt 2: hat der Spieler Welt 2 frei (und ist der Schalter an)? WorldService wird erst
+-- beim Aufruf geladen (kein Ladezyklus ueber PlayerService).
+local function world2Active(player: Player): boolean
+	if not FeatureFlags.isOn("WELT2_LOOK") then return false end
+	local ok, result = pcall(function()
+		local WorldService = require(ServerScriptService.Services.WorldService)
+		return WorldService.isWorld2Unlocked(player)
+	end)
+	return ok and result == true
+end
+
 -- Baut den kompletten Inhalt eines Plots (Gebaeude + Bruecke + PIT + Baerchis).
 local function buildPlotContents(plotModel: Model, slot: number, islandData: Types.IslandData, owner: Player)
+	if world2Active(owner) then plotModel:SetAttribute(Welt2Builder.PLOT_ATTRIBUTE, true) end   -- vor allen Gebaeuden
 	local pool = PondBuilder.honeyPool(islandData)
 	for _, building in islandData.buildings do
 		PlotBuilder.buildBuilding(plotModel, slot, building, pool)
@@ -138,6 +153,11 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 
 	ArenaBuilder.buildBridge(plotModel, slot)
 	ArenaBuilder.buildPit(plotModel, slot)
+	-- W1-P2: eigene Raketen-Insel hinter dem Fight-Pit (Schalter ROCKET_ISLAND); Fehler stoppen den Plot-Aufbau nie
+	if FeatureFlags.isOn("ROCKET_ISLAND") then
+		local okRocket, errRocket = pcall(RocketIslandBuilder.build, plotModel, slot)
+		if not okRocket then warn("[MapService] Raketen-Insel nicht gebaut:", errRocket) end
+	end
 	-- 20.10. Final-Epilog: ein Neuaufbau (Ausbau, Rebirth) darf den gehaltenen
 	-- Turm samt Gipfel nicht verlieren.
 	local hold = _towerHold[owner]
@@ -149,6 +169,7 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 			for i = 1, hold do
 				ArenaBuilder.buildTowerRing(tower, center, i)
 			end
+			if pit then ArenaBuilder.placeTowerFence(pit, slot, hold, true) end   -- 25.10. PIT_V2: kein Gelaender am Gipfel
 		end
 		EpilogSummitBuilder.build(plotModel, slot, owner, { animate = false })
 		-- Prompt 3: Insel und Bruecke wieder auf den Stand von vorher bringen
@@ -165,6 +186,10 @@ local function buildPlotContents(plotModel: Model, slot: number, islandData: Typ
 	-- 08.10.: Tower-Terminal am Stegbeginn (Zustand nur als Attribute)
 	if FeatureFlags.isOn("TOWER_TERMINAL") then
 		TerminalBuilder.build(plotModel, slot, _terminal[owner])
+	end
+	if Welt2Builder.enabled(plotModel) then
+		local okW2, errW2 = pcall(Welt2Builder.buildPlot, plotModel, slot)
+		if not okW2 then warn("[MapService] Welt-2-Plot nicht gebaut:", errW2) end
 	end
 	FigureBuilder.renderBaerchis(plotModel, slot, islandData)
 	LaidEggBuilder.renderLaidEggs(plotModel, slot, islandData, owner)
@@ -352,6 +377,36 @@ function MapService.updateBuildingLooks(player: Player, islandData: Types.Island
 			FigureFX.burstAt(position, LOOK_UPGRADE_COLOR, model, LOOK_UPGRADE_SPARKS)
 		end
 	end
+end
+
+-- 21.10. Welt 2: baut den Plot eines Spielers IM LAUFENDEN BETRIEB auf den Welt-2-Look um
+-- (Boden, Fusionsmaschine, Brunnen, Recycler, Inkubator, Terminal). Der Turm samt Gipfel,
+-- die Insel und die Baerchis bleiben unberuehrt. Aufrufer: EpilogService (Knopf-Finale).
+function MapService.applyWorld2(player: Player): boolean
+	if not FeatureFlags.isOn("WELT2_LOOK") then return false end
+	local model = _plotModels[player]
+	local slot  = _playerSlot[player]
+	local provider = _islandDataProvider
+	local islandData = if provider then provider(player) else nil
+	if not model or not slot or not islandData then return false end
+	model:SetAttribute(Welt2Builder.PLOT_ATTRIBUTE, true)
+	local ok = Welt2Builder.buildPlot(model, slot)
+	PondBuilder.buildPond(model, slot, islandData)
+	for _, building in islandData.buildings do
+		if building.id == "HoneyPond" then
+			local body = model:FindFirstChild(building.id)
+			if body then body:Destroy() end
+			PlotBuilder.buildBuilding(model, slot, building, PondBuilder.honeyPool(islandData))
+		end
+	end
+	RecyclerBuilder.build(model, slot, islandData.recycler)
+	if FeatureFlags.isOn("INCUBATOR") and islandData.incubator then
+		IncubatorBuilder.build(model, slot, islandData.incubator, _incubatorSlots(player), islandData.baerchis)
+	end
+	if FeatureFlags.isOn("TOWER_TERMINAL") then
+		TerminalBuilder.build(model, slot, _terminal[player])
+	end
+	return ok
 end
 
 -- Haengt die Quelle fuer frische IslandData ein (siehe _islandDataProvider).
@@ -566,6 +621,55 @@ function MapService.getPondPosition(player: Player): Vector3?
 	return PondBuilder.pondStand(slot).Position
 end
 
+-- 20.10. (Welt 1, Paket 1: Pet steckt im Steg des Honigteichs): Auf- und Abstieg am Steg.
+-- Der Standplatz liegt NEW_MODELS_V3 auf dem Steg des Brunnen-Meshs (~1,5 Studs hoch), der Heimplatz
+-- auf der Wiese. FigureWalker.walk haelt die Hoehe des Startpunkts fuer den ganzen Weg und lief darum
+-- auf Bodenhoehe in den Steg hinein (und zurueck auf Steghoehe ueber die Wiese). Diese Punkte liefern
+-- die Rampe: Wiese vor dem Steg -> Stegkante oben. Gibt {} zurueck, wenn es keinen Steg gibt (alter
+-- Teich: Standplatz ist ebenerdig). Reihenfolge: von der Wiese zum Steg; fuer den Rueckweg umdrehen.
+-- Die Punkte werden aus den echten Steg-Planken des gebauten Brunnens gelesen (Teile "Jetty_Plank*"),
+-- nicht aus festen Zahlen: Aussenkante und Oberkante gelten so fuer jede Stufe und jede Skalierung.
+-- Fehlen die Planken, gelten die Masse der Vorlage (Steg 3,8 .. 9,1 Studs von der Beckenmitte, Oberkante 1,54, mal k).
+function MapService.getPondRampPoints(player: Player): { Vector3 }
+	local slot = _playerSlot[player]
+	if not slot then return {} end
+	local RS = game:GetService("ReplicatedStorage")
+	if not (require(RS.Config.FeatureFlags).isOn("NEW_MODELS_V3")
+		and RS:FindFirstChild("Assets") and RS.Assets:FindFirstChild("Fountains")) then
+		return {}
+	end
+	local k = PondBuilder.standFactor(_plotModels[player])
+	local ground = PondBuilder.pondGround(slot)
+
+	local outerZ = -9.1 * k   -- teich-lokal: Aussenkante des Stegs (zeigt nach -Z)
+	local topY   = 1.54 * k   -- Oberkante der Planken
+	local plotModel = _plotModels[player]
+	local pond = plotModel and plotModel:FindFirstChild("Pond")
+	local fountain = pond and pond:FindFirstChild("Fountain")
+	if fountain then
+		local minZ, maxY = math.huge, -math.huge
+		for _, part in fountain:GetDescendants() do
+			if part:IsA("BasePart") and string.sub(part.Name, 1, 11) == "Jetty_Plank" then
+				for _, sx in { -0.5, 0.5 } do
+					for _, sy in { -0.5, 0.5 } do
+						for _, sz in { -0.5, 0.5 } do
+							local c = ground:PointToObjectSpace((part.CFrame * CFrame.new(part.Size * Vector3.new(sx, sy, sz))).Position)
+							minZ = math.min(minZ, c.Z)
+							maxY = math.max(maxY, c.Y)
+						end
+					end
+				end
+			end
+		end
+		if minZ < math.huge then outerZ, topY = minZ, maxY end
+	end
+
+	return {
+		(ground * CFrame.new(0, 0, outerZ - 0.35)).Position,   -- Wiese, kurz vor dem Steg
+		(ground * CFrame.new(0, topY, outerZ)).Position,       -- Stegkante, oben (Aufstieg als kleiner Hupfer)
+	}
+end
+
 -- Mitte des Beckens (Weltposition) — z. B. damit gelegte Eier nicht im Honig
 -- landen, seit der Baerchi am Becken wohnt (HONEY_POND_V2).
 function MapService.getPondCenter(player: Player): Vector3?
@@ -748,15 +852,13 @@ function MapService.setEventPitTheme(theme: EventTheme?)
 	local container = findEventPitContainer()
 	if not container then return end
 
-	local floorColor = if theme then theme.floorColor else MapConfig.EVENT_PIT_DEFAULT_FLOOR_COLOR
-	local fenceColor = if theme then theme.fenceColor else MapConfig.EVENT_PIT_DEFAULT_FENCE_COLOR
-	local ringColor  = if theme then theme.ringColor  else MapConfig.EVENT_PIT_DEFAULT_RING_COLOR
+	local floorColor = if theme then theme.floorColor else HubPlazaBuilder.DEFAULT_FLOOR_COLOR
+	local fenceColor = if theme then theme.fenceColor else HubPlazaBuilder.DEFAULT_FENCE_COLOR
+	local ringColor  = if theme then theme.ringColor  else HubPlazaBuilder.DEFAULT_RING_COLOR
 
-	-- Material wechselt mit: Wood/SmoothPlastic im Stall-Look, Neon waehrend
-	-- eines Events — sonst saehe man den Farbwechsel bei Zaun und Ring kaum,
-	-- weil beide im Stall-Look bewusst matt sind.
-	local activeMaterial = if theme then Enum.Material.Neon else Enum.Material.Wood
-	local ringMaterial   = if theme then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	-- EventRing ist im Ruhemodus Gold-Metal und wechselt waehrend eines Events auf Neon
+	-- (HubEventController prueft ring.Material == Enum.Material.Neon).
+	local ringMaterial = if theme then Enum.Material.Neon else Enum.Material.Metal
 
 	local floor = container:FindFirstChild("EventFloor")
 	if floor and floor:IsA("BasePart") then
@@ -770,9 +872,9 @@ function MapService.setEventPitTheme(theme: EventTheme?)
 	end
 
 	for _, child in container:GetChildren() do
-		if child.Name:match("^EventFence_") and child:IsA("BasePart") then
+		if (child.Name:match("^EventFence_") or child.Name:match("^EventCompassRay_")) and child:IsA("BasePart") then
 			child.Color    = fenceColor
-			child.Material = activeMaterial
+			child.Material = Enum.Material.Neon
 		end
 	end
 end
@@ -958,6 +1060,9 @@ function MapService.setPitTowerLevel(player: Player, level: number)
 	-- der Client schiesst den eigenen Charakter auf die Turm-Spitze.
 	container:SetAttribute("TowerLevel", wanted)
 	container:SetAttribute("TowerTopY", MapService.getPitTowerFloorY(wanted))
+	-- 25.10. (PIT_V2): Kollision der obersten Etage mitfuehren; auf dem gehaltenen
+	-- Gipfel ohne Gelaender und Kollision (dort fuehrt die Gipfel-Bruecke hinaus).
+	ArenaBuilder.placeTowerFence(container, slot, wanted, hold ~= nil)
 
 	local anchor = container:FindFirstChild("PitBannerAnchor")
 	if anchor and anchor:IsA("BasePart") then

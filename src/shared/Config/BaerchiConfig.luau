@@ -288,7 +288,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "PlatinumEgg", weight = 65 },
 		},
 		defaultSkill = "TitanMode", eggSource = {},
-		description = "War schon da bevor Paw Coins erfunden wurden.",
+		description = "War schon da bevor Pfotenmünzen erfunden wurden.",
 	},
 
 	-- ============================================================
@@ -484,6 +484,20 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		description = "Am Anfang war der Baerchi.",
 	},
 
+	-- 20.10. Welt 1, Paket 5d: das Hoffnungs-Pet des Ascension-Eis. Faellt NUR dort, mit 1 % (EggConfig.FIXED_PETS),
+	-- und legt selbst Ascension-Eier (langsam: 1 Ei / 7 Min, damit sich die Hoffnung nicht selbst vervielfacht).
+	-- Ausnahme von der Regel "Ascensions-Eier legt kein Baerchi" (siehe Kopf-Kommentar), bewusst.
+	AscendantBaerchi = {
+		id = "AscendantBaerchi", displayName = "Aufstiegs-Baerchi", rarity = "Godly", path = "Ascension",
+		baseStats = { hp = 9000, atk = 480, spd = 1.3, pwr = 0.40 },
+		layIntervalSeconds = 420,
+		eggTable = {
+			{ eggType = "TranscendenceEgg", weight = 100 },   -- 21.10.: einzige Quelle der Transzendenz-Eier
+		},
+		defaultSkill = "AscendingLight", eggSource = {},
+		description = "Wer ihn findet, steigt weiter auf.",
+	},
+
 	-- ============================================================
 	-- ETERNAL (Kosmos)
 	-- ============================================================
@@ -524,6 +538,56 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		},
 		defaultSkill = "OmegaStrike", eggSource = {},
 		description = "Der letzte Baerchi. Danach kommt nichts mehr.",
+	},
+
+	-- ============================================================
+	-- ANIME-PFAD (21.10. Welt 2, Basis-Anime-Ei). Fallen nur aus Anime-Eiern (EggConfig.buildHatchTables).
+	-- Eigene Archetypen, keine Originalfiguren, keine Originalnamen (Recht: claude/HBB_W2_ANIME_EI_PROTOTYP_2026-10-21.md).
+	-- Faehigkeiten: je Pet eine eigene (SkillConfig/SkillFXConfig), aus vorhandenen Effekt-Typen gebaut.
+	-- ============================================================
+
+	GummiPirateBaerchi = {
+		id = "GummiPirateBaerchi", displayName = "Gummi-Pirat", rarity = "Mythic", path = "Anime",
+		baseStats = { hp = 1500, atk = 110, spd = 1.1, pwr = 0.24 },
+		layIntervalSeconds = 190,
+		eggTable = {
+			{ eggType = "AnimeEgg", weight = 100 },
+		},
+		defaultSkill = "RubberSmash", eggSource = {},
+		description = "Sein Arm reicht bis zum Horizont.",
+	},
+
+	OrangeNinjaBaerchi = {
+		id = "OrangeNinjaBaerchi", displayName = "Orange-Ninja", rarity = "Mythic", path = "Anime",
+		baseStats = { hp = 1100, atk = 95, spd = 1.5, pwr = 0.30 },
+		layIntervalSeconds = 185,
+		eggTable = {
+			{ eggType = "AnimeEgg", weight = 100 },
+		},
+		defaultSkill = "SpiralDash", eggSource = {},
+		description = "Schnell, laut und immer hungrig.",
+	},
+
+	StarWarriorBaerchi = {
+		id = "StarWarriorBaerchi", displayName = "Sternenkrieger", rarity = "Divine", path = "Anime",
+		baseStats = { hp = 2400, atk = 150, spd = 1.1, pwr = 0.20 },
+		layIntervalSeconds = 200,
+		eggTable = {
+			{ eggType = "AnimeEgg", weight = 100 },
+		},
+		defaultSkill = "StarBlast", eggSource = {},
+		description = "Seine Haare trotzen jeder Schwerkraft.",
+	},
+
+	PlaidHunterBaerchi = {
+		id = "PlaidHunterBaerchi", displayName = "Karo-Jäger", rarity = "Divine", path = "Anime",
+		baseStats = { hp = 2000, atk = 140, spd = 1.3, pwr = 0.26 },
+		layIntervalSeconds = 195,
+		eggTable = {
+			{ eggType = "AnimeEgg", weight = 100 },
+		},
+		defaultSkill = "PlaidSlash", eggSource = {},
+		description = "Ein Schwert, ein Umhang, ein Versprechen.",
 	},
 }
 
@@ -853,6 +917,8 @@ local PATHS: { { id: Types.PathId, color: Color3, goal: string } } = {
 	{ id = "Void",      color = Color3.fromRGB(150,  90, 230), goal = "rare" },
 	{ id = "Kosmos",    color = Color3.fromRGB( 92,  72, 255), goal = "all" },
 	{ id = "Ascension", color = Color3.fromRGB(196, 128, 255), goal = "rebirth" },
+	-- 21.10. Welt 2: Anime-Pfad (Basis-Anime-Ei). Eigene Archetypen, keine Originalfiguren.
+	{ id = "Anime",     color = Color3.fromRGB(255, 140,  50), goal = "world2" },
 	-- v17: Sonder-Eier aus Events (kein Baerchi hat diesen Pfad)
 	{ id = "Event",     color = Color3.fromRGB(255, 214,  60), goal = "event" },
 }

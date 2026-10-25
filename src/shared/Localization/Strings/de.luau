@@ -25,6 +25,8 @@ return {
 	["ui.audio.music"] = "Musik",
 	["ui.audio.sfx"] = "Effekte",
 	["ui.audio.mute"] = "Stumm",
+	["ui.lowend.on"] = "Schwaches Gerät: An",
+	["ui.lowend.off"] = "Schwaches Gerät: Aus",
 
 	----------------------------------------------------------------------------
 	-- Zeit (Theme.formatDuration) — Werte kommen vorformatiert (z.B. "05")
@@ -46,8 +48,8 @@ return {
 	----------------------------------------------------------------------------
 	["ui.rebirth.title"]   = "Rebirth",
 	["ui.rebirth.status"]  = "Rebirth {count}  —  Multiplikator x{mult:d2}",
-	["ui.rebirth.cost"]    = "Kostet {cost} Paw Coins  (du hast {have})",
-	["ui.rebirth.loss"]    = "Weg: alle Gebäude-Level, die Level deiner Baerchis und deine Paw Coins (zurück auf {start}) — gib sie vorher aus!\nBleibt: deine Baerchis, alle Eier (auch im Inkubator), der Inkubator-Ausbau, der Ei-Baum, Tower-Rekorde, Honey Crystals, Rang und Statistiken.",
+	["ui.rebirth.cost"]    = "Kostet {cost} Pfotenmünzen  (du hast {have})",
+	["ui.rebirth.loss"]    = "Weg: alle Gebäude-Level, die Level deiner Baerchis und deine Pfotenmünzen (zurück auf {start}) — gib sie vorher aus!\nBleibt: deine Baerchis, alle Eier (auch im Inkubator), der Inkubator-Ausbau, der Ei-Baum, Tower-Rekorde, Honey Crystals, Rang und Statistiken.",
 	["ui.rebirth.reward"]  = "Danach: Multiplikator x{mult:d2}",
 	["ui.rebirth.reward_eggs.one"]   = "Danach: Multiplikator x{mult:d2}  —  +{n} Ascensions-Ei",
 	["ui.rebirth.reward_eggs.other"] = "Danach: Multiplikator x{mult:d2}  —  +{n} Ascensions-Eier",
@@ -57,8 +59,8 @@ return {
 	----------------------------------------------------------------------------
 	-- Meldungen (Toasts)
 	----------------------------------------------------------------------------
-	["msg.recycled"]       = "Verwertet: +{gummies} Paw Coins",
-	["msg.recycled_gold"]  = "Verwertet: +{gummies} Paw Coins  und  +{gold} Honey Crystals",
+	["msg.recycled"]       = "Verwertet: +{gummies} Pfotenmünzen",
+	["msg.recycled_gold"]  = "Verwertet: +{gummies} Pfotenmünzen  und  +{gold} Honey Crystals",
 	["msg.offline_honey"]  = "Während du weg warst ({time}): +{honey} Honig",
 	["msg.level_up"]       = "Level Up!  Jetzt Level {level}",
 	["msg.rebirth_done"]   = "Rebirth {count} geschafft: Multiplikator x{mult:d2}",
@@ -80,10 +82,10 @@ return {
 	["err.baerchi_not_found"]       = "Baerchi nicht gefunden",
 	["err.baerchi_data_corrupt"]    = "Baerchi-Daten defekt",
 	["err.baerchi_busy"]            = "Der Baerchi ist gerade unterwegs — kurz warten",
-	["err.not_enough_gummies"]      = "Nicht genug Paw Coins (du hast {have}, du brauchst {need})",
+	["err.not_enough_gummies"]      = "Nicht genug Pfotenmünzen (du hast {have}, du brauchst {need})",
 	["err.not_enough_gold_gummies"] = "Nicht genug Honey Crystals (du hast {have}, du brauchst {need})",
 	["err.shop_free_taken"] = "Heute schon abgeholt — morgen gibt es wieder Gold!",
-	["err.rebirth_cost"]            = "Rebirth kostet {cost} Paw Coins (du hast {have})",
+	["err.rebirth_cost"]            = "Rebirth kostet {cost} Pfotenmünzen (du hast {have})",
 
 	["err.building_missing"]        = "Gebäude nicht vorhanden",
 	["err.building_unknown"]        = "Unbekanntes Gebäude",
@@ -121,10 +123,19 @@ return {
 	["ui.pets.limit.full_hint"]       = "Verkaufe Bärchis, um Platz zu schaffen",
 	["ui.pets.sell.toggle"]           = "Verkaufen",
 	["ui.pets.sell.toggle_active"]    = "Fertig",
+	["ui.mut.title"] = "Mutationen",
+	["ui.mut.button"] = "Mutationen",
+	["ui.mut.intro"] = "Jedes geschlüpfte Bärchi hat zusammen {pct} Chance auf eine Mutation. Je höher die Stärke, desto seltener.",
+	["ui.mut.col_name"] = "Mutation",
+	["ui.mut.col_power"] = "Stärke",
+	["ui.mut.col_chance"] = "Chance",
+	["ui.mut.odds"] = "1 von {n}",
+	["ui.mut.per_hatch"] = "{pct} pro Schlüpfen",
+	["ui.mut.note"] = "Stärke gilt für HP, ATK und Ei-Tempo. SPD und PWR bekommen nur ein Drittel des Bonus. Beim Fusionieren bleibt die höhere Mutation.",
 	["ui.pets.sell.hint"]             = "Tippe Bärchis an, um sie zum Verkaufen zu markieren",
 	["ui.pets.sell.sell_button.one"]   = "{n} Bärchi verkaufen",
 	["ui.pets.sell.sell_button.other"] = "{n} Bärchis verkaufen",
-	["ui.pets.sell.clear_all"]        = "Alle abwählen",
+	["ui.pets.sell.clear_all"]        = "Auswahl aufheben",
 	["ui.pets.sell.confirm_title"]    = "Verkaufen?",
 	["ui.pets.sell.confirm_text.one"]   = "Willst du wirklich {n} Bärchi verkaufen? Das kann nicht rückgängig gemacht werden.",
 	["ui.pets.sell.confirm_text.other"] = "Willst du wirklich {n} Bärchis verkaufen? Das kann nicht rückgängig gemacht werden.",
@@ -256,8 +267,8 @@ return {
 	["ui.quest.resets_in"] = "Neue Tages-Quests in {time}",
 	["ui.quest.claimed"] = "Erledigt",
 	["ui.quest.claim_short"] = "Abholen",
-	["ui.quest.reward_gummies"] = "+{n} Paw Coins",
-	["ui.quest.reward_with_egg"] = "+{n} Paw Coins und ein {egg}",
+	["ui.quest.reward_gummies"] = "+{n} Pfotenmünzen",
+	["ui.quest.reward_with_egg"] = "+{n} Pfotenmünzen und ein {egg}",
 	["ui.quest.reward_gold"] = "+{n} Honey Crystals",
 	["ui.quest.toast"] = "Quest geschafft: {text}",
 	["err.quest_unknown"] = "Unbekannte Quest",
@@ -292,8 +303,8 @@ return {
 	["quest.d_hatch3.hint"] = "Eier aus dem Lager und vom Plot zaehlen beide.",
 	["quest.d_fight8.title"] = "Gewinne heute 8 Kaempfe",
 	["quest.d_fight8.hint"] = "Nutze den Kampf-Knopf unten.",
-	["quest.d_earn.title"] = "Verdiene heute 1.500 Paw Coins",
-	["quest.d_earn.hint"] = "Kaempfe und deine Gebaeude zahlen Paw Coins aus.",
+	["quest.d_earn.title"] = "Verdiene heute 1.500 Pfotenmünzen",
+	["quest.d_earn.hint"] = "Kaempfe und deine Gebaeude zahlen Pfotenmünzen aus.",
 
 	----------------------------------------------------------------------------
 	-- v14: Mega Egg Tree (Ei-Baum, neue Eier, neue Baerchis, Faehigkeiten)
@@ -409,6 +420,10 @@ return {
 	["skill.ShadeSlash.name"] = "Schattenhieb",
 	["skill.RiddleBeam.name"] = "Rätselstrahl",
 	["skill.TitanFist.name"] = "Titanenfaust",
+	["skill.RubberSmash.name"] = "Gummi-Schlag",
+	["skill.SpiralDash.name"] = "Wirbelsprint",
+	["skill.StarBlast.name"] = "Sternenblitz",
+	["skill.PlaidSlash.name"] = "Karo-Schnitt",
 	["skill.GenesisWave.name"] = "Schöpfungswelle",
 	["skill.ChronosRift.name"] = "Zeitriss",
 	["skill.InfinityBarrage.name"] = "Unendlichkeits-Salve",
@@ -425,16 +440,19 @@ return {
 	["ui.recycler.name"]     = "Recycler",
 	["ui.recycler.upgrade"]  = "Ausbauen  ({cost})",
 	["ui.recycler.maxed"]    = "Höchste Stufe",
-	["ui.recycler.cost_g"]   = "{gummies} Paw Coins",
-	["ui.recycler.cost_gg"]  = "{gummies} Paw Coins + {gold} Honey Crystals",
+	["ui.recycler.cost_g"]   = "{gummies} Pfotenmünzen",
+	["ui.recycler.cost_gg"]  = "{gummies} Pfotenmünzen + {gold} Honey Crystals",
 	["msg.recycler_upgraded"] = "Recycler jetzt Level {level}",
 
 	----------------------------------------------------------------------------
 	-- v17: Lebendige Events (UFO-Abwurf, Lava-Waben, Wespenkoenigin)
 	----------------------------------------------------------------------------
 	["egg.UfoJackpotEgg.name"]  = "UFO-Jackpot-Ei",
+	["egg.AnimeEgg.name"]  = "Anime-Ei",
 	["path.Event"]              = "Event",
 	["path.Event.goal"]         = "Sonder-Eier aus Events",
+	["path.Anime"]              = "Anime",
+	["path.Anime.goal"]         = "Ab Welt 2",
 	["msg.ufo.patrol"]          = "Das UFO patrouilliert! Alle 30 s wirft es eine Kiste ab — lauf hin und schnapp sie dir",
 	["msg.ufo.drop_picked"]     = "Kiste geschnappt: +1 {egg}",
 	["msg.ufo.jackpot_drop"]    = "JACKPOT! Das UFO wirft eine goldene Kiste ab!",
@@ -451,7 +469,7 @@ return {
 	["ui.boss.name"]            = "Wespenkönigin",
 	["ui.boss.hp"]              = "Wespenkönigin  {hp} / {max}",
 	["ui.boss.hit"]             = "Getroffen! Dein Baerchi setzt kurz aus",
-	["msg.event.gummies"]       = "Event-Belohnung: +{n} Paw Coins",
+	["msg.event.gummies"]       = "Event-Belohnung: +{n} Pfotenmünzen",
 	["msg.event.combs"]         = "Event-Belohnung: +{n} Waben für den Recycler",
 	["msg.event.rarity_up"]     = "RARITY UP: {from} → {to}!",
 
@@ -487,7 +505,7 @@ return {
 	["msg.tower_milestone"]            = "Tower {tower} · Stage {stage}: {reward}",
 	["err.tower_unknown"]              = "Unbekannter Tower",
 	["err.tower_locked"]               = "Dieser Tower öffnet ab Rebirth {rebirths}",
-	["msg.pit_refund"]                 = "Das PIT-Level ist jetzt der Tower! Erstattung: +{amount} Paw Coins",
+	["msg.pit_refund"]                 = "Das PIT-Level ist jetzt der Tower! Erstattung: +{amount} Pfotenmünzen",
 	["ui.building.level_look"]         = "Level {level}/{max} · Look {look}",
 	["ui.ability.soon"]                = "bald",
 	["ability.AutoHarvest"]            = "Auto-Abnahme",
@@ -512,6 +530,12 @@ return {
 	["ui.profile.unavailable"]         = "Profil nicht verfügbar (Spieler nicht auf diesem Server)",
 	["ui.profile.equipped"]            = "Ausgerüstet: {baerchi}",
 	["ui.profile.tower"]               = "Bester Tower: {tower} · Stage {stage}",
+	["ui.badge.rookie"]                = "Neuling",
+	["ui.badge.tower"]                 = "Tower {tower} · {stage}",
+	["ui.badge.final"]                 = "Final · {stage}",
+	["ui.badge.endless"]               = "Endlos · {stage}",
+	["ui.badge.rebirth"]               = "R{n}",
+	["ui.badge.hint"]                  = "Rang: höchster Tower mit Stage · R = Rebirths. Antippen für das Profil.",
 	["ui.profile.rebirths"]            = "Rebirths: {n}",
 	["ui.profile.index"]               = "Index: {have}/{total}",
 	["ui.profile.top"]                 = "Top-Baerchis:",
@@ -551,7 +575,7 @@ return {
 	["ui.moment.rebirth"]   = "Rebirth!",
 	["ui.moment.jackpot"]   = "Jackpot!",
 	-- HBB Paket 2: Rebirth-Warnung als ein kurzer Satz (der Rest sind Icons)
-	["ui.rebirth.warn_short"] = "Paw Coins, Gebäude- und Baerchi-Level gehen zurück auf Start.",
+	["ui.rebirth.warn_short"] = "Pfotenmünzen, Gebäude- und Baerchi-Level gehen zurück auf Start.",
 	-- HBB Paket 7: Boss-Belohnungsstufe (Client zeigt eine Truhe statt des Texts)
 	["msg.boss.tier"] = "Boss-Truhe Stufe {tier}!",
 	-- HBB Paket 5: Heim-Knopf
@@ -685,6 +709,7 @@ return {
 	["ui.hatch.open"] = "Öffnen",
 	["ui.hatch.open_n"] = "Öffnen ×{n}",
 	["ui.hatch.batch_ok"] = "OK",
+	["ui.hatch.fallback"] = "Ergebnis: {list}",
 	["ui.hatch.batch_title"] = "Du hast bekommen",
 	["ui.hatch.to_incubator"] = "In den Inkubator",
 	["ui.hatch.empty"] = "Keine Eier im Lager.\nDein ausgerüsteter Baerchi legt welche auf deinem Plot — einfach einsammeln.",
@@ -717,15 +742,19 @@ return {
 	["msg.incubator.upgrade"] = "Inkubator verbessert",
 	-- Sammel-Update 05.10.2026
 	["guide.hatch"] = "Öffne ein Ei — darin wartet dein erster Baerchi!",
-	["guide.fight"] = "Schick deinen Baerchi in den Tower — jede Stage bringt Paw Coins.",
+	["guide.fight"] = "Schick deinen Baerchi in den Tower — jede Stage bringt Pfotenmünzen.",
 	["guide.collect"] = "Sammle die gelegten Eier auf deinem Plot ein.",
 	["guide.merchant"] = "Kauf beim Ei-Händler ein neues Ei.",
-	["guide.combs"] = "Hol Waben aus der Mitte und bring sie zu deinem Recycler — das gibt Paw Coins.",
-	["guide.upgrade"] = "Verbessere dein Honig-Gebäude: mehr Honig = mehr XP für deinen Baerchi.",
+	["guide.combs"] = "Hol Waben aus der Mitte und bring sie zu deinem Recycler — das gibt Pfotenmünzen.",
+	["guide.upgrade"] = "Verbessere deinen Brunnen: mehr Honig = mehr XP für deinen Baerchi.",
 	["guide.event"] = "Event in der Mitte: dein Baerchi wird dort stärker.",
+	["guide.incubator"] = "Stell Eier in den Inkubator auf deinem Plot — dort brüten sie von selbst.",
+	["guide.tower3"] = "Tower II geschafft! Am Computer wartet Tower III — es geht weiter.",
+	["guide.tower"] = "Tower I geschafft! Am Computer wählst du den nächsten Tower.",
+	["guide.charms_tip"] = "Tipp: Im Bärchi-Fenster kannst du mit Honey Crystals Charms für deine Bärchis würfeln.",
 	["ui.menu.building"] = "Verbessern",
 	-- Sammel-Update 05.10.2026
-	["hint.gummies"] = "Paw Coins! Damit verbesserst du Gebäude und baust den Inkubator aus.",
+	["hint.gummies"] = "Pfotenmünzen! Damit verbesserst du Gebäude und baust den Inkubator aus.",
 	["hint.gold"] = "Honey Crystals! Damit würfelst du Charms und beschleunigst den Inkubator.",
 	-- Sammel-Update 05.10.2026
 	["ui.building.why"] = "Verbessern = mehr Honig. Mehr Honig = mehr XP = dein Baerchi schafft höhere Stages.",
@@ -763,7 +792,7 @@ return {
 	["ui.baerchi.collect_n"] = "Alle {n} Eier einsammeln",
 	["ui.baerchi.collect_none"] = "Keine Eier da",
 	["ui.baerchi.level"] = "Level {level} / {max}",
-	["ui.baerchi.recycle_value"] = "Verwerten bringt: {n} Paw Coins",
+	["ui.baerchi.recycle_value"] = "Verwerten bringt: {n} Pfotenmünzen",
 	["ui.baerchi.recycle_equipped"] = "Ausgerüstet — nicht verwertbar",
 	["ui.baerchi.recycle"] = "Verwerten",
 	["ui.baerchi.section_state"] = "Zustand",
@@ -805,7 +834,7 @@ return {
 	["baerchi.GoldenGrizzly.desc"]        = "Selten, mächtig, und weiß es.",
 	["baerchi.VoidBaerchi.desc"]          = "Kommt aus dem Nichts. Verschwindet genauso.",
 	["baerchi.RainbowBaerchi.desc"]       = "Jede Farbe. Jede Kraft.",
-	["baerchi.AncientBaerchi.desc"]       = "War schon da, bevor Paw Coins erfunden wurden.",
+	["baerchi.AncientBaerchi.desc"]       = "War schon da, bevor Pfotenmünzen erfunden wurden.",
 	["baerchi.CosmicBaerchi.desc"]        = "Ein Stück Sternenhimmel mit Fell.",
 	["baerchi.PhoenixBaerchi.desc"]       = "Fällt einmal. Steht immer wieder auf.",
 	["baerchi.GlacierBaerchi.desc"]       = "Wo er hinschaut, wird alles langsam.",
@@ -844,6 +873,7 @@ return {
 	["egg.EternityEgg.desc"]              = "Es war schon immer da. Es bleibt für immer.",
 	["egg.OmegaEgg.desc"]                 = "Das letzte Ei. 30% Omega.",
 	["egg.UfoJackpotEgg.desc"]            = "Vom UFO abgeworfen. Ein ganz seltener Fund.",
+	["egg.AnimeEgg.desc"]            = "Ein Ei aus einer anderen Welt. Heldenhaft.",
 	["egg.BasicEgg.short"]                = "Basis",
 	["egg.SugarEgg.short"]                = "Zucker",
 	["egg.GoldenEgg.short"]               = "Gold",
@@ -865,6 +895,7 @@ return {
 	["egg.EternityEgg.short"]             = "Ewigkeit",
 	["egg.OmegaEgg.short"]                = "Omega",
 	["egg.UfoJackpotEgg.short"]           = "Jackpot",
+	["egg.AnimeEgg.short"]           = "Anime",
 	["skill.BearHug.name"]                = "Bärchen-Umarmung",
 	["skill.Revive.name"]                 = "Auferstehung",
 	["skill.BasicPunch.desc"]             = "Ein einfacher Schlag. Immer da.",
@@ -893,6 +924,10 @@ return {
 	["skill.ShadeSlash.desc"]             = "Unter 30% Gegner-HP trifft der Hieb mit 4x ATK.",
 	["skill.RiddleBeam.desc"]             = "Ein Strahl aus Symbolen, 2.6x Schaden.",
 	["skill.TitanFist.desc"]              = "Eine Faust vom Himmel, 3.6x Schaden.",
+	["skill.RubberSmash.desc"]            = "Ein gedehnter Hieb, 3x Schaden.",
+	["skill.SpiralDash.desc"]            = "Jeder Sprint trifft stärker als der vorige.",
+	["skill.StarBlast.desc"]            = "Ein gebündelter Strahl, 2.9x Schaden.",
+	["skill.PlaidSlash.desc"]            = "Unter 30% Gegner-HP trifft der Schnitt mit 3.6x ATK.",
 	["skill.GenesisWave.desc"]            = "Jede Welle baut auf der letzten auf.",
 	["skill.ChronosRift.desc"]            = "Reißt die Zeit auf, 3x Schaden.",
 	["skill.InfinityBarrage.desc"]        = "Fünf Treffer hintereinander, je 0.6x ATK.",
@@ -923,6 +958,10 @@ return {
 	["skill.ShadeSlash.drawback"]         = "Gegen volle Gegner nur durchschnittlich.",
 	["skill.RiddleBeam.drawback"]         = "Cooldown 4.",
 	["skill.TitanFist.drawback"]          = "Cooldown 6.",
+	["skill.RubberSmash.drawback"]        = "Cooldown 5.",
+	["skill.SpiralDash.drawback"]        = "Schwacher Anfang.",
+	["skill.StarBlast.drawback"]        = "Cooldown 5.",
+	["skill.PlaidSlash.drawback"]        = "Gegen volle Gegner nur durchschnittlich.",
 	["skill.GenesisWave.drawback"]        = "Braucht lange Kämpfe.",
 	["skill.ChronosRift.drawback"]        = "Cooldown 5.",
 	["skill.InfinityBarrage.drawback"]    = "Cooldown 5.",
@@ -944,7 +983,7 @@ return {
 	["event.bonus.jump"]             = "{n}x Sprung-Ei",
 	["event.bonus.highest"]          = "{n}x dein höchstes Ei",
 	["event.bonus.eggs"]             = "{n}x {egg}",
-	["event.bonus.gummies"]          = "{n} Paw Coins",
+	["event.bonus.gummies"]          = "{n} Pfotenmünzen",
 	["event.bonus.gold"]             = "{n} Honey Crystals",
 	["event.bonus.mutation"]         = "bis zu {pct}% Chance auf eine Mutation (sinkt mit Rarity)",
 	["event.bonus.unknown"]          = "Belohnung unbekannt",
@@ -979,7 +1018,7 @@ return {
 	["ui.card.equipped"]            = "Ausgerüstet",
 	["ui.card.equip"]               = "Ausrüsten",
 	["ui.card.hp_exhausted"]        = "erschöpft  —  0 / {max} HP",
-	["ui.card.recycle_value"]       = "Verwerten bringt: {n} Paw Coins",
+	["ui.card.recycle_value"]       = "Verwerten bringt: {n} Pfotenmünzen",
 	["ui.card.recycle_blocked"]     = "Ausgerüstet — nicht verwertbar",
 	["ui.card.recycle"]             = "Verwerten",
 	["ui.card.badge_fusion"]        = "FUSION",
@@ -1080,10 +1119,10 @@ return {
 	["ui.world.sign_level"]       = "{name}  Lv.{level}",
 	["ui.world.honey_stock"]      = "Honig {n} / {max}",
 	["ui.world.combs_queued"]     = "Waben: {n}",
-	["ui.world.gummies_per_comb"] = "{n} Paw Coins je Wabe",
+	["ui.world.gummies_per_comb"] = "{n} Pfotenmünzen je Wabe",
 	["ui.world.showcase_title"]   = "{name}  ·  {tower}  ·  {record}",
 	["ui.world.owner_badge"]      = "◆ {tower} · {record}",
-	["ui.merchant.buy"]           = "{egg} kaufen ({n} Paw Coins)",
+	["ui.merchant.buy"]           = "{egg} kaufen ({n} Pfotenmünzen)",
 	["ui.merchant.stand"]         = "Eier-Stand",
 	["err.merchant_too_far"]      = "Zu weit vom Händler entfernt",
 	["ev.label.abducted"]         = "ENTFÜHRT!",
@@ -1112,7 +1151,7 @@ return {
 	["ev.bonus.eggs_jump"]        = "+{n}x {egg} (Sprung-Ei!)",
 	["ev.bonus.blueprint"]        = "+1 Blaupause!",
 	["ev.bonus.basic_egg"]        = "+1 Basis-Ei",
-	["ev.bonus.gummies"]          = "+{n} Paw Coins",
+	["ev.bonus.gummies"]          = "+{n} Pfotenmünzen",
 	["ev.bonus.gold"]             = "+{n} Honey Crystals",
 	["ev.bonus.mutation"]         = "MUTATION: {mutation}!",
 	["ev.bonus.mutation_weaker"]  = "Mutations-Wurf: {mutation} — schwächer als seine, bleibt wie es ist",
@@ -1129,8 +1168,8 @@ return {
 	----------------------------------------------------------------------------
 	-- 08.10. Paket G: Ausbau mit einem Druck, Erfolgs-Moment
 	----------------------------------------------------------------------------
-	["ui.upgrade.prompt_buy"] = "Verbessern · {cost} Paw Coins",
-	["ui.upgrade.prompt_need"] = "Es fehlen {missing} Paw Coins",
+	["ui.upgrade.prompt_buy"] = "Verbessern · {cost} Pfotenmünzen",
+	["ui.upgrade.prompt_need"] = "Es fehlen {missing} Pfotenmünzen",
 	["ui.upgrade.fx_level"] = "Level {from} ➡ {to}",
 	["ui.upgrade.fx_look"] = "NEUER LOOK!",
 
@@ -1166,7 +1205,7 @@ return {
 	["ui.tower2.start_sub"] = "ab Stage {stage}",
 	["ui.tower2.free"] = "GRATIS",
 	["ui.tower2.skip"] = "⏩ Stage {stage}",
-	["ui.tower2.price"] = "{price} Paw Coins",
+	["ui.tower2.price"] = "{price} Pfotenmünzen",
 	["ui.tower2.pass_free"] = "Gratis (Pass)",
 	["ui.tower2.pass_owned"] = "Hast du schon",
 	["ui.tower2.pass_buy"] = "Holen",
@@ -1245,4 +1284,32 @@ return {
 	["world.rocket.ready"] = "Der Finale Tower ist besiegt – zum Gipfel!",   -- 20.10. P4 Raketen-Insel
 	["world.rocket.launched"] = "Welt 2 ist geöffnet.",   -- 20.10. P4 Raketen-Insel
 	["world.rocket.progress"] = "Final-Tower: Stage {stage}/{total}",   -- 20.10. P4 Raketen-Insel
+	["ui.rebirth.locked_world2"] = "Rebirth gibt es erst, wenn du Welt 2 erreicht hast – starte die Rakete!",   -- 20.10. P5a
+	["ui.pad.confirm"] = "Auswählen",   -- 20.10. P6d (Controller-Legende)
+	["ui.pad.back"] = "Zurück",
+	["ui.pad.menu"] = "Menü",
+	["err.rebirth_world2"] = "Rebirth ist erst nach Welt 2 möglich – starte die Rakete auf der Raketeninsel.",   -- 20.10. P5a
+	["ui.incubator.upgrade_need_tower"] = "Tower {tower} komplett schaffen",   -- 20.10. P5a
+	["err.incubator_needs_tower"] = "Dafür musst du Tower {tower} komplett schaffen",   -- 20.10. P5a
+	["ui.incubator.h_need_tower"] = "Stufe {level}: Tower {tower} schaffen",   -- 20.10. P5a
+	["ui.power.roll"] = "Wurf: {grade}",   -- 20.10. P5b
+	["ui.power.grade.weak"] = "schwach",   -- 20.10. P5b
+	["ui.power.grade.average"] = "durchschnittlich",   -- 20.10. P5b
+	["ui.power.grade.good"] = "gut",   -- 20.10. P5b
+	["ui.power.grade.great"] = "sehr gut",   -- 20.10. P5b
+	["ui.power.grade.outstanding"] = "herausragend",   -- 20.10. P5b
+	["baerchi.AscendantBaerchi.name"] = "Aufstiegs-Baerchi",   -- 20.10. P5d
+	["baerchi.AscendantBaerchi.desc"] = "Wer ihn findet, steigt weiter auf.",
+	["baerchi.GummiPirateBaerchi.name"] = "Gummi-Pirat",
+	["baerchi.GummiPirateBaerchi.desc"] = "Sein Arm reicht bis zum Horizont.",
+	["baerchi.OrangeNinjaBaerchi.name"] = "Orange-Ninja",
+	["baerchi.OrangeNinjaBaerchi.desc"] = "Schnell, laut und immer hungrig.",
+	["baerchi.StarWarriorBaerchi.name"] = "Sternenkrieger",
+	["baerchi.StarWarriorBaerchi.desc"] = "Seine Haare trotzen jeder Schwerkraft.",
+	["baerchi.PlaidHunterBaerchi.name"] = "Karo-Jäger",
+	["baerchi.PlaidHunterBaerchi.desc"] = "Ein Schwert, ein Umhang, ein Versprechen.",
+	["ui.tree.cond_world2"] = "Welt 2 offen",
+	["skill.AscendingLight.name"] = "Aufstiegslicht",   -- 20.10. P5d
+	["skill.AscendingLight.desc"] = "Jedes Licht steigt hoeher und trifft staerker.",
+	["skill.AscendingLight.drawback"] = "Braucht lange Kaempfe.",
 }

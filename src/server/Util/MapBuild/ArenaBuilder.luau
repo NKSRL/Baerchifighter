@@ -19,8 +19,10 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local MapConfig        = require(ReplicatedStorage.Config.MapConfig)
 local AmbienceConfig   = require(ReplicatedStorage.Config.AmbienceConfig)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
+local PitV2Config      = require(ReplicatedStorage.Config.PitV2Config)
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
+local PitV2Builder = require(ServerScriptService.Util.MapBuild.PitV2Builder)   -- 25.10. Honig-Kolosseum
 local MapLayout = require(ReplicatedStorage.Modules.MapLayout)
 local Types     = require(ReplicatedStorage.Network.Types)
 local WorldText = require(ReplicatedStorage.Localization.WorldText)
@@ -119,37 +121,8 @@ function ArenaBuilder.buildBridge(plotModel: Model, slot: number)
 	end
 end
 
--- Die PIT-Arena am Ende der Bruecke. Flache runde Kampfflaeche.
---
--- Die Kampfflaeche heisst bewusst weiterhin "FightFloor": WorldController
--- haengt genau an diesem Namen seinen Kampf-Prompt auf.
-function ArenaBuilder.buildPit(plotModel: Model, slot: number)
-	local old = plotModel:FindFirstChild("PitPlatform")
-	if old then old:Destroy() end
-
-	local container = Instance.new("Model")
-	container.Name   = "PitPlatform"
-	container.Parent = plotModel
-
-	local center = MapParts.pitCenter(slot)
-
-	-- Die Arena-Insel: derselbe Aufbau wie jede andere Insel (Sandkante plus
-	-- Scheibe), damit sie nicht wie ein Fremdkoerper im Wasser steht. Ihre
-	-- Oberflaeche ist der Sockel, auf dem der Steg landet.
-	-- Der Sockel liegt PIT_RIM_DROP tiefer als die Kampfflaeche, sonst waeren
-	-- die beiden Oberseiten deckungsgleich und wuerden flimmern.
-	local rimY = MapConfig.PLATFORM_TOP_Y - MapConfig.PIT_RIM_DROP
-
-	MapParts.buildIsland(
-		container,
-		"PitBase",
-		center,
-		MapConfig.PIT_BASE_RADIUS,
-		MapConfig.PIT_BASE_COLOR,
-		Enum.Material.Slate,
-		MapConfig.PIT_RIM_DROP
-	)
-
+-- Altes Pit (PIT_V2 aus oder Vorlage fehlt): leuchtender Ring am Sockelrand.
+local function buildClassicRing(container: Model, center: Vector3, rimY: number)
 	-- Leuchtender Ring am Sockelrand: eine etwas breitere Scheibe, die flach
 	-- darunter liegt. Sichtbar bleibt nur ihr ueberstehender Rand — derselbe
 	-- Trick wie bei der Sandkante, und ein Teil statt eines Dutzends Segmente.
@@ -169,20 +142,10 @@ function ArenaBuilder.buildPit(plotModel: Model, slot: number)
 	ring.CanCollide = false
 	ring.CanQuery   = false
 	ring.Parent     = container
+end
 
-	-- Kampfflaeche: Oberkante auf PLATFORM_TOP_Y, also ein kleiner Absatz ueber
-	-- dem Sockelring ringsum.
-	local floorY = MapConfig.PLATFORM_TOP_Y - MapConfig.PIT_FLOOR_HEIGHT * 0.5
-	local floor = MapParts.newPart(
-		"FightFloor",
-		Vector3.new(MapConfig.PIT_FLOOR_HEIGHT, MapConfig.PIT_RADIUS * 2, MapConfig.PIT_RADIUS * 2),
-		CFrame.new(center.X, floorY, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
-		MapConfig.PIT_FLOOR_COLOR,
-		Enum.Material.SmoothPlastic
-	)
-	floor.Shape  = Enum.PartType.Cylinder
-	floor.Parent = container
-
+-- Altes Pit: Emblem, Neon-Zaun und Holz-Torbogen am Steg.
+local function buildClassicDecor(container: Model, center: Vector3, slot: number, rimY: number)
 	-- Goldenes Kolosseum-Emblem buendig auf der Kampfflaeche, damit die Arena
 	-- auch im Ruhezustand wie ein echter Kampf-Ring wirkt.
 	local emblemRing = MapParts.newPart(
@@ -311,6 +274,66 @@ function ArenaBuilder.buildPit(plotModel: Model, slot: number)
 	archCrest.CanTouch   = false
 	archCrest.CastShadow = false
 	archCrest.Parent     = container
+end
+
+-- Die PIT-Arena am Ende der Bruecke. Flache runde Kampfflaeche.
+--
+-- Die Kampfflaeche heisst bewusst weiterhin "FightFloor": WorldController
+-- haengt genau an diesem Namen seinen Kampf-Prompt auf.
+function ArenaBuilder.buildPit(plotModel: Model, slot: number)
+	local old = plotModel:FindFirstChild("PitPlatform")
+	if old then old:Destroy() end
+
+	local container = Instance.new("Model")
+	container.Name   = "PitPlatform"
+	container.Parent = plotModel
+
+	local center = MapParts.pitCenter(slot)
+
+	-- Die Arena-Insel: derselbe Aufbau wie jede andere Insel (Sandkante plus
+	-- Scheibe), damit sie nicht wie ein Fremdkoerper im Wasser steht. Ihre
+	-- Oberflaeche ist der Sockel, auf dem der Steg landet.
+	-- Der Sockel liegt PIT_RIM_DROP tiefer als die Kampfflaeche, sonst waeren
+	-- die beiden Oberseiten deckungsgleich und wuerden flimmern.
+	local rimY = MapConfig.PLATFORM_TOP_Y - MapConfig.PIT_RIM_DROP
+
+	-- 25.10. (PIT_V2): Honig-Kolosseum (PitV2Builder). Aus oder Vorlage fehlt = altes Pit.
+	local v2 = PitV2Builder.enabled()
+
+	MapParts.buildIsland(
+		container,
+		"PitBase",
+		center,
+		MapConfig.PIT_BASE_RADIUS,
+		if v2 then PitV2Config.BASE_COLOR else MapConfig.PIT_BASE_COLOR,
+		if v2 then PitV2Config.BASE_MATERIAL else Enum.Material.Slate,
+		MapConfig.PIT_RIM_DROP
+	)
+
+	if not v2 then
+		buildClassicRing(container, center, rimY)
+	end
+
+	-- Kampfflaeche: Oberkante auf PLATFORM_TOP_Y, also ein kleiner Absatz ueber
+	-- dem Sockelring ringsum.
+	local floorY = MapConfig.PLATFORM_TOP_Y - MapConfig.PIT_FLOOR_HEIGHT * 0.5
+	local floor = MapParts.newPart(
+		"FightFloor",
+		Vector3.new(MapConfig.PIT_FLOOR_HEIGHT, MapConfig.PIT_RADIUS * 2, MapConfig.PIT_RADIUS * 2),
+		CFrame.new(center.X, floorY, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		if v2 then PitV2Config.FLOOR_COLOR else MapConfig.PIT_FLOOR_COLOR,
+		Enum.Material.SmoothPlastic
+	)
+	floor.Shape  = Enum.PartType.Cylinder
+	floor.Parent = container
+
+	-- 25.10. (PIT_V2): Honig-Kolosseum aus Mesh-Vorlagen; sonst das alte Pit
+	-- (Emblem, Neon-Zaun, Holzbogen).
+	if v2 then
+		PitV2Builder.decorate(container, slot)
+	else
+		buildClassicDecor(container, center, slot, rimY)
+	end
 
 	-- Ordner fuer die Kampf-Figuren waehrend eines Laufs. Liegt hier, damit
 	-- PitArenaService nichts selbst anlegen muss und ein Neuaufbau des PIT
@@ -376,6 +399,18 @@ function ArenaBuilder.buildTowerRing(tower: Folder, center: Vector3, level: numb
 	)
 	ring.Shape  = Enum.PartType.Cylinder
 	ring.Parent = tower
+
+	-- 25.10. (PIT_V2): Sims und Goldgelaender aussen an jeder Etage
+	if PitV2Builder.enabled() then
+		PitV2Builder.addStageFence(ring, center, topY)
+	end
+end
+
+-- 25.10. (PIT_V2): Kollision der obersten Turm-Etage mitfuehren (MapService nach
+-- jedem Etagenwechsel). `held` = der Turm steht fuer den Gipfel: dann ohne
+-- Gelaender und Kollision, dort fuehrt die Gipfel-Bruecke hinaus.
+function ArenaBuilder.placeTowerFence(container: Instance, slot: number, level: number, held: boolean)
+	PitV2Builder.placeTopFence(container, slot, level, held)
 end
 
 --------------------------------------------------------------------------------

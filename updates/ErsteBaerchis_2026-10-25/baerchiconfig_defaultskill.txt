@@ -1,0 +1,8 @@
+BlueBaerchi:    defaultSkill = "PolarSlide", eggSource = {},   -- 25.10.2026, vorher IceSlam
+OrangeBaerchi:  defaultSkill = "TigerPounce", eggSource = {},   -- 25.10.2026, vorher FireBite
+SugarBaerchi:   defaultSkill = "BassDrop", eggSource = {},   -- 25.10.2026, vorher SugarStorm
+CrystalBaerchi: defaultSkill = "MagnifierBurn", eggSource = {},   -- 25.10.2026, vorher ShardBlast
+GoldenGrizzly:  defaultSkill = "CoinShower", eggSource = {},   -- 25.10.2026, vorher GoldRush
+VoidBaerchi:    defaultSkill = "ShurikenStorm", eggSource = {},   -- 25.10.2026, vorher BlackHole
+RainbowBaerchi: defaultSkill = "RainbowBridge", eggSource = {},   -- 25.10.2026, vorher ChromaBlast
+AncientBaerchi: defaultSkill = "RootBulwark", eggSource = {},   -- 25.10.2026, vorher TitanMode

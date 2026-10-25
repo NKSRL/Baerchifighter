@@ -25,6 +25,7 @@ local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 local SkyBuilder = require(ServerScriptService.Util.MapBuild.SkyBuilder)
 local ScenicBuilder = require(ServerScriptService.Util.MapBuild.ScenicBuilder)
 local MapMeshes = require(ServerScriptService.Util.MapBuild.MapMeshes)
+local HubPlazaBuilder = require(ServerScriptService.Util.MapBuild.HubPlazaBuilder)
 local RocketIslandBuilder = require(ServerScriptService.Util.MapBuild.RocketIslandBuilder)   -- P4 Raketen-Insel
 
 local WorldBuilder = {}
@@ -119,156 +120,21 @@ function WorldBuilder.buildFlowers(parent: Instance)
 	end
 end
 
--- Das runde, eingezaeunte Podest in der Weltmitte. Siehe MapConfig, Abschnitt
--- "EVENT-PIT" fuer das Warum der Zahlen. Normalerweise ein schlichter Stall —
+-- Das runde, eingezaeunte Podest in der Weltmitte (Tempel-Plaza + geschlossener
+-- Sanktuarium-Zaunring, nur ueber die 8 Freitreppen der Alleen betretbar).
 -- EventService faerbt Boden/Zaun/Ring waehrend eines Events um
 -- (MapService.setEventPitTheme) und schreibt die Countdown-Tafel
 -- (MapService.setEventBanner).
---
--- Acht Zaunluecken statt einer: das Pit liegt in der Mitte ALLER acht Stege,
--- nicht am Ende von nur einem. Jede Luecke sitzt exakt in der Aussenrichtung
--- eines Plots (outwardDirection) — wer von seiner Bruecke kommt, laeuft
--- geradewegs hinein.
 function WorldBuilder.buildEventPit(parent: Instance)
 	local container = Instance.new("Model")
 	container.Name   = "EventPit"
 	container.Parent = parent
 
-	local center = MapConfig.CENTER
-
-	-- Unterkante des Podests: bewusst NICHT direkt auf PLATFORM_TOP_Y (dort
-	-- liegt schon die Kachel-Oberseite, siehe EVENT_PIT_GROUND_CLEARANCE) —
-	-- sonst flimmert der Podestrand mit dem Rasen darunter statt sauber
-	-- darueber zu stehen.
+	local center       = MapConfig.CENTER
 	local floorBottomY = MapConfig.PLATFORM_TOP_Y + MapConfig.EVENT_PIT_GROUND_CLEARANCE
-	local floorY       = floorBottomY + MapConfig.EVENT_PIT_FLOOR_HEIGHT   -- Podest-Oberflaeche
+	local floorY       = floorBottomY + MapConfig.EVENT_PIT_FLOOR_HEIGHT
 
-	local floor = MapParts.newPart(
-		"EventFloor",
-		Vector3.new(MapConfig.EVENT_PIT_FLOOR_HEIGHT, MapConfig.EVENT_PIT_RADIUS * 2, MapConfig.EVENT_PIT_RADIUS * 2),
-		CFrame.new(center.X, floorY - MapConfig.EVENT_PIT_FLOOR_HEIGHT * 0.5, center.Z)
-			* CFrame.Angles(0, 0, math.rad(90)),
-		MapConfig.EVENT_PIT_DEFAULT_FLOOR_COLOR,
-		Enum.Material.WoodPlanks
-	)
-	floor.Shape = Enum.PartType.Cylinder
-	floor.Parent = container
-
-	-- Goldene Kompass- & Waben-Intarsie buendig auf dem Event-Pit-Boden:
-	-- verwandelt den 100-Studs-Holzboden auch ausserhalb der Boss-Events in
-	-- einen festlichen Marktplatz und zeigt die 8 Bruecken-Richtungen an.
-	local compassRing = MapParts.newPart(
-		"EventCompassRing",
-		Vector3.new(0.06, 56, 56),
-		CFrame.new(center.X, floorY + 0.03, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
-		Color3.fromRGB(235, 190, 85),
-		Enum.Material.SmoothPlastic
-	)
-	compassRing.Shape      = Enum.PartType.Cylinder
-	compassRing.CanCollide = false
-	compassRing.CanQuery   = false
-	compassRing.CanTouch   = false
-	compassRing.CastShadow = false
-	compassRing.Parent     = container
-
-	local compassInner = MapParts.newPart(
-		"EventCompassInner",
-		Vector3.new(0.08, 48, 48),
-		CFrame.new(center.X, floorY + 0.04, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
-		MapConfig.EVENT_PIT_DEFAULT_FLOOR_COLOR,
-		Enum.Material.WoodPlanks
-	)
-	compassInner.Shape      = Enum.PartType.Cylinder
-	compassInner.CanCollide = false
-	compassInner.CanQuery   = false
-	compassInner.CanTouch   = false
-	compassInner.CastShadow = false
-	compassInner.Parent     = container
-
-	for slot = 1, MapConfig.PLOT_COUNT do
-		local outward = MapParts.outwardDirection(slot)
-		local rayMid  = center + outward * 27
-		local rayPos  = Vector3.new(rayMid.X, floorY + 0.10, rayMid.Z)
-		local ray = MapParts.newPart(
-			"EventCompassRay_" .. slot,
-			Vector3.new(2.2, 0.06, 36),
-			CFrame.lookAt(rayPos, rayPos + outward),
-			Color3.fromRGB(245, 200, 90),
-			Enum.Material.Neon
-		)
-		ray.Transparency = 0.45
-		ray.CanCollide   = false
-		ray.CanQuery     = false
-		ray.CanTouch     = false
-		ray.CastShadow   = false
-		ray.Parent       = container
-	end
-
-	-- Sockel-Ring am Podestfuss: anders als bei den Spieler-Arenen (dort ein
-	-- SUNKENER Pit mit einem Ring, der grossteils im Boden verschwindet) steht
-	-- dieses Podest ueber dem Boden — der Ring sitzt deshalb komplett OBERHALB
-	-- der Grasflaeche, direkt am Fuss der Podestwand, und ist als kleiner
-	-- Sockel-Kranz ringsum sichtbar statt im Boden zu verschwinden. Bleibt im
-	-- Stall-Look ein mattes Braun und glimmt erst waehrend eines Events
-	-- (siehe setEventPitTheme).
-	local ringRadius = MapConfig.EVENT_PIT_RADIUS + MapConfig.EVENT_PIT_RING_OVERHANG
-	local ring = MapParts.newPart(
-		"EventRing",
-		Vector3.new(MapConfig.EVENT_PIT_RING_HEIGHT, ringRadius * 2, ringRadius * 2),
-		CFrame.new(center.X, floorBottomY + MapConfig.EVENT_PIT_RING_HEIGHT * 0.5, center.Z)
-			* CFrame.Angles(0, 0, math.rad(90)),
-		MapConfig.EVENT_PIT_DEFAULT_RING_COLOR,
-		Enum.Material.SmoothPlastic
-	)
-	ring.Shape      = Enum.PartType.Cylinder
-	ring.CanCollide = false
-	ring.CanQuery   = false
-	ring.Parent     = container
-
-	-- Eine Luecken-Mitte pro Plot-Richtung.
-	local gapAngles: { number } = {}
-	for slot = 1, MapConfig.PLOT_COUNT do
-		local outward = MapParts.outwardDirection(slot)
-		table.insert(gapAngles, math.atan2(outward.Z, outward.X))
-	end
-
-	local gap        = math.rad(MapConfig.EVENT_PIT_FENCE_GAP_DEGREES)
-	local postRadius = MapConfig.EVENT_PIT_RADIUS - MapConfig.EVENT_PIT_FENCE_INSET
-	local postY      = floorY + MapConfig.EVENT_PIT_FENCE_SIZE.Y * 0.5
-
-	for i = 1, MapConfig.EVENT_PIT_FENCE_COUNT do
-		local angle = (i - 1) * (2 * math.pi / MapConfig.EVENT_PIT_FENCE_COUNT)
-
-		local blocked = false
-		for _, gapAngle in gapAngles do
-			local delta = math.abs(((angle - gapAngle + math.pi) % (2 * math.pi)) - math.pi)
-			if delta <= gap then
-				blocked = true
-				break
-			end
-		end
-
-		if not blocked then
-			local post = MapParts.newPart(
-				"EventFence_" .. i,
-				MapConfig.EVENT_PIT_FENCE_SIZE,
-				CFrame.new(
-					center.X + postRadius * math.cos(angle),
-					postY,
-					center.Z + postRadius * math.sin(angle)
-				),
-				MapConfig.EVENT_PIT_DEFAULT_FENCE_COLOR,
-				Enum.Material.Wood
-			)
-			-- Wie beim Zaun der Spieler-Arenen (PIT_FENCE): reine Silhouette,
-			-- kein Hindernis. Acht schmalere Luecken statt einer breiten lassen
-			-- sonst zu wenig Spielraum, falls ein Pfosten optisch knapp am
-			-- Bruecken-Rand steht.
-			post.CanCollide = false
-			post.CanQuery   = false
-			post.Parent     = container
-		end
-	end
+	HubPlazaBuilder.buildEventPitPlaza(container)
 
 	-- Anzeigetafel: anders als bei den Spieler-Arenen IMMER eingeblendet — sie
 	-- ist der einzige Ort, an dem der Event-Countdown steht, egal ob gerade
@@ -295,10 +161,7 @@ function WorldBuilder.buildEventPit(parent: Instance)
 	banner.Enabled     = true
 	banner.Parent      = anchor
 
-	-- Drei feste Zeilen: Titel, Zeit, Belohnung. Die Zeit hat eine EIGENE
-	-- kurze Zeile: stand sie mit der Belohnung in einem Text, aenderte sich
-	-- dessen Breite jede Sekunde und TextScaled brach abwechselnd in eine und
-	-- zwei Zeilen um (Flackern, Playtest 05.10.).
+	-- Drei feste Zeilen: Titel, Zeit, Belohnung.
 	local bannerTitle = MapParts.newTextLabel("Title", banner, UDim2.fromScale(1, 0.45), UDim2.fromScale(0, 0))
 	bannerTitle.Text  = "..."
 	bannerTitle.TextColor3 = MapConfig.EVENT_PIT_BANNER_IDLE_COLOR
@@ -306,23 +169,8 @@ function WorldBuilder.buildEventPit(parent: Instance)
 	MapParts.newTextLabel("Reward", banner, UDim2.fromScale(1, 0.25), UDim2.fromScale(0, 0.75))
 end
 
--- Die ganze feste Welt: Wasser, Hauptinsel, die acht Plot-Inseln und die acht
--- Stege dazwischen, Blumen, Spawn und Honigmast. Wird nur EINMAL beim
--- Server-Start aufgerufen, nicht pro Spieler.
---
--- Globales Post-Processing: Bloom, Farbsaettigung, dezente Sonnenstrahlen.
---
--- Einmal in MapService.init() gesetzt, wirkt auf die GESAMTE Welt — kein
--- Aufwand pro Plot oder Figur. Siehe DESIGN_VORSCHLAG_TRENDANALYSE_2026-09-11.md
--- Abschnitt 5: der grosse Hebel hier ist nicht ein einzelner Effekt, sondern
--- dass es diese Objekte bisher ueberhaupt nicht gab — Lighting stand auf den
--- Roblox-Standardwerten.
---
--- Bewusst idempotent (FindFirstChild-Pruefung wie buildPlatform): ein
--- Server-Neustart im selben Studio-Prozess soll keine zweiten Kopien anlegen.
 -- Eine Tafel auf der Hauptinsel (zwei Pfosten, ein Brett mit SurfaceGui:
--- Titel + cfg.lines Zeilen), Schrift nach aussen. Beschriftet wird sie ueber
--- MapService (Bestenliste: writeLeaderboardBoard, Live: writeLiveBoard).
+-- Titel + cfg.lines Zeilen), Schrift nach aussen, mit Pavillon-Rahmen.
 type BoardCfg = {
 	angleDegrees : number,
 	radius       : number,
@@ -341,7 +189,7 @@ local function buildBoard(parent: Instance, name: string, cfg: BoardCfg): BasePa
 	local center = Vector3.new(base.X, groundY + cfg.postHeight + cfg.size.Y * 0.5, base.Z)
 	local frame = CFrame.lookAt(center, center + outward)
 
-	local board = MapParts.newPart(name, cfg.size, frame, cfg.color, Enum.Material.Wood)
+	local board = MapParts.newPart(name, cfg.size, frame, Color3.fromRGB(48, 43, 64), Enum.Material.Slate)
 	board.CanCollide = true
 	board.Parent = parent
 
@@ -349,18 +197,22 @@ local function buildBoard(parent: Instance, name: string, cfg: BoardCfg): BasePa
 		local postHeight = cfg.postHeight + cfg.size.Y
 		local post = MapParts.newPart(
 			name .. "Post",
-			Vector3.new(0.8, postHeight, 0.8),
-			frame * CFrame.new(side * (cfg.size.X * 0.5 - 0.6), -cfg.size.Y * 0.5 - cfg.postHeight + postHeight * 0.5, 0.8),
-			cfg.color,
-			Enum.Material.Wood
+			Vector3.new(0.95, postHeight, 0.95),
+			frame * CFrame.new(side * (cfg.size.X * 0.5 - 0.5), -cfg.size.Y * 0.5 - cfg.postHeight + postHeight * 0.5, 0.7),
+			Color3.fromRGB(48, 43, 64),
+			Enum.Material.Slate
 		)
 		post.CanCollide = true
 		post.Parent = parent
 	end
 
+	HubPlazaBuilder.decorateBoardPavilion(parent, name, frame, cfg.size, cfg.postHeight)
+
 	local surface = Instance.new("SurfaceGui")
 	surface.Name          = "Board"
 	surface.Face          = Enum.NormalId.Front
+	-- 21.10.: PixelsPerStud wirkt nur mit diesem SizingMode (sonst gestreckte Schrift)
+	surface.SizingMode    = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	surface.PixelsPerStud = 30
 	surface.Adornee       = board
 	surface.Parent        = board
@@ -381,9 +233,7 @@ local function buildBoard(parent: Instance, name: string, cfg: BoardCfg): BasePa
 	return board
 end
 
--- v15: die Bestenlisten-Tafel auf der Hauptinsel. HBB Paket 5: mit
--- `angleDegrees`/`name` mehrfach (eine feste Tafel je Liste, siehe
--- MapLayout.leaderboardBoards); ohne = die eine wechselnde Tafel wie bisher.
+-- v15: die Bestenlisten-Tafel auf der Hauptinsel.
 function WorldBuilder.buildLeaderboardBoard(parent: Instance, angleDegrees: number?, name: string?): BasePart
 	local cfg = table.clone(MapConfig.LEADERBOARD_BOARD) :: any
 	cfg.angleDegrees = angleDegrees or cfg.angleDegrees
@@ -395,16 +245,16 @@ function WorldBuilder.buildLiveBoard(parent: Instance): BasePart
 	return buildBoard(parent, "LiveBoard", MapConfig.LIVE_BOARD :: any)
 end
 
--- HBB Paket 6: Wespen-Nest am Honigmast (MapConfig.WASP_NEST). Koerper,
--- zwei Streifen, Flugloch, darueber ein Schild mit der Zeit bis zum Boss.
--- Teile: 4 + Schild-Anker. Leuchten schaltet MapService.setWaspNest um.
+-- HBB Paket 6: Wespen-Nest am Honigmast (MapConfig.WASP_NEST). Skulptiertes
+-- Koenigs-Hornissennest mit Chitin-Ringen, Goldkrone, leuchtendem Flugloch
+-- und darueber dem Schild mit der Zeit bis zum Boss.
 function WorldBuilder.buildWaspNest(parent: Instance, center: Vector3): Model
 	local cfg = MapConfig.WASP_NEST
 	local nest = Instance.new("Model")
 	nest.Name = "WaspNest"
 
-	local function piece(name: string, shape: Enum.PartType, size: Vector3, frame: CFrame, color: Color3): BasePart
-		local part = MapParts.newPart(name, size, frame, color, Enum.Material.SmoothPlastic)
+	local function piece(name: string, shape: Enum.PartType, size: Vector3, frame: CFrame, color: Color3, mat: Enum.Material?): BasePart
+		local part = MapParts.newPart(name, size, frame, color, mat or Enum.Material.SmoothPlastic)
 		part.Shape      = shape
 		part.CanCollide = false
 		part.CanQuery   = false
@@ -414,20 +264,38 @@ function WorldBuilder.buildWaspNest(parent: Instance, center: Vector3): Model
 		return part
 	end
 
-	local body = piece("Body", Enum.PartType.Ball, cfg.bodySize, CFrame.new(center), cfg.color)
-	body.Material = Enum.Material.Sand
-	for i, dy in { 0.8, -0.8 } do
+	local body = piece("Body", Enum.PartType.Ball, cfg.bodySize, CFrame.new(center), cfg.color, Enum.Material.Sandstone)
+	body.Material = Enum.Material.Sandstone
+
+	-- Obere und untere Kappe + goldener Aufhaenge-Kronenring
+	piece("CrownAttach", Enum.PartType.Cylinder,
+		Vector3.new(0.45, cfg.bodySize.X * 0.52, cfg.bodySize.Z * 0.52),
+		CFrame.new(center + Vector3.new(0, cfg.bodySize.Y * 0.46, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(238, 186, 52), Enum.Material.Metal)
+	piece("BottomSpike", Enum.PartType.Ball,
+		Vector3.new(cfg.bodySize.X * 0.45, cfg.bodySize.Y * 0.38, cfg.bodySize.Z * 0.45),
+		CFrame.new(center + Vector3.new(0, -cfg.bodySize.Y * 0.44, 0)),
+		cfg.stripeColor, Enum.Material.Slate)
+
+	for i, spec in { { dy = 1.05, s = 0.88 }, { dy = 0.0, s = 1.02 }, { dy = -1.05, s = 0.86 } } do
 		piece("Stripe" .. i, Enum.PartType.Cylinder,
-			Vector3.new(0.35, cfg.bodySize.X * 0.98, cfg.bodySize.Z * 0.98),
-			CFrame.new(center + Vector3.new(0, dy, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-			cfg.stripeColor)
+			Vector3.new(0.38, cfg.bodySize.X * spec.s, cfg.bodySize.Z * spec.s),
+			CFrame.new(center + Vector3.new(0, spec.dy, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			cfg.stripeColor, Enum.Material.Slate)
 	end
-	-- Flugloch nach aussen (weg vom Mast)
+
 	local away = Vector3.new(cfg.offset.X, 0, cfg.offset.Z)
 	away = if away.Magnitude > 1e-3 then away.Unit else Vector3.new(1, 0, 0)
-	piece("Hole", Enum.PartType.Ball, Vector3.new(1.2, 1.2, 1.2),
-		CFrame.new(center + away * (cfg.bodySize.X * 0.47) + Vector3.new(0, -1.2, 0)),
-		cfg.stripeColor)
+	local holePos = center + away * (cfg.bodySize.X * 0.46) + Vector3.new(0, -0.85, 0)
+	piece("HoleRim", Enum.PartType.Ball, Vector3.new(1.65, 1.65, 1.15),
+		CFrame.lookAt(holePos, holePos + away),
+		Color3.fromRGB(238, 186, 52), Enum.Material.Metal)
+	piece("Hole", Enum.PartType.Ball, Vector3.new(1.25, 1.25, 1.25),
+		CFrame.new(holePos + away * 0.12),
+		cfg.stripeColor, Enum.Material.Slate)
+	piece("HoleGlow", Enum.PartType.Ball, Vector3.new(0.75, 0.75, 0.75),
+		CFrame.new(holePos + away * 0.22),
+		cfg.glowColor, Enum.Material.Neon)
 
 	local anchor = MapParts.newPart("SignAnchor", Vector3.new(1, 1, 1),
 		CFrame.new(center + Vector3.new(0, cfg.bodySize.Y * 0.5 + cfg.signGap, 0)), cfg.glowColor, Enum.Material.SmoothPlastic)
@@ -457,9 +325,6 @@ function WorldBuilder.buildGlobalLighting()
 		return   -- schon gesetzt
 	end
 
-	-- Himmel, Atmosphaere, Wolken, Tageszeit: siehe SkyBuilder / AmbienceConfig.
-	-- (MapConfig.LIGHTING_CLOCK_TIME ist damit abgeloest: die Tageszeit steht
-	-- jetzt in AmbienceConfig.CLOCK_TIME.)
 	SkyBuilder.build()
 
 	local bloom = Instance.new("BloomEffect")
@@ -482,13 +347,6 @@ function WorldBuilder.buildGlobalLighting()
 	sunRays.Parent    = Lighting
 end
 
--- WARUM DIE PLOT-INSELN HIER STEHEN UND NICHT BEI buildPlotBase:
--- Eine Insel gehoert zur Landschaft, nicht zum Spieler. Wuerden sie mit dem
--- Plot-Model eines Spielers entstehen und vergehen, waere die Welt bei zwei
--- Spielern ein Ozean mit zwei Inseln darin, und beim Verlassen verschwaende
--- mitten im Bild ein Stueck Land. Auf einer leeren Insel steht dann eben
--- nichts — den Weg dorthin gibt es trotzdem. Was dem SPIELER gehoert (Beet,
--- Zaun, Schild, Gebaeude, Arena), baut buildPlotBase darauf.
 function WorldBuilder.buildPlatform()
 	if workspace:FindFirstChild("Platform") then
 		return   -- schon gebaut
@@ -497,12 +355,6 @@ function WorldBuilder.buildPlatform()
 	local model = Instance.new("Model")
 	model.Name = "Platform"
 
-	-- Das Wasser zuerst: eine einzige grosse Scheibe unter allem.
-	--
-	-- Sie ist begehbar. Wer von einem Steg faellt, landet auf der Oberflaeche
-	-- und laeuft zurueck, statt ins Leere zu stuerzen — in einem Spiel, in dem
-	-- man staendig ueber schmale Stege laeuft, ist das die freundlichere
-	-- Loesung (siehe MapConfig).
 	local water = MapParts.newPart(
 		"Water",
 		Vector3.new(MapConfig.WATER_HEIGHT, MapConfig.WATER_RADIUS * 2, MapConfig.WATER_RADIUS * 2),
@@ -519,8 +371,8 @@ function WorldBuilder.buildPlatform()
 	water.CanQuery     = false
 	water.Parent       = model
 
-	-- Hauptinsel: dunkle Wiesenscheibe mit Sandkante, darauf die hellen Karos.
-	local ground = MapParts.buildIsland(
+	-- Hauptinsel: strukturierte botanische Sanktuarium-Wiese mit Sandstein-Uferpromenade
+	MapParts.buildIsland(
 		model,
 		"Ground",
 		MapConfig.CENTER,
@@ -528,17 +380,14 @@ function WorldBuilder.buildPlatform()
 		MapConfig.GRASS_DARK,
 		Enum.Material.Grass
 	)
-	MapMeshes.studGround(ground, MapMeshes.enabled())
-	if not MapMeshes.enabled() then
-		MapParts.buildCheckerDisc(model, MapConfig.CENTER.X, MapConfig.CENTER.Z, MapConfig.PLATFORM_RADIUS)
-	end
+	HubPlazaBuilder.buildMainIslandMeadow(model)
 
-	-- Die acht Plot-Inseln und die Stege dorthin.
+	-- Die acht Plot-Inseln und die geschwungenen Bogenbruecken dorthin.
 	for slot = 1, MapConfig.PLOT_COUNT do
 		local outward = MapParts.outwardDirection(slot)
 		local center  = MapConfig.CENTER + outward * MapConfig.PLOT_RING_RADIUS
 
-		local plotIsland = MapParts.buildIsland(
+		MapParts.buildIsland(
 			model,
 			"PlotIsland_" .. slot,
 			center,
@@ -546,15 +395,9 @@ function WorldBuilder.buildPlatform()
 			MapConfig.PLOT_ISLAND_COLOR,
 			Enum.Material.Grass
 		)
-		-- Baseplate-Boden auch auf dem eigenen Plot (gleiches Raster wie die Hauptinsel)
-		if FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and MapMeshes.enabled() then
-			MapMeshes.groundOldschool(model, plotIsland, {
-				center = center, radius = MapConfig.PLOT_ISLAND_RADIUS,
-				folderName = "PlotGroundStuds_" .. slot, color = MapStyleConfig.GROUND.PLOT_COLOR, levels = MapStyleConfig.GROUND.PLOT_LEVELS,
-			})
-		end
+		HubPlazaBuilder.buildPlotIslandGround(model, slot, center)
 
-		MapParts.buildSpan(
+		HubPlazaBuilder.buildArchedBridge(
 			model,
 			"BridgeInner_" .. slot,
 			outward,
@@ -563,42 +406,25 @@ function WorldBuilder.buildPlatform()
 		)
 	end
 
-	-- P4 (20.10.): dauerhafte Raketen-Insel mit Bruecke (Schalter ROCKET_ISLAND, eigene Maße
-	-- in Config/RocketIslandConfig). Ein Fehler hier darf den Welt-Aufbau nie stoppen.
-	if FeatureFlags.isOn("ROCKET_ISLAND") then
-		local ok, err = pcall(RocketIslandBuilder.build, model)
-		if not ok then warn("[WorldBuilder] Raketen-Insel nicht gebaut:", err) end
-	end
-
 	WorldBuilder.buildFlowers(model)
 
 	-- Das Event-Pit in der Mitte — siehe buildEventPit oben.
 	WorldBuilder.buildEventPit(model)
 
-	-- Der Honigmast steht jetzt auf dem Event-Pit-Podest statt auf einem
-	-- eigenen Spawn-Pad (das gibt es nicht mehr, siehe Not-Spawn unten) — er
-	-- bleibt derselbe Orientierungspunkt, den man von jeder Insel aus sieht,
-	-- nur jetzt mittig im Stall statt auf einer separaten Platte.
+	-- Koenigliches Honig-Heiligtum & Brunnen in der Weltmitte (unter dem Namen "Honigmast"
+	-- fuer volle Kompatibilitaet mit DayCycleController, HubLandmarkController & Tests).
 	local mast = Instance.new("Model")
 	mast.Name = "Honigmast"
-	MapParts.buildDecor(
+	HubPlazaBuilder.buildSanctuaryFountain(
 		mast,
-		CFrame.new(
+		Vector3.new(
 			MapConfig.CENTER.X,
 			MapConfig.PLATFORM_TOP_Y + MapConfig.EVENT_PIT_GROUND_CLEARANCE + MapConfig.EVENT_PIT_FLOOR_HEIGHT,
 			MapConfig.CENTER.Z
-		),
-		MapConfig.CENTER_DECOR
+		)
 	)
 	mast.Parent = model
 
-	-- Not-Spawn: seit dem Insel-Spawn (siehe buildPlotBase → PLAYER_SPAWN_OFFSET
-	-- und PlayerService.onPlayerAdded) spawnt hier niemand mehr normalerweise.
-	-- Der einzige Fall, der diesen Pad noch braucht, ist ein voller Server
-	-- (MapService.spawnIsland findet keinen freien Slot mehr) — dann bekommt
-	-- der Spieler nie ein RespawnLocation gesetzt und faellt auf den naechsten
-	-- SpawnLocation in der Welt zurueck. Unsichtbar, damit er nicht als
-	-- zweiter Bodenbelag unter dem Event-Pit durchscheint.
 	if not workspace:FindFirstChildOfClass("SpawnLocation") then
 		local spawnPad = Instance.new("SpawnLocation")
 		spawnPad.Name          = "FallbackSpawn"
@@ -618,7 +444,7 @@ function WorldBuilder.buildPlatform()
 		spawnPad.Parent        = model
 	end
 
-	-- Landschafts-Deko (Meeresboden, Schaum, Wege, Laternen, Baeume ...).
+	-- Landschafts-Deko (Meeresboden, Schaum, Alleen, Imker-Laternen, Brueckenportale, Baeume ...).
 	ScenicBuilder.build(model, WorldBuilder.isOnBridgeLane)
 
 	model.Parent = workspace
@@ -629,23 +455,21 @@ function WorldBuilder.buildPlatform()
 	)
 end
 
--- Nur Studio-Debug (D:Invoke("mapstyle")): Bodenkacheln der Hauptinsel und die Vegetation
--- nach dem Schalter MAP_STYLE_V2 neu aufbauen. Plot-Beete folgen beim naechsten Plot-Aufbau
--- (Rebirth/Reset), weil sie mit dem Plot entstehen. Gibt (Kacheln, Vegetationsteile) zurueck.
+-- Nur Studio-Debug (D:Invoke("mapstyle")): Boden der Hauptinsel und die Vegetation
+-- nach dem Schalter MAP_STYLE_V2 neu aufbauen.
 function WorldBuilder.restyle(): (number, number)
 	local model = workspace:FindFirstChild("Platform")
 	if not model then return 0, 0 end
 
 	for _, child in model:GetChildren() do
-		if child.Name == "GrassTile" then child:Destroy() end
+		if child.Name == "GrassTile" or child.Name:sub(1, 7) == "Meadow_" then
+			child:Destroy()
+		end
 	end
-	MapMeshes.studGround(model:FindFirstChild("Ground"), MapMeshes.enabled())
-	if not MapMeshes.enabled() then
-		MapParts.buildCheckerDisc(model, MapConfig.CENTER.X, MapConfig.CENTER.Z, MapConfig.PLATFORM_RADIUS)
-	end
+	HubPlazaBuilder.buildMainIslandMeadow(model)
 	local tiles = 0
 	for _, child in model:GetChildren() do
-		if child.Name == "GrassTile" then tiles += 1 end
+		if child.Name:sub(1, 7) == "Meadow_" then tiles += 1 end
 	end
 
 	return tiles, ScenicBuilder.restyle(model, WorldBuilder.isOnBridgeLane)

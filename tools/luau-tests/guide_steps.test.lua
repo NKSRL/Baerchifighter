@@ -83,7 +83,7 @@ check("Rekord zaehlt als Kampf", GuideSteps.current(rec), "combs")
 
 -- Monotonie: eine wachsende Folge darf nie zu einem frueheren Schritt zurueck
 -- "collect" ist ein Einschub zwischen Kampf und Event: gleicher Rang wie "event"
-local order = { hatch = 1, merchant = 1, fight = 2, collect = 3, combs = 3, upgrade = 3, event = 3, tower = 4 }
+local order = { hatch = 1, merchant = 1, fight = 2, collect = 3, combs = 3, upgrade = 3, event = 3, tower = 4, tower3 = 4, incubator = 3 }
 local seq = fresh()
 local last = 0
 local states = {
@@ -126,6 +126,41 @@ twv.rebirthCount = 1
 twv.island.baerchis = { a = {} }
 twv.towers = { records = { I = 30 }, selected = "I", unlocked = { I = true, II = true } }
 check("Veteran mit Rebirth -> keine Fuehrung", GuideSteps.current(twv), nil)
+
+-- 21.10.: Schritt "incubator" (1 Kampf UND 6 Eier, Inkubator ungenutzt)
+local inc = fresh()
+inc.island.baerchis = { a = {} }
+inc.island.towerProgress = { I = 1 }
+inc.stats.totalHatched = 5
+check("5 Eier -> kein incubator", GuideSteps.current(inc) ~= "incubator", true)
+inc.stats.totalHatched = 6
+check("1 Kampf + 6 Eier -> incubator", GuideSteps.current(inc), "incubator")
+inc.quests.chainDone = 6
+check("incubator auch bei Ketten-Quests >= 4", GuideSteps.current(inc), "incubator")
+inc.island.incubator = { slots = { { slot = 1 } } }
+check("Inkubator benutzt -> kein incubator", GuideSteps.current(inc) ~= "incubator", true)
+local inc2 = fresh()
+inc2.island.baerchis = { a = {} }
+inc2.stats.totalHatched = 9
+check("6 Eier, aber nie gekaempft -> fight", GuideSteps.current(inc2), "fight")
+inc2.rebirthCount = 1
+check("Rebirth -> kein incubator", GuideSteps.current(inc2), nil)
+
+-- 21.10.: Schritt "tower3" (Tower II geschafft -> zum Computer)
+local t3 = fresh()
+t3.island.baerchis = { a = {} }
+t3.island.towerProgress = { I = 30 }
+t3.stats.totalEventsCompleted = 1
+t3.towers = { records = { I = 30, II = 45 }, selected = "II", unlocked = { I = true, II = true, III = true } }
+check("Tower II geschafft -> tower3", GuideSteps.current(t3), "tower3")
+t3.towers.selected = "III"
+check("III gewaehlt -> fertig", GuideSteps.current(t3), nil)
+t3.towers.selected = "II"
+t3.towers.records.III = 2
+check("in III gekaempft -> fertig", GuideSteps.current(t3), nil)
+t3.towers.records.III = nil
+t3.rebirthCount = 1
+check("Rebirth -> kein tower3", GuideSteps.current(t3), nil)
 
 if failures > 0 then
 	error(failures .. " Test(s) fehlgeschlagen")

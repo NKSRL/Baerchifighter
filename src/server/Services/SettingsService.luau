@@ -69,12 +69,30 @@ function SettingsService.setAudio(player: Player, music: any, sfx: any, muted: a
 	PlayerService.markDirty(player)
 end
 
+-- 21.10.: "Schwaches Geraet". Der Client darf nur true/false schicken; alles
+-- andere wird still verworfen. false wird als nil gespeichert (kein Feld).
+function SettingsService.setLowEnd(player: Player, value: any)
+	local data = PlayerService.getData(player)
+	if not data then return end
+	if typeof(value) ~= "boolean" then return end
+
+	local newValue: boolean? = if value then true else nil
+	if data.lowEnd == newValue then return end
+
+	data.lowEnd = newValue
+	PlayerService.markDirty(player)
+end
+
 function SettingsService.init()
 	RateLimiter.connect(Remotes.RequestSetLanguage, "RequestSetLanguage", function(player, language: any)
 		SettingsService.setLanguage(player, language)
 	end)
 	RateLimiter.connect(Remotes.RequestSetAudio, "RequestSetAudio", function(player, music: any, sfx: any, muted: any)
 		SettingsService.setAudio(player, music, sfx, muted)
+	end)
+
+	RateLimiter.connect(Remotes.RequestSetLowEnd, "RequestSetLowEnd", function(player, value: any)
+		SettingsService.setLowEnd(player, value)
 	end)
 
 	print("[SettingsService] Initialisiert")

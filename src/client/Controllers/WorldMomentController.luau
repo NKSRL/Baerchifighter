@@ -35,6 +35,8 @@ local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
 local TowerConfig   = require(ReplicatedStorage.Config.TowerConfig)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 local WorldMoments  = require(ReplicatedStorage.Modules.WorldMoments)
+local UiScale       = require(script.Parent.Parent.UI.UiScale)        -- 21.10.
+local PanelManager  = require(script.Parent.Parent.UI.PanelManager)   -- 21.10.
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
@@ -346,8 +348,20 @@ function WorldMomentController.init()
 	gui.DisplayOrder = 1
 	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 	local label = Instance.new("TextLabel")
+	-- 21.10. Playtest: Die Meldung ("X zieht ...") lag je nach Aufloesung in den Symbol-Knoepfen
+	-- der Pet-Leiste (fester Abstand -96 px, aber die Leiste waechst mit der UI-Skalierung).
+	-- Jetzt: gleiche Skalierung wie die UI und verankert ueber der Leiste, auf jeder Aufloesung am
+	-- selben Punkt.
+	local uiScale = Instance.new("UIScale")
+	uiScale.Scale = UiScale.get()
+	uiScale.Parent = gui
+	UiScale.onChanged(function(scale: number) uiScale.Scale = scale end)
 	label.AnchorPoint = Vector2.new(0.5, 1)
-	label.Position = UDim2.new(0.5, 0, 1, -96)
+	local function placeLine()
+		label.Position = UDim2.new(0.5, 0, 1, -(PanelManager.getBottomReserve() + 10))
+	end
+	placeLine()
+	PanelManager.onAreaChanged(placeLine)
 	label.Size = UDim2.fromOffset(520, 28)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne

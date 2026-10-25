@@ -72,14 +72,18 @@ local UpgradeHintController = require(Controllers:WaitForChild("UpgradeHintContr
 local IncubatorController   = require(Controllers:WaitForChild("IncubatorController"))   -- Sammel-Update 8
 local AreaSignController    = require(Controllers:WaitForChild("AreaSignController"))    -- Sammel-Update 3.8
 local RocketIslandController = require(Controllers:WaitForChild("RocketIslandController"))   -- P4 Raketen-Insel
+local BadgeController    = require(Controllers:WaitForChild("BadgeController"))   -- W1-P3 Rang-Billboard
 local EpilogIslandFX        = require(Controllers:WaitForChild("EpilogIslandFX"))        -- 20.10. Final-Epilog P3: Inseldeko wippt
 local EpilogTerminalController = require(Controllers:WaitForChild("EpilogTerminalController"))   -- 20.10. Final-Epilog P4: Start-Terminal
 local EpilogController = require(Controllers:WaitForChild("EpilogController"))   -- 20.10. Final-Epilog P5: Kamerafahrt
+local GamepadController     = require(Controllers:WaitForChild("GamepadController"))     -- W1-P6d Controller-Steuerung
 local TerminalController    = require(Controllers:WaitForChild("TerminalController"))    -- 08.10. Tower-Terminal
+local Welt2Controller       = require(Controllers:WaitForChild("Welt2Controller"))       -- 21.10. Welt 2: Fusionsmaschine
 local TowerFlightController = require(Controllers:WaitForChild("TowerFlightController")) -- 12.10. Flugfeld am Kampf-Turm
 
 local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
+local DeviceProfile    = require(UI:WaitForChild("DeviceProfile"))   -- W1-P6b Geraete-Profil
 local ShopPanel        = require(UI:WaitForChild("ShopPanel"))
 local Hud              = require(UI:WaitForChild("Hud"))
 local MenuBar          = require(UI:WaitForChild("MenuBar"))
@@ -129,6 +133,7 @@ pcall(function()
 	(screenGui :: any).ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 end)
 UiScale.init(screenGui)
+DeviceProfile.init()   -- W1-P6b: vor allen UI-Modulen, die das Profil lesen
 
 --------------------------------------------------------------------------------
 -- Start
@@ -206,10 +211,12 @@ EggTimerController.init()
 IncubatorController.init()   -- Sammel-Update Paket 8
 AreaSignController.init()    -- Sammel-Update Paket 3.8
 RocketIslandController.init()   -- P4: Schild/Rakete nach eigenem Stand
+BadgeController.init()   -- W1-P3: Rang-Billboard (Schalter RANK_BADGE_V2)
 EpilogIslandFX.init()        -- 20.10. Final-Epilog Prompt 3 (wippende Inseldeko)
 EpilogTerminalController.init()   -- 20.10. Final-Epilog Prompt 4 (Start-Terminal)
 EpilogController.init()   -- 20.10. Final-Epilog Prompt 5 (Kamerafahrt)
 TerminalController.init()    -- 08.10. Tower-Terminal an der Bruecke
+Welt2Controller.init()       -- 21.10. Welt 2: Prompt an der Fusionsmaschine
 TowerFlightController.init() -- 12.10. Flugfeld auf den Kampf-Turm
 -- v14: Faehigkeiten-Show im PIT (unabhaengig von allem anderen)
 SkillFXController.init()
@@ -246,5 +253,7 @@ UiEventLogger.init()
 GuideController.init(screenGui)
 -- HBB Paket 3: ⬆ ueber bezahlbaren eigenen Gebaeuden
 UpgradeHintController.init()
+-- W1-P6d: Controller (nach allen Fenstern und der Pet-Leiste; wirkt nur mit Gamepad)
+GamepadController.init(screenGui)
 
 print("[Client] Bereit")

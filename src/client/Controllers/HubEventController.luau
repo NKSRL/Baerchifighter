@@ -121,21 +121,24 @@ local function buildPitFrame(folder: Instance)
 	local pennantId = WorldFXKit.textureId("pennant_fabric")
 
 	local count = MapConfig.PLOT_COUNT
-	local tops: { Vector3 } = {}
-	for k = 0, count - 1 do
-		-- Masten in den Zaunfeldern zwischen zwei Stegen (Test: map_layout)
-		local foot = MapLayout.atAngle(180 / count + k * (360 / count), cfg.POLE_RADIUS)
-		foot = Vector3.new(foot.X, pitFloorY() - 0.3, foot.Z)
-		WorldFXKit.pole("Pole", group, foot, cfg.POLE_HEIGHT, 0.5, cfg.POLE_COLOR, Enum.Material.Wood)
-		local top = foot + Vector3.new(0, cfg.POLE_HEIGHT, 0)
-		table.insert(tops, top)
-		table.insert(_lanterns, WorldFXKit.ball("Lantern", group, 1.2, top + Vector3.new(0, 0.5, 0), cfg.LANTERN_OFF, Enum.Material.SmoothPlastic))
-	end
-
-	-- Kette zwischen zwei Nachbarmasten, mit Durchhang
+	local fenceR = 46.0
+	local gateHalfAngle = 0.124
+	local topY = pitFloorY() + MapConfig.EVENT_PIT_FLOOR_HEIGHT + 11.2
 	local colorIndex = 0
-	for k = 1, count do
-		local a, b = tops[k], tops[k % count + 1]
+
+	for k = 0, count - 1 do
+		local baseAngle = k * (TAU / count)
+		local aStart = baseAngle + gateHalfAngle
+		local aEnd   = baseAngle + (TAU / count) - gateHalfAngle
+
+		local pA = MapConfig.CENTER + Vector3.new(math.cos(aStart) * fenceR, 0, math.sin(aStart) * fenceR)
+		local pB = MapConfig.CENTER + Vector3.new(math.cos(aEnd) * fenceR, 0, math.sin(aEnd) * fenceR)
+		local a = Vector3.new(pA.X, topY, pA.Z)
+		local b = Vector3.new(pB.X, topY, pB.Z)
+
+		table.insert(_lanterns, WorldFXKit.ball("Lantern", group, 1.05, a + Vector3.new(0, 1.6, 0), cfg.LANTERN_OFF, Enum.Material.SmoothPlastic))
+		table.insert(_lanterns, WorldFXKit.ball("Lantern", group, 1.05, b + Vector3.new(0, 1.6, 0), cfg.LANTERN_OFF, Enum.Material.SmoothPlastic))
+
 		local chord = b - a
 		local along = Vector3.new(chord.X, 0, chord.Z).Unit
 		local function hangAt(t: number): Vector3

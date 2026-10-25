@@ -23,7 +23,11 @@ local Workspace         = game:GetService("Workspace")
 
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local GuideSteps   = require(ReplicatedStorage.Modules.GuideSteps)
+local GuideArrowRules = require(ReplicatedStorage.Modules.GuideArrowRules)   -- 21.10. Pfeil-Partikel
+local WorldFXKit   = require(script.Parent.WorldFXKit)
+local LowEndSetting = require(script.Parent.LowEndSetting)   -- 21.10. Option "Schwaches Geraet"
 local EggConfig    = require(ReplicatedStorage.Config.EggConfig)
+local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)   -- 21.10. Schritt "incubator"
 local Loc          = require(ReplicatedStorage.Localization.Loc)   -- Sammel-Update 3.5
 local PanelManager = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PanelManager"))
 
@@ -33,6 +37,8 @@ local UiScale     = require(UI:WaitForChild("UiScale"))
 local MenuBar     = require(UI:WaitForChild("MenuBar"))
 local PetBar      = require(UI:WaitForChild("PetBar"))
 local TowerPanel  = require(UI:WaitForChild("TowerPanel"))          -- 08.10. Schritt "tower"
+local Notify      = require(UI:WaitForChild("Notify"))
+local Toast       = require(UI:WaitForChild("Toast"))               -- 21.10. Charms-Hinweis
 local TerminalController = require(script.Parent.TerminalController)
 local ClientState = require(script.Parent.ClientState)
 
@@ -51,11 +57,15 @@ local ARROW_BOUNCE_STRONG = 30
 local EVENT_STEP_SECONDS = 8
 -- 3.5 ein Satz, was der Schritt bringt (Schluessel "guide.<step>")
 local HINT_WIDTH = 300
+-- Standardplatz des Hinweises (unten mittig); zeigt der Pfeil von oben auf einen Knopf,
+-- rueckt der Hinweis ueber den Pfeil, damit er den Knopf nicht verdeckt.
+local HINT_DEFAULT_POS = UDim2.new(0.5, 0, 1, -112)
 local HIGHLIGHT_COLOR = Color3.fromRGB(255, 236, 140)
 local BEAM_COLOR      = Color3.fromRGB(255, 220, 90)
 local LAID_EGG_ATTRIBUTE = "LaidEggUid"
 
 local _step: string? = nil
+local _charmsHinted = false   -- 21.10.
 local _stepSince = 0
 -- Welt-Ziel, im Takt von evaluate() gesucht (nicht jeden Frame: die Suche
 -- laeuft ueber den Workspace)
@@ -70,6 +80,21 @@ local _beam: Beam? = nil
 local _from: Attachment? = nil
 local _to: Attachment? = nil
 
+-- 21.10. Pfeil-Partikel (statt Beam, wenn GUIDE_ARROW_PARTICLES an ist)
+local ARROW_START_DOWN  = 0     -- Studs unter der Rumpfmitte (0 = mittig vor dem Charakter, nicht im Boden)
+local ARROW_START_AHEAD = 3     -- Studs Richtung Ziel: der Strahl beginnt vor dem Koerper
+local ARROW_DOT_PIXELS = 16        -- Groesse des Zielpunkts in Pixeln
+local ARROW_SHAPE_PARTIAL = 0      -- 0 = nur genau Richtung Ziel, kein Streuen: alle Pfeile auf einer Linie
+local _emitter: ParticleEmitter? = nil
+local _emitAnchor: Part? = nil
+local _emitDot: Part? = nil   -- klarer Punkt, zu dem die Pfeile fliegen
+local _emitTarget: BasePart? = nil
+local _lastStart: Vector3? = nil     -- fuer die Laufgeschwindigkeit des Ausgangs
+local _lastStartTime = 0
+local _closing = 0                   -- geglaettet, Studs/s in Richtung Ziel
+local _emitAcc = 0                   -- angesammelte Pfeile, die noch auszusenden sind
+local _lastFrame = 0
+
 --------------------------------------------------------------------------------
 -- Ziele
 --------------------------------------------------------------------------------
@@ -81,7 +106,7 @@ local function uiTarget(step: string): GuiObject?
 		return PetBar.getButton("Fight")
 	elseif step == "event" then
 		return PetBar.getButton("Event")
-	elseif step == "tower" then
+	elseif step == "tower" or step == "tower3" then
 		-- 08.10.: im offenen Tower-Panel der Waehlen-Knopf von Tower II;
 		-- sonst zeigt der Strahl zum Terminal (worldTarget)
 		return TowerPanel.getGuideTarget()
@@ -165,8 +190,24 @@ local function ownHoneyBuilding(): BasePart?
 	return nil
 end
 
+-- 21.10.: Inkubator auf dem EIGENEN Plot (Model "Incubator" im Plot-Model)
+local function ownIncubator(): BasePart?
+	for _, plot in Workspace:GetChildren() do
+		if plot:IsA("Model") and plot:GetAttribute("PlotOwner") == Players.LocalPlayer.UserId then
+			local model = plot:FindFirstChild(IncubatorConfig.MODEL_NAME)
+			if model and model:IsA("Model") then
+				return model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+			end
+		end
+	end
+	return nil
+end
+
 local function worldTarget(step: string): BasePart?
-	if step == "tower" then
+	if step == "incubator" then
+		return ownIncubator()
+	end
+	if step == "tower" or step == "tower3" then
 		if TowerPanel.isOpen() then return nil end
 		return TerminalController.getOwnScreen()
 	end
@@ -233,9 +274,156 @@ local function showBeam(target: BasePart)
 	_beam, _from, _to = beam, from, to
 end
 
+local function clearArrows()
+	-- der Emitter haengt am Anker-Part und verschwindet mit ihm
+	if _emitAnchor then _emitAnchor:Destroy() end
+	if _emitDot then _emitDot:Destroy() end
+	_emitter, _emitAnchor, _emitDot, _emitTarget = nil, nil, nil, nil
+	_lastStart, _closing, _emitAcc = nil, 0, 0
+end
+
+-- Pfeil-Partikel vom Spieler zum Ziel. Der Emitter sitzt auf einem winzigen
+-- unsichtbaren Anker-Part VOR dem Charakter und schaut zum Ziel; ShapePartial
+-- macht aus der Rundum-Kugel einen schmalen Kegel (gebuendelter Strahl).
+-- Beschleunigung und Drag kommen aus dem Welt-Versatz zum Ziel
+-- (GuideArrowRules.motion) und werden jeden Frame nachgefuehrt.
+local function showArrows(target: BasePart, strong: boolean)
+	local root = characterRoot()
+	if not root then
+		clearArrows()
+		return
+	end
+	local rootPos = root.Position
+	local toPos = target.Position
+	local flat = Vector3.new(toPos.X - rootPos.X, 0, toPos.Z - rootPos.Z)
+	if flat.Magnitude < 0.01 then
+		clearArrows()
+		return
+	end
+	local dir = flat.Unit
+	local startPos = rootPos + Vector3.new(0, -ARROW_START_DOWN, 0) + dir * ARROW_START_AHEAD
+
+	-- Wie schnell wandert der Ausgang aufs Ziel zu? Daraus folgt die Rate, damit der
+	-- Abstand der Pfeile beim Stehen und Laufen gleich bleibt.
+	local nowT = os.clock()
+	local last = _lastStart
+	if last and nowT - _lastStartTime > 1 / 240 then
+		local along = (startPos - last):Dot(dir) / (nowT - _lastStartTime)
+		_closing += (math.clamp(along, -40, 40) - _closing) * 0.25
+		_lastStart, _lastStartTime = startPos, nowT
+	elseif not last then
+		_closing = 0
+		_lastStart, _lastStartTime = startPos, nowT
+	end
+
+	local anchor = _emitAnchor
+	local emitter = _emitter
+	if not anchor or not emitter or not anchor.Parent then
+		clearArrows()
+		local newAnchor = Instance.new("Part")
+		newAnchor.Name = "GuideArrowAnchor"
+		newAnchor.Size = Vector3.new(0.2, 0.2, 0.2)
+		newAnchor.Transparency = 1
+		newAnchor.Anchored = true
+		newAnchor.CanCollide = false
+		newAnchor.CanQuery = false
+		newAnchor.CanTouch = false
+		newAnchor.CFrame = CFrame.lookAt(startPos, startPos + dir)
+		newAnchor.Parent = Workspace
+		local newEmitter = Instance.new("ParticleEmitter")
+		newEmitter.Name = "GuideArrows"
+		newEmitter.Texture = WorldFXKit.textureId("guide_arrow") or ""
+		newEmitter.Shape = Enum.ParticleEmitterShape.Sphere
+		newEmitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+		newEmitter.ShapePartial = ARROW_SHAPE_PARTIAL
+		newEmitter.EmissionDirection = Enum.NormalId.Front
+		newEmitter.Orientation = Enum.ParticleOrientation.VelocityParallel
+		newEmitter.Speed = NumberRange.new(GuideArrowRules.SPEED)
+		newEmitter.Rate = 0   -- ausgesendet wird per Emit() mit festem Abstand, nicht per Rate
+		newEmitter.LightEmission = 1
+		newEmitter.LockedToPart = false
+		newEmitter.Color = ColorSequence.new(BEAM_COLOR)
+		newEmitter.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.1, 0.1),
+			NumberSequenceKeypoint.new(0.8, 0.1),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		newEmitter.Parent = newAnchor
+		anchor, emitter = newAnchor, newEmitter
+		_emitAnchor, _emitter = newAnchor, newEmitter
+		_lastFrame = nowT
+	end
+	if not anchor or not emitter then return end
+	_emitTarget = target
+
+	-- Zielpunkt: ueber dem Ziel auf Hoehe der Pfeile, sichtbar auch durch Waende
+	local dot = _emitDot
+	if not dot or not dot.Parent then
+		local newDot = Instance.new("Part")
+		newDot.Name = "GuideArrowDot"
+		newDot.Size = Vector3.new(0.2, 0.2, 0.2)
+		newDot.Transparency = 1
+		newDot.Anchored = true
+		newDot.CanCollide = false
+		newDot.CanQuery = false
+		newDot.CanTouch = false
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "Dot"
+		gui.Size = UDim2.fromOffset(ARROW_DOT_PIXELS, ARROW_DOT_PIXELS)
+		gui.AlwaysOnTop = true
+		gui.LightInfluence = 0
+		gui.Parent = newDot
+		local fill = Instance.new("Frame")
+		fill.Size = UDim2.fromScale(1, 1)
+		fill.BackgroundColor3 = Color3.fromRGB(255, 245, 170)
+		fill.BorderSizePixel = 0
+		fill.Parent = gui
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = fill
+		local ring = Instance.new("UIStroke")
+		ring.Color = Color3.fromRGB(255, 170, 40)
+		ring.Thickness = 2
+		ring.Parent = fill
+		newDot.Parent = Workspace
+		_emitDot = newDot
+		dot = newDot
+	end
+	if not dot then return end
+	dot.Position = Vector3.new(toPos.X, startPos.Y, toPos.Z)
+
+	anchor.CFrame = CFrame.lookAt(startPos, startPos + dir)
+	local motion = GuideArrowRules.motion(toPos.X - startPos.X, toPos.Z - startPos.Z)
+	emitter.Enabled = motion.visible
+	-- Rate aus festem Pfeil-Abstand und Laufgeschwindigkeit (siehe GuideArrowRules.rate)
+	local rate = GuideArrowRules.rate(LowEndSetting.get() or WorldFXKit.quality() < 1, _closing)
+	local frameDt = math.clamp(nowT - _lastFrame, 0, 0.1)
+	_lastFrame = nowT
+	if motion.visible then
+		_emitAcc += rate * frameDt
+		local count = math.floor(_emitAcc)
+		if count > 0 then
+			_emitAcc -= count
+			emitter:Emit(math.min(count, 8))
+		end
+	else
+		_emitAcc = 0
+	end
+	local dotGui = dot:FindFirstChildOfClass("BillboardGui")
+	if dotGui then dotGui.Enabled = motion.visible end
+	emitter.Acceleration = Vector3.new(motion.accelX, motion.accelY, motion.accelZ)
+	emitter.Drag = motion.drag
+	emitter.Lifetime = NumberRange.new(motion.lifetime)
+	-- Timed Hint: nach Leerlauf groessere, wippende Pfeile
+	local size = if strong then 1.5 + math.sin(os.clock() * 8) * 0.3 else 1.1
+	emitter.Size = NumberSequence.new(size)
+end
+
 local function hideHighlight()
 	if _frame then _frame.Visible = false end
 	if _arrow then _arrow.Visible = false end
+	if _hint then _hint.Position = HINT_DEFAULT_POS end
 end
 
 -- Sammel-Update 3.5: Satz zum Schritt, unten mittig ueber der Pet-Leiste.
@@ -278,9 +466,14 @@ local function showHighlight(target: GuiObject, strong: boolean, t: number)
 		-- "➡" statt "➜": "➜" kann die Spielschrift nicht darstellen.
 		arrow.Text = "➡"
 		arrow.Position = UDim2.fromOffset(pos.X - ARROW_SIZE - 6 - bounce, pos.Y + size.Y * 0.5 - ARROW_SIZE * 0.5)
+		if _hint then _hint.Position = HINT_DEFAULT_POS end
 	else
 		arrow.Text = "⬇"
 		arrow.Position = UDim2.fromOffset(pos.X + size.X * 0.5 - ARROW_SIZE * 0.5, pos.Y - ARROW_SIZE - 6 - bounce)
+		-- Hinweis ueber den hoechsten Punkt des wippenden Pfeils (ohne zu zittern)
+		if _hint then
+			_hint.Position = UDim2.new(0.5, 0, 0, pos.Y - ARROW_SIZE - 10 - ARROW_BOUNCE_STRONG)
+		end
 	end
 end
 
@@ -301,6 +494,13 @@ local function evaluate()
 	if step ~= _step then
 		_step = step
 		_stepSince = os.clock()
+		-- 21.10.: Mini-Hinweis auf Charms, einmal pro Sitzung, wenn Tower III frei wird
+		if step == "tower3" and not _charmsHinted then
+			_charmsHinted = true
+			Notify.emit("guide_charms_tip", function()
+				Toast.info(Loc.t("guide.charms_tip"))
+			end)
+		end
 	end
 	_worldTarget = if step then worldTarget(step) else nil
 end
@@ -316,6 +516,7 @@ local function render()
 	if not step then
 		hideHighlight()
 		clearBeam()
+		clearArrows()
 		return
 	end
 	local strong = now - _stepSince >= HINT_AFTER_SECONDS
@@ -323,13 +524,18 @@ local function render()
 	local target = uiTarget(step)
 	if target then
 		clearBeam()
+		clearArrows()
 		showHighlight(target, strong, now)
 		return
 	end
 	hideHighlight()
 
 	local part = _worldTarget
-	if part and part.Parent then
+	if part and part.Parent and FeatureFlags.isOn("GUIDE_ARROW_PARTICLES") then
+		clearBeam()
+		showArrows(part, strong)
+	elseif part and part.Parent then
+		clearArrows()
 		showBeam(part)
 		local beam = _beam
 		if beam then
@@ -338,6 +544,7 @@ local function render()
 		end
 	else
 		clearBeam()
+		clearArrows()
 	end
 end
 

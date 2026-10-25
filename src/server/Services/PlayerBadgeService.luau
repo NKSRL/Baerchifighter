@@ -13,8 +13,11 @@ local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local Types       = require(ReplicatedStorage.Network.Types)
-local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
+local Types         = require(ReplicatedStorage.Network.Types)
+local TowerConfig   = require(ReplicatedStorage.Config.TowerConfig)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
+local BadgeConfig   = require(ReplicatedStorage.Config.BadgeConfig)
+local BadgeRules    = require(ReplicatedStorage.Modules.BadgeRules)
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 
@@ -34,7 +37,29 @@ local function badgeOf(data: Types.PlayerData): (string, Color3)
 	return string.format("%s   ⟳ %d", towerPart, data.rebirthCount), def.color
 end
 
+-- Paket 3 (RANK_BADGE_V2): der Server setzt nur drei Attribute am Spieler; das Billboard baut der Client
+-- (Controllers/BadgeController). Das alte Kopf-Abzeichen wird dabei entfernt und der Roblox-Namensschild-Text
+-- ausgeblendet (der Name steht im neuen Billboard).
+local function applyV2(player: Player, data: Types.PlayerData)
+	local info = BadgeRules.info(data.towers, data.rebirthCount)
+	player:SetAttribute(BadgeConfig.ATTR_TOWER, info.towerId)
+	player:SetAttribute(BadgeConfig.ATTR_RECORD, info.record)
+	player:SetAttribute(BadgeConfig.ATTR_REBIRTH, info.rebirth)
+	local character = player.Character
+	if character then
+		local head = character:FindFirstChild("Head")
+		local old = head and head:FindFirstChild(BADGE_NAME)
+		if old then old:Destroy() end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
+	end
+end
+
 local function apply(player: Player, data: Types.PlayerData, force: boolean)
+	if FeatureFlags.isOn("RANK_BADGE_V2") then
+		applyV2(player, data)
+		return
+	end
 	local text, color = badgeOf(data)
 	if not force and _text[player] == text then return end
 	_text[player] = text

@@ -746,8 +746,10 @@ function Kit.button(name: string, parent: Instance, kind: ButtonKind, text: stri
 	end
 	view.setKind = function(newKind: ButtonKind)
 		view.kind = newKind
+		button:SetAttribute("HBBKind", newKind)   -- W1-P6: Gamepad X springt auf den Hauptknopf
 		paint()
 	end
+	button:SetAttribute("HBBKind", kind)
 
 	-- Eindruecken: Flaeche sinkt auf die Kante
 	button.MouseButton1Down:Connect(function()

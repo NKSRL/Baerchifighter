@@ -32,11 +32,18 @@ export type Piece = {
 -- Bild auf einer Seite des Teils (Decal) oder gekachelt (Texture, tile = Studs pro Kachel)
 export type Deco = { id: number, face: Enum.NormalId, tile: Vector2?, color: Color3? }
 
--- Bilder (Asset Manager, 15.10.2026)
+-- Bilder (Asset Manager, 15.10.2026). 20.10.: Das waren Decal-IDs (Asset-Typ 13); sie laden weder als Decal.Texture
+-- noch als Bild ("Asset type does not match requested type"). Hier stehen jetzt die Image-IDs dahinter
+-- (InsertService:LoadAsset(<decalId>) -> Decal.Texture). Alte Decal-IDs im Kommentar je Zeile.
 local IMG = {
-	Bark = 114888432264786, BeeSticker = 73015920974297, GlowRing = 136391997379517,
-	Honeycomb = 84016842651629, HoneyDripTrim = 99699962232406, Sign = 106270284386721,
-	Sparkle = 122651035050334, WoodRings = 97067726944869,
+	Bark = 117335543708569,          -- Decal 114888432264786
+	BeeSticker = 94482730024992,     -- Decal 73015920974297
+	GlowRing = 91854870308136,       -- Decal 136391997379517
+	Honeycomb = 117223102024916,     -- Decal 84016842651629
+	HoneyDripTrim = 89680454074594,  -- Decal 99699962232406
+	Sign = 122830236597585,          -- Decal 106270284386721
+	Sparkle = 71432124214267,        -- Decal 122651035050334
+	WoodRings = 121669955699632,     -- Decal 97067726944869
 }
 
 local IncubatorModels = {}

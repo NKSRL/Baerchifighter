@@ -207,7 +207,7 @@ local function showResult(result: Types.PitRunResult)
 	local parts = {
 		"Tower " .. def.numeral,
 		Loc.tn("msg.tower_cleared", cleared),
-		"+" .. Theme.formatNumber(result.gummiesWon or 0) .. " Paw Coins",
+		Loc.t("ui.quest.reward_gummies", { n = Theme.formatNumber(result.gummiesWon or 0) }),
 	}
 	if (result.goldGummiesWon or 0) > 0 then
 		table.insert(parts, "+" .. Theme.formatNumber(result.goldGummiesWon) .. " Honey Crystals")
@@ -240,7 +240,7 @@ end
 local function showMilestone(reward: Types.TowerMilestoneReward)
 	local def = TowerConfig.get(reward.towerId) or TowerConfig.TOWERS[1]
 	local parts: { string } = {}
-	if reward.gummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.gummies) .. " Paw Coins") end
+	if reward.gummies > 0 then table.insert(parts, Loc.t("ui.quest.reward_gummies", { n = Theme.formatNumber(reward.gummies) })) end
 	if reward.goldGummies > 0 then table.insert(parts, "+" .. Theme.formatNumber(reward.goldGummies) .. " Honey Crystals") end
 	if reward.eggType and reward.eggs > 0 then
 		table.insert(parts, string.format("+%d %s", reward.eggs, Names.egg(reward.eggType)))

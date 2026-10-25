@@ -30,6 +30,8 @@ local WorldFXConfig = {}
 -- Roblox-Textur) oder der Aufrufer laesst das Bild ganz weg und zeigt nur
 -- Farbe/Neon. Alles laeuft also auch ohne Upload.
 WorldFXConfig.TEXTURE_IDS = {
+	-- 21.10. Tutorial-Pfeil (GuideController)
+	guide_arrow         = "rbxassetid://130945063140879",
 	-- Paket A
 	cloud_puff_flipbook = "rbxassetid://128747336317638",
 	firefly             = "rbxassetid://89196054022807",
@@ -361,7 +363,8 @@ WorldFXConfig.SIGNPOST = {
 	-- 12.10.: die Schilder haengen AUSSEN am Pfahl (inneres Ende am Pfahl,
 	-- zeigen von ihm weg) statt mittig darauf — sonst verdeckt der Pfahl die
 	-- Schrift. Kleiner Spalt, damit Pfahl und Brett nicht flimmern.
-	BOARD_POST_GAP = 0.05,
+	-- 21.10. (Playtest 2): leicht NEGATIV, das Brett steckt im Pfahl (sonst wirkt es schwebend)
+	BOARD_POST_GAP = -0.2,
 	HOME_COLOR   = Color3.fromRGB(255, 214, 110),   -- Schild "Deine Insel"
 	SHOW_DISTANCE = 160,
 }
@@ -429,6 +432,16 @@ WorldFXConfig.ISLAND_STAGE = {
 	REBIRTHS_FOR = { [2] = 1, [3] = 3, [4] = 5 },   -- passend zu den Rebirth-Deckeln
 	RIM_RADIUS   = 53.5,     -- Abstand zur Inselmitte (Beet-Ecke 50,9, Inselrand 58)
 	SHOW_DISTANCE = 260,
+	-- Welt-2-Plot (25.10.): Die Deko steht auf dem Plattenboden statt auf der
+	-- Insel darunter: Aussenring der Vorlage (T0__W2_Floor, 0,15 unter der
+	-- Laufhoehe PLOT_SIZE.Y), etwas weiter innen, damit nichts in den Goldrand
+	-- (ab R 54,8) ragt, in Farbe und Material dieses Bodens und ohne Leuchten.
+	WELT2 = {
+		RIM_RADIUS = 52.5,
+		FLOOR_DROP = 0.15,
+		COLOR      = Color3.fromRGB(62, 54, 82),
+		MATERIAL   = Enum.Material.Slate,
+	},
 }
 
 -- Was ab welcher Stufe am Inselrand steht. `angle` in Grad, plot-lokal:

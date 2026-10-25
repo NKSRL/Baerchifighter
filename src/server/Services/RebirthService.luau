@@ -47,6 +47,7 @@ local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)   -- 12.
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)   -- Paket 4.1: Rebirth nach Stage
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local RebirthRules     = require(ReplicatedStorage.Modules.RebirthRules)   -- 20.10. P5a: Rebirth erst nach Welt 2
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
@@ -90,6 +91,12 @@ end
 function RebirthService.rebirth(player: Player)
 	local data = PlayerService.getData(player)
 	if not data then return end
+
+	-- 20.10. P5a: Rebirth erst nach Welt 2 (Flag REBIRTH_NEEDS_WORLD2, Bestandsschutz ab R1).
+	if not RebirthRules.allowed(data :: any) then
+		fail(player, Loc.msg("err.rebirth_world2"))
+		return
+	end
 
 	-- Sammel-Update 05.10. (Paket 4.1): kein Gummy-Preis mehr. Bedingung ist
 	-- eine Tower-Stage, in DIESEM Leben geschafft (island.stageBest, siehe

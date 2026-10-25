@@ -56,13 +56,15 @@ export type EggType =
 	| "TranscendenceEgg"
 	| "EternityEgg"
 	| "OmegaEgg"
+	-- Anime-Pfad (ab Welt 2)
+	| "AnimeEgg"
 	-- Sonder-Eier ausserhalb des Baums (EggConfig: special = true)
 	| "UfoJackpotEgg"
 
 -- v14: die Pfade des Ei-Baums. Ein Pfad ist kein Upgrade, sondern ein
 -- Spielziel (Gold = stark, Kristall = schnell, Void = selten, Kosmos =
 -- Allrounder, Ascension = Rebirth). Siehe BaerchiConfig.PATHS.
-export type PathId = "Stamm" | "Gold" | "Kristall" | "Void" | "Kosmos" | "Ascension"
+export type PathId = "Stamm" | "Gold" | "Kristall" | "Void" | "Kosmos" | "Ascension" | "Anime"
 	| "Event"   -- Sonder-Eier aus Events (nicht im Baum, nie freischaltbar)
 
 -- v11: MUTATION-SYSTEM (ersetzt das binaere isInverted-Feld).
@@ -538,6 +540,7 @@ export type JourneyState = {
 	claimed : { [string]: boolean },
 	skipped : { [string]: boolean },
 	hidden  : boolean,
+	islandSeen : boolean?,   -- 20.10. (Welt 1, Paket 2): Raketen-Insel entdeckt (einmalig, serverseitig geprueft)
 }
 
 export type EpilogState = {
@@ -575,6 +578,10 @@ export type PlayerData = {
 	-- Audio-Rework 16.10.: Lautstaerke-Regler. Fehlt bei alten Spielstaenden
 	-- (nil = Audio.DEFAULTS), kein Versions-Sprung noetig.
 	audio        : { music: number, sfx: number, muted: boolean }?,
+
+	-- 21.10.: Option "Schwaches Geraet" (weniger Partikel, z. B. Tutorial-Pfeile).
+	-- nil = aus, kein Versions-Sprung noetig.
+	lowEnd       : boolean?,
 
 	-- Insel
 	island : IslandData,
@@ -659,6 +666,7 @@ export type PlayerDataUpdate = {
 	rank         : Rank,
 	language     : string?,
 	audio        : { music: number, sfx: number, muted: boolean }?,
+	lowEnd       : boolean?,
 	island       : IslandData,
 	discovered   : { [string]: boolean },
 	quests       : QuestView,

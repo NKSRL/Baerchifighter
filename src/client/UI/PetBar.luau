@@ -33,6 +33,7 @@ local Names = require(game:GetService("ReplicatedStorage").Localization.Names)
 local Theme           = require(script.Parent.Theme)
 local PanelManager = require(script.Parent.PanelManager)   -- 08.10.: Tower-Name oeffnet das Tower-Panel
 local UiScale         = require(script.Parent.UiScale)
+local DeviceProfile = require(script.Parent.DeviceProfile)   -- W1-P6b
 local TouchSafeArea   = require(script.Parent.TouchSafeArea)
 local Icons           = require(script.Parent.Icons)
 local PitResumeDialog = require(script.Parent.PitResumeDialog)
@@ -329,6 +330,22 @@ function PetBar.getState(): string
 	return _state
 end
 
+-- W1-P6d: Controller-Eingabe loest dieselben Klicks aus wie ein Tipp auf den
+-- Knopf. mode = "Event" | "Fight" | "Recall" (Recall = Pet zurueckholen,
+-- je nach Zustand ueber den Knopf, der es losgeschickt hat).
+function PetBar.press(mode: string): boolean
+	local target = mode
+	if mode == "Recall" then
+		if _state == "ToPit" or _state == "InPit" then target = "Fight"
+		elseif _state == "ToEvent" or _state == "AtEvent" then target = "Event"
+		else return false end
+	end
+	local view = if target == "Fight" then _fight elseif target == "Event" then _event else nil
+	if not view or not view.button.Visible or not view.button.Active then return false end
+	if target == "Fight" then onFightClicked() else onEventClicked() end
+	return true
+end
+
 function PetBar.getButton(mode: string): GuiObject?
 	local view = if mode == "Fight" then _fight elseif mode == "Event" then _event else nil
 	return if view then view.button else nil
@@ -434,12 +451,18 @@ function PetBar.init(screenGui: ScreenGui)
 			bar.Position = UDim2.new(0.5, 0, 1, -BAR_MARGIN)
 			scale.Scale  = math.clamp((width - 32) / barWidth, 0.6, 1)
 		end
+		-- W1-P6b: Konsole: Rand >= 5 % der Hoehe (TV-Sicherheitsrand)
+		if DeviceProfile.isConsole() then
+			local safe = UiScale.toGui(DeviceProfile.safeMarginPx(screenGui.AbsoluteSize.Y))
+			bar.Position = UDim2.new(0.5, 0, 1, -math.max(BAR_MARGIN, safe))
+		end
 		-- R1: den Fenstern sagen, wie viel Hoehe unten belegt ist (Rand + Leiste
 		-- + Luft), damit sie oberhalb zentriert werden und Event/Fight frei bleiben.
 		PanelManager.setBottomReserve(BAR_MARGIN + BUTTON_HEIGHT * scale.Scale + WINDOW_GAP)
 	end
 	TouchSafeArea.watch(screenGui, rescale)
 	UiScale.onChanged(rescale)
+	DeviceProfile.onChanged(function() rescale() end)
 
 	-- R1: ein Tipp auf die Leiste (auch zwischen den Knoepfen) zaehlt nie als
 	-- "ausserhalb" und schliesst das offene Fenster nicht.

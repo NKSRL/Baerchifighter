@@ -67,6 +67,7 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- aber jeder Wechsel stoesst ein Daten-Update an — daher nicht null.
 	RequestSetLanguage     = 1.00,
 	RequestSetAudio        = 0.50,
+	RequestSetLowEnd       = 0.50,
 
 	GetPlayerData          = 1.00,
 

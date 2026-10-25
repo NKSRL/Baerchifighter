@@ -28,6 +28,7 @@ local PanelManager = require(script.Parent.PanelManager)
 local Icons        = require(script.Parent.Icons)
 local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local Unlock       = require(script.Parent.Unlock)
+local DeviceProfile = require(script.Parent.DeviceProfile)   -- W1-P6b
 
 local Hud = {}
 
@@ -152,6 +153,12 @@ local function makeBarPill(parent: Instance, order: number, barName: string): (T
 	plus.Size = UDim2.fromScale(0.16, 0.9)
 	plus.ZIndex = 5
 	plus.Parent = pill
+	-- W1-P6b: Touch-Trefferflaeche >= 48 px (60 Einheiten bei Skala 0,8)
+	if DeviceProfile.isTouch() then
+		local minSize = Instance.new("UISizeConstraint")
+		minSize.MinSize = Vector2.new(60, 60)
+		minSize.Parent = plus
+	end
 	plus.Activated:Connect(function()
 		PanelManager.toggle("Shop")
 	end)

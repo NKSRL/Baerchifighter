@@ -398,6 +398,7 @@ function HatchPanel.init(screenGui: ScreenGui)
 	_root = holder
 
 	local skin = EggPanelSkin.new(holder, { layout = "list", emptyTitle = Loc.t("ui.hatch.empty") })
+	EggPanelSkin.bindToArea(screenGui, holder, skin, nil)   -- 21.10.: gleicher Fensterbereich wie Bears
 	skin.EmptyText.Visible = false
 	_skin = skin
 	_scroller = skin.Content

@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService      = game:GetService("TweenService")
 
 local Loc         = require(ReplicatedStorage.Localization.Loc)
+local RebirthRules = require(ReplicatedStorage.Modules.RebirthRules)
 local TowerConfig = require(ReplicatedStorage.Config.TowerConfig)
 
 local Theme        = require(script.Parent.Theme)
@@ -43,6 +44,7 @@ local _art: ImageLabel? = nil   -- Honig-Bild: leuchtet statt des Rahmens
 
 -- Darf der Spieler gerade rebirthen? (gleiche Regel wie der Server)
 local function isReady(data: any): boolean
+	if not RebirthRules.allowed(data) then return false end   -- 20.10. P5a
 	return TowerConfig.isRebirthReady(data.rebirthCount or 0, data.island.stageBest, data.towers and data.towers.records)
 end
 

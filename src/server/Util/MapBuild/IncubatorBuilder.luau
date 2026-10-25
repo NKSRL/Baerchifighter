@@ -28,6 +28,7 @@ local IncubatorModels = require(ReplicatedStorage.Config.IncubatorModels)
 local IncubatorRules  = require(ReplicatedStorage.Modules.IncubatorRules)
 local BaerchiConfig   = require(ReplicatedStorage.Config.BaerchiConfig)
 local BaerchiMesh     = require(ReplicatedStorage.Modules.BaerchiMesh)
+local Welt2Builder = require(ServerScriptService.Util.MapBuild.Welt2Builder)   -- 21.10. Welt-2-Look
 
 local MapParts = require(ServerScriptService.Util.MapBuild.MapParts)
 
@@ -163,7 +164,8 @@ function IncubatorBuilder.build(plotModel: Model, slot: number, incubator: Types
 	model.Name = IncubatorConfig.MODEL_NAME
 
 	local ground = MapParts.plotCFrame(slot)
-		* CFrame.new(look.offset.X, MapParts.plotSurfaceOffset() + look.offset.Y, look.offset.Z)
+		* CFrame.new(look.offset.X + (if Welt2Builder.enabled(plotModel) then Welt2Builder.INCUBATOR_SHIFT_X else 0),
+			MapParts.plotSurfaceOffset() + look.offset.Y, look.offset.Z)
 		* CFrame.Angles(0, math.rad(look.yaw), 0)
 
 	for _, piece in IncubatorModels.LEVELS[IncubatorRules.levelOf(incubator)] do
@@ -180,6 +182,21 @@ function IncubatorBuilder.build(plotModel: Model, slot: number, incubator: Types
 		dress(part, piece)
 		part.Parent = model
 		if piece.name == "Base" then model.PrimaryPart = part end
+	end
+
+	-- 21.10. Welt 2: die alten Teile bleiben als unsichtbare Funktions-Teile (Dome_1, Base, Kollision),
+	-- das neue Modell kommt als Optik dazu.
+	if Welt2Builder.enabled(plotModel) then
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Transparency = 1
+			elseif d:IsA("Decal") or d:IsA("SurfaceGui") or d:IsA("ParticleEmitter") then
+				d:Destroy()
+			end
+		end
+		local level = IncubatorRules.levelOf(incubator)
+		local w2 = Welt2Builder.place(model, "Inkubator", ground, level, "Welt2Look")
+		if w2 then Welt2Builder.addBuildingBeam(w2, "Inkubator", ground, level) end
 	end
 
 	model.Parent = plotModel

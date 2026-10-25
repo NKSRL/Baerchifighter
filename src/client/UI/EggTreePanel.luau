@@ -79,6 +79,7 @@ local WAVE_LIGHT  = Color3.fromRGB(255, 246, 214)
 local BRANCH_TEXTURE: { [string]: string } = {
 	Stamm = "tree/branch_stamm", Gold = "tree/branch_gold", Kristall = "tree/branch_kristall",
 	Void = "tree/branch_void", Kosmos = "tree/branch_kosmos", Ascension = "tree/branch_ascension",
+	Anime = "tree/branch_ascension",
 }
 
 -- Ast-Faerbung je Zustand (multipliziert sich auf die Textur)
@@ -834,14 +835,13 @@ function showInfo(eggId: string?, x: number?, y: number?)
 	head.Position = UDim2.fromOffset(18, 158)
 	head.Size = UDim2.new(1, -36, 0, 16)
 	local yy = 176
-	for i, drop in drops(eggId) do
-		if i > 4 then break end
+	for _, drop in drops(eggId) do   -- 21.10.: ALLE Pets zeigen (vorher nur die ersten 4)
 		local bdef = BaerchiConfig.getById(drop.configId)
 		if not bdef then continue end
 		local known = data.discovered and data.discovered[drop.configId]
 		local nm = if known then Loc.name("baerchi." .. drop.configId .. ".name", bdef.displayName) else "???"
 		local pct = drop.chance * 100
-		local pctText = if pct >= 10 then Loc.formatNumber(math.round(pct)) .. "%" else Loc.formatDecimal(pct, 1) .. "%"
+		local pctText = if pct >= 10 then Loc.formatNumber(math.round(pct)) .. "%" elseif pct >= 1 then Loc.formatDecimal(pct, 1) .. "%" else Loc.formatDecimal(pct, 2) .. "%"
 		local row = Theme.bodyText("Drop", card, string.format("%s  •  %s", pctText, nm))
 		row.Position = UDim2.fromOffset(18, yy)
 		row.Size = UDim2.new(1, -36, 0, 18)
@@ -879,6 +879,8 @@ local function conditionText(c: EggTree.Condition): string
 		return Loc.t("ui.tree.cond_index", { rarity = rarityName(c.rarity :: string), have = c.have, need = c.need })
 	elseif c.kind == "rebirth" then
 		return Loc.t("ui.tree.cond_rebirth", { have = c.have, need = c.need })
+	elseif c.kind == "world2" then
+		return Loc.t("ui.tree.cond_world2")   -- 20.10. P5d
 	elseif c.kind == "blueprint" then
 		return Loc.t("ui.tree.cond_blueprint")
 	end
@@ -1155,7 +1157,7 @@ local function buildDetail(detail: ScrollingFrame, data: Types.PlayerDataUpdate)
 			local known = data.discovered and data.discovered[drop.configId]
 			local name = if known then Names.baerchi(drop.configId) else "???"
 			local pct = drop.chance * 100
-			local pctText = if pct >= 10 then Loc.formatNumber(math.round(pct)) .. "%" else Loc.formatDecimal(pct, 1) .. "%"
+			local pctText = if pct >= 10 then Loc.formatNumber(math.round(pct)) .. "%" elseif pct >= 1 then Loc.formatDecimal(pct, 1) .. "%" else Loc.formatDecimal(pct, 2) .. "%"
 			local l = Theme.bodyText("Drop", row, string.format("%s  •  %s  •  %s", pctText, name, rarityName(bdef.rarity)))
 			l.Size = UDim2.fromScale(1, 1)
 			l.TextSize = 12

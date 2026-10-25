@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Types         = require(ReplicatedStorage.Network.Types)
 local EggConfig     = require(ReplicatedStorage.Config.EggConfig)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)   -- 20.10. P5d
 
 local EggTree = {}
 
@@ -26,6 +27,7 @@ export type TreeInput = {
 	eggTree      : Types.EggTreeState?,
 	discovered   : { [string]: boolean }?,
 	rebirthCount : number?,
+	epilog       : { state: string? }?,   -- 20.10. P5d: Welt 2 offen = state "launched"
 }
 
 export type Condition = {
@@ -168,7 +170,27 @@ function EggTree.getProgress(input: TreeInput, eggType: Types.EggType): NodeProg
 			table.insert(conditions, { kind = "blueprint", have = 1, need = 1, done = true })
 		end
 
-		if node.rebirth and node.rebirth > 0 then
+		if node.world2 then   -- 21.10. Anime-Ei: Welt 2 offen (Epilog gestartet) und Schalter ANIME_EGG
+			local open = FeatureFlags.isOn("ANIME_EGG") and input.epilog ~= nil and input.epilog.state == "launched"
+			table.insert(conditions, { kind = "world2", have = if open then 1 else 0, need = 1, done = open })
+		end
+
+		local ascV2 = node.ascensionV2
+		if ascV2 and FeatureFlags.isOn("ASCENSION_V2") then
+			-- 20.10. P5d: Fortschritt statt Rebirth. Welt 2 offen (nur beim ersten Ascension-Ei) + Schluessel-Pet.
+			if eggType == "AscensionEgg" then
+				local open = input.epilog ~= nil and input.epilog.state == "launched"
+				table.insert(conditions, { kind = "world2", have = if open then 1 else 0, need = 1, done = open })
+			end
+			local pets, doneCount = {}, 0
+			for _, id in ascV2.keyPets do
+				local done = input.discovered ~= nil and input.discovered[id] == true
+				if done then doneCount += 1 end
+				table.insert(pets, { id = id, done = done })
+			end
+			local need = ascV2.keyNeed or 1
+			table.insert(conditions, { kind = "keyPet", have = math.min(doneCount, need), need = need, done = doneCount >= need, pets = pets })
+		elseif node.rebirth and node.rebirth > 0 then
 			local have = input.rebirthCount or 0
 			table.insert(conditions, {
 				kind = "rebirth", have = math.min(have, node.rebirth), need = node.rebirth,
@@ -311,7 +333,7 @@ function EggTree.highestUnlocked(state: Types.EggTreeState?): Types.EggType
 	local best: Types.EggType = "SugarEgg"
 	local bestTier, bestOrder = 0, math.huge
 	for eggId, egg in EggConfig.data do
-		if egg.path ~= "Ascension" and not egg.special and EggTree.isUnlocked(state, eggId) then
+		if egg.path ~= "Ascension" and egg.path ~= "Anime" and not egg.special and EggTree.isUnlocked(state, eggId) then
 			if egg.tier > bestTier or (egg.tier == bestTier and egg.sortOrder < bestOrder) then
 				best, bestTier, bestOrder = eggId, egg.tier, egg.sortOrder
 			end
@@ -327,7 +349,7 @@ function EggTree.pickJumpEgg(state: Types.EggTreeState?): Types.EggType?
 	local options: { Types.EggType } = {}
 	for _, eggId in EggConfig.getOrderedIds() do
 		local egg = EggConfig.data[eggId]
-		if egg.path ~= "Ascension" and not EggTree.isUnlocked(state, eggId) then
+		if egg.path ~= "Ascension" and egg.path ~= "Anime" and not EggTree.isUnlocked(state, eggId) then
 			local parentFree = (egg.parent ~= nil and EggTree.isUnlocked(state, egg.parent :: Types.EggType))
 			if not egg.parent then
 				local node = EggConfig.TREE[eggId]
@@ -349,7 +371,7 @@ end
 -- Erwartete Rarity (1 = Common ... 12 = Omega) eines Eis — fuer Pruefskripte
 -- und die Anzeige "Ø".
 function EggTree.expectedRarity(eggType: Types.EggType): number
-	local dist = EggConfig.RARITY_DIST[eggType]
+	local dist = EggConfig.getRarityDist(eggType)   -- 20.10. P5c: gilt je nach DROPRATES_V2
 	if not dist then return 0 end
 	local sum, total = 0, 0
 	for rarity, percent in dist do

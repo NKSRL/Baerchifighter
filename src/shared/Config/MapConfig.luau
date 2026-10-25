@@ -167,7 +167,8 @@ local SPAWN_COLOR = Color3.fromRGB(240, 230, 200)
 -- liegt genau in der Aussenrichtung eines Plots — wer von seiner Bruecke
 -- kommt, laeuft geradewegs hinein statt am Zaun entlang zu suchen.
 --
--- Podesthoehe 2 Studs, derselbe Trick wie beim Plot-Beet (PLOT_SIZE.Y):
+-- Podesthoehe 2 Studs, derselbe Trick wie frueher beim Plot-Beet (PLOT_SIZE.Y,
+-- seit 25.10. nur noch 0,5):
 -- ein klarer Schritt nach oben statt eines Absenk-Tricks, niedrig genug zum
 -- Hochlaufen ohne Springen.
 local EVENT_PIT_RADIUS       = 50
@@ -229,7 +230,13 @@ local PLOT_ISLAND_RADIUS = 58
 -- (die Insel muss die Beet-Ecken decken) — an dieser Zahl zu drehen wuerde das
 -- Beet ueber den Inselrand ragen lassen, nicht nur den Weg dorthin verkuerzen.
 local PLOT_RING_RADIUS = 212
-local PLOT_SIZE        = Vector3.new(72, 2, 72)
+-- 25.10. (Plot tiefer): Beet- und Plattenhoehe 0,5 statt 2. Die Welt-2-Platte
+-- stand 2 Studs ueber der Insel und wirkte an jeder Seite wie ein Klotz, jetzt
+-- liegt sie fast buendig. Alles auf dem Plot rechnet mit PLOT_SIZE.Y (Gebaeude,
+-- Spawn, Baerchis, Wege, Welt-2-Vorlage und -Rampe, Welt-1-Treppe); die
+-- Insel-Deko unter der Welt-2-Platte blendet der PlotLifeController aus.
+-- Rueckweg: wieder 2.
+local PLOT_SIZE        = Vector3.new(72, 0.5, 72)
 
 -- Der Wiesenrand der Plot-Insel, auf dem das Beet steht. Etwas dunkler als das
 -- Karo, damit das Beet als eigene Flaeche liest und nicht mit der Insel

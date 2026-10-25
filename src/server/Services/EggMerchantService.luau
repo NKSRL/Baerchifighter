@@ -191,7 +191,7 @@ function EggMerchantService.init()
 	-- Sammel-Update 2.4: der Prompt ist fuer alle gleich (Server-Objekt) —
 	-- deshalb sprachneutral: Ei + Preis.
 	prompt.ActionText            = string.format("🥚 +1  (%d G)", merchant.priceGummies)
-	prompt.ObjectText            = "🥚"
+	prompt.ObjectText            = ""   -- 21.10. Playtest: das Ei stand doppelt (Ueberschrift + Aktion) -> Ueberschrift weg
 	prompt.MaxActivationDistance = merchant.promptDistance
 	prompt.RequiresLineOfSight   = false
 	prompt.HoldDuration          = 0

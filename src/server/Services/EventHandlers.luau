@@ -591,7 +591,7 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				end
 
 				-- Beam-Fortschritt (pausiert waehrend eines Kampfes)
-				if beamOpen and now >= fightPause then
+				if beamOpen and running and now >= fightPause then
 					for _, part in inBeamList do
 						local st = stateOf(part)
 						st.progress += dt
@@ -746,6 +746,19 @@ function EventHandlers.Ufo(api: Api, def: EventConfig.EventDef): Session
 				end
 				pcall(setLabel, part, nil)
 			end
+			-- 21.10. Playtest: Wer nicht die volle Beam-Zeit geschafft hatte, behielt nach dem
+			-- Event den Zaehler ("17 / 20s") ueber dem Kopf. Darum zusaetzlich ALLE Event-Labels
+			-- wegraeumen (auch von Figuren, die nicht mehr in `states` stehen), einmal sofort
+			-- und einmal kurz danach, falls ein laufender Tick noch eines gesetzt hat.
+			local function sweepLabels()
+				for _, d in Workspace:GetDescendants() do
+					if d.Name == "EventLabel" and d:IsA("BillboardGui") then
+						d:Destroy()
+					end
+				end
+			end
+			sweepLabels()
+			task.delay(1, sweepLabels)
 			folder:Destroy()
 			return {}
 		end,

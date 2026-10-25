@@ -6,9 +6,9 @@
 --   - P4 (20.10.): dauerhafte Mini-Insel mit Bruecke, Rakete auf Startrampe und Hinweisschild
 --     "Welt 2" in Welt 1 bauen. Reine Deko + Schild; keine Interaktion, kein Startknopf (A7).
 --
--- Lage: Part "RaketenAnker" im Workspace (A6), sonst Platzhalter zwischen zwei Plot-Inseln
--- (RocketIslandRules.layout). Alles haengt am Modell `Platform` (wird mit dem Welt-Aufbau neu
--- gebaut), Namensschema "RocketIsland_*". Teile-Budget RocketIslandConfig.PART_BUDGET.
+-- Lage (W1-P2): je Plot eine Insel hinter der Arena-Insel (Fight-Pit) auf der Plot-Achse
+-- (RocketIslandRules.layout); optional Part "RaketenAnker_<slot>" im Workspace. Alles haengt am
+-- Plot-Modell (wird mit dem Plot neu gebaut), Namensschema "RocketIsland_*". Teile-Budget RocketIslandConfig.PART_BUDGET.
 --
 -- Das Schild zeigt serverseitig nur den Platzhalter (gesperrt); den Zustand je Spieler setzt der
 -- Client (Controllers/RocketIslandController) aus seinem Spielstand — die Welt gibt es nur einmal.
@@ -48,26 +48,27 @@ local function cylinderUp(parent: Instance, name: string, height: number, diamet
 	return p
 end
 
-function RocketIslandBuilder.build(platform: Instance): Folder?
+-- Baut die Raketen-Insel von `slot` als Kind von `parent` (dem Plot-Modell). Lage: auf der Achse des Plots hinter
+-- der Arena-Insel (Fight-Pit): Event-Pit -> Plot -> Fight-Pit -> Rakete. Jeder Spieler hat seine eigene.
+function RocketIslandBuilder.build(parent: Instance, slot: number): Folder?
 	if not FeatureFlags.isOn("ROCKET_ISLAND") then return nil end
-	local old = platform:FindFirstChild(P .. "Root")
+	local old = parent:FindFirstChild(P .. "Root")
 	if old then old:Destroy() end
 
-	local anchor = workspace:FindFirstChild(RocketIslandConfig.ANCHOR_NAME)
+	-- Optionaler Anker je Slot (RaketenAnker_<slot>), sonst berechneter Platzhalter hinter dem Pit
+	local anchor = workspace:FindFirstChild(RocketIslandConfig.ANCHOR_NAME .. "_" .. tostring(slot))
 	local anchorPos: Vector3? = if anchor and anchor:IsA("BasePart") then anchor.Position else nil
-	local layout = RocketIslandRules.layout(anchorPos)
-	if layout.placeholder then
-		warn("[RocketIslandBuilder] Kein Part 'RaketenAnker' im Workspace - Platzhalter-Lage bei",
-			layout.center, "(Winkel", RocketIslandConfig.PLACEHOLDER_ANGLE_DEG, "Grad)")
-	end
-	local clearance = RocketIslandRules.clearanceToPlots(layout.center)
+	local layout = RocketIslandRules.layout(slot, anchorPos)
+	local clearance = RocketIslandRules.clearanceToIslands(layout.center, slot)
 	if clearance <= 0 then
-		warn("[RocketIslandBuilder] Mini-Insel liegt zu nah an einer Plot-Insel (Luft:", clearance, "Studs)")
+		warn("[RocketIslandBuilder] Slot", slot, ": Raketen-Insel liegt zu nah an einer anderen Insel (Luft:", clearance, "Studs)")
 	end
 
 	local root = Instance.new("Folder")
 	root.Name = P .. "Root"
 	root:SetAttribute("Placeholder", layout.placeholder)
+	root:SetAttribute("Slot", slot)
+	root:SetAttribute("AngleDeg", layout.angleDeg)
 
 	local R = RocketIslandConfig.ISLAND_RADIUS
 	local center = layout.center
@@ -76,8 +77,8 @@ function RocketIslandBuilder.build(platform: Instance): Folder?
 	-- Bruecke (gleiche Bauart wie die Stege)
 	MapParts.buildSpan(root, P .. "Bridge", layout.outward, layout.fromRadius, layout.toRadius)
 
-	-- Insel + Old-School-Boden
-	local ground = MapParts.buildIsland(root, P .. "Ground", center, R, MapStyleConfig.GROUND.COLOR, Enum.Material.Plastic)
+	-- Insel mit ruhiger Wiesen-Oberflaeche (passend zum Royal-Honey-Sanktuarium)
+	local ground = MapParts.buildIsland(root, P .. "Ground", center, R, MapConfig.GRASS_DARK, Enum.Material.Grass)
 	if FeatureFlags.isOn("MAP_GROUND_OLDSCHOOL") and MapMeshes.enabled() then
 		MapMeshes.groundOldschool(root, ground, {
 			center = center, radius = R,
@@ -170,7 +171,7 @@ function RocketIslandBuilder.build(platform: Instance): Folder?
 		part(root, "Rock", Vector3.new(2.2 + i * 0.3, 1.6 + i * 0.2, 2.0), CFrame.new(rp) * CFrame.Angles(0, math.rad(ang * 2), math.rad(6 * i)), C.rock, Enum.Material.Slate, false)
 	end
 
-	root.Parent = platform
+	root.Parent = parent
 
 	local count = 0
 	for _, d2 in root:GetDescendants() do
@@ -180,7 +181,7 @@ function RocketIslandBuilder.build(platform: Instance): Folder?
 	if count > RocketIslandConfig.PART_BUDGET then
 		warn("[RocketIslandBuilder] Teile-Budget ueberschritten:", count, ">", RocketIslandConfig.PART_BUDGET)
 	end
-	print("[RocketIslandBuilder] Raketen-Insel gebaut |", count, "Teile | Lage", layout.center, "| Platzhalter:", layout.placeholder)
+	print("[RocketIslandBuilder] Raketen-Insel Slot", slot, "gebaut |", count, "Teile | Lage", layout.center, "| Platzhalter:", layout.placeholder)
 	return root
 end
 

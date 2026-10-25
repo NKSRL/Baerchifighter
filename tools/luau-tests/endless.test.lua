@@ -40,7 +40,10 @@ local endless = TowerConfig.get("Endless")
 local final = TowerConfig.get("Final")
 check("Endless existiert", endless ~= nil)
 check("Endless ist der letzte Tower", TowerConfig.TOWERS[#TowerConfig.TOWERS].id == "Endless")
-if FeatureFlags.isOn("TOWER_F_EASIER") then
+if FeatureFlags.isOn("TOWER_BALANCE_V3") then
+	-- 21.10. (V3): Endless beginnt gleich hinter Final 100 (84,2 -> 85)
+	check("Endless-Anker 85 (direkt hinter Final)", endless.startEquivalent == 85, endless.startEquivalent)
+elseif FeatureFlags.isOn("TOWER_F_EASIER") then
 	-- 20.10. (P2, A4): Endless behaelt seinen festen Anker 132 (nicht mehr an Final gekoppelt)
 	check("Endless-Anker fest bei 132", endless.startEquivalent == 132, endless.startEquivalent)
 else

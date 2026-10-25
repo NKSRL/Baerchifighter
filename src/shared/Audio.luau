@@ -174,8 +174,11 @@ Audio.DEFAULTS = { music = 0.7, sfx = 0.8, muted = false } :: Settings
 
 -- Vorschau-Ordner im Studio-Content (siehe tools/audio/install_studio_preview.ps1)
 local PREVIEW_ROOT = "rbxasset://sounds/hbb/"
-Audio.USE_STUDIO_PREVIEW = true
-
+-- 20.10. Standard AUS: der lokale Pfad existiert nur, wenn tools/audio/install_studio_preview.ps1
+-- gelaufen ist; sonst meldet Roblox "Failed to load sound ... Temp read failed" (Fehler im Output).
+-- Wer die Vorschau-Dateien installiert hat, setzt das hier oder per Attribut
+-- ReplicatedStorage:SetAttribute("HBB_AudioPreview", true) auf true.
+Audio.USE_STUDIO_PREVIEW = false
 local function normalize(id: any): string
 	if typeof(id) == "number" then return "rbxassetid://" .. tostring(math.floor(id)) end
 	if typeof(id) ~= "string" or id == "" then return "" end
@@ -187,7 +190,8 @@ end
 function Audio.resolve(def: { id: any, file: string }): string
 	local id = normalize(def.id)
 	if id ~= "" then return id end
-	if Audio.USE_STUDIO_PREVIEW and RunService:IsStudio() then
+	local previewOn = Audio.USE_STUDIO_PREVIEW or game:GetService("ReplicatedStorage"):GetAttribute("HBB_AudioPreview") == true
+	if previewOn and RunService:IsStudio() then
 		return PREVIEW_ROOT .. def.file .. ".wav"
 	end
 	return ""

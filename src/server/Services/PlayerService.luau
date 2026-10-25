@@ -387,6 +387,7 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		rank         = data.rank,
 		language     = data.language,
 		audio        = data.audio,
+		lowEnd       = data.lowEnd,
 		island       = data.island,
 		discovered   = data.discovered,
 		quests       = QuestProgress.buildView(data, os.time()),

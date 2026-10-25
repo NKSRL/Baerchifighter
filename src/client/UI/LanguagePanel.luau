@@ -22,6 +22,7 @@ local Icons              = require(script.Parent.Icons)
 local FeatureFlags       = require(ReplicatedStorage.Config.FeatureFlags)
 local PanelManager       = require(script.Parent.PanelManager)
 local LanguageController = require(script.Parent.Parent.Controllers.LanguageController)
+local AudioPanel         = require(script.Parent.AudioPanel)   -- 21.10. Ton + Geraet im Einstellungs-Fenster
 
 local LanguagePanel = {}
 
@@ -49,6 +50,7 @@ end
 local _root: Frame? = nil
 local _rows: { Row } = {}
 local honeyWindowImage: ImageLabel? = nil
+local _refreshSound: (() -> ())? = nil
 
 --------------------------------------------------------------------------------
 -- Anzeige
@@ -78,6 +80,8 @@ local function openInternal(...: any)
 	if not root then return end
 	root.Visible = true
 	refresh()
+	local refreshSound = _refreshSound
+	if refreshSound then refreshSound() end
 end
 
 local function closeInternal()
@@ -162,8 +166,8 @@ function LanguagePanel.init(screenGui: ScreenGui)
 	local root = Theme.dialog(
 		"LanguagePanel", screenGui,
 		Vector2.new(0.30, 0.52),
-		if honey then Vector2.new(WIN_W, WIN_H) else Vector2.new(240, 300),
-		if honey then Vector2.new(WIN_W, WIN_H) else Vector2.new(340, 360)
+		if honey then Vector2.new(WIN_W, WIN_H) else Vector2.new(660, 380),
+		if honey then Vector2.new(WIN_W, WIN_H) else Vector2.new(660, 380)
 	)
 	_root = root
 
@@ -188,13 +192,28 @@ function LanguagePanel.init(screenGui: ScreenGui)
 		-- Inhaltsflaeche = dunkles Feld des Bildes (links daneben die Tab-Leiste, noch leer)
 		body.Position = UDim2.fromOffset(108, 114)
 		body.Size     = UDim2.fromOffset(652, 326)
-		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	end
 
+	-- 21.10. zwei Spalten: links die Sprachen, rechts Ton und Geraet (frueher eigener Lautsprecher-Knopf)
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	layout.VerticalAlignment = Enum.VerticalAlignment.Top
+	layout.Padding = UDim.new(0, 16)
+
+	local langCol = Theme.container("Languages", body)
+	langCol.Size = UDim2.new(0, ROW_W, 1, 0)
+	langCol.LayoutOrder = 1
+	Theme.listLayout(langCol, 8)
+
+	local soundCol = Theme.container("Sound", body)
+	soundCol.Size = UDim2.new(1, -(ROW_W + 16), 1, 0)
+	soundCol.LayoutOrder = 2
+	_refreshSound = AudioPanel.buildSection(soundCol)
+
 	-- "Automatisch" zuerst, danach die Sprachen in der Reihenfolge aus Loc
-	addRow(body, 1, nil, nil, "ui.language.auto")
+	addRow(langCol, 1, nil, nil, "ui.language.auto")
 	for index, lang in Loc.LANGUAGES do
-		addRow(body, index + 1, lang.code, lang.native, nil)
+		addRow(langCol, index + 1, lang.code, lang.native, nil)
 	end
 
 	PanelManager.register(PANEL_NAME, {

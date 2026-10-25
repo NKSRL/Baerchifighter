@@ -12,13 +12,20 @@
 
 local RocketIslandConfig = {}
 
--- Anker: Part mit diesem Namen im Workspace gibt die Mitte der Mini-Insel vor (A6).
--- Fehlt er, wird der Platzhalter benutzt (PLACEHOLDER_ANGLE_DEG zwischen zwei Plot-Inseln).
+-- 20.10. (Welt 1, Paket 2, Entscheidung des Spielleiters): JEDER Spieler hat seine EIGENE Raketen-Insel, von der Mitte
+-- nach aussen: Event-Pit, Spieler-Plot, Fight-Pit (Arena-Insel), Rakete. Die Insel liegt auf der Achse des Plots, hinter
+-- der Arena-Insel, mit derselben Luecke wie die uebrigen Stege (ISLAND_GAP) und einer Bruecke vom Arena-Rand.
+-- Sie gehoert zum Plot-Model des Spielers (entsteht und vergeht mit ihm).
+-- Anker (optional, pro Slot): Part "RaketenAnker_<slot>" im Workspace gibt die Mitte vor (ersetzt die berechnete Lage).
 RocketIslandConfig.ANCHOR_NAME = "RaketenAnker"
-RocketIslandConfig.PLACEHOLDER_ANGLE_DEG = 22.5   -- Plot-Inseln liegen bei k x 45 Grad
+RocketIslandConfig.GAP_FROM_ARENA = 34             -- Wasserluecke Arena-Rand -> Raketen-Insel-Rand (Studs), wie ISLAND_GAP
+RocketIslandConfig.PLACEHOLDER_ANGLE_DEG = 22.5   -- ALT (P4, eine Insel zwischen zwei Plots); nicht mehr benutzt
+-- Entdeckung (Paket 2): Annaeherung an die Insel-Mitte auf <= DISCOVER_DISTANCE Studs. Einmalig, der Server prueft
+-- die Position (JourneyService, Aktion "island") und merkt es in journey.islandSeen (optionales Feld, keine Migration).
+RocketIslandConfig.DISCOVER_DISTANCE = 40
 RocketIslandConfig.ISLAND_RADIUS = 12
-RocketIslandConfig.MIN_GAP_FROM_MAIN = 10          -- Mindestluecke Hauptinsel-Rand -> Mini-Insel-Rand (Studs)
-RocketIslandConfig.PLATFORM_RADIUS_SAFETY = 8      -- Abstand der Mini-Insel zu Plot-Inseln wird geprueft (Rules)
+RocketIslandConfig.MIN_GAP_FROM_MAIN = 10          -- ALT (P4); jetzt gilt GAP_FROM_ARENA
+RocketIslandConfig.PLATFORM_RADIUS_SAFETY = 8      -- Mindest-Luft zu Nachbar-Inseln (Rules.clearanceToIslands)
 
 -- Old-School-Boden der Mini-Insel (gleiche Funktion wie die Hauptinsel, kleinere Kacheln)
 RocketIslandConfig.GROUND_LEVELS = { 8, 4, 2 }

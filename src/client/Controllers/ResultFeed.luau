@@ -126,7 +126,7 @@ function ResultFeed.init()
 		if typed.eggs > 0 and typed.eggType then
 			table.insert(parts, string.format("+%d %s", typed.eggs, Loc.name("egg." .. typed.eggType .. ".name", typed.eggType)))
 		end
-		if typed.gummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.gummies) .. " Paw Coins") end
+		if typed.gummies > 0 then table.insert(parts, Loc.t("ui.quest.reward_gummies", { n = Loc.formatNumber(typed.gummies) })) end
 		if typed.goldGummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.goldGummies) .. " Honey Crystals") end
 		if typed.blueprints > 0 then table.insert(parts, Loc.t("ui.index_reward.blueprint", { n = typed.blueprints })) end
 		if typed.incubatorSlots > 0 then table.insert(parts, Loc.t("ui.index_reward.slot", { n = typed.incubatorSlots })) end

@@ -1,0 +1,31 @@
+-- 25.10. (Pulsar-Nova) — neue Bausteine:
+--   pulsar     der Pulsar-Baerchi SELBST (Klon wie `ascend`): Bodenblitz, ein    ring, draw, crouchAt, crouch, rise, height,
+--              Lichtpunkt zeichnet den Ring um ihn (12 Tick-Striche); er duckt  spins, grow, beamAt, beamLen, ticks,
+--              sich, das Jetpack zuendet (Teile acc_flame/acc_nozzle/acc_visor), collapseAt, pulseAt, windAt, launchAt,
+--              Aufstieg mit Drehung, der Ring wird sein Orbit-Ring; ab `beamAt`  fly, emergeAt, emerge, back, settle
+--              Leuchtturm: Lichtkegel aus Visier und Jetpack, er dreht immer     (Test: freezeAt, trailLife)
+--              schneller, der Visier-Kegel fegt zu den Zeiten in `ticks` durch
+--              die Kamera jedes Clients (Blitz; Besitzer: Schleier, F22); bei
+--              `collapseAt` wird er zum Neutronenstern (Anime-Sternbruch), pulst
+--              (`pulseAt`), schiesst bei `launchAt` als Komet in den Gegner
+--              (Landung = Einschlag); ab `emergeAt` rollt er sich aus dem Krater
+--              auf, Rueckwaerts-Salto heim. Setzt avatarCf, pulsarHover, pulsarCam.
+--   firedome   Feuerkuppel am Einschlag: kleine Kuppel (`mini`, "IFrameDome"),  at, radius, mini, miniFor, grow, pulseAt,
+--              dann die grosse (flach weissgluehend: SmoothPlastic + Highlight,  flareAt, fade, burn, holes, skirt,
+--              pinker Umriss), laufende Flammenbaender mit Luecken (Beams),      chunks (Test: freezeAt)
+--              dunkle Loecher, Flammenkranz, Truemmer, Brandfleck; Pulse
+--              (`pulseAt`, Besitzer: rosa), bei `flareAt` Aufflammen (Besitzer:
+--              Weissblende -> Rosa), danach `burn` s Flammen am Gegner (Brand).
+--              Setzt novaT0/novaCenter/novaRadius.
+--   novaframe  Impact-Frames (nur Besitzer): invertiertes Bild - rosa Grund,     invert, white, fade, lines
+--              tintenschwarze Silhouetten (ViewportFrame: Gegner + Teile, deren
+--              Name mit "IFrame" beginnt), Speedlines zum Einschlag -, dann
+--              Weiss, dann ausblenden; jedes Bild mindestens ein gerendertes Bild.
+--   novabolt   Echo: kleiner Neutronenstern schiesst in den Gegner, eine kleine  at, fly, radius, life, size (Test: freezeAt)
+--              Feuerkuppel ploppt auf.
+--   Helfer: novaRing (Kreis aus 4 Bezier-Beams: zeichnen, Luecken-Muster),
+--              novaVeil (Bildschirm-Schleier nur Besitzer), novaFlames (Flammen-
+--              zungen als Beams), pulsarJet (Jetpack-Flammen + Visier), novaInk
+--              (tintenschwarzer Klon fuer den Impact-Frame).
+-- Erweiterte Parameter:
+--   cinematic style "pulsar"  tief auf der Seite der Spielkamera, Blick hoch auf den Leuchtturm (die Kegel fegen ueber die Kamera), folgt dem Flug, faehrt nach dem Einschlag zurueck auf die ganze Feuerkuppel

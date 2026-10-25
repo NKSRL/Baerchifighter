@@ -1,0 +1,60 @@
+-- 25.10.2026 (Erste Baerchis: Bauchrutscher, Tigersprung, Brennglas, Bass-Drop;
+-- Stufe 2, ohne Kamerafahrt) — neue Bausteine:
+--   moves      der Baerchi SELBST (Klon wie `ascend`) folgt Posen aus den       keys, hat, outline, hold, gap
+--              DATEN: je Pose t, at ("home"|"land"|"target"|"arena"), dx/dy/dz    (Test: freezeAt)
+--              (seitlich/hoch/vorwaerts), u + h (+ from/to: Punkt auf einem
+--              Bogen, z. B. ein Regenbogen), pitch/yaw/roll in Umdrehungen
+--              (pitch < 0 = Kopf nach vorn), scale, ease ("inout"|"in"|"out"|
+--              "back"|"linear"), arc (Sprunghoehe), trail, burst/smoke
+--              (Funken/Rauch beim Erreichen), hidden (Puff), tip (0..1 Hut
+--              gelueftet, Teile aus `hat`), dxc (seitlich relativ zur Kamera-
+--              Seite, + = zur Kamera hin). Drehung, Groesse, Hut und Sicht-
+--              barkeit erben von der Pose davor, Ort und Versatz nicht.
+--              Setzt avatarCf/avatarScale/avatarModel.
+--   icepath    Eisbahn gefriert von den eigenen Fuessen bis vor den Gegner        draw, width, plates, spikes, over,
+--              (Eisplatten, Reifkanten, Eiszacken, Glitzer), Schneefahne hinter  slideAt, slideEnd, meltAt, dur
+--              dem rutschenden Klon, taut ab `meltAt`                             (Test: freezeAt)
+--   iceblock   Gegner im Eisblock (folgt ihm, Leuchtumriss, Frosthauch),          at, appear, breakAt, dur, pad, small
+--              zerspringt bei `breakAt` in Eissplitter                            (Test: freezeAt)
+--   clawmarks  Krallenhiebe: je Hieb `claws` gluehende Streifen ueber die         at, count, every, claws, len, draw,
+--              Vorderseite der Figur (folgen ihr), werden zu schwelenden          fade, dur (Test: freezeAt)
+--              Kratzern (Brand)
+--   pawprints  leuchtende Pfotenspuren von self zum Landeplatz (`gap` wie      count, every, sway, gap, pulseAt,
+--              moves), blitzen bei                                                dur
+--              `pulseAt`, verblassen am Ende                                      (Test: freezeAt)
+--   lensbeam   Brennglas: grosse Lupe waechst aus der Pfote des Klons (seine      lens, appear, beamAt, burnAt, away,
+--              kleine Lupe acc_lupe* verschwindet so lange), Lichtsaeule von      dur, small (Test: freezeAt)
+--              oben, Brennkegel auf den Gegner (wandernder Punkt, Rauch),
+--              `burnAt` Flammenstoss, Lupe zurueck in die Pfote
+--   djset      Bass-Drop: Schallplatte unter dem DJ (SurfaceGui), Equalizer-      beats, buildAt, dropAt, dur, bars,
+--              Balken um die Arena (Luecke zur Kamera, F44), Beats (Bodenring,    radius, disc (Test: freezeAt)
+--              Kopfhoerer-Muscheln leuchten), Build-up, Drop (Welle, Bodenring
+--              bis zum Zaun, Streusel am Gegner)
+--   Helfer (Tabelle LOW): ease, groundY, fxAnchor (Funken/Rauch/Schweif-Anker),
+--              sprinkles (bunte Staebchen als Rig).
+-- 25.10.2026 (Erste Baerchis, Schub 2: Muenzregen, Shuriken-Sturm, Wurzelwall,
+-- Regenbogenbruecke; Stufe 3, ohne Kamerafahrt) — neue Bausteine:
+--   coinshower Muenzregen: Goldmuenzen spritzen bei `burstAt` aus den Fuessen     count, burstAt, rise, fly, every, dur,
+--              des Gegners und fliegen nacheinander im Bogen zum Angreifer,      small (Test: freezeAt)
+--              tuermen sich zum Haufen; Medaille/Rubin des Klons blitzen
+--   ninjaclones Schattenklone (inkBear, rotes Stirnband) erscheinen in Puffs     count, radius, appearAt, every,
+--              auf einem Ring um den Gegner (hinten/seitlich, F44), werfen      throwAt, flight, dashAt, dash,
+--              Shuriken (Viersterne), die sich rund um ihn in den Boden        flashAt, dur, single (Test: freezeAt)
+--              bohren; bei `dashAt` stuermen alle durch ihn (Lichtstreifen,
+--              Puffs); `flashAt` blitzen die Shuriken und sinken ein;
+--              `single`: ein Shuriken von self (Echo)
+--   katana     sichelfoermiger Lichtschnitt ueber dem Oberkoerper des Gegners,     at, radius, draw, fade, lift
+--              zur Kamera gedreht, Funken (Test: freezeAt)
+--   roots      Wurzelwall: Wurzeln brechen rund um self aus dem Boden, winden     count, segs, radius, height, grow,
+--              sich als Bogen ueber den Kopf zum Kaefig (Rinde, Moosknoten),    stagger, closeAt, sinkAt, dur
+--              `closeAt` Puls + Blaetter + Gluehwuermchen, Blattkrone des       (Test: freezeAt)
+--              Klons leuchtet (acc_leaf*), ab `sinkAt` zurueck in den Boden
+--   rainbow    Regenbogenbruecke aus `bands` Bezier-Beams von self zum Lande-    bands, width, curve, tilt, lift, draw,
+--              platz (gleicher Bogen wie `moves`-Posen mit `curve`/`tilt`),     dissolveAt, dur, gap, echo
+--              zeichnet sich vom Baerchi weg, loest sich ab `dissolveAt` auf   (Test: freezeAt)
+--   paintsplash Farbkleckse in Regenbogenfarben rund um die Figur am Boden       at, count, radius, dur (Test: freezeAt)
+-- Erweiterte Parameter:
+--   moves      Pose mit `u` + `curve` (+ `tilt`): Punkt auf der Bruecke LOW.bridge
+--              (kubische Bezier wie ein Beam), sonst `u` + `h` = Parabel
+--   Helfer (LOW): bridge (Bruecken-Punkt), tube (Zylinder-Stueck), shuriken (Vierstern).
+

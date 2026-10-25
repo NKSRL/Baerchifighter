@@ -268,6 +268,32 @@ function EggHatch.play(params: Params): Handle
 	dim.Active = false
 	dim.Parent = root
 
+	-- 21.10. Playtest: das Haupt-ScreenGui laesst Platz fuer die Topbar (CoreUISafeInsets),
+	-- dort fehlte die Abdunklung. Eigenes ScreenGui ohne Inset, direkt UNTER dem Haupt-GUI
+	-- (dort ist an dieser Stelle nichts von RBL gezeichnet), Transparenz folgt dim.
+	local dimGui = Instance.new("ScreenGui")
+	dimGui.Name = "EggHatchDimFull"
+	dimGui.ResetOnSpawn = false
+	dimGui.IgnoreGuiInset = true
+	dimGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	local baseGui = if parent:IsA("ScreenGui") then parent else parent:FindFirstAncestorWhichIsA("ScreenGui")
+	dimGui.DisplayOrder = (if baseGui then (baseGui :: ScreenGui).DisplayOrder else 0) - 1
+	local dimFull = Instance.new("Frame")
+	dimFull.Name = "Dim"
+	dimFull.BackgroundColor3 = Color3.new(0, 0, 0)
+	dimFull.BorderSizePixel = 0
+	dimFull.Size = UDim2.fromScale(1, 1)
+	dimFull.BackgroundTransparency = dim.BackgroundTransparency
+	dimFull.Active = false
+	dimFull.Parent = dimGui
+	dimGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	dim:GetPropertyChangedSignal("BackgroundTransparency"):Connect(function()
+		dimFull.BackgroundTransparency = dim.BackgroundTransparency
+	end)
+	root.Destroying:Connect(function()
+		dimGui:Destroy()
+	end)
+
 	local vignette = image(root, "vignette", 50)
 	vignette.Position = UDim2.fromScale(0.5, 0.5)
 	vignette.Size = UDim2.fromScale(1.15, 1.15)
@@ -343,7 +369,17 @@ function EggHatch.play(params: Params): Handle
 		local front = if primary then primary.CFrame.LookVector else Vector3.new(0, 0, -1)
 		local camera = Instance.new("Camera")
 		camera.FieldOfView = G.fovBase
-		camera.CFrame = CFrame.lookAt(cf.Position + front * size.Y * 2.1 + Vector3.new(0, size.Y * 0.1, 0), cf.Position)
+		-- 21.10. Playtest: Beim Mist Egg sass das Ei nicht mittig im Kreis und die Risse
+		-- hingen daneben. Grund: Die Huelle (GetBoundingBox) ragt bei manchen Eiern seitlich
+		-- ueber den Koerper hinaus (Mist: 0,2 Studs), die Kamera zielte auf deren Mitte.
+		-- Jetzt wird nur seitlich auf den Ei-Koerper (PrimaryPart) zentriert; Hoehe/Tiefe
+		-- bleiben wie bisher, damit die anderen Eier unveraendert aussehen.
+		local target = cf.Position
+		if primary then
+			local right = primary.CFrame.RightVector
+			target = cf.Position - right * (cf.Position - primary.Position):Dot(right)
+		end
+		camera.CFrame = CFrame.lookAt(target + front * size.Y * 2.1 + Vector3.new(0, size.Y * 0.1, 0), target)
 		camera.Parent = view
 		view.CurrentCamera = camera
 		eggCamera = camera
@@ -513,9 +549,15 @@ function EggHatch.play(params: Params): Handle
 
 	for k = 1, 3 do impactAt[k] = tAppear + (k - 1) * interval + interval * 0.6 end
 
+	-- 21.10. Playtest-Bug "Animation wird uebersprungen": Wer auf onFinished:Wait()
+	-- wartet, kann das Signal verlieren (Fire + sofortiges Destroy des BindableEvents).
+	-- Darum zusaetzlich das Feld handle.finished, das man abfragen kann.
+	local handleRef: any = nil
+
 	local function finish()
 		if finished then return end
 		finished = true
+		if handleRef then handleRef.finished = true end
 		finishedEvent:Fire()
 	end
 
@@ -530,7 +572,8 @@ function EggHatch.play(params: Params): Handle
 		table.clear(particles)
 		root:Destroy()
 		finish()
-		finishedEvent:Destroy()
+		-- nicht sofort zerstoeren: sonst kann ein wartender Thread das Signal verpassen
+		task.delay(2, function() finishedEvent:Destroy() end)
 	end
 
 	local function doFlash(strength: number, seconds: number)
@@ -1062,6 +1105,7 @@ function EggHatch.play(params: Params): Handle
 		onFinished = finishedEvent.Event,
 		finished = false,
 	}
+	handleRef = handle
 	return handle
 end
 

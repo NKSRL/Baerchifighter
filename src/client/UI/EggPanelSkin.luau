@@ -416,6 +416,49 @@ function EggPanelSkin.makeCard(parent: Instance, name: string, order: number)
 end
 
 --------------------------------------------------------------------------------
+-- bindToArea: der Halter ist der zentrale Fensterbereich (PanelManager.getArea,
+-- oberhalb der Pet-Leiste), nicht der ganze Bildschirm. Die gewuenschte Groesse
+-- (Anteil des Bildschirms) wird auf diesen Bereich umgerechnet und nie groesser
+-- als er; das Seitenverhaeltnis haelt die UIAspectRatioConstraint.
+-- 21.10. Playtest: Eggs (HatchPanel) hing am ganzen Bildschirm, Bears (adopt) am
+-- Fensterbereich, darum sassen beide je nach Aufloesung versetzt. Jetzt benutzen
+-- ALLE Honig-Fenster diese eine Funktion.
+--------------------------------------------------------------------------------
+function EggPanelSkin.bindToArea(screenGui: Instance, holder: GuiObject, skin: any, size: UDim2?)
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	local function layoutHolder()
+		local gui = screenGui :: any
+		if not gui:IsA("LayerCollector") then return end
+		local globalScale = gui:FindFirstChild("GlobalScale")
+		local g = if globalScale and globalScale:IsA("UIScale") then math.max(globalScale.Scale, 0.01) else 1
+		local screenUnits = gui.AbsoluteSize / g
+		if screenUnits.X <= 0 or screenUnits.Y <= 0 then return end
+		local area = PanelManager.getArea(screenUnits)
+		holder.Position = UDim2.fromOffset(area.center.X, area.center.Y)
+		holder.Size = UDim2.fromOffset(area.size.X, area.size.Y)
+		local want = size or UDim2.fromScale(0.9, 0.72)
+		skin.Root.Size = UDim2.fromScale(
+			math.min(1, want.X.Scale * screenUnits.X / area.size.X),
+			math.min(1, want.Y.Scale * screenUnits.Y / area.size.Y)
+		)
+	end
+	PanelManager.onAreaChanged(layoutHolder)
+	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutHolder)
+	local globalScaleNow = screenGui:FindFirstChild("GlobalScale")
+	if globalScaleNow then
+		globalScaleNow:GetPropertyChangedSignal("Scale"):Connect(layoutHolder)
+	end
+	-- GlobalScale kann erst nach dem Fenster angelegt werden
+	screenGui.ChildAdded:Connect(function(child)
+		if child.Name == "GlobalScale" and child:IsA("UIScale") then
+			child:GetPropertyChangedSignal("Scale"):Connect(layoutHolder)
+			layoutHolder()
+		end
+	end)
+	layoutHolder()
+end
+
+--------------------------------------------------------------------------------
 -- adopt: ein bestehendes Theme.dialog-Menue in ein Template-Panel setzen.
 -- Das alte root bleibt die "Wahrheit" fuer PanelManager (Visible) und
 -- Layout-Code (AbsoluteSize); es wird nur durchsichtig gemacht, seine
@@ -436,34 +479,7 @@ function EggPanelSkin.adopt(screenGui: Instance, root: GuiObject, body: GuiObjec
 	})
 	skin.Holder = holder
 
-	-- R1: der Halter ist der zentrale Fensterbereich (PanelManager.getArea,
-	-- oberhalb der Pet-Leiste), nicht der ganze Bildschirm. Die gewuenschte
-	-- Groesse (Anteil des Bildschirms) wird auf diesen Bereich umgerechnet und
-	-- nie groesser als er; das Seitenverhaeltnis haelt die UIAspectRatioConstraint.
-	holder.AnchorPoint = Vector2.new(0.5, 0.5)
-	local function layoutHolder()
-		local gui = screenGui :: any
-		if not gui:IsA("LayerCollector") then return end
-		local globalScale = gui:FindFirstChild("GlobalScale")
-		local g = if globalScale and globalScale:IsA("UIScale") then math.max(globalScale.Scale, 0.01) else 1
-		local screenUnits = gui.AbsoluteSize / g
-		if screenUnits.X <= 0 or screenUnits.Y <= 0 then return end
-		local area = PanelManager.getArea(screenUnits)
-		holder.Position = UDim2.fromOffset(area.center.X, area.center.Y)
-		holder.Size = UDim2.fromOffset(area.size.X, area.size.Y)
-		local want = opts.size or UDim2.fromScale(0.9, 0.72)
-		skin.Root.Size = UDim2.fromScale(
-			math.min(1, want.X.Scale * screenUnits.X / area.size.X),
-			math.min(1, want.Y.Scale * screenUnits.Y / area.size.Y)
-		)
-	end
-	PanelManager.onAreaChanged(layoutHolder)
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutHolder)
-	local globalScaleNow = screenGui:FindFirstChild("GlobalScale")
-	if globalScaleNow then
-		globalScaleNow:GetPropertyChangedSignal("Scale"):Connect(layoutHolder)
-	end
-	layoutHolder()
+	EggPanelSkin.bindToArea(screenGui, holder, skin, opts.size)
 
 	for _, child in root:GetChildren() do
 		if child == body then continue end

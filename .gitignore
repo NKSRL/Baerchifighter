@@ -48,3 +48,17 @@ __pycache__/
 *.luau.bak*
 # Git-Reste abgebrochener Synchronisierung
 tmp_obj_*
+
+# Sicherheit: nur echte Geheimnisse
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.roblosecurity
+*.cookie
+secrets.*
+credentials.*
+apikey*
+api_key*

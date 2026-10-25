@@ -84,4 +84,8 @@ IncubatorConfig.LUCK = {
 
 IncubatorConfig.MODEL_NAME = "Incubator"
 
+-- 20.10. P5a (Flag REBIRTH_NEEDS_WORLD2): Ausbau-Stufe -> Tower, der dafuer ganz geschafft sein muss
+-- (statt Rebirths). Stufe 2 = Tower I, 3 = Tower II, 4 = Tower III.
+IncubatorConfig.TOWER_GATE = { [2] = "I", [3] = "II", [4] = "III" } :: { [number]: string }
+
 return IncubatorConfig

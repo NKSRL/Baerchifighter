@@ -32,6 +32,8 @@ local _pending: { [Player]: boolean } = {}
 local function reached(data: Types.PlayerData, m: EconomyConfig.SpecialMilestone): boolean
 	if m.kind == "tower" then
 		return ((data.towers.records or {})[m.tower or ""] or 0) >= (m.stage or math.huge)
+	elseif m.kind == "epilog" then
+		return data.epilog ~= nil and data.epilog.state == "launched"   -- 21.10.: Epilog gestartet
 	elseif m.kind == "stat" then
 		return ((data.stats :: any)[m.stat or ""] or 0) >= (m.atLeast or math.huge)
 	end

@@ -41,6 +41,7 @@ local PATH_PATTERN: { [string]: Pattern } = {
 	Kosmos    = "stars",
 	Ascension = "stars",
 	Event     = "stars",
+	Anime     = "swirl",
 }
 
 -- Feste Musterfarben, wo "heller oder dunkler als die Grundfarbe" nicht reicht.
@@ -48,6 +49,7 @@ local PATH_ACCENT: { [string]: Color3 } = {
 	Void      = Color3.fromRGB(190, 120, 255),
 	Ascension = Color3.fromRGB(255, 232, 140),
 	Event     = Color3.fromRGB(255, 255, 255),
+	Anime     = Color3.fromRGB(255, 170, 70),
 }
 
 -- Ab dieser Stufe schimmert ein Ei (Sonne, Prisma, Schatten ... Omega).

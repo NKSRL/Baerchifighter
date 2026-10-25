@@ -106,15 +106,11 @@ export type RebirthMilestone = {
 }
 
 local REBIRTH_MILESTONES: { [number]: RebirthMilestone } = {
-	[1]   = { eggs = { { eggType = "AscensionEgg", count = 1 } } },
-	[3]   = { eggs = { { eggType = "AscensionEgg", count = 1 } } },
-	[5]   = { eggs = { { eggType = "AscensionEgg", count = 2 } } },
-	[10]  = { eggs = { { eggType = "AscensionEgg", count = 3 } } },
-	[15]  = { eggs = { { eggType = "TranscendenceEgg", count = 1 } }, unlock = { "TranscendenceEgg" } },
-	[20]  = { eggs = { { eggType = "AscensionEgg", count = 5 } } },
-	[25]  = { eggs = { { eggType = "TranscendenceEgg", count = 2 } } },
+	-- 21.10.: Ascensions-Eier stehen nicht mehr hier: 1 je Rebirth (getRebirthMilestone) und 1 einmalig beim
+	-- Epilog (SPECIAL_MILESTONES). Transzendenz-Eier gibt es NUR noch vom Aufstiegs-Baerchi (legt sie selbst),
+	-- darum hier keine Transzendenz-Eier und kein erzwungenes Freischalten mehr.
 	[30]  = { eggs = { { eggType = "EternityEgg", count = 1 } }, unlock = { "EternityEgg" } },
-	[40]  = { eggs = { { eggType = "TranscendenceEgg", count = 3 }, { eggType = "EternityEgg", count = 1 } } },
+	[40]  = { eggs = { { eggType = "EternityEgg", count = 1 } } },
 	[50]  = { eggs = { { eggType = "OmegaEgg", count = 1 }, { eggType = "EternityEgg", count = 2 } }, unlock = { "OmegaEgg" } },
 	[75]  = { eggs = { { eggType = "OmegaEgg", count = 2 } } },
 	[100] = { eggs = { { eggType = "OmegaEgg", count = 3 } } },
@@ -140,9 +136,11 @@ export type SpecialMilestone = {
 }
 
 local SPECIAL_MILESTONES: { SpecialMilestone } = {
-	{ id = "tower_III_60", kind = "tower", tower = "III",   stage = 60,  eggs = { { eggType = "AscensionEgg", count = 1 } } },
-	{ id = "final_100",    kind = "tower", tower = "Final", stage = 100, eggs = { { eggType = "AscensionEgg", count = 2 } } },
-	{ id = "first_boss",   kind = "stat",  stat = "bossVictories", atLeast = 1, eggs = { { eggType = "AscensionEgg", count = 1 } } },
+	-- 21.10.: einziger besonderer Ascensions-Ei-Meilenstein: 1 Ei, sobald der Epilog gestartet wurde (Knopf gedrueckt).
+	-- Die alten (Tower III 60, Final 100, erster Boss) sind entfernt.
+	{ id = "epilog_launched", kind = "epilog", eggs = { { eggType = "AscensionEgg", count = 1 } } },
+	-- 21.10. Welt 2: Start-Eier fuer den Anime-Pfad (einmalig, ebenfalls mit dem Epilog-Knopf).
+	{ id = "epilog_launched_anime", kind = "epilog", eggs = { { eggType = "AnimeEgg", count = 3 } } },
 }
 
 -- Fuer alte Stellen, die nur die Ascensions-Eier kennen (wird von
@@ -414,12 +412,18 @@ end
 
 -- Wie viele AscensionEggs es fuer das Erreichen dieses rebirthCount gibt
 local function getAscensionEggReward(rebirthCount: number): number
-	return REBIRTH_ASCENSION_MILESTONES[rebirthCount] or 0
+	return if rebirthCount >= 1 then 1 else 0   -- 21.10.: 1 Ascensions-Ei je Rebirth
 end
 
 -- v14: der komplette Meilenstein (alle Ei-Sorten) oder nil.
 local function getRebirthMilestone(rebirthCount: number): RebirthMilestone?
-	return REBIRTH_MILESTONES[rebirthCount]
+	if rebirthCount < 1 then return nil end
+	local fixed = REBIRTH_MILESTONES[rebirthCount]
+	local eggs = { { eggType = "AscensionEgg" :: Types.EggType, count = 1 } }   -- 21.10.: jeder Rebirth gibt 1
+	if fixed then
+		for _, entry in fixed.eggs do table.insert(eggs, entry) end
+	end
+	return { eggs = eggs, unlock = if fixed then fixed.unlock else nil }
 end
 
 -- XP die ein Honig bei diesem Veredler-Level gibt (Level 1-10 aus der

@@ -17,8 +17,10 @@ local Loc                = require(ReplicatedStorage.Localization.Loc)
 local WorldText          = require(ReplicatedStorage.Localization.WorldText)
 local FeatureFlags       = require(ReplicatedStorage.Config.FeatureFlags)
 local RocketIslandConfig = require(ReplicatedStorage.Config.RocketIslandConfig)
+local MapConfig          = require(ReplicatedStorage.Config.MapConfig)
 local RocketIslandRules  = require(ReplicatedStorage.Modules.RocketIslandRules)
 local ClientState        = require(script.Parent.ClientState)
+local Remotes            = require(ReplicatedStorage.Network.Remotes)
 
 local RocketIslandController = {}
 
@@ -29,8 +31,16 @@ local _lastState = 0
 
 local function findRoot(): Instance?
 	if _root and _root.Parent then return _root end
-	local platform = workspace:FindFirstChild("Platform")
-	_root = if platform then platform:FindFirstChild(RocketIslandConfig.NAME_PREFIX .. "Root") else nil
+	-- W1-P2: jeder Spieler hat seine eigene Insel am eigenen Plot (Plot_<slot>, Attribut PlotOwner)
+	_root = nil
+	local me = game:GetService("Players").LocalPlayer
+	for slot = 1, MapConfig.PLOT_COUNT do
+		local plot = workspace:FindFirstChild("Plot_" .. slot)
+		if plot and plot:GetAttribute("PlotOwner") == me.UserId then
+			_root = plot:FindFirstChild(RocketIslandConfig.NAME_PREFIX .. "Root")
+			break
+		end
+	end
 	return _root
 end
 
@@ -72,6 +82,32 @@ local function apply(view: any)
 	end
 end
 
+-- Entdeckung (Paket 2): alle 2 s pruefen, bis die Insel gemeldet ist (kein Dauer-Loop danach). Der Server
+-- prueft die Entfernung erneut und merkt es einmalig (journey.islandSeen).
+local function watchDiscovery()
+	task.spawn(function()
+		local sent = 0
+		while sent < 3 do   -- hoechstens 3 Meldungen pro Sitzung (der Server ist ohnehin einmalig)
+			task.wait(2)
+			local data: any = ClientState.get()
+			local journey = data and data.journey
+			if journey and journey.islandSeen == true then return end
+			local root = findRoot()
+			local ground = root and root:FindFirstChild(RocketIslandConfig.NAME_PREFIX .. "Ground")
+			local player = game:GetService("Players").LocalPlayer
+			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if data and ground and ground:IsA("BasePart") and hrp and hrp:IsA("BasePart") then
+				local flat = Vector3.new(hrp.Position.X - ground.Position.X, 0, hrp.Position.Z - ground.Position.Z)
+				if flat.Magnitude <= RocketIslandConfig.DISCOVER_DISTANCE - 2 then
+					Remotes.RequestJourney:FireServer("island")
+					sent += 1
+					task.wait(8)   -- Antwort (neuer Spielstand) abwarten, nicht spammen
+				end
+			end
+		end
+	end)
+end
+
 -- Debug (Server-Befehl rocketisland set n schickt n ueber Attribut am Workspace)
 function RocketIslandController.init()
 	if not FeatureFlags.isOn("ROCKET_ISLAND") then return end
@@ -82,6 +118,7 @@ function RocketIslandController.init()
 		local current = ClientState.get()
 		if current then apply(current) end
 	end)
+	watchDiscovery()
 	-- die Plattform wird beim Welt-Aufbau repliziert: kurz nachfassen, sobald sie da ist
 	task.spawn(function()
 		for _ = 1, 20 do

@@ -18,6 +18,8 @@
 local Types           = require(script.Parent.Parent.Network.Types)
 local IncubatorConfig = require(script.Parent.Parent.Config.IncubatorConfig)
 local EconomyConfig   = require(script.Parent.Parent.Config.EconomyConfig)
+local TowerConfig     = require(script.Parent.Parent.Config.TowerConfig)       -- 20.10. P5a
+local FeatureFlags    = require(script.Parent.Parent.Config.FeatureFlags)
 
 local IncubatorRules = {}
 
@@ -188,6 +190,22 @@ end
 function IncubatorRules.rebirthsOk(targetLevel: number, rebirthCount: number): boolean
 	local cost = IncubatorRules.upgradeCost(targetLevel)
 	return cost ~= nil and rebirthCount >= cost.rebirths
+end
+
+-- 20.10. P5a: Ausbau-Voraussetzung. Flag an: Tower der Stufe komplett geschafft (Rekord >= Stages);
+-- aus: alte Rebirth-Zahl. Gibt (ok, towerId?, stages?) zurueck; towerId = nil -> Rebirth-Regel.
+function IncubatorRules.gateWith(flagOn: boolean, targetLevel: number, rebirthCount: number, records: { [string]: number }?): (boolean, string?, number?)
+	if not flagOn then return IncubatorRules.rebirthsOk(targetLevel, rebirthCount), nil, nil end
+	local towerId = IncubatorConfig.TOWER_GATE[targetLevel]
+	if towerId == nil then return IncubatorRules.rebirthsOk(targetLevel, rebirthCount), nil, nil end
+	local def = TowerConfig.get(towerId)
+	if not def then return false, towerId, nil end
+	local have = if records then (records[towerId] or 0) else 0
+	return have >= def.stages, towerId, def.stages
+end
+
+function IncubatorRules.gate(targetLevel: number, rebirthCount: number, records: { [string]: number }?): (boolean, string?, number?)
+	return IncubatorRules.gateWith(FeatureFlags.isOn("REBIRTH_NEEDS_WORLD2"), targetLevel, rebirthCount, records)
 end
 
 return IncubatorRules

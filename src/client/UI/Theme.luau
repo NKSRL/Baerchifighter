@@ -107,8 +107,37 @@ Theme.BAND_COLORS = {
 	Color3.fromRGB(255,  70, 110),   -- 5 rot-pink
 }
 
+-- 21.10. Playtest: Common/Uncommon und Rare/Epic hatten dieselbe Farbe (Paket 4: fuenf Baender),
+-- Spieler suchten ihr Epic nach der Farbe. Jetzt hat JEDE Rarity ihre eigene Farbe
+-- (BaerchiConfig.RARITY_COLORS: grau, gruen, blau, lila, gold, ...). Die Baender
+-- (BAND_COLORS) bleiben fuer Stellen, die sie ausdruecklich wollen. Einzige Ausnahme:
+-- Secret ist dort fast schwarz und auf den dunklen Listen unlesbar, hier ein helles Magenta.
+local SECRET_UI_COLOR = Color3.fromRGB(255, 92, 230)
 function Theme.bandColor(rarity: string): Color3
-	return Theme.BAND_COLORS[RarityBandConfig.bandOf(rarity)] or Theme.BAND_COLORS[1]
+	if rarity == "Secret" then return SECRET_UI_COLOR end
+	return BaerchiConfig.getRarityColor(rarity :: any)
+end
+
+-- Je hoeher die Rarity, desto dicker und leuchtender der Text: Groesse wachsen lassen und
+-- einen Rand in (abgedunkelter) Rarity-Farbe geben, der wie ein Leuchten wirkt.
+-- `baseSize` ist die Groesse der niedrigsten Stufe.
+function Theme.styleRarityText(label: TextLabel, rarity: string, baseSize: number)
+	local index = BaerchiConfig.getRarityIndex(rarity :: any)
+	local color = Theme.bandColor(rarity)
+	label.TextColor3 = color
+	label.TextSize   = baseSize + (if index >= 4 then 1 else 0) + (if index >= 7 then 1 else 0) + (if index >= 10 then 1 else 0)
+	if index >= 3 then
+		local stroke = label:FindFirstChildOfClass("UIStroke")
+		if not stroke then
+			local created = Instance.new("UIStroke")
+			created.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+			created.Parent = label
+			stroke = created
+		end
+		assert(stroke)
+		stroke.Color     = color:Lerp(Color3.fromRGB(20, 10, 0), 0.45)
+		stroke.Thickness = 2 + (if index >= 5 then 1 else 0) + (if index >= 8 then 1 else 0) + (if index >= 11 then 1 else 0)
+	end
 end
 
 function Theme.buildingColor(buildingId: string): Color3
@@ -412,8 +441,11 @@ function Theme.scroller(name: string, parent: Instance): ScrollingFrame
 	scroller.Name                   = name
 	scroller.BackgroundTransparency = 1
 	scroller.BorderSizePixel        = 0
-	scroller.ScrollBarThickness     = 6
-	scroller.ScrollBarImageColor3   = Theme.COLORS.panelLight
+	-- 21.10. Playtest: die Scrollbar war auf dunklem Grund (Baerchis, Index) kaum zu sehen.
+	-- Jetzt Honig-Gelb und etwas breiter, wie in den Honig-Fenstern (EggPanelSkin).
+	scroller.ScrollBarThickness     = 8
+	scroller.ScrollBarImageColor3   = Color3.fromRGB(255, 196, 64)
+	scroller.ScrollBarImageTransparency = 0.05
 	scroller.CanvasSize             = UDim2.new()
 	scroller.AutomaticCanvasSize    = Enum.AutomaticSize.Y
 	scroller.ScrollingDirection     = Enum.ScrollingDirection.Y

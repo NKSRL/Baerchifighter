@@ -25,6 +25,7 @@ local RunService        = game:GetService("RunService")
 
 local MapConfig     = require(ReplicatedStorage.Config.MapConfig)
 local WorldFXConfig = require(ReplicatedStorage.Config.WorldFXConfig)
+local FeatureFlags  = require(ReplicatedStorage.Config.FeatureFlags)
 local MapLayout     = require(ReplicatedStorage.Modules.MapLayout)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 
@@ -69,7 +70,10 @@ local _gust: { [number]: number } = {}   -- Slot → Startzeit des Windstosses
 local GUST_TIME = 1.6
 local GUST_DEGREES = 26
 
-local function buildKind(parent: Instance, kind: string, ground: CFrame, slot: number?)
+-- Welt-2-Look der Stufen-Deko (Farbe und Material des Plattenbodens, ohne Leuchten)
+type DecorLook = typeof(WorldFXConfig.ISLAND_STAGE.WELT2)
+
+local function buildKind(parent: Instance, kind: string, ground: CFrame, slot: number?, look: DecorLook?)
 	local pieces = (WorldFXConfig.ISLAND_KINDS :: any)[kind]
 	if not pieces then return end
 	if kind == "Flowers" and slot then
@@ -88,10 +92,12 @@ local function buildKind(parent: Instance, kind: string, ground: CFrame, slot: n
 		if rot then
 			cf = cf * CFrame.Angles(math.rad(rot.X), math.rad(rot.Y), math.rad(rot.Z))
 		end
-		local glow = piece.name == WorldFXConfig.ISLAND_GLOW_PIECE
-		local part = WorldFXKit.part(piece.name, parent, piece.size, cf, piece.color,
+		local glow = piece.name == WorldFXConfig.ISLAND_GLOW_PIECE and look == nil
+		local part = WorldFXKit.part(piece.name, parent, piece.size, cf, if look then look.COLOR else piece.color,
 			if glow then Enum.Material.Neon else Enum.Material.SmoothPlastic, piece.shape)
-		if piece.name == "Box" or piece.name == "Roof" or piece.name == "Stand" then
+		if look then
+			part.Material = look.MATERIAL   -- Welt 2: wie aus dem Plattenboden gehauen
+		elseif piece.name == "Box" or piece.name == "Roof" or piece.name == "Stand" then
 			part.Material = Enum.Material.Wood
 		elseif piece.name == "Rock" then
 			part.Material = Enum.Material.Slate
@@ -103,10 +109,65 @@ local function buildKind(parent: Instance, kind: string, ground: CFrame, slot: n
 end
 
 -- Boden-CFrame an einem Randpunkt: -Z zeigt zur Inselmitte.
-local function rimGround(slot: number, angle: number, radius: number): CFrame
+-- `height` (optional): Bodenhoehe, Standard die Insel (PLATFORM_TOP_Y).
+local function rimGround(slot: number, angle: number, radius: number, height: number?): CFrame
 	local p, toCenter = MapLayout.islandRimPoint(slot, angle, radius)
-	local ground = Vector3.new(p.X, MapConfig.PLATFORM_TOP_Y, p.Z)
+	local ground = Vector3.new(p.X, height or MapConfig.PLATFORM_TOP_Y, p.Z)
 	return CFrame.lookAt(ground, ground + toCenter)
+end
+
+--------------------------------------------------------------------------------
+-- Welt-2-Plots (25.10., Plot tiefer)
+--------------------------------------------------------------------------------
+
+local WORLD2_ATTRIBUTE = "World2"   -- = Welt2Builder.PLOT_ATTRIBUTE (setzt MapService am Plot)
+
+-- Welt-2-Look an? Wie Welt2Builder.enabled auf dem Server: Attribut UND Schalter.
+local function isWelt2(slot: number): boolean
+	if not FeatureFlags.isOn("WELT2_LOOK") then return false end
+	local plot = workspace:FindFirstChild("Plot_" .. slot)
+	return plot ~= nil and plot:GetAttribute(WORLD2_ATTRIBUTE) == true
+end
+
+-- Seit PLOT_SIZE.Y = 0,5 liegt die Welt-2-Platte fast auf der Insel. Die
+-- Boden-Deko der Insel (Platform.PlotIslandDecor_<slot>: Ring-Scheiben,
+-- Vorplaetze, Uferkranz bis 0,66 hoch) und die Randbuesche und -felsen
+-- (Scenery, Mitte innerhalb des Inselradius) ragten sonst durch Boden und
+-- Goldrand. Solange die Platte steht, blendet jeder Client sie lokal aus
+-- (LocalTransparencyModifier, der Server bleibt unberuehrt); wird der Plot
+-- frei, kommen sie zurueck. Kann warten (Platform noch nicht repliziert).
+local _covered: { [number]: { BasePart } } = {}
+
+local function setCovered(slot: number, covered: boolean)
+	for _, part in _covered[slot] or {} do
+		part.LocalTransparencyModifier = 0
+	end
+	_covered[slot] = nil
+	if not covered then return end
+	local platform = workspace:WaitForChild("Platform", 30)
+	local ground = platform and platform:WaitForChild("PlotIslandDecor_" .. slot, 10)
+	local scenery = platform and platform:WaitForChild("Scenery", 10)
+	-- waehrend des Wartens frei geworden oder Welt 2 weg: nichts ausblenden
+	if not platform or not isWelt2(slot) then return end
+	local list: { BasePart } = {}
+	if ground then
+		for _, d in ground:GetDescendants() do
+			if d:IsA("BasePart") then table.insert(list, d) end
+		end
+	end
+	if scenery then
+		local center = MapLayout.plotCenter(slot)
+		for _, d in scenery:GetDescendants() do
+			if d:IsA("BasePart") and d.Position.Y + d.Size.Y * 0.5 > MapConfig.PLATFORM_TOP_Y then
+				local flat = Vector3.new(d.Position.X - center.X, 0, d.Position.Z - center.Z)
+				if flat.Magnitude <= MapConfig.PLOT_ISLAND_RADIUS then table.insert(list, d) end
+			end
+		end
+	end
+	for _, part in list do
+		part.LocalTransparencyModifier = 1
+	end
+	_covered[slot] = list
 end
 
 --------------------------------------------------------------------------------
@@ -138,9 +199,13 @@ local function rebuildDecor(state: PlotState)
 	_sways[state.slot] = nil
 	local folder = _folder :: Folder
 	local group = WorldFXKit.folder("IslandDecor_" .. state.slot, folder)
+	-- Welt 2: auf dem Plattenboden statt auf der Insel darunter, im Look des Bodens
+	local w2 = if isWelt2(state.slot) then WorldFXConfig.ISLAND_STAGE.WELT2 else nil
+	local radius = if w2 then w2.RIM_RADIUS else WorldFXConfig.ISLAND_STAGE.RIM_RADIUS
+	local height = if w2 then MapConfig.PLATFORM_TOP_Y + MapConfig.PLOT_SIZE.Y - w2.FLOOR_DROP else nil
 	for _, item in WorldFXConfig.ISLAND_STAGE_ITEMS do
 		if item.stage <= stage then
-			buildKind(group, item.kind, rimGround(state.slot, item.angle, WorldFXConfig.ISLAND_STAGE.RIM_RADIUS), state.slot)
+			buildKind(group, item.kind, rimGround(state.slot, item.angle, radius, height), state.slot, w2)
 		end
 	end
 	state.decor = group
@@ -322,14 +387,20 @@ local function buildFree(slot: number): FreeState
 	local center = MapLayout.plotCenter(slot)
 	local facing = CFrame.lookAt(center, Vector3.new(MapConfig.CENTER.X, center.Y, MapConfig.CENTER.Z))
 
-	-- Schild "Frei" mit Baerchi-Silhouette, zur Hauptinsel gedreht
-	local wood = WorldFXConfig.SIGNPOST.WOOD
+	-- Schild "Frei" als kleiner Royal-Honey-Sanktuarium-Schrein, zur Hauptinsel gedreht
+	local stoneColor = Color3.fromRGB(238, 224, 192)
+	local slateColor = Color3.fromRGB(48, 43, 64)
+	local goldColor  = Color3.fromRGB(235, 180, 50)
+	WorldFXKit.part("SignPlinth", group, Vector3.new(6.8, 0.45, 1.8),
+		facing * CFrame.new(0, 0.225, 0.15), stoneColor, Enum.Material.Sandstone)
 	for _, side in { -1, 1 } do
-		WorldFXKit.pole("SignPost", group, (facing * CFrame.new(side * 2.4, 0, 0.3)).Position, cfg.SIGN_HEIGHT + 1, 0.4,
-			WorldFXConfig.SIGNPOST.WOOD_DARK, Enum.Material.Wood)
+		WorldFXKit.pole("SignPost", group, (facing * CFrame.new(side * 2.55, 0, 0.25)).Position, cfg.SIGN_HEIGHT + 1.4, 0.48,
+			slateColor, Enum.Material.Slate)
 	end
-	local board = WorldFXKit.part("SignBoard", group, Vector3.new(6, 3, 0.3),
-		facing * CFrame.new(0, cfg.SIGN_HEIGHT, 0), wood, Enum.Material.Wood)
+	WorldFXKit.part("SignCap", group, Vector3.new(6.6, 0.35, 0.65),
+		facing * CFrame.new(0, cfg.SIGN_HEIGHT + 1.55, 0.05), goldColor, Enum.Material.Metal)
+	local board = WorldFXKit.part("SignBoard", group, Vector3.new(6, 3, 0.35),
+		facing * CFrame.new(0, cfg.SIGN_HEIGHT, 0), slateColor, Enum.Material.Slate)
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front
 	gui.PixelsPerStud = 40
@@ -343,7 +414,7 @@ local function buildFree(slot: number): FreeState
 	label.Position = UDim2.fromScale(0.36, 0.1)
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
-	label.TextColor3 = WorldFXConfig.SIGNPOST.TEXT_COLOR
+	label.TextColor3 = stoneColor
 	label.Parent = gui
 	Loc.bind(label, "world.sign.free")
 
@@ -418,6 +489,19 @@ local function setOccupied(slot: number, occupied: boolean)
 			end
 			st.stage = 0
 			rebuildDecor(st)
+			-- Welt 2: Das Attribut am Plot kann nach dem Plot ankommen (oder erst
+			-- spaeter, MapService.applyWorld2): dann Deko neu setzen und die
+			-- Insel-Deko unter der Platte aus- bzw. einblenden. Die Verbindung
+			-- endet mit dem Plot.
+			local plot = workspace:FindFirstChild("Plot_" .. slot)
+			if plot then
+				plot:GetAttributeChangedSignal(WORLD2_ATTRIBUTE):Connect(function()
+					st.stage = 0
+					rebuildDecor(st)
+					setCovered(slot, isWelt2(slot))
+				end)
+			end
+			setCovered(slot, isWelt2(slot))
 		end)
 	else
 		local state = _plots[slot]
@@ -433,6 +517,7 @@ local function setOccupied(slot: number, occupied: boolean)
 			state.decor = nil
 			state.stage = 0
 		end
+		setCovered(slot, false)   -- ohne Welt-2-Platte: Insel-Deko wieder zeigen
 		if _homeSlot == slot then
 			local home = _homeGroup
 			if home then home:Destroy() end

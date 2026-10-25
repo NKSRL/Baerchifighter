@@ -103,7 +103,7 @@ end
 -- FigureWalker und PitArenaService machen.
 --
 -- Gibt zurueck, ob die Bewegung ganz durchgelaufen ist.
-local function animate(model: Model, seconds: number, step: (t: number) -> ()): boolean
+local function animate(model: Model, seconds: number, step: (t: number) -> (), abortIf: (() -> boolean)?): boolean
 	local duration = math.max(seconds, MIN_SECONDS)
 	local elapsed  = 0
 
@@ -112,6 +112,9 @@ local function animate(model: Model, seconds: number, step: (t: number) -> ()): 
 		elapsed += dt
 
 		if model.Parent == nil then
+			return false
+		end
+		if abortIf and abortIf() then
 			return false
 		end
 
@@ -172,6 +175,15 @@ type IdleEntry = {
 }
 
 local _idle: { [Model]: IdleEntry } = {}
+
+-- 21.10. Playtest-Bug "Baerchi glitcht, wenn er beim Trinken in den Kampf geschickt
+-- wird": leanForward blockierte bis zum Ende und liess sich nicht unterbrechen. Ein Kampf
+-- liess die Figur laufen, waehrend die Vorbeuge weiter dieselbe Position schrieb (und
+-- danach meldete sich das Ruhe-Atmen auch wieder an). Jetzt merkt sich jede laufende
+-- Vorbeuge hier ihren Zustand; stopIdle (das jeder Uebernehmer ohnehin zuerst aufruft)
+-- bricht sie ab und stellt die Figur sofort aufrecht hin.
+type LeanEntry = { basePivot: CFrame, cancelled: boolean }
+local _lean: { [Model]: LeanEntry } = {}
 local _idleConnection: RBXScriptConnection? = nil
 local _idleClock = 0
 
@@ -237,6 +249,16 @@ end
 --
 -- Fuer eine nicht angemeldete Figur passiert nichts.
 function FigureFX.stopIdle(model: Model)
+	-- laufende Vorbeuge (Trinken) abbrechen und aufrichten
+	local lean = _lean[model]
+	if lean then
+		lean.cancelled = true
+		_lean[model] = nil
+		if model.Parent ~= nil then
+			model:PivotTo(lean.basePivot)
+		end
+	end
+
 	local entry = _idle[model]
 	if not entry then return end
 
@@ -385,6 +407,9 @@ function FigureFX.leanForward(model: Model, degrees: number, duration: number)
 	local basePivot = model:GetPivot()
 	local foot      = footOf(model)
 
+	local entry: LeanEntry = { basePivot = basePivot, cancelled = false }
+	_lean[model] = entry
+
 	-- Negativ = nach vorne (siehe tilted).
 	local radians = -math.rad(degrees)
 	local move    = (1 - LEAN_HOLD_SHARE) * 0.5   -- Anteil fuer Runter bzw. Hoch
@@ -400,9 +425,17 @@ function FigureFX.leanForward(model: Model, degrees: number, duration: number)
 		end
 
 		model:PivotTo(tilted(basePivot, foot, radians * math.clamp(amount, 0, 1), 0))
+	end, function()
+		return entry.cancelled
 	end)
 
-	-- Sauber aufgerichtet enden, auch nach einem Abbruch.
+	-- Wurde die Vorbeuge von aussen abgebrochen (Kampf, Event), hat stopIdle die Figur
+	-- schon aufgerichtet und der Uebernehmer bewegt sie jetzt selbst: nichts mehr anfassen,
+	-- und das Ruhe-Atmen NICHT wieder anmelden.
+	if entry.cancelled then return end
+	_lean[model] = nil
+
+	-- Sauber aufgerichtet enden.
 	if model.Parent ~= nil then
 		model:PivotTo(basePivot)
 	end

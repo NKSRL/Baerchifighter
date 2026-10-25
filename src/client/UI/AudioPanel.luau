@@ -3,13 +3,14 @@
 -- StarterPlayerScripts/UI/AudioPanel.luau
 --
 -- Einzige Zustaendigkeit:
---   - Das Ton-Fenster: Regler fuer Musik und Effekte, Stumm-Taste
---   - Den kleinen Lautsprecher-Knopf unter dem Zahnrad, der es oeffnet
+--   - Den Abschnitt "Ton und Geraet" fuer das Einstellungs-Fenster (Zahnrad,
+--     LanguagePanel): Regler fuer Musik und Effekte, Stumm-Taste, Option
+--     "Schwaches Geraet"
 --
--- Was gilt und was gespeichert wird, entscheidet AudioController — dieses
--- Panel ruft nur dessen set() auf und zeigt den aktuellen Stand.
--- (Audio-Rework 16.10. Das Sprach-Fenster hat ein festes Bild als Rahmen
--- ohne Platz fuer Regler, deshalb ein eigenes kleines Fenster.)
+-- Was gilt und was gespeichert wird, entscheidet AudioController bzw.
+-- LowEndSetting — dieser Abschnitt ruft nur deren set() auf und zeigt den
+-- aktuellen Stand. (21.10.: der eigene Lautsprecher-Knopf mit eigenem Fenster
+-- ist entfallen, alles liegt jetzt im Einstellungs-Fenster.)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService  = game:GetService("UserInputService")
@@ -17,33 +18,15 @@ local UserInputService  = game:GetService("UserInputService")
 local Loc = require(ReplicatedStorage.Localization.Loc)
 
 local Theme           = require(script.Parent.Theme)
-local PanelManager    = require(script.Parent.PanelManager)
 local AudioController = require(script.Parent.Parent.Controllers.AudioController)
+local LowEndSetting   = require(script.Parent.Parent.Controllers.LowEndSetting)   -- 21.10.
 
 local AudioPanel = {}
-
-local PANEL_NAME = "Audio"
-
-local _root: Frame? = nil
-local _refresh: (() -> ())? = nil
 
 -- Loc.bind haelt Beschriftungen nur schwach. Ein Label, das sonst niemand
 -- festhaelt, kann vom Muellsammler eingesammelt werden und folgt dann dem
 -- Sprachwechsel nicht mehr — deshalb hier festhalten.
 local _keep: { Instance } = {}
-
-local function openInternal(...: any)
-	local root = _root
-	if not root then return end
-	root.Visible = true
-	local refresh = _refresh
-	if refresh then refresh() end
-end
-
-local function closeInternal()
-	local root = _root
-	if root then root.Visible = false end
-end
 
 -- Regler 0..1 in 5-%-Schritten, ziehen mit Maus oder Finger. onChange bekommt
 -- den Wert laufend; gespeichert wird verzoegert (AudioController).
@@ -128,33 +111,26 @@ local function addSlider(body: Frame, order: number, bindKey: string, getValue: 
 	return function() show(getValue()) end
 end
 
-function AudioPanel.init(screenGui: ScreenGui)
-	local root = Theme.dialog(
-		"AudioPanel", screenGui,
-		Vector2.new(0.30, 0.40),
-		Vector2.new(280, 230),
-		Vector2.new(360, 260)
-	)
-	_root = root
+-- Baut den Abschnitt in `parent` (eine leere Spalte) und gibt eine Funktion
+-- zurueck, die alle Anzeigen auf den aktuellen Stand bringt (beim Oeffnen).
+function AudioPanel.buildSection(parent: Frame): () -> ()
+	Theme.listLayout(parent, 10)
 
-	local title = Theme.dialogHeader(root, "", function()
-		PanelManager.close(PANEL_NAME)
-	end)
-	title.AutoLocalize = false
-	table.insert(_keep, title)
-	Loc.bind(title, "ui.audio.section")
+	local heading = Theme.label("Heading", parent, "")
+	heading.AutoLocalize = false
+	table.insert(_keep, heading)
+	heading.Size = UDim2.new(1, -8, 0, 30)
+	heading.LayoutOrder = 0
+	Loc.bind(heading, "ui.audio.section")
 
-	local body = Theme.dialogBody(root)
-	Theme.listLayout(body, 10)
-
-	local refreshMusic = addSlider(body, 1, "ui.audio.music",
+	local refreshMusic = addSlider(parent, 1, "ui.audio.music",
 		function() return AudioController.getSettings().music end,
 		function(value) AudioController.set({ music = value }) end)
-	local refreshSfx = addSlider(body, 2, "ui.audio.sfx",
+	local refreshSfx = addSlider(parent, 2, "ui.audio.sfx",
 		function() return AudioController.getSettings().sfx end,
 		function(value) AudioController.set({ sfx = value }) end)
 
-	local mute = Theme.button("Mute", body, "", Theme.COLORS.panelLight)
+	local mute = Theme.button("Mute", parent, "", Theme.COLORS.panelLight)
 	mute.Size = UDim2.new(1, -8, 0, 40)
 	mute.LayoutOrder = 3
 	mute.TextColor3 = Theme.COLORS.text
@@ -166,43 +142,39 @@ function AudioPanel.init(screenGui: ScreenGui)
 		AudioController.play("click")
 	end)
 
+	-- 21.10. Option "Schwaches Geraet": weniger Partikel (Tutorial-Pfeile)
+	local lowEnd = Theme.button("LowEnd", parent, "", Theme.COLORS.panelLight)
+	lowEnd.Size = UDim2.new(1, -8, 0, 40)
+	lowEnd.LayoutOrder = 4
+	lowEnd.TextColor3 = Theme.COLORS.text
+	table.insert(_keep, lowEnd)
+	lowEnd.AutoLocalize = false
+	lowEnd.Activated:Connect(function()
+		LowEndSetting.set(not LowEndSetting.get())
+		AudioController.play("click")
+	end)
+	local function refreshLowEnd()
+		local on = LowEndSetting.get()
+		lowEnd.Text = Loc.t(if on then "ui.lowend.on" else "ui.lowend.off")
+		lowEnd.BackgroundColor3 = if on then Theme.COLORS.good else Theme.COLORS.panelLight
+	end
+	LowEndSetting.onChanged(refreshLowEnd)
+	Loc.onChanged(refreshLowEnd)
+
 	local function refreshAll()
 		refreshMusic()
 		refreshSfx()
+		refreshLowEnd()
 		mute.BackgroundColor3 = if AudioController.getSettings().muted then Theme.COLORS.bad else Theme.COLORS.panelLight
 	end
-	_refresh = refreshAll
 	AudioController.onSettingsChanged(refreshAll)
 	refreshAll()
+	return refreshAll
+end
 
-	-- Lautsprecher-Knopf: als 4. Knopf in die Knopf-Zeile oben links (HudRow:
-	-- Zahnrad, Quests, Shop), sobald es sie gibt; sonst fest unter die Waehrungen.
-	local button = Theme.button("AudioButton", screenGui, "🔊", Theme.COLORS.panelLight)
-	button.AnchorPoint = Vector2.new(0, 0)
-	button.Position    = UDim2.new(0.012, 12, 0, 150)
-	button.Size        = UDim2.fromOffset(38, 38)
-	button.TextColor3  = Theme.COLORS.text
-	button.LayoutOrder = 4
-	button.Activated:Connect(function()
-		PanelManager.toggle(PANEL_NAME)
-	end)
-	task.spawn(function()
-		local row = screenGui:WaitForChild("HudRow", 15)
-		if row and row:IsA("GuiObject") then
-			row.Size = row.Size + UDim2.fromOffset(44, 0)   -- Platz fuer den 4. Knopf (38 px + 6 px Abstand)
-			button.Parent = row
-		end
-	end)
-	AudioController.onSettingsChanged(function(settings)
-		button.Text = if settings.muted or (settings.music <= 0 and settings.sfx <= 0) then "🔇" else "🔊"
-	end)
-
-	PanelManager.register(PANEL_NAME, {
-		open  = openInternal,
-		close = closeInternal,
-	})
-
-	print("[AudioPanel] Initialisiert")
+-- Bleibt fuer Main.client: kein eigener Knopf und kein eigenes Fenster mehr.
+function AudioPanel.init(screenGui: ScreenGui)
+	print("[AudioPanel] Initialisiert | Abschnitt im Einstellungs-Fenster")
 end
 
 return AudioPanel

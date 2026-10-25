@@ -34,53 +34,62 @@ function RocketIslandRules.finalRecord(view: View): number
 	return (records and tonumber(records.Final)) or 0
 end
 
--- Lage der Mini-Insel. anchor = Weltposition des Ankers (oder nil -> Platzhalter).
--- Gibt { center, outward, fromRadius, toRadius, distance, placeholder } zurueck; der Abstand
--- zur Mitte wird so geklemmt, dass zwischen Hauptinsel-Rand und Mini-Insel mindestens
--- MIN_GAP_FROM_MAIN Studs Wasser bleiben (die Bruecke ueberspannt genau diese Luecke).
-function RocketIslandRules.layout(anchor: Vector3?): {
-	center: Vector3, outward: Vector3, fromRadius: number, toRadius: number, distance: number, placeholder: boolean }
+-- Lage der Raketen-Insel von `slot`: auf der Achse des Plots HINTER der Arena-Insel (Fight-Pit).
+-- anchor = Weltposition eines Ankers (oder nil -> berechnet). Gibt { center, outward, fromRadius, toRadius,
+-- distance, placeholder, angleDeg } zurueck; `fromRadius` ist der Rand der Arena-Insel, `toRadius` der Rand der
+-- Raketen-Insel (die Bruecke ueberspannt genau diese Luecke). `placeholder` = nicht aus einem Anker.
+function RocketIslandRules.layout(slot: number, anchor: Vector3?): {
+	center: Vector3, outward: Vector3, fromRadius: number, toRadius: number, distance: number, placeholder: boolean, angleDeg: number }
 	local c = MapConfig.CENTER
 	local R = RocketIslandConfig.ISLAND_RADIUS
-	local placeholder = anchor == nil
-	local outward: Vector3
+	local angle = math.rad((slot - 1) * (360 / MapConfig.PLOT_COUNT))
+	local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
 	local distance: number
+	-- Rand der Arena-Insel (MapParts.pitCenter + PIT_BASE_RADIUS)
+	local arenaEdge = MapConfig.PLOT_RING_RADIUS + MapConfig.PLOT_ISLAND_RADIUS + MapConfig.ISLAND_GAP + 2 * MapConfig.PIT_BASE_RADIUS
 	if anchor then
 		local flat = Vector3.new(anchor.X - c.X, 0, anchor.Z - c.Z)
 		if flat.Magnitude < 1e-3 then
-			outward = Vector3.new(1, 0, 0)
-			distance = 0
+			distance = arenaEdge + RocketIslandConfig.GAP_FROM_ARENA + R
 		else
 			outward = flat.Unit
 			distance = flat.Magnitude
 		end
 	else
-		local angle = math.rad(RocketIslandConfig.PLACEHOLDER_ANGLE_DEG)
-		outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		-- ein Inselabstand hinter dem Hauptinsel-Rand (wie die Stege zu den Plot-Inseln)
-		distance = MapConfig.PLATFORM_RADIUS + MapConfig.ISLAND_GAP + R
+		distance = arenaEdge + RocketIslandConfig.GAP_FROM_ARENA + R
 	end
-	local minDistance = MapConfig.PLATFORM_RADIUS + RocketIslandConfig.MIN_GAP_FROM_MAIN + R
-	distance = math.max(distance, minDistance)
+	distance = math.max(distance, arenaEdge + RocketIslandConfig.MIN_GAP_FROM_MAIN + R)
 	return {
 		center = Vector3.new(c.X + outward.X * distance, MapConfig.PLATFORM_TOP_Y, c.Z + outward.Z * distance),
 		outward = outward,
-		fromRadius = MapConfig.PLATFORM_RADIUS,
+		fromRadius = arenaEdge,
 		toRadius = distance - R,
 		distance = distance,
-		placeholder = placeholder,
+		placeholder = anchor == nil,
+		angleDeg = math.deg(math.atan2(outward.Z, outward.X)) % 360,
 	}
 end
 
--- Kleinster Abstand zwischen den Raendern der Mini-Insel und aller Plot-Inseln (positiv = frei).
-function RocketIslandRules.clearanceToPlots(center: Vector3): number
+-- Kleinster Abstand zwischen dem Rand dieser Insel (`center`) und dem Rand aller ANDEREN Inseln: Plot-Inseln,
+-- Arena-Inseln und der Raketen-Inseln der uebrigen Slots (positiv = frei). Wasser-Ufer (SHORE_WIDTH) zaehlt doppelt.
+function RocketIslandRules.clearanceToIslands(center: Vector3, slot: number): number
 	local best = math.huge
-	for slot = 1, MapConfig.PLOT_COUNT do
-		local angle = math.rad((slot - 1) * (360 / MapConfig.PLOT_COUNT))
-		local px = MapConfig.CENTER.X + MapConfig.PLOT_RING_RADIUS * math.cos(angle)
-		local pz = MapConfig.CENTER.Z + MapConfig.PLOT_RING_RADIUS * math.sin(angle)
-		local d = math.sqrt((center.X - px) ^ 2 + (center.Z - pz) ^ 2)
-		best = math.min(best, d - MapConfig.PLOT_ISLAND_RADIUS - RocketIslandConfig.ISLAND_RADIUS - MapConfig.SHORE_WIDTH * 2)
+	local n = MapConfig.PLOT_COUNT
+	local shore = MapConfig.SHORE_WIDTH * 2
+	local R = RocketIslandConfig.ISLAND_RADIUS
+	for other = 1, n do
+		local angle = math.rad((other - 1) * (360 / n))
+		local ox, oz = math.cos(angle), math.sin(angle)
+		local function dist(radius: number): number
+			return math.sqrt((center.X - MapConfig.CENTER.X - ox * radius) ^ 2 + (center.Z - MapConfig.CENTER.Z - oz * radius) ^ 2)
+		end
+		best = math.min(best, dist(MapConfig.PLOT_RING_RADIUS) - MapConfig.PLOT_ISLAND_RADIUS - R - shore)
+		if other ~= slot then
+			local arenaCenter = MapConfig.PLOT_RING_RADIUS + MapConfig.PLOT_ISLAND_RADIUS + MapConfig.ISLAND_GAP + MapConfig.PIT_BASE_RADIUS
+			best = math.min(best, dist(arenaCenter) - MapConfig.PIT_BASE_RADIUS - R - shore)
+			local rocketCenter = arenaCenter + MapConfig.PIT_BASE_RADIUS + RocketIslandConfig.GAP_FROM_ARENA + R
+			best = math.min(best, dist(rocketCenter) - 2 * R - shore)
+		end
 	end
 	return best
 end

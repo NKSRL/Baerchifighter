@@ -31,15 +31,21 @@
 -- Feedback, IndexView, MenuBar, PetBar.
 
 local UserInputService = game:GetService("UserInputService")
+local FeatureFlags     = require(game:GetService("ReplicatedStorage").Config.FeatureFlags)
 
 local UiScale = {}
 
 -- Tokens ----------------------------------------------------------------------
 -- Bei dieser Bildschirmhoehe (Pixel, ohne Topbar) ist die UI 1:1 gebaut.
 UiScale.REFERENCE_HEIGHT   = 820
-UiScale.MAX_SCALE          = 1.6
+-- 21.10. Playtest: Mit 1,6 als Obergrenze wurde die UI auf WQHD leicht und auf 4K deutlich
+-- KLEINER im Verhaeltnis zum Bildschirm als auf Full-HD (und Fenster sassen anders). Die Grenze
+-- liegt jetzt oberhalb von 4K (2160 / 820 = 2,63): gleiche Proportionen auf jedem Monitor.
+UiScale.MAX_SCALE          = 3.2
 UiScale.MIN_SCALE_DESKTOP  = 0.75
 UiScale.MIN_SCALE_TOUCH    = 0.65
+-- W1-P6b (UI_ADAPTIVE_V1): damit 60-Einheiten-Knoepfe auf dem Handy >= 48 px bleiben (60 x 0,8)
+UiScale.MIN_SCALE_TOUCH_ADAPTIVE = 0.8
 
 local _scale = 1
 local _uiScale: UIScale? = nil
@@ -52,7 +58,8 @@ end
 
 -- Reine Rechnung (ohne Roblox-Objekte), damit sie testbar bleibt.
 function UiScale.compute(heightPixels: number, touch: boolean): number
-	local floor = if touch then UiScale.MIN_SCALE_TOUCH else UiScale.MIN_SCALE_DESKTOP
+	local touchFloor = if FeatureFlags.isOn("UI_ADAPTIVE_V1") then UiScale.MIN_SCALE_TOUCH_ADAPTIVE else UiScale.MIN_SCALE_TOUCH
+	local floor = if touch then touchFloor else UiScale.MIN_SCALE_DESKTOP
 	return math.clamp(heightPixels / UiScale.REFERENCE_HEIGHT, floor, UiScale.MAX_SCALE)
 end
 

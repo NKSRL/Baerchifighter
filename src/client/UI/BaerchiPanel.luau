@@ -65,6 +65,7 @@ local ClientState  = require(script.Parent.Parent.Controllers.ClientState)
 local Unlock       = require(script.Parent.Unlock)   -- HBB Paket 3
 local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local CombatRating = require(ReplicatedStorage.Modules.CombatRating)
+local PowerRules   = require(ReplicatedStorage.Modules.PowerRules)   -- 20.10. P5b
 local Loc          = require(ReplicatedStorage.Localization.Loc)
 local Names        = require(ReplicatedStorage.Localization.Names)
 local BaerchiMesh  = require(ReplicatedStorage.Modules.BaerchiMesh)
@@ -383,6 +384,12 @@ local function fill(baerchi: Types.Baerchi)
 		-- Sammel-Update 3.7: Symbole vor den Kuerzeln
 		_statsLabel.Text = string.format("⚔ ATK %d   ⚡ SPD %.2f   ✨ PWR %d%%",
 			stats.atk, stats.spd, math.floor(stats.pwr * 100 + 0.5))
+		-- 20.10. P5b: Wurf-Qualitaet (nur im Modell V2) — gute Pets sollen auf einen Blick erkennbar sein.
+		if def and FeatureFlags.isOn("POWER_MODEL_V2") then
+			local roll = PowerRules.roll(baerchi.uid, BaerchiConfig.getRarityIndex(def.rarity) - 1)
+			_statsLabel.Text ..= "\n" .. Loc.t("ui.power.roll", { grade = Loc.t("ui.power.grade." .. roll.grade) })
+				.. "  " .. PowerRules.meterText(roll)
+		end
 	end
 
 	-- HP-Balken. Die HP bleiben zwischen PIT-Laeufen stehen: ein leerer Balken
@@ -764,7 +771,9 @@ local function buildHoney(root: Frame)
 	-- ---------------------------------------- Ausruesten (lila Knopf) + Verwerten (Gummibaer)
 	local equipDim = hcover(root, "EquipDim", 488, 720, 672, 778, Color3.fromRGB(30, 16, 6), 0.5, 12, 7)
 	local equipButton = hbutton(root, "Equip", 488, 720, 672, 778)
-	local charmText = hlabel(root, "CharmsText", 538, 728, 664, 770, 20, Enum.TextXAlignment.Center)   -- 19.10.
+	-- 21.10. Playtest: Die Pfote ist ins Knopfbild eingebacken (Mitte, x ca. 583-612) und lag unter
+	-- dem Text. Jetzt steht der Text RECHTS neben der Pfote, zweizeilig ("Charms" / "1/8").
+	local charmText = hlabel(root, "CharmsText", 616, 726, 670, 774, 15, Enum.TextXAlignment.Center)   -- 19.10./21.10.
 	local recycleText = hlabel(root, "RecycleText", 222, 736, 452, 772, 16, Enum.TextXAlignment.Center)
 	local recycleButton = hbutton(root, "Recycle", 100, 708, 462, 792)
 
@@ -975,7 +984,7 @@ local function buildHoney(root: Frame)
 		for slotIndex = 1, CharmConfig.SLOT_COUNT do
 			if CharmConfig.isSlotUnlocked(slotIndex, promotion) then openSlots += 1 end
 		end
-		charmText.Text = "Charms  " .. openSlots .. "/" .. CharmConfig.SLOT_COUNT
+		charmText.Text = "Charms\n" .. openSlots .. "/" .. CharmConfig.SLOT_COUNT
 		local recycleUnlocked = Unlock.isVisible("recycling")
 		if isEquipped then
 			recycleText.Text = Loc.t("ui.card.equipped")

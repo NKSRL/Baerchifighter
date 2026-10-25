@@ -184,9 +184,10 @@ local function buildCard(parent: Instance, def: TowerConfig.TowerDef, order: num
 	lockIcon.ZIndex = 38
 
 	local left = 14 + BADGE + 14
-	local title = Kit.text("Title", face, towerName(def.id), T.text.cardTitle)
-	title.Position = UDim2.fromOffset(left, 10)
-	title.Size = UDim2.new(1, -(left + RIGHT_W + 12), 0, 30)
+	-- 21.10. Playtest: Schrift im Tower-Terminal war zu klein -> Titel, Belohnung, Hinweise groesser
+	local title = Kit.text("Title", face, towerName(def.id), T.text.cardTitle + 4)
+	title.Position = UDim2.fromOffset(left, 7)
+	title.Size = UDim2.new(1, -(left + RIGHT_W + 12), 0, 36)
 	title.ZIndex = 32
 
 	local progress = Kit.progress("Record", face, 26)
@@ -197,9 +198,9 @@ local function buildCard(parent: Instance, def: TowerConfig.TowerDef, order: num
 	rewardIcon.Position = UDim2.fromOffset(left, 80)
 	rewardIcon.Size = UDim2.fromOffset(24, 24)
 	rewardIcon.ZIndex = 32
-	local reward = Kit.text("Reward", face, "", T.text.small + 1, { color = T.color.inkSoft })
-	reward.Position = UDim2.fromOffset(left + 30, 80)
-	reward.Size = UDim2.new(1, -(left + 30 + RIGHT_W + 12), 0, 24)
+	local reward = Kit.text("Reward", face, "", T.text.small + 5, { color = T.color.inkSoft })
+	reward.Position = UDim2.fromOffset(left + 30, 78)
+	reward.Size = UDim2.new(1, -(left + 30 + RIGHT_W + 12), 0, 28)
 	reward.ZIndex = 32
 
 	-- Rechts: Waehlen-Knopf ...
@@ -227,7 +228,7 @@ local function buildCard(parent: Instance, def: TowerConfig.TowerDef, order: num
 	lockChip.Position = UDim2.new(1, -14, 0.5, 0)
 	lockChip.Size = UDim2.fromOffset(RIGHT_W, 68)
 	lockChip.ZIndex = 32
-	local lockText = Kit.text("Text", lockChip, "", T.text.small + 1, { color = T.color.ink, align = Enum.TextXAlignment.Center, wrap = true })
+	local lockText = Kit.text("Text", lockChip, "", T.text.small + 4, { color = T.color.ink, align = Enum.TextXAlignment.Center, wrap = true })
 	lockText.Size = UDim2.new(1, 0, 0, 36)
 	lockText.ZIndex = 33
 	local lockBar = Kit.progress("Bar", lockChip, 24, T.color.honey)
@@ -697,8 +698,8 @@ function TowerPanel.init(screenGui: ScreenGui)
 				label.TextWrapped = true
 				label.TextXAlignment = Enum.TextXAlignment.Center
 				local limit = Instance.new("UITextSizeConstraint")
-				limit.MaxTextSize = 15
-				limit.MinTextSize = 8
+				limit.MaxTextSize = 19
+				limit.MinTextSize = 10
 				limit.Parent = label
 			end
 		end
@@ -751,7 +752,7 @@ function TowerPanel.init(screenGui: ScreenGui)
 	gummyIcon.ZIndex = 34
 	_gummyChip = gummyChip
 
-	local hint = Kit.text("Hint", footer, "", T.text.small, { color = T.color.inkSoft, align = Enum.TextXAlignment.Right })
+	local hint = Kit.text("Hint", footer, "", T.text.small + 3, { color = T.color.inkSoft, align = Enum.TextXAlignment.Right })
 	hint.AnchorPoint = Vector2.new(1, 0)
 	hint.Position = UDim2.new(1, -PAD, 0, 10)
 	hint.Size = UDim2.new(0.6, 0, 0, 30)

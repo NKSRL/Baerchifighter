@@ -677,6 +677,10 @@ local function runFinale(player: Player, fin: Fin)
 	if not MapService.hasSummit(player) then MapService.setSummit(player, true, false) end
 	local uid = if data then data.island.equippedUid else nil
 	MapService.teleportToSummit(player, uid)
+	-- 21.10. Welt 2: der Plot baut sich jetzt um, waehrend Insel und Bruecke weg sind und der
+	-- Spieler oben steht; bis der Lift ihn runterfaehrt ist alles fertig.
+	local okW2, errW2 = pcall(MapService.applyWorld2, player)
+	if not okW2 then warn("[EpilogService] Welt-2-Umbau fehlgeschlagen:", errW2) end
 	local removed = false
 	MapService.removeIsland(player, true, function() removed = true end)
 	local waited = 0
@@ -867,6 +871,25 @@ function EpilogService.restore(player: Player)
 	local data = PlayerService.getData(player)
 	if not data then return end
 	local state = EpilogService.getState(data)
+	-- 20.10. Nachholen: Final 100 war schon geschafft, bevor der Schalter FINAL_EPILOG an war
+	-- (state "none"): die volle Sequenz startet jetzt einmalig beim Beitritt. Danach ist der
+	-- Zustand "pending", ein zweiter Beitritt nimmt den Wiedereinstieg unten.
+	if state == S.NONE then
+		local def = TowerConfig.get(EpilogConfig.TOWER_ID)
+		local records = if data.towers then data.towers.records else nil
+		local record = if records then (tonumber(records[EpilogConfig.TOWER_ID]) or 0) else 0
+		if def and record >= def.stages and EpilogRules.applyFinalClear(data, os.time()) then
+			print("[EpilogService]", player.Name, "| Final 100 lag schon vor dem Epilog -> pending (Sequenz startet beim Beitritt)")
+			local okSummit, errSummit = pcall(MapService.setSummit, player, true, true)
+			if not okSummit then warn("[EpilogService] Gipfel (Nachholen):", errSummit) end
+			task.spawn(function()
+				PlayerService.saveConfirmed(player)
+				task.wait(3)   -- Client/Plot sind bereit
+				if player.Parent ~= nil then EpilogService.beginFull(player) end
+			end)
+		end
+		return
+	end
 	-- Prompt 6: "launched" (Spieler kam beim Finale/Rueckweg heraus): Gipfel, Insel, Terminal
 	-- und Rakete gibt es nach dem Join nicht mehr; sicherheitshalber alles wegraeumen, den
 	-- Turm freigeben und den Avatar auf den Plot setzen. Keine Effekte, keine Fahrt.

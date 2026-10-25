@@ -76,6 +76,7 @@ local UI_IDS: { [string]: string } = {
 	["eggs/SunEgg"]                 = "rbxassetid://95896852084747",
 	["eggs/TranscendenceEgg"]       = "rbxassetid://132274722580858",
 	["eggs/UfoJackpotEgg"]          = "",
+	["eggs/AnimeEgg"]               = "",
 	["eggs/VoidEgg"]                = "rbxassetid://136294845645416",
 	["eggs/ZenithEgg"]              = "",
 	["eggs/egg_mask"]               = "",

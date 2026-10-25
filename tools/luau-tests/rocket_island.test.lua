@@ -23,20 +23,33 @@ check("bereit bei Final-Rekord 100", Rules.state({ towers = { records = { Final 
 check("gestartet bei launched", Rules.state({ epilog = { state = "launched" }, towers = { records = { Final = 100 } } }) == 3)
 check("Fortschritt Final-Rekord", Rules.finalRecord({ towers = { records = { Final = 37 } } }) == 37)
 
--- Platzhalter-Lage
-local L = Rules.layout(nil)
-check("Platzhalter markiert", L.placeholder == true)
-check("Bruecke ueberspannt >= Mindestluecke", L.toRadius - L.fromRadius >= Cfg.MIN_GAP_FROM_MAIN, L.toRadius - L.fromRadius)
-check("Platzhalter frei von Plot-Inseln", Rules.clearanceToPlots(L.center) > 0, Rules.clearanceToPlots(L.center))
-check("Platzhalter im Wasserkreis", L.distance + Cfg.ISLAND_RADIUS + 8 < MapConfig.WATER_RADIUS)
+-- Lage je Slot (W1-P2): auf der Plot-Achse HINTER der Arena-Insel (Fight-Pit)
+local arenaEdge = MapConfig.PLOT_RING_RADIUS + MapConfig.PLOT_ISLAND_RADIUS + MapConfig.ISLAND_GAP + 2 * MapConfig.PIT_BASE_RADIUS
+local seen = {}
+for slot = 1, MapConfig.PLOT_COUNT do
+	local L = Rules.layout(slot, nil)
+	local a = math.rad((slot - 1) * (360 / MapConfig.PLOT_COUNT))
+	local dx, dz = L.center.X - MapConfig.CENTER.X, L.center.Z - MapConfig.CENTER.Z
+	check("Slot " .. slot .. ": Platzhalter markiert", L.placeholder == true)
+	check("Slot " .. slot .. ": auf der Plot-Achse", math.abs(dx * math.sin(a) - dz * math.cos(a)) < 1e-6)
+	check("Slot " .. slot .. ": hinter dem Fight-Pit", L.distance - Cfg.ISLAND_RADIUS >= arenaEdge + 1, L.distance)
+	check("Slot " .. slot .. ": Bruecke ueberspannt die Luecke", math.abs((L.toRadius - L.fromRadius) - Cfg.GAP_FROM_ARENA) < 1e-6, L.toRadius - L.fromRadius)
+	check("Slot " .. slot .. ": im Wasserkreis", L.distance + Cfg.ISLAND_RADIUS + 8 < MapConfig.WATER_RADIUS, L.distance)
+	local clear = Rules.clearanceToIslands(L.center, slot)
+	check("Slot " .. slot .. ": frei von anderen Inseln", clear > 0, clear)
+	local key = string.format("%.1f/%.1f", L.center.X, L.center.Z)
+	check("Slot " .. slot .. ": eigene Lage", not seen[key])
+	seen[key] = true
+end
+check("Reihenfolge Plot -> Pit -> Rakete", Rules.layout(1, nil).fromRadius > MapConfig.PLOT_RING_RADIUS + MapConfig.PLOT_ISLAND_RADIUS)
 
--- Anker: zu nah wird geklemmt, Richtung bleibt
-local near = Rules.layout(Vector3.new(30, 5, 0))
-check("zu naher Anker wird geklemmt", near.distance >= MapConfig.PLATFORM_RADIUS + Cfg.MIN_GAP_FROM_MAIN + Cfg.ISLAND_RADIUS)
+-- Anker: behaelt Richtung, wird hinter dem Pit geklemmt
+local near = Rules.layout(1, Vector3.new(30, 5, 0))
+check("zu naher Anker wird hinter das Pit geklemmt", near.distance >= arenaEdge + Cfg.MIN_GAP_FROM_MAIN + Cfg.ISLAND_RADIUS)
 check("Anker behaelt Richtung", math.abs(near.outward.X - 1) < 1e-6)
-check("Anker im Zentrum -> Sicherheitsrichtung", Rules.layout(Vector3.new(0, 0, 0)).outward.X == 1)
-local far = Rules.layout(Vector3.new(0, 0, 200))
-check("Anker weit weg bleibt unveraendert", math.abs(far.distance - 200) < 1e-6 and not far.placeholder)
+check("Anker im Zentrum -> Plot-Achse", Rules.layout(1, Vector3.new(MapConfig.CENTER.X, 0, MapConfig.CENTER.Z)).placeholder == false)
+local far = Rules.layout(1, Vector3.new(MapConfig.CENTER.X + 500, 0, MapConfig.CENTER.Z))
+check("Anker weit weg bleibt unveraendert", math.abs(far.distance - 500) < 1e-6 and not far.placeholder)
 
 -- Teile-Budget: Boden-Raster der Mini-Insel
 local cells = MapStyleRules.groundCells(Cfg.ISLAND_RADIUS, Cfg.GROUND_LEVELS, Cfg.GROUND_MARGIN)

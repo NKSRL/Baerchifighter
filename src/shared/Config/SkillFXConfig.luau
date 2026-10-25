@@ -756,6 +756,87 @@ local FX: { [string]: SkillFX } = {
 		},
 	},
 
+	-- 21.10. Welt 2: Anime-Pets, aus vorhandenen Effekt-Bausteinen (ohne neue Texturen)
+	RubberSmash = {
+		tier = 3, duration = 3.8, color = C(230, 70, 60), color2 = C(255, 220, 120),
+		sounds = { charge = "whoosh", strike = "boom", impact = "thunder" }, pitch = 0.9,
+		steps = {
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "ring",      at = "self", radius = 5, dur = 1.0 },
+			{ t = 0.30, fx = "cinematic", dur = 1.6, style = "orbit" },
+			{ t = 1.40, fx = "beam",      width = 1.6, dur = 0.5 },
+			{ t = 1.40, fx = "sound",     slot = "strike" },
+			{ t = 1.90, fx = "flash",     dur = 0.2 },
+			{ t = 1.90, fx = "wave",      at = "target", radius = 18, dur = 0.7 },
+			{ t = 1.90, fx = "sound",     slot = "impact" },
+			{ t = 1.90, fx = "shake",     power = 1.0, dur = 0.6 },
+		},
+	},
+
+	SpiralDash = {
+		tier = 2, duration = 3.0, color = C(255, 150, 50), color2 = C(60, 100, 220),
+		sounds = { charge = "whoosh", strike = "whoosh", impact = "ping" }, pitch = 1.3,
+		steps = {
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "ring",      at = "self", radius = 4, dur = 0.8 },
+			{ t = 0.20, fx = "ring",      at = "self", radius = 7, dur = 0.8 },
+			{ t = 0.80, fx = "cinematic", dur = 1.4, style = "orbit" },
+			{ t = 1.50, fx = "sound",     slot = "strike" },
+			{ t = 1.60, fx = "shards",    at = "target", count = 14, size = 0.7, dur = 0.8 },
+			{ t = 1.60, fx = "sound",     slot = "impact" },
+			{ t = 1.60, fx = "shake",     power = 0.5, dur = 0.3 },
+		},
+	},
+
+	StarBlast = {
+		tier = 4, duration = 4.0, color = C(255, 200, 80), color2 = C(255, 255, 255),
+		sounds = { charge = "rumble", strike = "rocket", impact = "boom" }, pitch = 1.0,
+		steps = {
+			{ t = 0.00, fx = "sky",       tint = C(255, 235, 190), brightness = 0.1, saturation = 0.2, dur = 3.6 },
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "shake",     power = 0.3, dur = 1.4 },
+			{ t = 0.00, fx = "ring",      at = "self", radius = 6, dur = 1.4 },
+			{ t = 0.50, fx = "cinematic", dur = 1.8, style = "up" },
+			{ t = 1.60, fx = "beam",      width = 3.0, dur = 1.1 },
+			{ t = 1.60, fx = "sound",     slot = "strike" },
+			{ t = 2.30, fx = "flash",     dur = 0.2 },
+			{ t = 2.30, fx = "wave",      at = "target", radius = 22, dur = 0.8 },
+			{ t = 2.30, fx = "sound",     slot = "impact" },
+			{ t = 2.30, fx = "shake",     power = 1.1, dur = 0.6 },
+		},
+	},
+
+	PlaidSlash = {
+		tier = 3, duration = 3.4, color = C(60, 170, 110), color2 = C(220, 230, 240),
+		sounds = { charge = "ping", strike = "whoosh", impact = "glass" }, pitch = 1.1,
+		steps = {
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "ring",      at = "self", radius = 5, dur = 1.0 },
+			{ t = 0.40, fx = "cinematic", dur = 1.6, style = "orbit" },
+			{ t = 1.50, fx = "sound",     slot = "strike" },
+			{ t = 1.60, fx = "beam",      width = 0.6, dur = 0.4 },
+			{ t = 2.00, fx = "shards",    at = "target", count = 18, size = 0.8, dur = 0.9 },
+			{ t = 2.00, fx = "sound",     slot = "impact" },
+			{ t = 2.00, fx = "shake",     power = 0.7, dur = 0.4 },
+		},
+	},
+
+	AscendingLight = {   -- 20.10. P5d
+		tier = 4, duration = 4.4, color = C(150, 230, 255), color2 = C(255, 235, 170),
+		sounds = { charge = "whoosh", strike = "ping", impact = "boom" }, pitch = 1.0,
+		steps = {
+			{ t = 0.00, fx = "sky",       tint = C(225, 245, 255), brightness = 0.15, saturation = 0.3, dur = 4.0 },
+			{ t = 0.00, fx = "sound",     slot = "charge" },
+			{ t = 0.00, fx = "rise",      at = "self", count = 36, dur = 2.0 },
+			{ t = 0.50, fx = "cinematic", dur = 2.0, style = "up" },
+			{ t = 1.80, fx = "beam",      width = 1.8, dur = 0.9 },
+			{ t = 1.80, fx = "sound",     slot = "strike" },
+			{ t = 2.40, fx = "wave",      at = "target", radius = 20, dur = 0.8 },
+			{ t = 2.40, fx = "sound",     slot = "impact" },
+			{ t = 2.40, fx = "shake",     power = 0.7, dur = 0.5 },
+		},
+	},
+
 	TitanFist = {
 		tier = 4, duration = 4.8, color = C(220, 160, 90), color2 = C(255, 240, 200),
 		sounds = { charge = "rumble", strike = "boom", impact = "thunder" }, pitch = 0.55,

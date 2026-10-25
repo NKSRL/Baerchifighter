@@ -395,12 +395,13 @@ local function connectSkip(run: Run)
 		end))
 	end
 	table.insert(run.conns, UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+		-- W1-P6d: auf dem Controller zusaetzlich B halten
+		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX or input.KeyCode == Enum.KeyCode.ButtonB then
 			skipInput(run, true)
 		end
 	end))
 	table.insert(run.conns, UserInputService.InputEnded:Connect(function(input: InputObject)
-		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX or input.KeyCode == Enum.KeyCode.ButtonB then
 			skipInput(run, false)
 		end
 	end))

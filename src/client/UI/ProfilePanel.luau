@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
+local FeatureFlags = require(ReplicatedStorage.Config.FeatureFlags)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
 local Names         = require(ReplicatedStorage.Localization.Names)
 local BaerchiConfig = require(ReplicatedStorage.Config.BaerchiConfig)
@@ -61,6 +62,8 @@ local function render(card: Types.PlayerProfileCard?)
 		"",
 		Loc.t("ui.profile.top"),
 	}
+	-- W1-P3: Erklaerung der Plakette ueber dem Kopf (nur mit dem neuen Billboard)
+	if FeatureFlags.isOn("RANK_BADGE_V2") then table.insert(out, 1, Loc.t("ui.badge.hint") .. "\n") end
 	for i, entry in card.top do
 		table.insert(out, string.format("%d. %s", i, baerchiLine(entry)))
 	end

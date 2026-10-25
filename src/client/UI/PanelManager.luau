@@ -92,12 +92,28 @@ export type Area = {
 }
 
 local _bottomReserve = 0
+-- 21.10.: zusaetzlicher Platz unter dem Fenster (Verkaufsleiste der Baerchi-Liste haengt UNTER
+-- dem Fenster). Das Fenster schrumpft dafuer; die Pet-Leiste bleibt unberuehrt.
+local _extraBottom = 0
 local _areaListeners: { () -> () } = {}
 
 -- Die Pet-Leiste meldet, wie viel Hoehe unten (Rand + Leiste + Luft) belegt ist.
 function PanelManager.setBottomReserve(units: number)
 	if math.abs(units - _bottomReserve) < 0.5 then return end
 	_bottomReserve = units
+	for _, callback in _areaListeners do
+		task.spawn(callback)
+	end
+end
+
+-- Hoehe, die unten von der Pet-Leiste belegt ist (Rand + Leiste + Luft), in Oberflaechen-Einheiten.
+function PanelManager.getBottomReserve(): number
+	return math.max(PanelManager.AREA.bottomMin, _bottomReserve)
+end
+
+function PanelManager.setExtraBottom(units: number)
+	if math.abs(units - _extraBottom) < 0.5 then return end
+	_extraBottom = units
 	for _, callback in _areaListeners do
 		task.spawn(callback)
 	end
@@ -112,7 +128,7 @@ end
 function PanelManager.getArea(screen: Vector2): Area
 	local top = PanelManager.AREA.top
 	local side = screen.X * PanelManager.AREA.sideFraction
-	local bottom = math.max(PanelManager.AREA.bottomMin, _bottomReserve)
+	local bottom = math.max(PanelManager.AREA.bottomMin, _bottomReserve) + _extraBottom
 	local size = Vector2.new(math.max(1, screen.X - side * 2), math.max(1, screen.Y - top - bottom))
 	return { center = Vector2.new(screen.X * 0.5, top + size.Y * 0.5), size = size }
 end
@@ -165,6 +181,11 @@ function PanelManager.open(name: string, ...: any)
 			task.spawn(callback, name)
 		end
 	end
+end
+
+-- W1-P6: welches Fenster ist gerade offen? (Gamepad: B schliesst das oberste)
+function PanelManager.current(): string?
+	return _openName
 end
 
 function PanelManager.close(name: string)

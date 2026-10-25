@@ -21,6 +21,7 @@ local Types         = require(script.Parent.Parent.Network.Types)
 -- v14: die hatchTables werden aus den Baerchis BERECHNET (Rarity + Pfad).
 -- BaerchiConfig kennt EggConfig nicht, es gibt also keinen Ringschluss.
 local BaerchiConfig = require(script.Parent.BaerchiConfig)
+local FeatureFlags  = require(script.Parent.FeatureFlags)   -- 20.10. P5c
 
 -- Wahrscheinlichkeiten muessen pro Egg genau 1.0 ergeben.
 -- Format: { configId = Gewichtung }  (wird von GachaRoller normalisiert)
@@ -107,11 +108,71 @@ local RARITY_DIST: { [Types.EggType]: { [string]: number } } = {
 	TranscendenceEgg = { Secret = 60, Godly = 38, Eternal = 2 },
 	EternityEgg      = { Godly = 80, Eternal = 19, Omega = 1 },
 	OmegaEgg         = { Eternal = 70, Omega = 30 },
+	AnimeEgg         = { Mythic = 75, Divine = 25 },   -- 21.10. Welt 2: Anime-Pfad, genau 4 Pets (2 Mythic, 2 Divine)
 	-- v17: UFO-Jackpot (Sonder-Ei). Breit gestreut von Epic bis Godly: fuer
 	-- Fruehspieler ein Riesensprung, fuer Spaetspieler eine echte Chance auf
 	-- ein Late-Game-Pet (Cosmic+ 8 %). Ø ~ Mythic. ANNAHME, eine Zeile.
 	UfoJackpotEgg    = { Epic = 30, Legendary = 30, Mythic = 20, Divine = 12, Cosmic = 5, Secret = 2.5, Godly = 0.5 },
 }
+
+--------------------------------------------------------------------------------
+-- 20.10. (Welt 1, Paket 5c): RARITY_DIST_V2 — das SELTENSTE Pet je Ei folgt dem Fortschritt
+--------------------------------------------------------------------------------
+-- Vorgabe des Spielleiters: seltenste Stufe je Ei frueh 10 %, danach 5 %, spaeter 1 %, ganz spaet 0,1 %.
+-- Alt (RARITY_DIST) und neu (RARITY_DIST_V2) stehen nebeneinander; Schalter DROPRATES_V2 (Standard aus) waehlt.
+-- Die Stufen je Ei (Reihenfolge des Ei-Baums, 4 x 5 Eier; Ascension siehe unten):
+--   10 %  Basis, Zucker, Golden, Nebel, Platin
+--    5 %  Kristall, Void, Sonne, Prisma, Schatten
+--    1 %  Zenit, Aurora, Abyss, Komet, Nova (+ Ascension: das Hoffnungs-Pet, siehe Paket 5d)
+--  0,1 %  Galaxie, Transzendenz, Ewigkeit, Omega
+-- Die uebrigen Rarities eines Eis: Haeufigkeit steigt nach unten gleichmaessig (geometrisch), Summe 100 %.
+-- UFO-Jackpot (Sonder-Ei) bleibt unveraendert.
+local RAREST_PCT_V2: { [string]: number } = {
+	-- 21.10.: hoehere Rarities noch seltener. Anfang 9 %, fruehe Spruenge 5 %, Mittelspiel ~3 %,
+	-- spaetes Mittelspiel 1 %, Endgame 0,5 %.
+	BasicEgg = 9,
+	SugarEgg = 5, GoldenEgg = 5, MistEgg = 5, PlatinumEgg = 5,
+	CrystalEgg = 3, VoidEgg = 3, SunEgg = 3, PrismEgg = 3, ShadowEgg = 3,
+	ZenithEgg = 1, AuroraEgg = 1, AbyssEgg = 1, CometEgg = 1.5, NovaEgg = 1,   -- Komet 1,5: sein Durchschnitt muss ueber Abyss liegen (egg_tree_check)
+	GalaxyEgg = 0.5, TranscendenceEgg = 0.5, EternityEgg = 0.5, OmegaEgg = 0.5,
+	AnimeEgg = 5,
+}
+
+-- Verteilung mit gleichmaessig steigender Haeufigkeit (Faktor q je Stufe nach unten), seltenste Stufe = rarestPct.
+local function makeDistV2(dist: { [string]: number }, rarestPct: number): { [string]: number }
+	local tiers: { string } = {}
+	for rarity in dist do table.insert(tiers, rarity) end
+	table.sort(tiers, function(a, b) return BaerchiConfig.getRarityIndex(a :: any) < BaerchiConfig.getRarityIndex(b :: any) end)
+	local n = #tiers
+	local function share(q: number): number   -- Anteil der seltensten Stufe bei Faktor q
+		local sum = 0
+		for i = 0, n - 1 do sum += q ^ i end
+		return 1 / sum
+	end
+	local lo, hi = 1.0, 1e6
+	for _ = 1, 200 do
+		local mid = math.sqrt(lo * hi)
+		if share(mid) > rarestPct / 100 then lo = mid else hi = mid end
+	end
+	local q = math.sqrt(lo * hi)
+	local result: { [string]: number } = {}
+	for i, rarity in tiers do   -- tiers[1] = haeufigste Stufe
+		result[rarity] = 100 * (q ^ (n - i)) * share(q)
+	end
+	return result
+end
+
+local RARITY_DIST_V2: { [Types.EggType]: { [string]: number } } = {}
+for eggId, dist in RARITY_DIST do
+	local pct = RAREST_PCT_V2[eggId]
+	RARITY_DIST_V2[eggId] = if pct then makeDistV2(dist, pct) else dist
+end
+
+-- Welche Verteilung gilt gerade (Schalter DROPRATES_V2 beim Laden, oder setDropRatesV2 zur Laufzeit/Test).
+local _dropV2: boolean = FeatureFlags.isOn("DROPRATES_V2")
+local function activeDist(eggId: Types.EggType): { [string]: number }
+	return if _dropV2 then RARITY_DIST_V2[eggId] else RARITY_DIST[eggId]
+end
 
 -- Gewicht eines Baerchis innerhalb seiner Rarity: 3, wenn sein Pfad zum
 -- Pfad des Eis passt, sonst 1. Ascensions-Eier sind neutral (alle 1).
@@ -127,7 +188,7 @@ local PATH_MATCH_WEIGHT = 3
 local BRANCH_OF_PATH: { [string]: string } = {
 	Stamm = "Middle", Kosmos = "Middle",
 	Gold = "Left", Kristall = "Left",
-	Void = "Right", Ascension = "Right",
+	Void = "Right", Ascension = "Right", Anime = "Right",
 }
 
 -- ZWEIGSPRUNG: ein extrem seltenes Pet in einem Ei eines Zweigs schaltet ein Ei
@@ -283,6 +344,15 @@ local EGGS: { [Types.EggType]: EggDef } = {
 	},
 
 	-- ============================================================
+	-- ANIME-PFAD (21.10., ab Welt 2): Anime-Pets fallen NUR aus Anime-Eiern (siehe buildHatchTables)
+	-- ============================================================
+	AnimeEgg = {
+		id = "AnimeEgg", displayName = "Anime-Ei", path = "Anime", parent = nil, tier = 5, sortOrder = 22,
+		description = "Ein Ei aus einer anderen Welt. Heldenhaft.",
+		color = Color3.fromRGB(255, 140, 50), shortName = "Anime", hatchTable = {},
+	},
+
+	-- ============================================================
 	-- SONDER-EIER (v17, nicht im Baum)
 	-- ============================================================
 	UfoJackpotEgg = {
@@ -322,7 +392,9 @@ export type TreeNode = {
 	keyNeed    : number?,         -- wie viele davon (Standard 1)
 	index      : { rarity: Types.Rarity, count: number }?,
 	rebirth    : number?,
+	ascensionV2: { keyPets: { string }, keyNeed: number? }?,   -- 20.10. P5d: Ersatz fuer rebirth bei ASCENSION_V2 (plus Welt 2 offen)
 	start      : boolean?,        -- von Anfang an frei
+	world2     : boolean?,        -- 21.10. Anime-Ei: frei, sobald Welt 2 offen ist (Epilog gestartet) und Schalter ANIME_EGG an
 }
 
 local TREE: { [Types.EggType]: TreeNode } = {
@@ -357,10 +429,15 @@ local TREE: { [Types.EggType]: TreeNode } = {
 	NovaEgg     = { keyPets = { "RiddleBaerchi", "ShadeBaerchi" } },
 	GalaxyEgg   = { keyPets = { "TitanBaerchi", "GenesisBaerchi" } },
 
-	AscensionEgg     = { rebirth = 1 },
-	TranscendenceEgg = { rebirth = 15 },
-	EternityEgg      = { rebirth = 30 },
-	OmegaEgg         = { rebirth = 50 },
+	-- 20.10. P5d: Rebirth-Gates bleiben (Schalter ASCENSION_V2 aus); mit Schalter gilt ascensionV2:
+	-- Ascension = Welt 2 offen + Schluessel-Pet aus Abyss, danach je ein Schluessel-Pet des Vorgaenger-Eis.
+	AscensionEgg     = { rebirth = 1,  ascensionV2 = { keyPets = { "NebulaBaerchi" } } },
+	TranscendenceEgg = { rebirth = 15, ascensionV2 = { keyPets = { "AscendantBaerchi" } } },
+	EternityEgg      = { rebirth = 30, ascensionV2 = { keyPets = { "TitanBaerchi", "GenesisBaerchi" } } },
+	OmegaEgg         = { rebirth = 50, ascensionV2 = { keyPets = { "ChronosBaerchi", "InfinityBaerchi" } } },
+
+	-- 21.10. Welt 2: das Anime-Ei ist ein eigener Pfad ohne Elternei, frei sobald Welt 2 offen ist.
+	AnimeEgg         = { world2 = true },
 }
 
 -- Kinder je Ei (fuer Panel und "naechste Stufe"). Kometen-Ei hat keinen
@@ -371,12 +448,26 @@ local CHILDREN: { [string]: { Types.EggType } } = {}
 -- hatchTables BERECHNEN
 --------------------------------------------------------------------------------
 
+-- 20.10. P5d: Pets mit fester Chance in genau einem Ei (wie Zweigsprung-Pets, aber ohne Zweigsprung).
+-- Das Hoffnungs-Pet faellt nur aus dem Ascension-Ei (1 %), nur mit Schalter ASCENSION_V2.
+local FIXED_PETS: { { egg: Types.EggType, pet: string, chance: number } } = {
+	{ egg = "AscensionEgg", pet = "AscendantBaerchi", chance = 1 },
+}
+
 local JUMP_PET_EGG: { [string]: string } = {}
 for _, jump in JUMPS do
 	for _, jp in jump.pets do JUMP_PET_EGG[jp.pet] = jp.egg end
 end
+for _, fp in FIXED_PETS do JUMP_PET_EGG[fp.pet] = fp.egg end
+
+-- 21.10.: Eier mit fester Pet-Auswahl (nur diese Baerchis duerfen fallen, je Rarity mindestens eins).
+-- Ascensions-Ei: nur 4 verschiedene Pets (3 + das 1-%-Hoffnungs-Pet), damit der Spieler auf die 1 % hinarbeitet.
+local EGG_PET_WHITELIST: { [string]: { [string]: boolean } } = {
+	AscensionEgg = { AncientBaerchi = true, RainbowBaerchi = true, PhantomBaerchi = true },
+}
 
 local function buildHatchTables()
+	table.clear(CHILDREN)   -- 20.10. P5c: wiederholbar (setDropRatesV2)
 	-- Baerchis je Rarity, deterministisch sortiert.
 	local byRarity: { [string]: { any } } = {}
 	for id, def in BaerchiConfig.data do
@@ -388,7 +479,7 @@ local function buildHatchTables()
 	end
 
 	for eggId, egg in EGGS do
-		local dist = RARITY_DIST[eggId]
+		local dist = activeDist(eggId)
 		local hatch: HatchTable = {}
 		for rarity, percent in dist do
 			local pets = byRarity[rarity]
@@ -397,6 +488,8 @@ local function buildHatchTables()
 			local weights = {}
 			for _, def in pets do
 				if JUMP_PET_EGG[def.id] then continue end   -- 19.10.: Sprung-Pets nur aus ihrem Quell-Ei
+				if EGG_PET_WHITELIST[eggId] and not EGG_PET_WHITELIST[eggId][def.id] then continue end   -- 21.10.
+				if (def.path == "Anime") ~= (egg.path == "Anime") then continue end   -- 21.10. Anime-Pets nur aus Anime-Eiern und umgekehrt
 				local w = 1
 				if egg.path ~= "Ascension" and def.path == egg.path then
 					w = PATH_MATCH_WEIGHT
@@ -416,6 +509,12 @@ local function buildHatchTables()
 				if jp.egg == eggId then jumpTotal += jump.chance end
 			end
 		end
+		local fixedList = {}
+		if FeatureFlags.isOn("ASCENSION_V2") then
+			for _, fp in FIXED_PETS do
+				if fp.egg == eggId then jumpTotal += fp.chance; table.insert(fixedList, fp) end
+			end
+		end
 		if jumpTotal > 0 then
 			for id, v in hatch do hatch[id] = v * (100 - jumpTotal) / 100 end
 			for _, jump in JUMPS do
@@ -423,6 +522,7 @@ local function buildHatchTables()
 					if jp.egg == eggId then hatch[jp.pet] = jump.chance end
 				end
 			end
+			for _, fp in fixedList do hatch[fp.pet] = fp.chance end
 		end
 		egg.hatchTable = hatch
 		egg.branch = if egg.special then nil else BRANCH_OF_PATH[egg.path]
@@ -454,6 +554,16 @@ local function buildHatchTables()
 end
 
 buildHatchTables()
+
+-- 20.10. P5c: Verteilung zur Laufzeit umschalten (Debug "dropchance", Tests). Rechnet alle hatchTables neu.
+local function setDropRatesV2(on: boolean)
+	_dropV2 = on
+	buildHatchTables()
+end
+
+local function getRarityDist(eggId: Types.EggType): { [string]: number }
+	return activeDist(eggId)
+end
 
 -- Alle Ei-IDs des BAUMS in Anzeige-Reihenfolge (ohne Sonder-Eier: Baum,
 -- Freischaltung, Sprung-Ei und Panel kennen nur diese).
@@ -498,7 +608,7 @@ end
 -- waehlt der Spieler, ob Gold- oder Void-Pfad.
 local PRESS = {
 	cost          = 5,
-	blockedPaths  = { Ascension = true, Event = true },
+	blockedPaths  = { Ascension = true, Event = true, Anime = true },
 	-- Playtest 05.10. (Schalter entfernt): Basis-Eier gibt es beim
 	-- Haendler unbegrenzt fuer Gummies. Waeren sie pressbar, liesse sich jedes
 	-- Gummi-Polster ueber die Presse in immer bessere Eier tauschen.
@@ -715,6 +825,11 @@ return {
 
 	-- v14: Ei-Baum
 	RARITY_DIST        = RARITY_DIST,
+	RARITY_DIST_V2     = RARITY_DIST_V2,   -- 20.10. P5c
+	RAREST_PCT_V2      = RAREST_PCT_V2,
+	FIXED_PETS         = FIXED_PETS,
+	setDropRatesV2     = setDropRatesV2,
+	getRarityDist      = getRarityDist,
 	PATH_MATCH_WEIGHT  = PATH_MATCH_WEIGHT,
 	TREE               = TREE,
 	PRESS              = PRESS,

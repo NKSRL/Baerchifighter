@@ -472,6 +472,54 @@ end
 -- Ablauf einer Oeffnung
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- Absicherung gegen haengende Animationen (Playtest 21.10.: nach ca. 30 Minuten
+-- wurde die Animation uebersprungen, die Eier waren trotzdem weg, und man
+-- sah nicht, was man gezogen hatte; erst ein Rejoin half).
+-- Ursache: Die Warteschlange (pump) wartete ohne Zeitlimit auf das Ende EINER
+-- Animation. Haengt eine einzige (Signal verpasst, Szene von aussen zerstoert,
+-- OK-Knopf weg), wartet jede weitere Oeffnung unsichtbar dahinter.
+--------------------------------------------------------------------------------
+
+local JOB_LIMIT_SINGLE = 40    -- Sekunden: Einzel-Ei komplett (inkl. Auto-Schliessen)
+local JOB_LIMIT_BATCH  = 150   -- Sekunden: "x3/x10 oeffnen" (Spieler klickt OK)
+
+-- Wartet auf das Ende der Inszenierung, aber hoechstens `maxSeconds`.
+local function waitFinished(handle: EggHatch.Handle, maxSeconds: number)
+	local t0 = os.clock()
+	while not handle.finished and os.clock() - t0 < maxSeconds do
+		task.wait(0.05)
+	end
+	if not handle.finished then
+		warn("[HatchAnimation] Szene meldet kein Ende nach", maxSeconds, "s - wird beendet")
+		handle.destroy()
+	end
+end
+
+-- Notnagel: Hat die Animation nicht (richtig) gespielt, steht das Ergebnis
+-- wenigstens als Toast da, damit man nicht im Inventar nachsehen muss.
+local function showFallbackResult(job: any)
+	local list: { string } = {}
+	local function add(r: any)
+		local b = if typeof(r) == "table" then r.baerchi else nil
+		if typeof(b) ~= "table" then return end
+		table.insert(list, string.format("%s (%s)", Names.baerchi(b.configId), Loc.t("rarity." .. tostring(b.rarity))))
+	end
+	if job.result then add(job.result) end
+	if job.results then
+		for i, r in job.results do
+			if i > 6 then break end
+			add(r)
+		end
+	end
+	if #list == 0 then return end
+	local more = if job.results and #job.results > 6 then " ..." else ""
+	local text = Loc.t("ui.hatch.fallback", { list = table.concat(list, ", ") .. more })
+	Notify.emit("hatch_fallback", function()
+		Toast.show(text, Theme.COLORS.good)
+	end)
+end
+
 -- R6: Einzel-Ei ueber VFX/EggHatch. Das Ergebnis ist vor dem Start bekannt (der Server
 -- hat gerollt); bis es da ist, passiert nichts, bei Timeout kommt die Fehlermeldung.
 local function play(job: Job)
@@ -505,7 +553,7 @@ local function play(job: Job)
 		mutation = baerchi.mutation,
 		isNew    = result.isNew == true,
 	})
-	handle.onFinished:Wait()
+	waitFinished(handle, JOB_LIMIT_SINGLE - 5)
 end
 
 -- Alte Inszenierung (Ellipse + Karte), nicht mehr benutzt; bleibt als Rueckfall im Code.
@@ -751,7 +799,7 @@ local function playBatch(job: Job)
 		burstOnly = true,
 	})
 	-- burstOnly meldet "fertig", sobald das Ei aufgebrochen ist; die Szene bleibt stehen
-	handle.onFinished:Wait()
+	waitFinished(handle, 25)
 	local scene = {
 		root = handle.root,
 		stage = handle.stage,
@@ -833,7 +881,13 @@ local function playBatch(job: Job)
 	end)
 
 	task.wait(0.6)
+	-- Mit Zeitlimit und Szenen-Pruefung: ist die Szene weg oder klickt niemand,
+	-- darf die Warteschlange nicht ewig stehen bleiben.
+	local waitStart = os.clock()
 	while not clicked do
+		if not scene.root.Parent or os.clock() - waitStart > JOB_LIMIT_BATCH - 40 then
+			break
+		end
 		RunService.RenderStepped:Wait()
 	end
 
@@ -845,6 +899,17 @@ local function playBatch(job: Job)
 	handle.destroy()
 end
 
+-- Raeumt uebrig gebliebene Szenen weg (Name: EggHatch, so heisst die Wurzel in VFX/EggHatch).
+local function removeLeftovers()
+	local gui = _screenGui
+	if not gui then return end
+	for _, child in gui:GetChildren() do
+		if child.Name == "EggHatch" or child.Name == "HatchAnimation" then
+			child:Destroy()
+		end
+	end
+end
+
 local function pump()
 	if _running then return end
 	_running = true
@@ -852,12 +917,33 @@ local function pump()
 	task.spawn(function()
 		while #_queue > 0 do
 			local job = _queue[1]
-			local ok, err = pcall(if job.batch then playBatch else play, job)
-			if not ok then
-				warn("[HatchAnimation] Abspielen fehlgeschlagen:", err)
-				local gui = _screenGui
-				local leftover = if gui then gui:FindFirstChild("HatchAnimation") else nil
-				if leftover then leftover:Destroy() end
+			-- Das Ergebnis-Zeitlimit zaehlt ab Start dieser Animation, nicht ab dem Klick:
+			-- Jobs, die hinter einer langen Animation warteten, sind sonst schon "abgelaufen".
+			if not job.result and not job.results then job.started = os.clock() end
+
+			local finishedJob = false
+			local worker = task.spawn(function()
+				local ok, err = pcall(if job.batch then playBatch else play, job)
+				if not ok then
+					warn("[HatchAnimation] Abspielen fehlgeschlagen:", err)
+					removeLeftovers()
+					showFallbackResult(job)
+				end
+				finishedJob = true
+			end)
+
+			-- Waechter: so lange wie eine Animation hoechstens dauern darf
+			local limit = if job.batch then JOB_LIMIT_BATCH else JOB_LIMIT_SINGLE
+			local startedAt = os.clock()
+			while not finishedJob and os.clock() - startedAt < limit do
+				task.wait(0.1)
+			end
+			if not finishedJob then
+				warn("[HatchAnimation] Job haengt (", limit, "s) - Warteschlange wird freigegeben. batch =",
+					job.batch == true, "Ergebnis da =", (job.result ~= nil or job.results ~= nil))
+				pcall(task.cancel, worker)
+				removeLeftovers()
+				showFallbackResult(job)
 			end
 			table.remove(_queue, 1)
 		end

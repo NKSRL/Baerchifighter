@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types         = require(ReplicatedStorage.Network.Types)
 local Remotes       = require(ReplicatedStorage.Network.Remotes)
+local RebirthRules = require(ReplicatedStorage.Modules.RebirthRules)   -- 20.10. P5a
 local TowerConfig   = require(ReplicatedStorage.Config.TowerConfig)   -- Paket 4.1
 local EconomyConfig = require(ReplicatedStorage.Config.EconomyConfig)
 local Loc           = require(ReplicatedStorage.Localization.Loc)
@@ -64,7 +65,8 @@ function RebirthDialog.refresh()
 	local have    = ((data.island :: any).stageBest or {})[reqTower] or 0
 	local nextMult = EconomyConfig.getRebirthMult(data.rebirthCount + 1)
 	local eggs    = EconomyConfig.getAscensionEggReward(data.rebirthCount + 1)
-	local enough  = TowerConfig.isRebirthReady(data.rebirthCount, (data.island :: any).stageBest, records)
+	local allowed = RebirthRules.allowed(data :: any)   -- 20.10. P5a: erst nach Welt 2
+	local enough  = allowed and TowerConfig.isRebirthReady(data.rebirthCount, (data.island :: any).stageBest, records)
 
 	-- Zahlen uebergibt der Code als Zahlen: Loc formatiert sie je nach Sprache
 	-- ("1.500" / "1,500" / "1 500"), der Text legt das Dezimalformat fest ({mult:d2}).
@@ -82,6 +84,10 @@ function RebirthDialog.refresh()
 			stage = reqStage,
 		})
 		_costLabel.TextColor3 = if enough then Theme.COLORS.good else Theme.COLORS.bad
+		if not allowed then
+			_costLabel.Text = Loc.t("ui.rebirth.locked_world2")
+			_costLabel.TextColor3 = Theme.COLORS.bad
+		end
 	end
 
 	if _lossLabel then

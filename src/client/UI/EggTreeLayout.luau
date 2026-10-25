@@ -67,6 +67,8 @@ EggTreeLayout.NODES = {
 	TranscendenceEgg = { x = 1440, y = 665 },
 	EternityEgg      = { x = 1594, y = 565 },
 	OmegaEgg         = { x = 1527, y = 219 },
+	-- Rechts: Anime (freier Kelch R_K, Welt 2)
+	AnimeEgg         = { x = 1107, y = 345 },
 } :: { [string]: Point }
 
 -- Freie Aeste (noch ohne Ei): "bald"
@@ -75,7 +77,6 @@ EggTreeLayout.EMPTY = {
 	{ id = "L_B", branch = "Left",  x = 618,  y = 275 },
 	{ id = "L_K", branch = "Left",  x = 832,  y = 345 },
 	{ id = "R_B", branch = "Right", x = 1321, y = 268 },
-	{ id = "R_K", branch = "Right", x = 1107, y = 345 },
 } :: { Slot }
 
 -- Sprung-Tore: ein Blatt je Seite oben neben dem Stamm (Verbindung zum

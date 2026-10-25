@@ -41,6 +41,7 @@ local PetCapacity    = require(ReplicatedStorage.Modules.PetCapacity)
 local PetSellRules   = require(ReplicatedStorage.Modules.PetSellRules)
 local PetLimitConfig = require(ReplicatedStorage.Config.PetLimitConfig)
 local PetSellConfirm = require(script.Parent.PetSellConfirm)
+local MutationList = require(script.Parent.MutationList)   -- 21.10.: Mutationsliste
 local HoneyButton    = require(script.Parent.HoneyButton)
 local Toast          = require(script.Parent.Toast)
 
@@ -50,6 +51,7 @@ local function ratingText(baerchi: Types.Baerchi): string
 	local digits = if suffix ~= "" and value < 100 then 1 else 0
 	return "⚔ " .. (if digits > 0 then Loc.formatDecimal(value, digits) else Loc.formatNumber(math.floor(value))) .. suffix
 end
+local BaerchiListPreview = require(script.Parent.BaerchiListPreview)   -- 21.10.: Vorschau im Viereck
 local IndexView    = require(script.Parent.IndexView)
 
 local BaerchiInventory = {}
@@ -63,6 +65,7 @@ local TAB_H       = 32
 local _root: Frame?               = nil
 local _title: TextLabel?          = nil
 local _scroller: ScrollingFrame?  = nil
+local _sellBarOutside = false   -- 21.10.: Verkaufsleiste haengt UNTER dem Fenster (Honig-Fenster), nicht darin
 local _empty: TextLabel?          = nil
 local _footer: Frame?             = nil
 local _slotLabels: { TextLabel }  = {}
@@ -89,6 +92,7 @@ local _sellSel: { [string]: boolean } = {}
 local _sellCount = 0
 local _sellPending = false   -- Anfrage beim Server unterwegs: keine Doppelklicks
 local _rightW = 0            -- Platz rechts in der Werkzeugleiste (Zaehler + Umschalter)
+local MUT_W = 124              -- 21.10.: "Mutationen"-Knopf links in der Werkzeugleiste
 local TOGGLE_W = 124         -- Honig-Standardknopf ~3,85:1 bei 32 Pixeln Hoehe
 local COUNTER_W = 90
 local SELL_BAR_H = 54       -- schlanker als die Fusionsleiste: auf kleinen Fenstern bleibt Platz fuer die Liste
@@ -316,6 +320,9 @@ local function setSellMode(on: boolean)
 	if on == _sellMode then return end
 	if on and not sellModeAvailable() then return end
 	_sellMode = on
+	-- Das Fenster schrumpft um die Hoehe der Leiste, die unter ihm haengt
+	-- 21.10. (Playtest 2): Fenster bleibt gleich gross, die Leiste haengt unter dem Fenster
+	PanelManager.setExtraBottom(0)
 	table.clear(_sellSel)
 	_sellCount = 0
 	_sellPending = false
@@ -485,12 +492,10 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 			Theme.stroke(mark, Theme.COLORS.gummy, 4)
 		end
 
-		-- Level im linken Feld
-		local lv = honeyText("Lv", row, "Lv\n" .. baerchi.level, 14)
-		lv.Position       = UDim2.new(0, 13, 0, 17)
-		lv.Size           = UDim2.fromOffset(58, 32)
-		lv.TextXAlignment = Enum.TextXAlignment.Center
-		lv.TextYAlignment = Enum.TextYAlignment.Center
+		-- 21.10. Playtest: Im Viereck links steht jetzt eine kleine Vorschau des Baerchis
+		-- (wird je nach Scroll-Position nachgeladen), das Level wandert in die Datenleiste.
+		BaerchiListPreview.host(row, baerchi.configId, baerchi.rarity, mutation,
+			{ x = 15, y = 9, w = 54, h = 46 })
 
 		-- Name auf dem Balken (golden = ausgeruestet)
 		local name = honeyText("Name", row,
@@ -498,20 +503,56 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 			.. (if mutation then BaerchiConfig.getMutationBadge(mutation) .. " " else "")
 			.. Names.baerchi(baerchi.configId), 16)
 		name.Position   = UDim2.new(0, 82, 0, 10)
-		name.Size       = UDim2.new(1, -82 - 92 - 108, 0, 22)
+		name.Size       = UDim2.new(1, -82 - 92 - 108 - 14, 0, 22)
 		name.TextColor3 = if equipped then Theme.COLORS.goldGummy else Color3.new(1, 1, 1)
 
-		-- Rarity (+ Mutation) in Rarity-Farbe
-		local sub = honeyText("Sub", row, Loc.t("rarity." .. baerchi.rarity)
-			.. (if mutation then "  —  " .. Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)):upper() else ""), 12)
-		sub.Position   = UDim2.new(0, 82, 0, 33)
-		sub.Size       = UDim2.new(1, -82 - 92 - 108, 0, 18)
-		sub.TextColor3 = if mutation then BaerchiConfig.getMutationColor(mutation) else color
+		-- Untere Zeile: Level | Rarity (+ Mutation) in Rarity-Farbe | Promotion rechts daneben
+		local subRow = Instance.new("Frame")
+		subRow.Name                   = "Sub"
+		subRow.BackgroundTransparency = 1
+		subRow.ClipsDescendants       = true
+		subRow.Position               = UDim2.new(0, 82, 0, 33)
+		subRow.Size                   = UDim2.new(1, -82 - 92 - 108 - 14, 0, 20)
+		subRow.ZIndex                 = 4
+		subRow.Parent                 = row
+		local subLayout = Instance.new("UIListLayout")
+		subLayout.FillDirection     = Enum.FillDirection.Horizontal
+		subLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		subLayout.SortOrder         = Enum.SortOrder.LayoutOrder
+		subLayout.Padding           = UDim.new(0, 9)
+		subLayout.Parent            = subRow
 
-		-- Power rechts ueber dem Wabenmuster
+		local lv = honeyText("Lv", subRow, "Lv. " .. baerchi.level, 12)
+		lv.LayoutOrder  = 1
+		lv.AutomaticSize = Enum.AutomaticSize.X
+		lv.Size         = UDim2.fromOffset(0, 18)
+		lv.TextTruncate = Enum.TextTruncate.None
+		lv.TextColor3   = Color3.fromRGB(255, 240, 200)
+
+		local sub = honeyText("Rarity", subRow, Loc.t("rarity." .. baerchi.rarity)
+			.. (if mutation then "  \u{2014}  " .. Loc.name("mutation." .. mutation .. ".name", BaerchiConfig.getMutationDisplayName(mutation)):upper() else ""), 12)
+		sub.LayoutOrder  = 2
+		sub.AutomaticSize = Enum.AutomaticSize.X
+		sub.Size         = UDim2.fromOffset(0, 18)
+		sub.TextTruncate = Enum.TextTruncate.None
+		-- Je hoeher die Rarity, desto dicker/leuchtender (Farbe je Rarity: Theme.bandColor)
+		Theme.styleRarityText(sub, baerchi.rarity, 12)
+		if mutation then sub.TextColor3 = BaerchiConfig.getMutationColor(mutation) end
+
+		local promotion = baerchi.promotionLevel or 0
+		if promotion > 0 then
+			local promo = honeyText("Promo", subRow, promotion .. "\u{2605}", 13)
+			promo.LayoutOrder   = 3
+			promo.AutomaticSize = Enum.AutomaticSize.X
+			promo.Size          = UDim2.fromOffset(0, 18)
+			promo.TextTruncate  = Enum.TextTruncate.None
+			promo.TextColor3    = Color3.fromRGB(255, 214, 64)
+		end
+
+		-- Power rechts ueber dem Wabenmuster (21.10.: etwas weiter links)
 		local stats = honeyText("Stats", row, if upgradeUi then ratingText(baerchi) else describeStats(baerchi), 18)
 		stats.AnchorPoint    = Vector2.new(1, 0.5)
-		stats.Position       = UDim2.new(1, -16, 0, 32)
+		stats.Position       = UDim2.new(1, -30, 0, 32)
 		stats.Size           = UDim2.fromOffset(84, 30)
 		stats.TextXAlignment = Enum.TextXAlignment.Right
 
@@ -523,7 +564,7 @@ local function buildRow(parent: Instance, order: number, baerchi: Types.Baerchi)
 			btn.BackgroundTransparency = 1
 			btn.Text                   = ""
 			btn.AnchorPoint            = Vector2.new(1, 0.5)
-			btn.Position               = UDim2.new(1, -16 - 84 - 8, 0, 32)
+			btn.Position               = UDim2.new(1, -30 - 84 - 8, 0, 32)
 			btn.Size                   = UDim2.fromOffset(104, 33)
 			btn.ZIndex                 = 6
 			btn.Parent                 = row
@@ -622,7 +663,7 @@ local function updateFooter()
 
 	local scroller = _scroller
 	if scroller then
-		local reserved = if _fusionMode then FOOTER_H + 6 elseif _sellMode then SELL_BAR_H + 6 else 0
+		local reserved = if _fusionMode then FOOTER_H + 6 elseif _sellMode and not _sellBarOutside then SELL_BAR_H + 6 else 0
 		scroller.Size = UDim2.new(1, 0, 1, -(TOOLBAR_H + 6 + reserved))
 	end
 
@@ -661,8 +702,9 @@ local function updateFooter()
 	local hint = _hint
 	if hint then
 		local shifted = modeButton ~= nil and modeButton.Visible
-		hint.Position = UDim2.new(0, if shifted then 140 else 0, 0, 0)
-		hint.Size     = UDim2.new(1, (if shifted then -140 else 0) - _rightW, 1, 0)
+		local left = MUT_W + 6 + (if shifted then 140 else 0)
+		hint.Position = UDim2.new(0, left, 0, 0)
+		hint.Size     = UDim2.new(1, -left - _rightW, 1, 0)
 	end
 
 	local hint = _hint
@@ -716,6 +758,7 @@ function BaerchiInventory.refresh()
 	end
 
 	updateFooter()
+	BaerchiListPreview.refresh()
 end
 
 --------------------------------------------------------------------------------
@@ -870,7 +913,15 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 
 	local modeButton = Theme.button("FusionMode", toolbar, Loc.t("ui.fusion.mode_off"), Theme.COLORS.gummy)
 	modeButton.Size = UDim2.new(0, 130, 1, 0)
+	modeButton.Position = UDim2.fromOffset(MUT_W + 6, 0)
 	_modeButton = modeButton
+
+	-- 21.10.: Mutationsliste (Staerke und Seltenheit aller Stufen)
+	local mutButton = HoneyButton.make(toolbar, "MutationInfo", Loc.t("ui.mut.button"), "light", Theme.COLORS.goldGummy)
+	mutButton.holder.Position = UDim2.fromOffset(0, 0)
+	mutButton.holder.Size     = UDim2.fromOffset(MUT_W, TOOLBAR_H)
+	mutButton.button.Activated:Connect(MutationList.open)
+	Loc.onChanged(function() mutButton.setText(Loc.t("ui.mut.button")) end)
 
 	local hint = Theme.bodyText("Hint", toolbar, Loc.t("ui.inventory.hint_card"))
 	_hint = hint
@@ -912,6 +963,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	scroller.Position = UDim2.new(0, 0, 0, TOOLBAR_H + 6)
 	scroller.Size     = UDim2.new(1, 0, 1, -(TOOLBAR_H + 6))
 	_scroller = scroller
+	BaerchiListPreview.bind(scroller)   -- 21.10.: Vorschauen nach Scroll-Position nachladen
 
 	local layout = Theme.listLayout(scroller, 6)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
@@ -978,12 +1030,13 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 	go.button.Activated:Connect(startSell)
 
 	PetSellConfirm.init(screenGui)
+	MutationList.init(screenGui)
 
 	-- 13.10. (UI-Templates 2): Menue im Honig-Template. Das alte root bleibt
 	-- fuer PanelManager und Layout zustaendig (EggPanelSkin.adopt).
 	if EggPanelSkin.isReady("bears") then
 		local TAB_PANELS = { eggs = "Hatch", star = "EggTree", crown = "Leaderboard" }
-		EggPanelSkin.adopt(screenGui, root, body, {
+		local adopted = EggPanelSkin.adopt(screenGui, root, body, {
 			variant = "bears",
 			onTab = function(tab: string)
 				local target = TAB_PANELS[tab]
@@ -993,6 +1046,17 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 				PanelManager.close(PANEL_NAME)
 			end,
 		})
+		-- 21.10. Playtest: Die Verkaufsleiste steht UNTER dem Fenster (dort ist Platz), nicht
+		-- mehr in der Liste, wo sie die Zeilen verdraengte.
+		local bar = _sellBar
+		if bar and adopted and adopted.Root then
+			_sellBarOutside = true
+			bar.Parent      = adopted.Root
+			bar.AnchorPoint = Vector2.new(0.5, 0)
+			bar.Position    = UDim2.new(0.5, 0, 1, 8)
+			bar.Size        = UDim2.new(0.9, 0, 0, SELL_BAR_H)
+			bar.ZIndex      = 30
+		end
 	end
 
 	PanelManager.register(PANEL_NAME, {

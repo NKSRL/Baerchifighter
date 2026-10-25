@@ -462,6 +462,22 @@ local function buildHoney(root: Frame)
 	autoCount.Text = "x" .. CharmConfig.AUTO_ROLL_COUNT
 	_autoCostLabel = hlabel(root, "AutoCost", 772, 1318, 862, 1380, 24, Enum.TextXAlignment.Center)
 
+	-- 21.10. Playtest: Ins Fensterbild ist an beiden Knoepfen eine grosse Paw-Coin-Muenze
+	-- eingebacken. Gewuerfelt wird aber mit Honey Crystals, das fuehrte Spieler in die Irre.
+	-- Darum liegt das Honey-Crystal-Symbol groesser ueber der eingebackenen Muenze.
+	-- Lage (Bildpixel des Originals) ggf. in Studio um ein paar Pixel nachziehen.
+	local function crystalOver(name: string, x0: number, y0: number, x1: number, y1: number)
+		local icon = Icons.uiImage(root, "honey/honey_crystal")
+		if not icon then return end
+		icon.Name   = name
+		icon.ZIndex = 7
+		icon.ScaleType = Enum.ScaleType.Fit
+		hplace(icon, x0, y0, x1, y1)
+	end
+	-- 21.10. (Playtest 2): groesser, damit die eingebackene Muenze ganz verdeckt ist
+	crystalOver("RollCrystal", 246, 1276, 404, 1422)
+	crystalOver("AutoCrystal", 654, 1276, 796, 1422)
+
 	local roll = hbutton(root, "Roll", 150, 1290, 475, 1408)
 	_rollButton = roll
 	roll.Activated:Connect(function()

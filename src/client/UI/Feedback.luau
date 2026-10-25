@@ -62,6 +62,10 @@ local LOOK: { [string]: { icon: string?, text: string, color: Color3, float: boo
 local ICON_SIZE = 38
 -- Wie hoch die Zahl ueber den Startpunkt steigt (px)
 local NUMBER_RISE = 46
+-- Welche Zahl in welcher "Spur" ueber dem Baerchi schwebt (Vielfache der Zeilenhoehe nach oben)
+local FLOAT_LANE_OFFSET: { [string]: Vector2 } = {
+	level = Vector2.new(0, -1.15),
+}
 -- Wie hoch die Zahl ueber dem Baerchi steigt (Studs)
 local FLOAT_RISE = 3
 local FLOAT_BASE = 4
@@ -330,6 +334,10 @@ local function launchFloater(kind: string, amount: number, suffix: string?)
 	free.t0 = os.clock()
 	free.gui.Adornee = part
 	free.gui.StudsOffset = Vector3.new(0, FLOAT_BASE, 0)
+	-- 21.10. Playtest: "+XP" und "Level Up" kamen am selben Punkt hoch und lagen ineinander.
+	-- Der Level-Up steigt jetzt eine Zeile HOEHER auf (SizeOffset in Zeilenhoehen, daher bei
+	-- jedem Kameraabstand gleich), die anderen bleiben unten.
+	free.gui.SizeOffset = FLOAT_LANE_OFFSET[kind] or Vector2.zero
 	free.gui.Enabled = true
 	free.label.Text = formatAmount(kind, amount, suffix)
 	free.label.TextColor3 = if look then look.color else Theme.COLORS.text

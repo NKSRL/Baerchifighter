@@ -276,11 +276,48 @@ local SKILLS: { [string]: SkillDef } = {
 		description = "Eine Faust vom Himmel, 3.6x Schaden.",
 		drawback = "Cooldown 6.",
 	},
+	-- 21.10. Welt 2: Faehigkeiten der Anime-Pets (je Pet eine eigene, Effekt-Typen wie bei den bestehenden)
+	RubberSmash = {
+		id = "RubberSmash", displayName = "Gummi-Schlag",
+		effectType = "Damage", category = "damage", cooldown = 5, charge = 5,
+		params = { multiplier = 3.0, baseDamage = 70 },
+		description = "Ein gedehnter Hieb, 3x Schaden.",
+		drawback = "Cooldown 5.",
+	},
+	SpiralDash = {
+		id = "SpiralDash", displayName = "Wirbelsprint",
+		effectType = "Ramp", category = "damage", cooldown = 3, charge = 3,
+		params = { multiplier = 1.1, rampPerUse = 0.5, baseDamage = 35 },
+		description = "Jeder Sprint trifft staerker als der vorige.",
+		drawback = "Schwacher Anfang.",
+	},
+	StarBlast = {
+		id = "StarBlast", displayName = "Sternenblitz",
+		effectType = "Damage", category = "damage", cooldown = 5, charge = 5,
+		params = { multiplier = 2.9, baseDamage = 80 },
+		description = "Ein gebuendelter Strahl, 2.9x Schaden.",
+		drawback = "Cooldown 5.",
+	},
+	PlaidSlash = {
+		id = "PlaidSlash", displayName = "Karo-Schnitt",
+		effectType = "Finisher", category = "damage", cooldown = 3, charge = 3,
+		params = { multiplier = 1.5, finisherMultiplier = 3.6, threshold = 0.30, baseDamage = 45 },
+		description = "Unter 30% Gegner-HP trifft der Schnitt mit 3.6x ATK.",
+		drawback = "Gegen volle Gegner nur durchschnittlich.",
+	},
 	GenesisWave = {
 		id = "GenesisWave", displayName = "Schoepfungswelle",
 		effectType = "Ramp", category = "damage", cooldown = 4, charge = 4,
 		params = { multiplier = 1.4, rampPerUse = 0.6, baseDamage = 60 },
 		description = "Jede Welle baut auf der letzten auf.",
+		drawback = "Braucht lange Kaempfe.",
+	},
+	-- 20.10. P5d: Faehigkeit des Hoffnungs-Pets (jede Stufe baut auf der letzten auf)
+	AscendingLight = {
+		id = "AscendingLight", displayName = "Aufstiegslicht",
+		effectType = "Ramp", category = "damage", cooldown = 4, charge = 4,
+		params = { multiplier = 1.3, rampPerUse = 0.55, baseDamage = 50 },
+		description = "Jedes Licht steigt hoeher und trifft staerker.",
 		drawback = "Braucht lange Kaempfe.",
 	},
 	ChronosRift = {

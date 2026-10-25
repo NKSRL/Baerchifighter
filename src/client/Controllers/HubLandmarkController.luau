@@ -65,8 +65,33 @@ end
 
 local _crownCells: { BasePart } = {}
 
+local function isSanctuaryFountain(): Model?
+	local platform = workspace:FindFirstChild("Platform")
+	local mast = if platform then platform:FindFirstChild("Honigmast") else nil
+	if mast and mast:IsA("Model") and (mast:FindFirstChild("Sanctuary_BasePlinth") or mast:FindFirstChild("Hub_Brunnen_Sandstein")) then
+		return mast
+	end
+	return nil
+end
+
 local function buildCrown(folder: Instance)
 	local cfg = WorldFXConfig.MAST
+	local sanctuary = isSanctuaryFountain()
+	if sanctuary then
+		for _, child in sanctuary:GetChildren() do
+			if child:IsA("BasePart") and (
+				child.Name == "Sanctuary_CrownInner"
+				or child.Name == "Sanctuary_UpperHoney"
+				or child.Name == "Sanctuary_HoneyPool"
+				or child.Name == "Hub_Brunnen_HonigNeon"
+			) then
+				DayCycleController.registerGlow(child, cfg.CELL_DAY, cfg.CELL_NIGHT)
+				table.insert(_crownCells, child)
+			end
+		end
+		return
+	end
+
 	local model = Instance.new("Model")
 	model.Name = "MastCrown"
 	local combId = WorldFXKit.textureId("amber_comb")
@@ -100,6 +125,25 @@ end
 local function buildHoneyThread(folder: Instance)
 	local cfg = WorldFXConfig.MAST
 	local group = WorldFXKit.folder("HoneyThread", folder)
+	if isSanctuaryFountain() then
+		local angle = math.rad(30)
+		local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local spoutPos = MAST_FOOT + dir * 4.85 + Vector3.new(0, 9.2, 0)
+		local surfaceY = MAST_FOOT.Y + 2.08
+		local drop = WorldFXKit.ball("Drop", nil, cfg.DROP_SIZE, spoutPos, cfg.HONEY_COLOR, Enum.Material.Neon)
+		local ring = WorldFXKit.part("Ring", nil, Vector3.new(0.04, 0.3, 0.3), CFrame.new(), Color3.fromRGB(255, 226, 150),
+			Enum.Material.Neon, Enum.PartType.Cylinder)
+		_drip = {
+			group = group,
+			drop = drop,
+			ring = ring,
+			spout = spoutPos,
+			surfaceY = surfaceY,
+			cycleStart = os.clock(),
+		}
+		WorldFXKit.cullGroup(group, MAST_FOOT, cfg.SHOW_DISTANCE)
+		return
+	end
 	local angle = math.rad(cfg.THREAD_ANGLE)
 	local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
 
@@ -207,13 +251,15 @@ local function buildBoard(parent: Instance, center: Vector3, dir: Vector3, color
 	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud   -- 21.10.: sonst gestreckte Schrift
 		gui.PixelsPerStud = 40
 		gui.LightInfluence = 0   -- 12.10.: Schrift bleibt auch nachts hell
 		gui.Parent = board
 		local label = Instance.new("TextLabel")
 		label.BackgroundTransparency = 1
-		label.Size = UDim2.fromScale(0.9, 0.8)
-		label.Position = UDim2.fromScale(0.05, 0.1)
+		-- 21.10.: innen etwas mehr Rand, weil das Brett im Pfahl steckt
+		label.Size = UDim2.fromScale(0.86, 0.8)
+		label.Position = UDim2.fromScale(0.09, 0.1)
 		label.Font = Enum.Font.FredokaOne
 		label.TextScaled = true
 		label.TextColor3 = cfg.TEXT_COLOR

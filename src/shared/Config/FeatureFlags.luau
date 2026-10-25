@@ -96,6 +96,13 @@ local FLAGS: { [string]: boolean } = {
 	WORLD_C_HUB       = true,   -- Mastkrone, Honigfaden, Ankunft, Wegweiser, Pit-Rahmen, Haendler, Nest, Tafeln
 	WORLD_F_LIFE      = true,   -- Bienen, Schmetterlinge, Blumen im Wind, Pollenfarbe, Pfotenabdruecke
 	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
+	-- 21.10. (Welt 2): Plot im Welt-2-Look (Boden, Saeulen, Krone, Fusionsmaschine, neue Modelle fuer
+	-- Brunnen/Inkubator/Recycler/Terminal) fuer Spieler mit worlds.unlocked.World2. Vorlagen: ServerStorage.Assets.Welt2.
+	-- Aus oder Vorlage fehlt = alter Look. Bericht: claude/HBB_W2_IMPORT_STAND_2026-10-21.md
+	WELT2_LOOK        = true,
+	-- 21.10. (Welt 2): Anime-Ei (Pfad "Anime", 4 Pets), frei ab Welt 2 (Epilog gestartet). Aus = Ei bleibt gesperrt.
+	-- Plan: nach Abnahme plus einem Release entfernen. Bericht: claude/HBB_W2_ANIME_EI_UMGESETZT_2026-10-21.md
+	ANIME_EGG         = true,
 
 	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
 	-- (Rekord >= Stage-Zahl), statt ueber Rebirths. Der Deckel pro Rebirth
@@ -144,9 +151,10 @@ local FLAGS: { [string]: boolean } = {
 	-- und epilog.state = "pending" atomar, startet die Sequenz (EpilogStart) und
 	-- haelt die Endless-Meldung zurueck. Aus = Verhalten wie vor dem Epilog
 	-- (die Daten-Migration v18 laeuft trotzdem, sie aendert kein Verhalten).
-	-- Bleibt AUS, bis Prompt 2-7 stehen; in Studio: D:Invoke("epilog","on").
+	-- 20.10. AN (Prompts 1-6 stehen): ohne diesen Schalter loeste Final 100 keine Sequenz aus.
+	-- Aus = Verhalten wie vor dem Epilog; in Studio ausserdem: D:Invoke("epilog","on"|"off").
 	-- Bericht: docs/HBB_EPILOG_P1_2026-10-20.md
-	FINAL_EPILOG      = false,
+	FINAL_EPILOG      = true,
 
 	-- 20.10. (Map-Stil V2): Boden-Kacheln, Baeume, Buesche, Rand-Buesche und Felsen
 	-- als Meshes im Epilog-Insel-Stil (Config/MapStyleConfig, Util/MapBuild/MapMeshes).
@@ -156,20 +164,64 @@ local FLAGS: { [string]: boolean } = {
 
 	-- 20.10. P1: Hauptinsel-Boden wie die alte Classic Baseplate (echte Noppen),
 	-- eingefaerbt. Aus = bisheriger Boden (moderne Textur). Bericht: docs/HBB_BODEN_ALT_2026-10-20.md
-	MAP_GROUND_OLDSCHOOL = true,
+	-- 22.10.: Deaktiviert zugunsten des Royal-Honey-Sanktuarium-Inselbodens & Gartens.
+	MAP_GROUND_OLDSCHOOL = false,
 
 	-- 20.10. P2: Final-Tower Stage 100 ohne Omega-Pet schaffbar (Kurve von Final und
 	-- Tower III sinkt, Belohnung gleicht aus). Aus = alte Werte. Endless bleibt fix auf 132.
 	-- Bericht: docs/HBB_TOWER_F_BALANCE_2026-10-20.md
 	TOWER_F_EASIER = true,
 
+	-- 21.10. Balance V3: Tower I-III brauchen keine Extrem-Rarities mehr (III = Mythic), Final 100 ~ Divine mit
+	-- gutem Ausbau, Endless direkt hinter Final und machbar. Ueberschreibt TOWER_F_EASIER. Aus = Stand 20.10.
+	-- Bericht: docs/HBB_BALANCE_V3_KONZEPT_2026-10-21.md
+	TOWER_BALANCE_V3 = true,
+
 	-- 20.10. P3: "Reise" (Ziel-Leiste, Etappen von Bearchi bis Final 100). Setzt UI_V2_GUIDE
 	-- voraus; aus = heutige Fuehrung. Bericht: docs/HBB_ONBOARDING_2026-10-20.md
 	ONBOARDING_V2 = true,
 
+	-- 21.10.: Tutorial-Laser aus Pfeil-Partikeln (GuideArrowRules) statt Beam. Aus = alter Beam.
+	GUIDE_ARROW_PARTICLES = true,
+
 	-- 20.10. P4: dauerhafte Raketen-Insel mit Bruecke in Welt 1 (Hinweis auf Welt 2; Start
 	-- bleibt im Epilog). Aus = Welt wie vorher. Bericht: docs/HBB_RAKETENINSEL_2026-10-20.md
 	ROCKET_ISLAND = true,
+
+	-- 20.10. (Welt 1, Paket 3): Rang ueber dem Kopf neu (Name, Plakette "Tower II · 37", Rebirth "R5", "Neuling").
+	-- Server setzt nur Spieler-Attribute, der Client baut das Billboard. Aus = altes Abzeichen (PlayerBadgeService).
+	-- Bericht: docs/HBB_W1_P3_2026-10-20.md
+	RANK_BADGE_V2 = true,
+
+	-- 20.10. (Welt 1, Paket 5a): Rebirth erst nach Welt 2 (data.epilog.state == "launched").
+	-- Wer schon einmal rebirthed hat, behaelt den Zugang (Bestandsschutz). Inkubator-Ausbau
+	-- haengt dann am Tower-Sieg statt an Rebirths. Aus = alte Regel. Bericht: docs/HBB_W1_P5_2026-10-20.md
+	REBIRTH_NEEDS_WORLD2 = true,
+
+	-- 20.10. (Welt 1, Paket 5b): Staerke-Modell V2: Rarity = moderate Basis (+6 %/Stufe), dazu ein individueller Wurf
+	-- aus der uid (PowerRules/PowerConfig), Tower-Gegner skaliert (PowerConfig.TOWER_ENEMY_SCALE). Aus = altes Modell.
+	POWER_MODEL_V2 = false,
+
+	-- 20.10. (Welt 1, Paket 5c): Drop-Raten V2: seltenstes Pet je Ei 10 % / 5 % / 1 % / 0,1 % nach Fortschritt
+	-- (EggConfig.RARITY_DIST_V2). Aus = alte Verteilung (RARITY_DIST). Standard AUS bis bestaetigt.
+	DROPRATES_V2 = true,   -- 21.10.: an (seltenste Stufe je Ei 5-10 % / 1 % / 0,1-3 %, siehe EggConfig.RAREST_PCT_V2)
+
+	-- 20.10. (Welt 1, Paket 5d): Ascension-Pfad per Fortschritt statt Rebirth (Welt 2 offen + Schluessel-Pet des
+	-- Vorgaengers) und das Hoffnungs-Pet (1 % im Ascension-Ei). Aus = Rebirth-Gates, Pet faellt nirgends.
+	ASCENSION_V2 = true,
+
+	-- 20.10. (Welt 1, Paket 6): Geraete-Profil (phone/tablet/desktop/console) und adaptive Oberflaeche
+	-- (Mindest-Touchflaechen, Konsolen-Rand, Glyphen). Aus = Oberflaeche wie vor Paket 6.
+	UI_ADAPTIVE_V1 = true,
+	-- 20.10. (Welt 1, Paket 6d): Gamepad-Steuerung (Fokus, B schliesst, SchulterTasten, Prompt-Taste X).
+	-- Wirkt nur, solange das Geraet ein Gamepad nutzt. Aus = bisherige Eingabe.
+	CONSOLE_V1 = true,
+
+	-- 25.10.: Honig-Kolosseum als neues Kampf-Pit (Mauer, Tribuenen, Tore, Waben-Boden) und
+	-- Zaun aussen an jeder Turm-Etage samt Kollision der obersten Etage. Vorlagen:
+	-- ServerStorage.Assets.PitV2. Aus oder Vorlage fehlt = altes Pit. Plan: nach Abnahme
+	-- plus einem Release entfernen. Bericht: claude/HBB_PIT_V2_KOLOSSEUM_2026-10-25.md
+	PIT_V2 = true,
 }
 
 local FeatureFlags = {}

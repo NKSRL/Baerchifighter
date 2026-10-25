@@ -20,6 +20,10 @@ local LeaderboardService        = require(ServerScriptService.Services.Leaderboa
 local LoginBonusService         = require(ServerScriptService.Services.LoginBonusService)
 local EpilogService             = require(ServerScriptService.Services.EpilogService)   -- 20.10. Final-Epilog
 local FeatureFlags              = require(ReplicatedStorage.Config.FeatureFlags)
+local BaerchiConfig             = require(ReplicatedStorage.Config.BaerchiConfig)      -- 20.10. P5b
+local EggConfig                 = require(ReplicatedStorage.Config.EggConfig)          -- 20.10. P5c
+local PowerRules                = require(ReplicatedStorage.Modules.PowerRules)
+local CombatCalculator          = require(ReplicatedStorage.Modules.CombatCalculator)
 local DebugRegistry = require(script.Parent.DebugRegistry)
 
 local commands = DebugRegistry.commands
@@ -140,6 +144,69 @@ commands.epilog = function(player, data, action: any, argument: any)
 	}
 end
 
+-- 20.10. P5b: Staerke-Modell. D:Invoke("power","on"|"off"|"state") schaltet POWER_MODEL_V2 (nur dieser Server),
+-- "state" listet Wurf und Kampfwerte der eigenen Baerchis.
+commands.power = function(_player, data, action: any)
+	local act = tostring(action or "state")
+	if act == "on" or act == "off" then
+		FeatureFlags.FLAGS.POWER_MODEL_V2 = (act == "on")
+	end
+	local rows = {}
+	for _, b in data.island.baerchis do
+		local def = BaerchiConfig.getById(b.configId)
+		if def then
+			local rank = BaerchiConfig.getRarityIndex(def.rarity) - 1
+			local roll = PowerRules.roll(b.uid, rank)
+			local st = CombatCalculator.getEffectiveStats(b, def.baseStats)
+			table.insert(rows, string.format("%s [%s] Wurf %.2f (%s) -> HP %d ATK %d SPD %.2f PWR %.2f", b.configId, def.rarity,
+				roll.total, roll.grade, st.maxHp, st.atk, st.spd, st.pwr))
+		end
+	end
+	return { modellV2 = FeatureFlags.isOn("POWER_MODEL_V2"), baerchis = rows }
+end
+
+-- 20.10. P6b: Geraete-Profil erzwingen. D:Invoke("device","phone"|"tablet"|"console"|"desktop"|"auto").
+-- Setzt das Spieler-Attribut HBBDeviceForce, das UI/DeviceProfile auf dem Client liest.
+commands.device = function(player, _data, kind: any)
+	local k = tostring(kind or "auto")
+	if k == "phone" or k == "tablet" or k == "console" or k == "desktop" then
+		player:SetAttribute("HBBDeviceForce", k)
+	else
+		player:SetAttribute("HBBDeviceForce", nil)
+		k = "auto"
+	end
+	return { force = k }
+end
+
+-- 20.10. P5c: Drop-Raten. D:Invoke("dropchance","<Ei>") zeigt alte und neue Verteilung und die Pet-Chancen;
+-- D:Invoke("dropchance","on"|"off") schaltet DROPRATES_V2 (nur dieser Server, rechnet die Ei-Tabellen neu).
+commands.dropchance = function(_player, _data, eggArg: any)
+	local arg = tostring(eggArg or "")
+	if arg == "on" or arg == "off" then
+		FeatureFlags.FLAGS.DROPRATES_V2 = (arg == "on")
+		EggConfig.setDropRatesV2(arg == "on")
+		return { dropratesV2 = FeatureFlags.isOn("DROPRATES_V2") }
+	end
+	local egg = EggConfig.data[arg]
+	if not egg then
+		local ids = {}
+		for _, id in EggConfig.getOrderedIds() do table.insert(ids, id) end
+		return { fehler = "Ei unbekannt", eier = ids }
+	end
+	local function fmt(dist: { [string]: number }): { string }
+		local rows = {}
+		for rarity, p in dist do table.insert(rows, { BaerchiConfig.getRarityIndex(rarity :: any), string.format("%s %.2f%%", rarity, p) }) end
+		table.sort(rows, function(a, b) return a[1] < b[1] end)
+		local out = {}
+		for _, r in rows do table.insert(out, r[2]) end
+		return out
+	end
+	local pets = {}
+	for id, w in egg.hatchTable do table.insert(pets, string.format("%s %.3f%% (1 von %d)", id, w, math.ceil(100 / math.max(w, 1e-9)))) end
+	table.sort(pets)
+	return { ei = arg, aktiv = if FeatureFlags.isOn("DROPRATES_V2") then "V2" else "V1", alt = fmt(EggConfig.RARITY_DIST[arg]), neu = fmt(EggConfig.RARITY_DIST_V2[arg]), pets = pets }
+end
+
 -- v15: Deckel des aktuellen Rebirths
 commands.rebirthcap = function(_player, data)
 	local caps: { [string]: number } = {}
@@ -232,9 +299,39 @@ commands.journey = function(player, _data, action: any, n: any)
 	return { aktuell = id, index = index, erfuellt = done, abgeholt = journey.claimed, uebersprungen = journey.skipped, ausgeblendet = journey.hidden }
 end
 
+-- W1-P3: Rang-Billboard.  badge state | set <TowerId|""> <Rekord> <Rebirth> (nur Anzeige-Attribute; der naechste
+-- Spielstand-Wechsel setzt sie wieder auf die echten Werte) | sync (echte Werte neu setzen)
+commands.badge = function(player, _data, action: any, towerId: any, record: any, rebirth: any)
+	local BadgeConfig = require(ReplicatedStorage.Config.BadgeConfig)
+	local act = tostring(action or "state")
+	if act == "set" then
+		player:SetAttribute(BadgeConfig.ATTR_TOWER, tostring(towerId or ""))
+		player:SetAttribute(BadgeConfig.ATTR_RECORD, math.floor(tonumber(record) or 0))
+		player:SetAttribute(BadgeConfig.ATTR_REBIRTH, math.floor(tonumber(rebirth) or 0))
+	elseif act == "sync" then
+		local BadgeRules = require(ReplicatedStorage.Modules.BadgeRules)
+		local PlayerService = require(ServerScriptService.Services.PlayerService)
+		local d: any = PlayerService.getData(player)
+		if d then
+			local info = BadgeRules.info(d.towers, d.rebirthCount)
+			player:SetAttribute(BadgeConfig.ATTR_TOWER, info.towerId)
+			player:SetAttribute(BadgeConfig.ATTR_RECORD, info.record)
+			player:SetAttribute(BadgeConfig.ATTR_REBIRTH, info.rebirth)
+		end
+	elseif act ~= "state" then
+		return { error = "badge state|set <Tower> <Rekord> <Rebirth>|sync" }
+	end
+	return {
+		tower = player:GetAttribute(BadgeConfig.ATTR_TOWER),
+		rekord = player:GetAttribute(BadgeConfig.ATTR_RECORD),
+		rebirth = player:GetAttribute(BadgeConfig.ATTR_REBIRTH),
+	}
+end
+
 -- 20.10. P4 Raketen-Insel. D:Invoke("rocketisland", "state" | "set", 1|2|3)
 --   state  Teile, Lage, Platzhalter ja/nein, Spielstand-Zustand
 --   set n  Schild-Zustand fuer alle Clients erzwingen (1 gesperrt, 2 bereit, 3 gestartet; 0 = aus dem Spielstand)
+--   undiscover  "Insel entdeckt" (journey.islandSeen) zuruecksetzen, damit die Entdeckung erneut getestet werden kann
 commands.rocketisland = function(player, _data, action: any, n: any)
 	local PlayerService = require(ServerScriptService.Services.PlayerService)
 	local RocketIslandRules = require(ReplicatedStorage.Modules.RocketIslandRules)
@@ -242,11 +339,22 @@ commands.rocketisland = function(player, _data, action: any, n: any)
 	if act == "set" then
 		local v = math.floor(tonumber(n) or 0)
 		workspace:SetAttribute("RocketIslandDebugState", if v >= 1 and v <= 3 then v else nil)
+	elseif act == "undiscover" then
+		local d: any = PlayerService.getData(player)
+		if d and d.journey then d.journey.islandSeen = nil; PlayerService.markDirty(player) end
 	elseif act ~= "state" then
-		return { error = "rocketisland state|set 0..3" }
+		return { error = "rocketisland state|set 0..3|undiscover" }
 	end
-	local platform = workspace:FindFirstChild("Platform")
-	local root = if platform then platform:FindFirstChild("RocketIsland_Root") else nil
+	-- W1-P2: eigene Insel (Plot des Spielers)
+	local MapConfig = require(ReplicatedStorage.Config.MapConfig)
+	local root: Instance? = nil
+	for slot = 1, MapConfig.PLOT_COUNT do
+		local plot = workspace:FindFirstChild("Plot_" .. slot)
+		if plot and plot:GetAttribute("PlotOwner") == player.UserId then
+			root = plot:FindFirstChild("RocketIsland_Root")
+			break
+		end
+	end
 	local data = PlayerService.getData(player)
 	return {
 		gebaut = root ~= nil,
@@ -254,6 +362,8 @@ commands.rocketisland = function(player, _data, action: any, n: any)
 		platzhalter = if root then root:GetAttribute("Placeholder") else nil,
 		zustandSpielstand = if data then RocketIslandRules.state(data :: any) else nil,
 		erzwungen = workspace:GetAttribute("RocketIslandDebugState"),
+		entdeckt = if data and (data :: any).journey then (data :: any).journey.islandSeen == true else false,
+		winkelGrad = if root then root:GetAttribute("AngleDeg") else nil,
 	}
 end
 

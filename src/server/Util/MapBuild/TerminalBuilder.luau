@@ -29,6 +29,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local MapConfig = require(ReplicatedStorage.Config.MapConfig)
 local MapParts  = require(ServerScriptService.Util.MapBuild.MapParts)
+local Welt2Builder = require(ServerScriptService.Util.MapBuild.Welt2Builder)   -- 21.10. Welt-2-Look
 
 local TerminalBuilder = {}
 
@@ -66,13 +67,20 @@ function TerminalBuilder.build(plotModel: Model, slot: number, view: TerminalVie
 	local old = plotModel:FindFirstChild(TerminalBuilder.MODEL_NAME)
 	if old then old:Destroy() end
 
-	local model = Instance.new("Model")
+	-- 21.10. Welt 2: Terminal-Modell aus ServerStorage.Assets.Welt2 (gleiche Teilnamen: Bildschirm, Knopf, Lampe, Licht1/2)
+	local w2model = if Welt2Builder.enabled(plotModel) then Welt2Builder.clone("Terminal", nil) else nil
+	local model = w2model or Instance.new("Model")
 	model.Name = TerminalBuilder.MODEL_NAME
 	local origin = TerminalBuilder.origin(slot)
-	MapParts.buildDecor(model, origin, MapConfig.TOWER_TERMINAL.pieces)
-	for _, part in model:GetChildren() do
-		if part:IsA("BasePart") then
-			part.CastShadow = part.Name == "Kopf" or part.Name == "Saeule" or part.Name == "Sockel"
+	if w2model then
+		origin += Vector3.new(0, Welt2Builder.groundLift(plotModel), 0)   -- neuer Boden liegt auf Beet-Hoehe
+		model:PivotTo(origin)
+	else
+		MapParts.buildDecor(model, origin, MapConfig.TOWER_TERMINAL.pieces)
+		for _, part in model:GetChildren() do
+			if part:IsA("BasePart") then
+				part.CastShadow = part.Name == "Kopf" or part.Name == "Saeule" or part.Name == "Sockel"
+			end
 		end
 	end
 	-- Pivot auf den Boden-Ursprung: der Client findet so "vorne" und "oben".

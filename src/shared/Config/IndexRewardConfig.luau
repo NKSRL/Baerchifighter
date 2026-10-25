@@ -76,7 +76,7 @@ IndexRewardConfig.PATH_INCUBATOR_SLOTS = 0   -- 15.10.: Solo-Inkubator hat nur e
 IndexRewardConfig.RARITY_GOLD_PER_INDEX = 20
 
 -- Ganzer Index (besonderer Meilenstein).
-IndexRewardConfig.ALL_EGGS = { eggType = "AscensionEgg" :: Types.EggType, count = 2 }
+IndexRewardConfig.ALL_EGGS = { eggType = "AscensionEgg" :: Types.EggType, count = 0 }   -- 21.10.: keine Ascensions-Eier mehr aus dem Index
 IndexRewardConfig.ALL_GOLD = 500
 
 --------------------------------------------------------------------------------
@@ -166,8 +166,10 @@ do
 	local all: { [string]: boolean } = {}
 	for configId in BaerchiConfig.data do all[configId] = true end
 	local reward = emptyReward()
-	reward.eggType     = IndexRewardConfig.ALL_EGGS.eggType
-	reward.eggs        = IndexRewardConfig.ALL_EGGS.count
+	if IndexRewardConfig.ALL_EGGS.count > 0 then
+		reward.eggType = IndexRewardConfig.ALL_EGGS.eggType
+		reward.eggs    = IndexRewardConfig.ALL_EGGS.count
+	end
 	reward.goldGummies = IndexRewardConfig.ALL_GOLD
 	order += 1
 	add({ id = "all", kind = "all", key = "all", members = sortedKeys(all), reward = reward, order = order })

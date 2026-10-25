@@ -16,6 +16,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
 local OnboardingConfig = require(ReplicatedStorage.Config.OnboardingConfig)
+local RocketIslandConfig = require(ReplicatedStorage.Config.RocketIslandConfig)
+local MapConfig          = require(ReplicatedStorage.Config.MapConfig)
 local OnboardingRules  = require(ReplicatedStorage.Modules.OnboardingRules)
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
@@ -42,6 +44,30 @@ function JourneyService.handle(player: Player, action: any, stageId: any): (bool
 	if action == "hide" or action == "show" then
 		journey.hidden = (action == "hide")
 		PlayerService.markDirty(player)
+		return true, nil
+	end
+
+	-- 20.10. (Welt 1, Paket 2): Raketen-Insel entdeckt. Der Client meldet nur; der Server prueft Schalter,
+	-- Einmaligkeit und die Entfernung der Spielerfigur zur Insel-Mitte.
+	if action == "island" then
+		if not FeatureFlags.isOn("ROCKET_ISLAND") then return false, "flag" end
+		if journey.islandSeen == true then return true, "schon" end
+		-- eigene Insel: Plot_<slot> mit PlotOwner == UserId (jeder Spieler hat seine eigene Raketen-Insel)
+		local ground: Instance? = nil
+		for slot = 1, MapConfig.PLOT_COUNT do
+			local plot = workspace:FindFirstChild("Plot_" .. slot)
+			if plot and plot:GetAttribute("PlotOwner") == player.UserId then
+				ground = plot:FindFirstChild(RocketIslandConfig.NAME_PREFIX .. "Ground", true)
+				break
+			end
+		end
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not (ground and ground:IsA("BasePart") and root and root:IsA("BasePart")) then return false, "nopos" end
+		local flat = Vector3.new(root.Position.X - ground.Position.X, 0, root.Position.Z - ground.Position.Z)
+		if flat.Magnitude > RocketIslandConfig.DISCOVER_DISTANCE then return false, "weit" end
+		journey.islandSeen = true
+		PlayerService.markDirty(player)
+		print("[JourneyService]", player.Name, "| Raketen-Insel entdeckt")
 		return true, nil
 	end
 

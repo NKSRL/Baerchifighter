@@ -31,6 +31,7 @@ local Loc        = require(ReplicatedStorage.Localization.Loc)
 local FeedbackConfig = require(ReplicatedStorage.Config.FeedbackConfig)
 
 local Theme       = require(script.Parent.Parent.UI.Theme)
+local Kit         = require(script.Parent.Parent.UI.Kit)   -- 21.10. Honig-Stil der Waben-Anzeige
 local Toast       = require(script.Parent.Parent.UI.Toast)
 -- HBB Paket 1: Meldungen nach FeedbackConfig verteilen (Icon/Moment/Toast)
 local Notify      = require(script.Parent.Parent.UI.Notify)
@@ -61,6 +62,7 @@ local SPIN_RATE  = 0.9    -- Radiant pro Sekunde
 local _pill: Frame? = nil
 local _carryLabel: TextLabel? = nil
 local _hintLabel: TextLabel? = nil
+local _fill: Frame? = nil   -- 21.10.: Fuellstand der Waben-Leiste
 
 local function isInPit(): boolean
 	local character = localPlayer.Character
@@ -88,39 +90,67 @@ local function refreshCarry()
 
 	pill.Visible = true
 	carryLabel.Text = Loc.t("ui.comb.carry", { n = count, max = max })
+	local fill = _fill
+	if fill then
+		fill.Size = UDim2.fromScale(math.clamp(count / math.max(1, max), 0, 1), 1)
+	end
 
 	if count >= max then
 		hint.Text = Loc.t("ui.comb.full")
-		hint.TextColor3 = Theme.COLORS.goldGummy
+		hint.TextColor3 = Kit.T.color.gummyDeep
 	elseif isInPit() then
 		hint.Text = Loc.t("ui.comb.slow")
-		hint.TextColor3 = Theme.COLORS.textDim
+		hint.TextColor3 = Kit.T.color.inkSoft
 	else
 		hint.Text = ""
 	end
 end
 
+-- 21.10. (Playtest 2): im Honig-Stil wie die uebrigen Fenster: cremefarbene Karte mit
+-- dicker brauner Kontur, Honig-Abzeichen links, Fuell-Leiste, Schrift in Schokolade.
 local function buildPill(screenGui: ScreenGui)
-	local pill = Theme.panel("CombPill", screenGui, Theme.COLORS.panel)
+	local T = Kit.T
+	local pill = Kit.frame("CombPill", screenGui, T.color.card)
 	pill.AnchorPoint = Vector2.new(0.5, 0)
 	pill.Position    = UDim2.new(0.5, 0, 0, 12)
-	pill.Size        = UDim2.new(0, 250, 0, 54)
+	pill.Size        = UDim2.fromOffset(380, 70)
 	pill.Visible     = false
+	Kit.corner(pill, 22)
+	Kit.stroke(pill, T.stroke.card + 1)
 
-	local carry = Theme.label("Carry", pill, "")
-	carry.Position       = UDim2.new(0, 10, 0, 4)
-	carry.Size           = UDim2.new(1, -20, 0, 26)
-	carry.TextXAlignment = Enum.TextXAlignment.Center
-	carry.TextColor3     = Theme.COLORS.goldGummy
+	-- Honig-Abzeichen links
+	local badge = Kit.frame("Badge", pill, Color3.new(1, 1, 1))
+	badge.AnchorPoint = Vector2.new(0, 0.5)
+	badge.Position    = UDim2.new(0, 8, 0.5, 0)
+	badge.Size        = UDim2.fromOffset(46, 46)
+	Kit.corner(badge, 23)
+	Kit.stroke(badge, T.stroke.textSmall + 1)
+	Kit.gradient(badge, T.color.honeyTop, T.color.honeyBottom)
+	local icon = Kit.text("Icon", badge, "🍯", 28, { align = Enum.TextXAlignment.Center })
+	icon.Size = UDim2.fromScale(1, 1)
 
-	local hint = Theme.bodyText("Hint", pill, "")
-	hint.Position       = UDim2.new(0, 10, 0, 30)
-	hint.Size           = UDim2.new(1, -20, 0, 20)
-	hint.TextXAlignment = Enum.TextXAlignment.Center
+	local carry = Kit.text("Carry", pill, "", 28, { color = T.color.ink, align = Enum.TextXAlignment.Left })
+	carry.Position = UDim2.new(0, 64, 0, 6)
+	carry.Size     = UDim2.new(1, -76, 0, 30)
+
+	-- Fuell-Leiste (Spur + Honig-Fuellung)
+	local track = Kit.frame("Track", pill, T.color.sunk)
+	track.Position = UDim2.new(0, 64, 0, 40)
+	track.Size     = UDim2.new(1, -76, 0, 10)
+	Kit.corner(track, 5)
+	local fill = Kit.frame("Fill", track, Color3.new(1, 1, 1))
+	fill.Size = UDim2.fromScale(0, 1)
+	Kit.corner(fill, 5)
+	Kit.gradient(fill, T.color.honeyTop, T.color.honeyBottom)
+
+	local hint = Kit.text("Hint", pill, "", 16, { color = T.color.inkSoft, align = Enum.TextXAlignment.Left })
+	hint.Position = UDim2.new(0, 64, 0, 52)
+	hint.Size     = UDim2.new(1, -76, 0, 16)
 
 	_pill        = pill
 	_carryLabel  = carry
 	_hintLabel   = hint
+	_fill        = fill
 end
 
 --------------------------------------------------------------------------------

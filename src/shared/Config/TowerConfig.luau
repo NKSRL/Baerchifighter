@@ -51,6 +51,7 @@
 local Types        = require(script.Parent.Parent.Network.Types)
 local FeatureFlags = require(script.Parent.FeatureFlags)
 local CombatConfig = require(script.Parent.CombatConfig)
+local PowerConfig  = require(script.Parent.PowerConfig)   -- 20.10. P5b
 
 local TowerConfig = {}
 
@@ -99,6 +100,20 @@ local EASIER = FeatureFlags.isOn("TOWER_F_EASIER")
 local CUR_III   = if EASIER then NEU_III else ALT_III
 local CUR_FINAL = if EASIER then NEU_FINAL else ALT_FINAL
 
+-- 21.10. Balance V3 (Schalter TOWER_BALANCE_V3, Ueberschreibt die Werte oben): Enden der Kurven
+-- I 34 | II 50 | III 68 | Final 84 | Endless ab 85 (Aequivalenz). Zwischen Mythic und Divine liegen ~20
+-- Aequivalenz-Punkte: III endet darunter (Mythic schafft es), Final 100 liegt darueber (Divine mit gutem
+-- Ausbau). Messung: tools/sim/tower_rebalance_v3.lua, tools/sim/rarity_capability.lua.
+local V3 = FeatureFlags.isOn("TOWER_BALANCE_V3")
+local V3_II    = { start = 22, per = 0.65 }
+local V3_III   = { start = 41, per = 0.45 }
+local V3_FINAL = { start = 58, per = 0.265, reward = 10, gold = 40 }
+if V3 then
+	CUR_III   = V3_III
+	CUR_FINAL = V3_FINAL
+end
+local CUR_II = if V3 then V3_II else { start = 25, per = 0.95 }
+
 local TOWERS: { TowerDef } = {
 	{
 		-- Sammel-Update 05.10. (Paket 4.2, "Kaempfe frueher vorbei, nicht
@@ -117,7 +132,7 @@ local TOWERS: { TowerDef } = {
 	},
 	{
 		id = "II", index = 2, stages = 45,
-		startEquivalent = 25, equivalentPerStage = 0.95,
+		startEquivalent = CUR_II.start, equivalentPerStage = CUR_II.per,
 		rewardFactor = 1,
 		goldPerFive = 20,
 		look = "Stone", color = Color3.fromRGB(150, 160, 175), numeral = "II",
@@ -148,7 +163,7 @@ local TOWERS: { TowerDef } = {
 if FeatureFlags.isOn("ENDLESS") then
 	table.insert(TOWERS, {
 		id = "Endless", index = 5, stages = 999,
-		startEquivalent = 132, equivalentPerStage = 0.5,
+		startEquivalent = if V3 then 85 else 132, equivalentPerStage = 0.8,
 		rewardFactor = 1,
 		goldPerFive = 40,
 		look = "Endless", color = Color3.fromRGB(255, 170, 230), numeral = "∞",
@@ -203,7 +218,18 @@ end
 
 -- Gegner-Werte einer Stage. CombatService baut daraus den Snapshot.
 function TowerConfig.getEnemyStats(towerId: string, stage: number): CombatConfig.EnemyStats
-	return CombatConfig.getEnemyStatsForEquivalent(TowerConfig.getEquivalent(towerId, stage))
+	local stats = CombatConfig.getEnemyStatsForEquivalent(TowerConfig.getEquivalent(towerId, stage))
+	-- 20.10. P5b: Modell V2 hat eine schmalere Spieler-Spanne zwischen den Rarities, die Gegner skalieren mit.
+	if FeatureFlags.isOn("POWER_MODEL_V2") then
+		local factor = PowerConfig.TOWER_ENEMY_SCALE[towerId] or 1
+		if factor ~= 1 then
+			local scaled = table.clone(stats) :: any
+			scaled.maxHp = math.max(1, math.floor(stats.maxHp * factor))
+			scaled.atk = math.max(1, math.floor(stats.atk * factor))
+			return scaled
+		end
+	end
+	return stats
 end
 
 --------------------------------------------------------------------------------

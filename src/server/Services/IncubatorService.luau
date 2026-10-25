@@ -32,6 +32,7 @@ local EggConfig       = require(ReplicatedStorage.Config.EggConfig)
 local FeatureFlags    = require(ReplicatedStorage.Config.FeatureFlags)
 local IncubatorConfig = require(ReplicatedStorage.Config.IncubatorConfig)
 local IncubatorRules  = require(ReplicatedStorage.Modules.IncubatorRules)
+local TowerConfig     = require(ReplicatedStorage.Config.TowerConfig)   -- 20.10. P5a
 local EggCalculator   = require(ReplicatedStorage.Modules.EggCalculator)
 local EggTree         = require(ReplicatedStorage.Modules.EggTree)
 
@@ -245,8 +246,14 @@ function IncubatorService.upgrade(player: Player): boolean
 		fail(player, "RequestUpgradeIncubator", Loc.msg("err.incubator_max"))
 		return false
 	end
-	if (data.rebirthCount or 0) < cost.rebirths then
-		fail(player, "RequestUpgradeIncubator", Loc.msg("err.incubator_needs_rebirth", { n = cost.rebirths }))
+	local gateOk, gateTower = IncubatorRules.gate(target, data.rebirthCount or 0, data.towers and data.towers.records)
+	if not gateOk then
+		if gateTower then   -- 20.10. P5a: Tower-Sieg statt Rebirth
+			local gdef = TowerConfig.get(gateTower)
+			fail(player, "RequestUpgradeIncubator", Loc.msg("err.incubator_needs_tower", { tower = if gdef then gdef.numeral else gateTower }))
+		else
+			fail(player, "RequestUpgradeIncubator", Loc.msg("err.incubator_needs_rebirth", { n = cost.rebirths }))
+		end
 		return false
 	end
 	if data.gummies < cost.gummies then

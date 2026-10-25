@@ -344,6 +344,10 @@ local RequestSetLanguage = getOrCreateEvent("RequestSetLanguage")
 -- Args: music: number (0..1), sfx: number (0..1), muted: boolean
 local RequestSetAudio = getOrCreateEvent("RequestSetAudio")
 
+-- 21.10.: Option "Schwaches Geraet" speichern (nur true/false, der Server prueft den Typ).
+-- Args: lowEnd: boolean
+local RequestSetLowEnd = getOrCreateEvent("RequestSetLowEnd")
+
 -- HBB Paket 0: Messpunkte der Oberflaeche (Panel geoeffnet, Panel schnell
 -- wieder geschlossen, Spieler steht still). Reine Statistik, aendert nichts
 -- am Spielstand. Der Server prueft Art und Panel-Namen gegen
@@ -476,6 +480,7 @@ return {
 	RequestRebirth         = RequestRebirth,
 	RequestSetLanguage     = RequestSetLanguage,
 	RequestSetAudio        = RequestSetAudio,
+	RequestSetLowEnd       = RequestSetLowEnd,
 	RequestPromoteBaerchi  = RequestPromoteBaerchi,
 	RequestRollCharms      = RequestRollCharms,
 	RequestToggleCharmLock = RequestToggleCharmLock,

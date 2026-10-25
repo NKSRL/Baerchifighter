@@ -138,7 +138,7 @@ local BINDABLE_NAME = "RBLDebug"
 
 local commands = DebugRegistry.commands
 
-local MODULES = { "DebugBasics", "DebugProgress", "DebugWorld", "DebugArena", "DebugBaerchi", "DebugEvents", "DebugState" }
+local MODULES = { "DebugBasics", "DebugProgress", "DebugWorld", "DebugArena", "DebugBaerchi", "DebugEvents", "DebugState", "DebugBridge" }
 
 --------------------------------------------------------------------------------
 -- Hilfebefehl
