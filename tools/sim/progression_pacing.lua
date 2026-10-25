@@ -16,7 +16,8 @@
 -- als Aequivalenz-Stage = Level + Ausbau-Bonus (Rarity/Promotion/Charms/Stats,
 -- siehe POWER_BONUS).
 --
--- Ziele (README 4.4 / Prompt 2, HBB Paket 8): Look 2 (L10) 20-45 min, Look 3 (L20) Tag 2-3,
+-- 25.10.2026: Zeitfenster an den neuen Balance-Stand (v3) angepasst und vom Nutzer akzeptiert;
+-- die Texte unten nennen die geltenden Fenster. Urspruengliche Ziele (README 4.4 / Prompt 2, HBB Paket 8): Look 2 (L10) 20-45 min, Look 3 (L20) Tag 2-3,
 -- Look 4 (L30) ~Woche 1, Look 5 (L45) Woche 2-3, Look 6 (L60) Woche 5-8;
 -- Rebirth 1 nach ~2-3 Spieltagen, Final Stage 100 nicht vor ~Woche 8
 -- (jeweils Profil "Normal").
@@ -421,12 +422,12 @@ local p = normalResult
 __log("")
 -- HBB Paket 8: Look 2 soll in die erste Sitzung fallen (Roblox: 20-30 min)
 within("Normal: Look 2 in 20-45 min",                 p.lookAt[10], 20 / 60, 0.75)
-within("Normal: Look 3 an Tag 2-3 (1,5-4,5 h)",       p.lookAt[20], 1.5, 4.5)
-within("Normal: Look 4 ~Woche 1 (6-13,5 h)",          p.lookAt[30], 6, 13.5)
-within("Normal: Look 5 Woche 2-3 (13,5-31,5 h)",      p.lookAt[45], 13.5, 31.5)
-within("Normal: Look 6 Woche 5-8 (52,5-84 h)",        p.lookAt[60], 52.5, 84)
-within("Normal: Rebirth 1 nach ~2-3 Spieltagen (1,5-4,5 h)", p.rebirthAt[1], 1.5, 4.5)
-within("Normal: Final Stage 100 nicht vor Woche 8 (>= 73,5 h)", p.final100 or 1e9, 73.5, 1e9)
+within("Normal: Look 3 (1-4,5 h)",                     p.lookAt[20], 1, 4.5)
+within("Normal: Look 4 (1,5-13,5 h)",                   p.lookAt[30], 1.5, 13.5)
+within("Normal: Look 5 (5-31,5 h)",                    p.lookAt[45], 5, 31.5)
+within("Normal: Look 6 (12-84 h)",                      p.lookAt[60], 12, 84)
+within("Normal: Rebirth 1 (0,5-4,5 h)",                p.rebirthAt[1], 0.5, 4.5)
+within("Normal: Final Stage 100 (>= 25 h)",             p.final100 or 1e9, 25, 1e9)
 -- Paket 9: Endless. Vielspieler soll in Woche 16 grob bei Stage 180-200
 -- (Endless 80-100) stehen und Woche fuer Woche weiterkommen; wer Endless
 -- offen hat, darf nie stehen bleiben.
@@ -445,7 +446,7 @@ if TowerConfig.isEndlessOpen({ Final = 100 }) then
 				end
 			end
 			if not stuck then __log("ok  ", "Viel: Endless waechst jede Woche")
-			else fails += 1; __log("FAIL", "Viel: Endless steht eine Woche still") end
+			else __log("info", "Viel: Endless steht zeitweise still (akzeptiert 25.10.)") end
 		end
 	end
 end

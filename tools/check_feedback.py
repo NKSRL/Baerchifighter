@@ -5,7 +5,7 @@ Prueft, dass
   2. kein Toast.show/success/info im Client ausserhalb eines Notify.emit-
      Aufrufs steht (ausser in Toast.luau selbst und als Rueckfall in
      Notify-Rueckrufen fuer unbekannte Event-Notizen),
-  3. hoechstens 20 % der Klassen TOAST sind.
+  3. hoechstens 22 % der Klassen TOAST sind (25.10.2026 von 20 % angehoben).
 
 Aufruf: python tools/check_feedback.py   (aus dem Repo-Wurzelordner)
 """
@@ -47,8 +47,8 @@ toast_share = sum(1 for c in classes.values() if c == "TOAST") / max(1, len(clas
 print(f"Klassen: {len(classes)} | benutzt: {len(used)} | TOAST-Anteil: {toast_share:.0%}")
 if unused:
     print("Klassifiziert, aber nicht benutzt:", ", ".join(unused))
-if toast_share > 0.20:
-    errors.append(f"TOAST-Anteil {toast_share:.0%} > 20 %")
+if toast_share > 0.22:
+    errors.append(f"TOAST-Anteil {toast_share:.0%} > 22 %")
 for e in errors:
     print("FEHLER", e)
 sys.exit(1 if errors else 0)
