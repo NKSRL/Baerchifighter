@@ -1,0 +1,163 @@
+{
+  "quelle": "tools/pit/pit_kolosseum_scene.py",
+  "achsen": "Blender (x,y,z) -> Roblox (x,z,-y)",
+  "ursprung": "Arena-Mitte auf Kampfflaechen-Oberkante; Modell -Z zeigt zum Steg",
+  "dateien": {
+    "Pit_Kolosseum.fbx": {
+      "Pit_Sandstein": {
+        "tris": 3188,
+        "roblox_center": [
+          0.0,
+          3.7,
+          -0.0
+        ],
+        "roblox_size": [
+          75.8,
+          10.6,
+          67.525
+        ],
+        "color": [
+          238,
+          223,
+          192
+        ],
+        "material": "SmoothPlastic"
+      },
+      "Pit_Schiefer": {
+        "tris": 3924,
+        "roblox_center": [
+          0.0,
+          4.9,
+          -0.0
+        ],
+        "roblox_size": [
+          75.4,
+          13.0,
+          69.289
+        ],
+        "color": [
+          48,
+          43,
+          64
+        ],
+        "material": "SmoothPlastic"
+      },
+      "Pit_Gold": {
+        "tris": 3380,
+        "roblox_center": [
+          0.0,
+          7.075,
+          -0.0
+        ],
+        "roblox_size": [
+          75.5,
+          14.25,
+          67.715
+        ],
+        "color": [
+          242,
+          188,
+          64
+        ],
+        "material": "Metal"
+      },
+      "Pit_Waben": {
+        "tris": 4460,
+        "roblox_center": [
+          0.0,
+          5.375,
+          1.176
+        ],
+        "roblox_size": [
+          55.974,
+          10.85,
+          54.009
+        ],
+        "color": [
+          236,
+          182,
+          82
+        ],
+        "material": "SmoothPlastic"
+      },
+      "Pit_Honig": {
+        "tris": 960,
+        "roblox_center": [
+          0.0,
+          -0.3,
+          -0.0
+        ],
+        "roblox_size": [
+          53.2,
+          0.2,
+          53.2
+        ],
+        "color": [
+          255,
+          196,
+          56
+        ],
+        "material": "Neon"
+      },
+      "Pit_Wimpel": {
+        "tris": 112,
+        "roblox_center": [
+          0.0,
+          9.325,
+          -0.0
+        ],
+        "roblox_size": [
+          72.9,
+          9.45,
+          56.36
+        ],
+        "color": [
+          215,
+          60,
+          75
+        ],
+        "material": "SmoothPlastic"
+      }
+    },
+    "Pit_Stufe.fbx": {
+      "Pit_Stufe_Rand": {
+        "tris": 576,
+        "roblox_center": [
+          0.0,
+          -0.17,
+          -0.0
+        ],
+        "roblox_size": [
+          54.2,
+          0.46,
+          54.2
+        ],
+        "color": [
+          238,
+          223,
+          192
+        ],
+        "material": "SmoothPlastic"
+      },
+      "Pit_Stufe_Gold": {
+        "tris": 1536,
+        "roblox_center": [
+          0.0,
+          0.86,
+          -0.0
+        ],
+        "roblox_size": [
+          53.7,
+          1.64,
+          53.7
+        ],
+        "color": [
+          242,
+          188,
+          64
+        ],
+        "material": "Metal"
+      }
+    }
+  }
+}

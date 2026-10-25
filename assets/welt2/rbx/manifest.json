@@ -1,0 +1,350 @@
+{
+ "placements": {
+  "Fusion": {
+   "pos": [
+    -0.0,
+    0.65,
+    0.0
+   ],
+   "yawDeg": 0.0
+  },
+  "Brunnen": {
+   "pos": [
+    -38.0,
+    0.65,
+    -4.0
+   ],
+   "yawDeg": -90.0
+  },
+  "Inkubator": {
+   "pos": [
+    38.0,
+    0.65,
+    -4.0
+   ],
+   "yawDeg": 90.0
+  },
+  "Recycler": {
+   "pos": [
+    -15.0,
+    0.65,
+    -47.0
+   ],
+   "yawDeg": 0.0
+  },
+  "Terminal": {
+   "pos": [
+    -11.0,
+    0.65,
+    45.0
+   ],
+   "yawDeg": -36.0
+  }
+ },
+ "materials": {
+  "W2_Floor": {
+   "rgb": [
+    62,
+    54,
+    82
+   ],
+   "emit": 0.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_Floor2": {
+   "rgb": [
+    54,
+    47,
+    72
+   ],
+   "emit": 0.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_Obsidian": {
+   "rgb": [
+    44,
+    38,
+    60
+   ],
+   "emit": 0.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_MagentaSoft": {
+   "rgb": [
+    255,
+    90,
+    210
+   ],
+   "emit": 1.6,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_Gold": {
+   "rgb": [
+    255,
+    205,
+    90
+   ],
+   "emit": 0.35,
+   "alpha": 1.0,
+   "metal": 0.25
+  },
+  "W2_GoldGlow": {
+   "rgb": [
+    255,
+    200,
+    80
+   ],
+   "emit": 3.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_ObsidianDark": {
+   "rgb": [
+    28,
+    24,
+    40
+   ],
+   "emit": 0.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_MagentaGlow": {
+   "rgb": [
+    255,
+    90,
+    210
+   ],
+   "emit": 4.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_Honey": {
+   "rgb": [
+    255,
+    120,
+    0
+   ],
+   "emit": 0.9,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_CyanGlow": {
+   "rgb": [
+    90,
+    230,
+    255
+   ],
+   "emit": 3.5,
+   "alpha": 1.0,
+   "metal": 0.0
+  },
+  "W2_Glass": {
+   "rgb": [
+    200,
+    170,
+    255
+   ],
+   "emit": 0.4,
+   "alpha": 0.35,
+   "metal": 0.0
+  },
+  "W2_GreenGlow": {
+   "rgb": [
+    90,
+    235,
+    140
+   ],
+   "emit": 3.0,
+   "alpha": 1.0,
+   "metal": 0.0
+  }
+ },
+ "beams": [
+  {
+   "name": "Strahl_Brunnen",
+   "pos": [
+    -38.0,
+    13.15,
+    -4.0
+   ],
+   "h": 22.0,
+   "r": 1.8,
+   "mat": "W2_BeamHoney2",
+   "tier": 6,
+   "bld": "Honigbrunnen"
+  },
+  {
+   "name": "Strahl_Inkubator",
+   "pos": [
+    38.0,
+    9.85,
+    -4.0
+   ],
+   "h": 20.0,
+   "r": 1.6,
+   "mat": "W2_BeamHoney2",
+   "tier": 4,
+   "bld": "Inkubator"
+  },
+  {
+   "name": "Strahl_Kern",
+   "pos": [
+    -0.0,
+    21.0,
+    0.0
+   ],
+   "h": 48.0,
+   "r": 3.6,
+   "mat": "W2_BeamHoney2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_Recycler",
+   "pos": [
+    -15.0,
+    10.65,
+    -47.0
+   ],
+   "h": 18.0,
+   "r": 1.8,
+   "mat": "W2_BeamHoney2",
+   "tier": 6,
+   "bld": "Recycler"
+  },
+  {
+   "name": "Strahl_S0_Kristall",
+   "pos": [
+    -54.36,
+    23.33,
+    10.81
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamMagenta2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S10_Kristall",
+   "pos": [
+    30.79,
+    23.33,
+    -46.08
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamMagenta2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S13_Kristall",
+   "pos": [
+    -30.79,
+    16.72,
+    -46.08
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamHoney2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S14_Kristall",
+   "pos": [
+    -46.08,
+    23.33,
+    -30.79
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamMagenta2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S1_Kristall",
+   "pos": [
+    -46.08,
+    16.72,
+    30.79
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamHoney2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S2_Kristall",
+   "pos": [
+    -30.79,
+    23.33,
+    46.08
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamMagenta2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S5_Kristall",
+   "pos": [
+    30.79,
+    16.72,
+    46.08
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamHoney2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S6_Kristall",
+   "pos": [
+    46.08,
+    23.33,
+    30.79
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamMagenta2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S8_Kristall",
+   "pos": [
+    54.36,
+    23.33,
+    -10.81
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamMagenta2",
+   "tier": 0,
+   "bld": "Plot"
+  },
+  {
+   "name": "Strahl_S9_Kristall",
+   "pos": [
+    46.08,
+    16.72,
+    -30.79
+   ],
+   "h": 22.0,
+   "r": 0.9,
+   "mat": "W2_BeamHoney2",
+   "tier": 0,
+   "bld": "Plot"
+  }
+ ]
+}
