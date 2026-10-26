@@ -57,6 +57,8 @@ local Remotes          = require(ReplicatedStorage.Network.Remotes)
 local BaerchiConfig    = require(ReplicatedStorage.Config.BaerchiConfig)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)   -- 26.10. Traenke
+local PotionRules      = require(ReplicatedStorage.Modules.PotionRules)   -- 26.10. Traenke
 
 local PlayerService   = require(ServerScriptService.Services.PlayerService)
 local EconomyService  = require(ServerScriptService.Services.EconomyService)
@@ -162,6 +164,18 @@ function CombatService._startRun(player: Player, baerchiUid: string, choice: Res
 	end
 
 	local stats = CombatCalculator.getEffectiveStats(baerchi, def.baseStats)
+
+	-- 26.10. (POTIONS_V1): Kraft-Trank = Angriff mal Faktor, als Momentaufnahme
+	-- beim Start (wie der Deckel) — ein Trank, der mitten im Lauf ablaeuft,
+	-- gilt fuer diesen Lauf noch. Kopie, damit die Kampfwerte des Baerchis
+	-- (maxHp fuer das Klemmen unten) unveraendert bleiben.
+	if FeatureFlags.isOn("POTIONS_V1") then
+		local strength = PotionRules.multiplier((data :: any).potions, "strength", os.time())
+		if strength ~= 1 then
+			stats = table.clone(stats)
+			stats.atk = math.max(1, math.floor(stats.atk * strength))
+		end
+	end
 
 	-- Der gespeicherte Wert kann ueber maxHp liegen, wenn der Baerchi seit dem
 	-- letzten Lauf ein Level gestiegen ist — deshalb immer klemmen.

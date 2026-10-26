@@ -123,6 +123,24 @@ function Names.charmStat(statId: string): string
 end
 
 --------------------------------------------------------------------------------
+-- 26.10. Traenke (Config/PotionConfig traegt bewusst keine Texte: Name und
+-- Beschreibung stehen NUR in den Sprachdateien, Rueckfall ist die id)
+--------------------------------------------------------------------------------
+
+function Names.potion(potionId: string): string
+	return Loc.name("potion." .. potionId .. ".name", potionId)
+end
+
+function Names.potionDesc(potionId: string): string
+	return Loc.name("potion." .. potionId .. ".desc", "")
+end
+
+-- Sorte ("Staerke", "Muenzen", ...), z. B. fuer den HUD-Chip
+function Names.potionKind(kind: string): string
+	return Loc.name("potion.kind." .. kind, kind)
+end
+
+--------------------------------------------------------------------------------
 -- Dieselben Namen als Nachricht (fuer den Server)
 --------------------------------------------------------------------------------
 -- Der Server kennt die Sprache des Spielers nicht. Er schickt deshalb nur den
@@ -136,6 +154,7 @@ Names.msg = {
 	event    = function(eventId: string): Types.LocMsg return Loc.msg("event." .. eventId .. ".name") end,
 	building = function(buildingId: string): Types.LocMsg return Loc.msg("building." .. buildingId .. ".name") end,
 	mutation = function(mutation: string): Types.LocMsg return Loc.msg("mutation." .. mutation .. ".name") end,
+	potion   = function(potionId: string): Types.LocMsg return Loc.msg("potion." .. potionId .. ".name") end,   -- 26.10.
 }
 
 return Names

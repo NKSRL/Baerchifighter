@@ -143,24 +143,41 @@ local function buildStand(): BasePart
 	return counter
 end
 
-local function onTriggered(player: Player)
+-- Die Theke (PrimaryPart des Stands). nil, bevor init gelaufen ist.
+-- 26.10.: PotionService haengt sein Regal daran.
+function EggMerchantService.getCounter(): BasePart?
+	return _counter
+end
+
+-- Steht der Spieler am Stand? Dieselbe Entfernung wie beim Ei-Kauf; der
+-- Server prueft das selbst, egal was der Client behauptet. 26.10.: auch fuer
+-- den Trank-Kauf (PotionService).
+function EggMerchantService.isNear(player: Player): boolean
 	local counter = _counter
-	if not counter then return end
+	if not counter then return false end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not (root and root:IsA("BasePart")) then return false end
+	return (root.Position - counter.Position).Magnitude <= EggConfig.MERCHANT.maxBuyDistance
+end
+
+-- Ein Basis-Ei kaufen und sofort oeffnen. Aufgerufen vom Prompt an der Theke
+-- und (26.10.) vom Haendler-Fenster (RequestMerchantBuy "egg"). Entprellung,
+-- Entfernung und Abrechnung bleiben in jedem Fall hier.
+function EggMerchantService.buyEgg(player: Player): boolean
+	local counter = _counter
+	if not counter then return false end
 
 	local now = os.clock()
 	if now - (_lastBuy[player] or 0) < BUY_COOLDOWN then
-		return
+		return false
 	end
 	_lastBuy[player] = now
 
 	-- Eigene Entfernungspruefung: nur wer wirklich am Stand steht, kauft.
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not (root and root:IsA("BasePart")) then return end
-
-	if (root.Position - counter.Position).Magnitude > EggConfig.MERCHANT.maxBuyDistance then
+	if not EggMerchantService.isNear(player) then
 		Remotes.ActionFailed:FireClient(player, "BuyBasicEgg", Loc.msg("err.merchant_far"))
-		return
+		return false
 	end
 
 	if EggService.buyFromMerchant(player) then
@@ -170,7 +187,7 @@ local function onTriggered(player: Player)
 		-- startet sie direkt, siehe HatchAnimation.deliver). Klappt das
 		-- Oeffnen nicht, liegt das Ei im Lager und es gibt den alten Toast.
 		if EggService.openEgg(player, EggConfig.MERCHANT.eggType) then
-			return
+			return true
 		end
 		-- Kurze Bestaetigung ueber den bestehenden Ei-Eingang (Toast "+1 Basis-Ei")
 		Remotes.EggCollectedReceived:FireClient(player, {
@@ -178,7 +195,13 @@ local function onTriggered(player: Player)
 			eggType = EggConfig.MERCHANT.eggType,
 			inStock = -1,   -- -1 = Anzeige ohne Lagerzahl
 		})
+		return true
 	end
+	return false
+end
+
+local function onTriggered(player: Player)
+	EggMerchantService.buyEgg(player)
 end
 
 function EggMerchantService.init()

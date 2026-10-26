@@ -65,6 +65,7 @@ local CLASSES: { [string]: Class } = {
 	daily_claimed      = "ICON",
 	quest_reward       = "ICON",
 	event_notice_good  = "ICON",    -- Event-Belohnung (Gummies/Waben/Fund); Rarity-Aufstieg als Moment
+	potion_bought      = "MOMENT",  -- 26.10.: Trank gekauft (grosses Zeichen, ein Wort); Faktor und Restzeit zeigt der HUD-Chip
 
 	-- Sieht man ohnehin
 	boss_hit           = "NONE",    -- Rueckstoss + Verlangsamung sind deutlich genug

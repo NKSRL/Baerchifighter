@@ -110,6 +110,8 @@ local REGISTRY: { { name: string, module: ModuleScript } } = {
 	{ name = "LiveBoardService",   module = ServerScriptService.Services.LiveBoardService },
 	-- HBB Paket 10: Shop (Gratis-Griff, Robux-Goldpakete)
 	{ name = "ShopService",        module = ServerScriptService.Services.ShopService },
+	-- 26.10.: Traenke am Haendler in der Mitte (Regal haengt sich in start() an den Stand)
+	{ name = "PotionService",      module = ServerScriptService.Services.PotionService },
 }
 
 local loaded: { [string]: any } = {}

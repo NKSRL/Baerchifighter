@@ -137,15 +137,24 @@ local function publishCarried(player: Player)
 	player:SetAttribute("CombsUnits", carried.units)
 end
 
+-- 26.10. Traenke: Tempo-Trank. PotionService setzt das Spieler-Attribut
+-- "PotionSpeed" (Faktor > 1) und fasst WalkSpeed nur an, solange keine Waben
+-- getragen werden; hier wird der Faktor auf beide Werte (gebremst, normal)
+-- gerechnet, damit der Trank im Pit nicht verloren geht. Ohne Attribut = 1.
+local function potionSpeedFactor(player: Player): number
+	local factor = player:GetAttribute("PotionSpeed")
+	return if typeof(factor) == "number" and factor > 0 then factor else 1
+end
+
 -- Wie schnell der Spieler IM PIT mit diesem Stapel laeuft. Jede Wabe bremst
 -- mit dem Wert ihres Themas (Lava ist schwerer).
-local function pitWalkSpeed(carried: Carried): number
+local function pitWalkSpeed(player: Player, carried: Carried): number
 	local slow = 0
 	for _, item in carried.items do
 		slow += item.slow
 	end
 	local factor = math.max(CombConfig.MIN_SPEED_FACTOR, 1 - slow)
-	return CombConfig.BASE_WALK_SPEED * factor
+	return CombConfig.BASE_WALK_SPEED * potionSpeedFactor(player) * factor
 end
 
 local function restoreSpeed(player: Player)
@@ -154,7 +163,7 @@ local function restoreSpeed(player: Player)
 
 	local humanoid = getHumanoid(player)
 	if humanoid then
-		humanoid.WalkSpeed = CombConfig.BASE_WALK_SPEED
+		humanoid.WalkSpeed = CombConfig.BASE_WALK_SPEED * potionSpeedFactor(player)
 	end
 end
 
@@ -456,7 +465,7 @@ local function checkPlayer(player: Player)
 	-- Tempo: nur im Pit und nur mit Last. Ausserhalb wieder normal.
 	if inPit and count > 0 then
 		_slowed[player] = true
-		humanoid.WalkSpeed = pitWalkSpeed(getCarried(player))
+		humanoid.WalkSpeed = pitWalkSpeed(player, getCarried(player))
 	else
 		restoreSpeed(player)
 	end

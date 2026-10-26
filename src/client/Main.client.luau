@@ -85,6 +85,8 @@ local Toast            = require(UI:WaitForChild("Toast"))
 local UiScale          = require(UI:WaitForChild("UiScale"))
 local DeviceProfile    = require(UI:WaitForChild("DeviceProfile"))   -- W1-P6b Geraete-Profil
 local ShopPanel        = require(UI:WaitForChild("ShopPanel"))
+local MerchantPanel    = require(UI:WaitForChild("MerchantPanel"))   -- 26.10. Traenke
+local PotionBar        = require(UI:WaitForChild("PotionBar"))       -- 26.10. Traenke
 local Hud              = require(UI:WaitForChild("Hud"))
 local MenuBar          = require(UI:WaitForChild("MenuBar"))
 local BaerchiPanel     = require(UI:WaitForChild("BaerchiPanel"))
@@ -178,6 +180,7 @@ LeaderboardPanel.init(screenGui)
 ProfilePanel.init(screenGui)
 DailyBonusPanel.init(screenGui)
 ShopPanel.init(screenGui)          -- HBB Paket 10 (nur mit SHOP_V1)
+MerchantPanel.init(screenGui)      -- 26.10. Traenke: Haendler-Fenster (nur mit POTIONS_V1)
 IncubatorPanel.init(screenGui)     -- Sammel-Update Paket 8
 
 Hud.init(screenGui)
@@ -201,6 +204,8 @@ QuestTracker.init(screenGui)
 HudRow.init(screenGui)
 -- v19 (P3): Reise-Leiste (Tower-Tutorial), Schalter ONBOARDING_V2
 JourneyPanel.init(screenGui)
+-- 26.10. Traenke: Chips mit Restzeit unter der Knopf-Zeile (braucht ClientState, Toast)
+PotionBar.init(screenGui)
 
 -- v12: untere Pet-Leiste (Event / Fight), legt auch den PitResumeDialog an
 PetBar.init(screenGui)

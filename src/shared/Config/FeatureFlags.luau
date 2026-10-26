@@ -222,6 +222,14 @@ local FLAGS: { [string]: boolean } = {
 	-- ServerStorage.Assets.PitV2. Aus oder Vorlage fehlt = altes Pit. Plan: nach Abnahme
 	-- plus einem Release entfernen. Bericht: claude/HBB_PIT_V2_KOLOSSEUM_2026-10-25.md
 	PIT_V2 = true,
+
+	-- 26.10.: Traenke (Staerke, Muenzen, Tempo, Glueck, Pet-EXP) beim Haendler in der
+	-- Mitte: Regal mit eigenem Prompt am Ei-Stand, Fenster mit bis zu 6 Angeboten
+	-- (Basis-Ei + 3-5 Traenke, Los wechselt alle 5 Minuten), Restzeit im HUD.
+	-- Aus = kein Regal, kein Fenster, alle Faktoren 1, Ei-Haendler wie vorher.
+	-- Zahlen: Config/PotionConfig, Regeln: Modules/PotionRules.
+	-- Bericht: docs/HBB_POTIONS_2026-10-26.md
+	POTIONS_V1 = true,
 }
 
 local FeatureFlags = {}

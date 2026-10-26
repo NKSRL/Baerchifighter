@@ -176,7 +176,11 @@ end
 --------------------------------------------------------------------------------
 
 local function tunePrompt(prompt: ProximityPrompt)
-	prompt.GamepadKeyCode = Enum.KeyCode[GamepadConfig.PROMPT_KEY]
+	-- 26.10. Traenke: das Regal am Haendler hat bewusst eine andere Taste (Y),
+	-- damit es neben dem Ei-Prompt (X) stehen kann — Attribut vom Server.
+	if prompt:GetAttribute("KeepGamepadKey") ~= true then
+		prompt.GamepadKeyCode = Enum.KeyCode[GamepadConfig.PROMPT_KEY]
+	end
 	prompt.ClickablePrompt = true
 end
 

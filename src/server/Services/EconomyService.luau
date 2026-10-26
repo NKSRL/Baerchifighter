@@ -17,6 +17,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)   -- 26.10. Traenke
+local PotionRules      = require(ReplicatedStorage.Modules.PotionRules)   -- 26.10. Traenke
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 
@@ -64,12 +66,17 @@ end
 
 -- Gutschrift MIT rebirthMult. Gibt den tatsaechlich gutgeschriebenen
 -- Betrag zurueck — Aufrufer melden diesen Wert an den Client, nicht den Basiswert.
+-- 26.10. (POTIONS_V1): der Muenz-Trank wirkt GENAU HIER, also nur auf
+-- Einkommen — Erstattungen und Verkaufswerte (awardGummiesFlat) bleiben flach.
 function EconomyService.awardGummies(player: Player, baseAmount: number): number
 	local data = PlayerService.getData(player)
 	if not data then return 0 end
 	if baseAmount <= 0 then return 0 end
 
-	local final = math.max(1, math.floor(baseAmount * data.rebirthMult))
+	local potion = if FeatureFlags.isOn("POTIONS_V1")
+		then PotionRules.multiplier((data :: any).potions, "coins", os.time())
+		else 1
+	local final = math.max(1, math.floor(baseAmount * data.rebirthMult * potion))
 	credit(player, "gummies", final)
 
 	data.stats.totalGummiesEarned += final

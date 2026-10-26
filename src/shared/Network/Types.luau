@@ -532,6 +532,55 @@ export type ShopView = {
 	freeGold   : number,
 }
 
+-- 26.10. Traenke (Regeln: Modules/PotionRules, Zahlen: Config/PotionConfig).
+-- Je Sorte (PotionConfig.Kind) hoechstens EIN laufender Effekt; expiresAt ist
+-- Unix-Zeit des Servers, damit ein Trank auch ueber einen Rejoin weiterlaeuft.
+export type PotionEffect = {
+	potionId   : string,
+	multiplier : number,
+	expiresAt  : number,
+}
+
+export type PotionState = {
+	active : { [string]: PotionEffect },   -- Schluessel = Sorte
+	bought : number,                        -- gekaufte Traenke gesamt (Statistik)
+}
+
+-- Sicht fuer den Client: Restzeit statt Zeitpunkt (Uhren unterscheiden sich)
+export type PotionEffectView = {
+	kind       : string,
+	potionId   : string,
+	multiplier : number,
+	remaining  : number,
+}
+
+-- Ein Platz im Sortiment des Haendlers. `action` = PotionRules.check-Ergebnis
+-- fuer DIESEN Spieler ("new" | "extend" | "replace" | "weaker" | "maxtime").
+export type MerchantOffer = {
+	slot     : number,
+	potionId : string,
+	price    : number,
+	action   : string,
+}
+
+-- Was der Client fuer das Haendler-Fenster braucht (MerchantViewReceived)
+export type MerchantView = {
+	window    : number,              -- Zeitfenster des Loses (Kauf nennt es mit)
+	rotatesIn : number,              -- Sekunden bis zum naechsten Sortiment
+	offers    : { MerchantOffer },
+	eggPrice  : number,              -- Basis-Ei (fester erster Platz)
+	eggType   : string,
+}
+
+-- Bestaetigung eines Trank-Kaufs (PotionActivated)
+export type PotionActivatedResult = {
+	potionId   : string,
+	kind       : string,
+	multiplier : number,
+	remaining  : number,
+	action     : string,
+}
+
 -- v18 (Final-Epilog): Fortschritt der Epilog-Sequenz nach Final 100. Nur der
 -- Server schreibt. none -> pending -> seen -> launched (Config/EpilogConfig).
 -- v19 (20.10., P3 "Reise"): was der Spieler mit den Etappen gemacht hat. Die Etappen selbst
@@ -618,6 +667,9 @@ export type PlayerData = {
 	-- HBB Paket 10: Shop (Gratis-Griff, gemerkte Robux-Kaeufe)
 	shop : ShopState,
 
+	-- v20 (26.10.): laufende Traenke (ueberleben Rejoin und Rebirth)
+	potions : PotionState,
+
 	-- v13: Quest-Stand
 	quests : QuestState,
 
@@ -682,6 +734,7 @@ export type PlayerDataUpdate = {
 	uiSeen       : { [string]: boolean }?,   -- HBB Paket 3
 	shop         : ShopView?,                -- HBB Paket 10
 	indexClaimed : { [string]: boolean }?,   -- v16: Paket 7
+	potions      : { PotionEffectView }?,    -- v20: laufende Traenke mit Restzeit
 }
 
 -- v15: was der Client fuer das Login-Bonus-Fenster braucht (fertig
@@ -1090,7 +1143,10 @@ local function createDefaultPlayerData(): PlayerData
 		-- v19 (20.10., P3): journey { claimed, skipped, hidden }. Die Migration markiert
 		-- schon erfuellte Etappen als abgeholt (ohne Nachzahlung) — das haengt am Spielstand,
 		-- nicht nur am fehlenden Feld, deshalb Sprung.
-		version    = 19,  -- v19: Reise (Tower-Tutorial), v18: Final-Epilog, v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
+		-- v20 (26.10., Traenke): potions { active, bought }. Nur Anlegen/Reparieren, am Feld
+		-- erkennbar (PlayerMigration.stepPotions); die Zahl steigt nach der Regel "neues Feld =
+		-- neue Version".
+		version    = 20,  -- v20: Traenke, v19: Reise (Tower-Tutorial), v18: Final-Epilog, v17: Tower-Freischaltung durch Schaffen, v16: Sammel-Update, v15: Tower + Gebaeude B + Login-Bonus, v14: Ei-Baum, v13: Quests + Index (discovered, quests, stats.totalHatched), v12: Sofort-Oeffnen + pitProgress, v11: Mutation-System (v10: Eier legen, v9: PWR statt DEF + Inverted, v8: Promotion/Charms/Stat-Level, v7: Gebaeude-Rollen, v6: equippedUid, v5: Ei-uid, v4: Honig-Gebaeude + currentHp)
 		createdAt  = now,
 		lastSeenAt = now,
 
@@ -1153,6 +1209,9 @@ local function createDefaultPlayerData(): PlayerData
 		-- HBB Paket 10: Shop (Modules/ShopRules). freeGrabDay = UTC-Tag des
 		-- letzten Gratis-Griffs (-1 = nie), receipts = gemerkte Robux-Kauf-IDs.
 		shop = { freeGrabDay = -1, receipts = {} },
+
+		-- v20 (26.10.): Traenke (Modules/PotionRules.newState)
+		potions = { active = {}, bought = 0 },
 
 		discovered = {},
 		uiSeen     = {},

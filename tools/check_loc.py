@@ -56,6 +56,7 @@ ANY_LITERAL = re.compile(r'"([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)"')
 DYNAMIC_PREFIXES = (
     "baerchi.", "rarity.", "mutation.", "egg.", "building.", "rank.", "skill.",
     "charm.", "event.",
+    "potion.",   # 26.10. Traenke: Names.potion / potionDesc / potionKind
 )
 
 

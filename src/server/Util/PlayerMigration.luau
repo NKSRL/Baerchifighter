@@ -770,6 +770,28 @@ local function stepSammelUpdate(data: Types.PlayerData)
 	end
 end
 
+-- v20 (26.10.): Traenke. Nur Anlegen/Reparieren, am Feld erkennbar und deshalb
+-- bei jedem Laden wiederholbar. Ein kaputter Eintrag (kein Zeitpunkt, kein
+-- Faktor) faellt weg — ein Trank ist ein Verbrauchsgut, kein Fortschritt.
+local function stepPotions(data: Types.PlayerData, default: Types.PlayerData)
+	local potions = (data :: any).potions
+	if typeof(potions) ~= "table" then
+		(data :: any).potions = default.potions
+		return
+	end
+	if typeof(potions.active) ~= "table" then potions.active = {} end
+	if typeof(potions.bought) ~= "number" or potions.bought < 0 then potions.bought = 0 end
+	for kind, effect in potions.active do
+		local ok = typeof(kind) == "string" and typeof(effect) == "table"
+			and typeof(effect.potionId) == "string"
+			and typeof(effect.multiplier) == "number" and effect.multiplier > 0
+			and typeof(effect.expiresAt) == "number"
+		if not ok then
+			potions.active[kind] = nil
+		end
+	end
+end
+
 -- Fehlende Felder aus Default auffuellen (einfache Migration fuer neue Felder).
 -- Muss jedes Feld abdecken das seit dem ersten Release in Types.luau
 -- dazugekommen ist — sonst crasht alter Save-Stand beim ersten Zugriff.
@@ -790,6 +812,7 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	stepRunResumeAndDaily(data)
 	stepBaerchiFields(data)
 	stepSammelUpdate(data)
+	stepPotions(data, default)   -- v20
 
 	-- Zum Schluss die Versionsnummer nachziehen. Sie steuert heute keine der
 	-- Migrationen oben — die pruefen alle einzeln auf fehlende Felder und

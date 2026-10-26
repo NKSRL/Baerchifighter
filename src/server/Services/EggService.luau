@@ -34,6 +34,7 @@ local BaerchiConfig  = require(ReplicatedStorage.Config.BaerchiConfig)
 local GachaRoller    = require(ReplicatedStorage.Modules.GachaRoller)
 local BaerchiFactory = require(ReplicatedStorage.Modules.BaerchiFactory)
 local PetCapacity    = require(ReplicatedStorage.Modules.PetCapacity)   -- 19.10.: Pet-Limit
+local PotionRules    = require(ReplicatedStorage.Modules.PotionRules)   -- 26.10.: Gluecks-Trank
 
 local PlayerService  = require(ServerScriptService.Services.PlayerService)
 local EconomyService = require(ServerScriptService.Services.EconomyService)
@@ -97,6 +98,16 @@ function EggService.openEgg(player: Player, eggType: Types.EggType, fromIncubato
 	local entries: { GachaRoller.WeightedEntry } = {}
 	for _, weighted in weightedTable do
 		table.insert(entries, { configId = weighted.configId, weight = weighted.weight })
+	end
+
+	-- 26.10. (POTIONS_V1): Gluecks-Trank — alles ausser dem haeufigsten
+	-- Ergebnis bekommt das x-fache Gewicht (PotionRules.applyLuck). Der
+	-- Mutations-Wurf darunter bleibt unberuehrt.
+	if FeatureFlags.isOn("POTIONS_V1") then
+		local luck = PotionRules.multiplier((data :: any).potions, "luck", os.time())
+		if luck ~= 1 then
+			entries = PotionRules.applyLuck(entries, luck)
+		end
 	end
 
 	local wonConfigId = GachaRoller.roll(entries)

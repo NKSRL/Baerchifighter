@@ -31,6 +31,7 @@ local Remotes         = require(ReplicatedStorage.Network.Remotes)
 local QuestProgress   = require(ReplicatedStorage.Modules.QuestProgress)
 local ShopRules     = require(ReplicatedStorage.Modules.ShopRules)
 local ShopConfig    = require(ReplicatedStorage.Config.ShopConfig)
+local PotionRules   = require(ReplicatedStorage.Modules.PotionRules)   -- 26.10. Traenke
 local MapService      = require(ServerScriptService.Services.MapService)
 local RateLimiter     = require(ServerScriptService.Util.RateLimiter)
 local PlayerMigration = require(ServerScriptService.Util.PlayerMigration)
@@ -403,6 +404,8 @@ local function buildUpdate(data: Types.PlayerData): Types.PlayerDataUpdate
 		uiSeen       = data.uiSeen,   -- HBB Paket 3
 		shop         = shopView(data),  -- HBB Paket 10
 		indexClaimed = data.indexClaimed,   -- Sammel-Update Paket 7
+		-- 26.10. Traenke: laufende Effekte mit Restzeit (der Client zaehlt herunter)
+		potions      = PotionRules.view((data :: any).potions, os.time()),
 	}
 end
 

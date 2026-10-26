@@ -55,6 +55,8 @@ local DebugConfig      = require(ReplicatedStorage.Config.DebugConfig)
 local BuildingBehavior = require(ReplicatedStorage.Config.BuildingBehavior)
 local CombatCalculator = require(ReplicatedStorage.Modules.CombatCalculator)
 local TowerConfig      = require(ReplicatedStorage.Config.TowerConfig)  -- Paket 9: Endless offen?
+local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)   -- 26.10. Traenke
+local PotionRules      = require(ReplicatedStorage.Modules.PotionRules)   -- 26.10. Traenke
 
 local PlayerService = require(ServerScriptService.Services.PlayerService)
 local MapService     = require(ServerScriptService.Services.MapService)
@@ -315,6 +317,10 @@ function HoneyService.feed(player: Player, baerchiUid: string, buildingId: Types
 	local heal   = math.max(1, math.floor(statsBefore.maxHp * healPercent))
 	local hpNow  = math.min(statsBefore.maxHp, hpBefore + heal)
 	local xp     = BuildingBehavior.getXpPerHoney(data.island.buildings)
+	-- 26.10. (POTIONS_V1): EXP-Trank = XP je Honig mal Faktor (auch Auto-Abnahme)
+	if FeatureFlags.isOn("POTIONS_V1") then
+		xp = math.max(1, math.floor(xp * PotionRules.multiplier((data :: any).potions, "petxp", os.time())))
+	end
 
 	building.honey    -= 1
 	baerchi.currentHp  = hpNow

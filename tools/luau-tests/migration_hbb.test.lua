@@ -409,7 +409,7 @@ do
 		return d
 	end
 
-	check("K0 Standard-Version ist 19", Types.createDefaultPlayerData().version, 19)
+	check("K0 Standard-Version ist 20", Types.createDefaultPlayerData().version, 20)   -- v20: Traenke (26.10.)
 	local fresh = Types.createDefaultPlayerData()
 	check("K0 neuer Spieler: epilog none", fresh.epilog.state, "none")
 	check("K0 neuer Spieler: Welt 2 zu", fresh.worlds.unlocked.World2, nil)
@@ -419,7 +419,7 @@ do
 	check("K1 firstClearAt gesetzt", type(veteran.epilog.firstClearAt), "number")
 	check("K1 Endless offen", veteran.towers.unlocked.Endless, true)
 	check("K1 Welt 2 zu", veteran.worlds.unlocked.World2, nil)
-	check("K1 Version 19", veteran.version, 19)
+	check("K1 Version 20", veteran.version, 20)
 	-- v19 (P3 Reise): Bestandsspieler mit Final 100 hat alle Etappen abgeholt, ohne Nachzahlung
 	check("K1 Reise: Final-100-Etappe abgeholt", veteran.journey.claimed.final_clear, true)
 	check("K1 Reise: nicht ausgeblendet", veteran.journey.hidden, false)

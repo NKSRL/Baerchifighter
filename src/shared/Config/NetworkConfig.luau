@@ -81,6 +81,9 @@ local REMOTE_COOLDOWNS: { [string]: number } = {
 	-- HBB Paket 5: Heim-Knopf. Teleport — nicht im Sekundentakt.
 	RequestGoHome          = 3.00,
 	RequestClaimFreeGrab   = 1.00,   -- HBB Paket 10
+	-- 26.10. Traenke: Kauf zahlt aus (nicht im Sekundentakt), Sicht ist nur Lesen
+	RequestMerchantBuy     = 0.50,
+	RequestMerchantView    = 1.00,
 
 	-- Sammel-Update 05.10.
 	RequestPitSpeed          = 0.25,   -- 4.3: nur ein Schalter, keine Spielwerte

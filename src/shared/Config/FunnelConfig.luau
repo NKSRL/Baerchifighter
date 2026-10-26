@@ -82,6 +82,7 @@ return {
 		Charms = true, Combat = true, Rebirth = true, Language = true,
 		Quests = true, EggTree = true, Leaderboard = true, Profile = true,
 		DailyBonus = true, Shop = true,
+		Merchant = true,   -- 26.10. Traenke: Haendler-Fenster
 		Building_Beehive = true, Building_HoneyRefiner = true, Building_HoneyPond = true,
 	} :: { [string]: boolean },
 

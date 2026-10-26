@@ -11,7 +11,7 @@ Roblox-Spiel (Luau). Lies zuerst `docs/HBB_STATUS_2026-10-05.md`, dann den Beric
 - `luau-compile --null <datei>` (Syntax)
 - `python tools/check_locals.py` (Roblox erlaubt max. 200 lokale Namen pro Modul-Ebene; der luau-CLI meldet das NICHT)
 - `luau tools/luau-tests/guide_steps.test.lua`, `unlock_rules.test.lua`, `boss_tiers.test.lua`
-- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, `ui_texts`
+- `python tools/luau-tests/run_local.py tools/luau-tests/<name>.test.lua` für `combat_rating`, `gold_rules`, `map_layout`, `live_board`, `event_schedule`, `egg_press`, `honey_pond`, `shop`, `migration_hbb`, `endless`, `ui_texts`, `potions`
 - `python tools/check_feedback.py` (plus `check_members.py`, `check_consistency.py`, `check_loc.py`, `check_ui.py`, `check_decor.py`); `check_members.py` endet auch bei Funden mit 0, Ausgabe lesen
 - Spieler-Texte: Config-Namen/-Beschreibungen nur über `Localization/Names`, Server-Texte in der Welt (Tafeln, Schilder, Prompts) nur über `Localization/WorldText` mit `Loc.msg` — `check_ui.py` meldet jeden Verstoß
 - Sims ohne Node: `python tools/luau-tests/run_local.py tools/sim/<name>.lua` (Exit 1 bei `FAIL`); Pflicht bei Balance-Änderungen: `progression_pacing.lua`, `tower_calibration.lua`
@@ -29,4 +29,4 @@ Nach Änderungen in Studio: Datei → Auf Roblox speichern.
 
 ## Nicht hier verfügbar
 `tools/luau-tests/run.mjs` und die Node-Tests (`migration.test.lua`, `client.test.lua`, `loc.test.lua` …) liegen nur auf dem Heim-PC.
-`tools/sim/*` und `tools/check_*.py` sind da. Paket 8: umgesetzt (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`, 12 Charm-Würfe/Tag).
+`tools/sim/*` und `tools/check_*.py` sind da. Paket 8: umgesetzt (`docs/HBB_GOLD_NUR_CHARMS_2026-10-05.md`, 12 Charm-Würfe/Tag). Tränke (26.10.): `docs/HBB_POTIONS_2026-10-26.md`.

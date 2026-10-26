@@ -369,6 +369,22 @@ local RequestGoHome = getOrCreateEvent("RequestGoHome")
 local RequestClaimFreeGrab = getOrCreateEvent("RequestClaimFreeGrab")
 
 -- ============================================================
+-- 26.10. Traenke und Haendler-Fenster (FeatureFlags.POTIONS_V1)
+-- ============================================================
+-- S->C: Sortiment des Haendlers fuer DIESEN Spieler (Preise und Stapel-Stand
+-- sind je Spieler). Args: Types.MerchantView, open: boolean (true = Fenster
+-- oeffnen, weil der Spieler am Regal gedrueckt hat; false = nur auffrischen).
+local MerchantViewReceived = getOrCreateEvent("MerchantViewReceived")
+-- C->S: Sortiment erneut anfragen (Fenster offen, Wechsel steht an). Keine Args.
+local RequestMerchantView = getOrCreateEvent("RequestMerchantView")
+-- C->S: am Haendler kaufen. Args: what: "egg" | "potion", potionId: string?,
+-- window: number? (Zeitfenster aus der Sicht — ein veraltetes Fenster wird
+-- abgelehnt, damit niemand ein abgelaufenes Angebot kauft).
+local RequestMerchantBuy = getOrCreateEvent("RequestMerchantBuy")
+-- S->C: Trank laeuft (Kauf bestaetigt). Args: Types.PotionActivatedResult
+local PotionActivated = getOrCreateEvent("PotionActivated")
+
+-- ============================================================
 -- Sammel-Update 05.10.
 -- ============================================================
 -- Paket 4.3: Tower-Wiedergabe beschleunigen. Args: speed (1 | 2 | 4 | 0 = sofort)
@@ -490,6 +506,12 @@ return {
 	RequestMarkUiSeen      = RequestMarkUiSeen,
 	RequestGoHome          = RequestGoHome,
 	RequestClaimFreeGrab   = RequestClaimFreeGrab,
+
+	-- 26.10. Traenke
+	MerchantViewReceived   = MerchantViewReceived,
+	RequestMerchantView    = RequestMerchantView,
+	RequestMerchantBuy     = RequestMerchantBuy,
+	PotionActivated        = PotionActivated,
 
 	-- Sammel-Update 05.10.
 	RequestPitSpeed          = RequestPitSpeed,

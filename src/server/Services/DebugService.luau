@@ -79,6 +79,14 @@
 --   D:Invoke("mapstyle", "on")      -- Map-Stil V2 (Meshes) an/aus/info: alt gegen neu vergleichen
 --   D:Invoke("v14save")             -- Spielstand im alten v14-Format simulieren + migrieren
 --
+-- 26.10. (Traenke, DebugPotions):
+--   D:Invoke("potions")             -- laufende Traenke mit Restzeit
+--   D:Invoke("potion", "SpeedII")   -- Trank ohne Kosten anwenden (Stapel-Regel gilt)
+--   D:Invoke("potion", "CoinsI", 20) -- ... mit 20 s Laufzeit (Ablauf testen)
+--   D:Invoke("potion", "clear")     -- alle Traenke austragen
+--   D:Invoke("merchant")            -- Sortiment, Preise fuer diesen Spieler, Zeit bis zum Wechsel
+--   D:Invoke("merchant", "next")    -- Fenster weiterschalten (neues Los, alle Clients bekommen es)
+--
 -- v17 (lebendige Events):
 --   D:Invoke("startevent", "Ufo")   -- UFO-Patrouille mit Abwuerfen
 --   D:Invoke("jackpot")             -- naechster UFO-Abwurf ist sicher ein Jackpot (Stand des Pity-Zaehlers)
@@ -138,7 +146,7 @@ local BINDABLE_NAME = "RBLDebug"
 
 local commands = DebugRegistry.commands
 
-local MODULES = { "DebugBasics", "DebugProgress", "DebugWorld", "DebugArena", "DebugBaerchi", "DebugEvents", "DebugState", "DebugBridge" }
+local MODULES = { "DebugBasics", "DebugProgress", "DebugWorld", "DebugArena", "DebugBaerchi", "DebugEvents", "DebugState", "DebugBridge", "DebugPotions" }
 
 --------------------------------------------------------------------------------
 -- Hilfebefehl
