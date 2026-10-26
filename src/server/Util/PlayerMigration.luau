@@ -792,6 +792,23 @@ local function stepPotions(data: Types.PlayerData, default: Types.PlayerData)
 	end
 end
 
+-- 26.10. Himmelsgericht: ALLE Seraph-Baerchis bekommen die neue Faehigkeit
+-- (Wunsch des Nutzers; defaultSkill allein gilt nur fuer neue Baerchis).
+-- Erkennbar am alten skillId, deshalb bei jedem Laden gefahrlos wiederholbar.
+-- SeraphGrace bleibt in SkillConfig (nichts loeschen).
+local function stepSeraphSkill(data: Types.PlayerData)
+	local n = 0
+	for _, baerchi in data.island.baerchis do
+		if baerchi.skillId == "SeraphGrace" then
+			baerchi.skillId = "SeraphJudgment"
+			n += 1
+		end
+	end
+	if n > 0 then
+		print(("[PlayerService] Himmelsgericht: %d Seraph-Baerchi(s) auf SeraphJudgment umgestellt"):format(n))
+	end
+end
+
 -- Fehlende Felder aus Default auffuellen (einfache Migration fuer neue Felder).
 -- Muss jedes Feld abdecken das seit dem ersten Release in Types.luau
 -- dazugekommen ist — sonst crasht alter Save-Stand beim ersten Zugriff.
@@ -813,6 +830,7 @@ function PlayerMigration.applyDefaults(data: Types.PlayerData): Types.PlayerData
 	stepBaerchiFields(data)
 	stepSammelUpdate(data)
 	stepPotions(data, default)   -- v20
+	stepSeraphSkill(data)   -- 26.10. Himmelsgericht
 
 	-- Zum Schluss die Versionsnummer nachziehen. Sie steuert heute keine der
 	-- Migrationen oben — die pruefen alle einzeln auf fehlende Felder und

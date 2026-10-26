@@ -85,6 +85,11 @@ Die Werkzeuge `list_roblox_studios`, `execute_luau`, `script_read` … kommen au
    `claude mcp add --transport stdio --scope user Roblox_Studio -- cmd.exe /c C:\Users\admin\AppData\Local\Roblox\mcp.bat`
 3. `claude mcp list` → „Connected“; Claude Code neu starten (`claude -c` setzt diese Unterhaltung fort); `/mcp` zeigt den Server. Werkzeuge heißen dann `mcp__Roblox_Studio__<tool>`.
 
+## Nachtrag 26.10. nachmittags: Einbau und Migration
+
+- Per Studio-MCP eingespielt (13 Stücke in 8 Skripten; eigener `quake` und impactframe-Patch entfielen, weil die Sitzungen „Gletscherblick“/„Himmelsgeläut“ vom Vormittag beide schon in Studio hatten – die Show nutzt deren `quake` mit `trauma`). Verifiziert: Bausteine je 1×, Controller 144 lokale Namen, Configs laden (5,9 s / 3,28 s, Echo 0,65 / 0,26), Texte in 4 Sprachen, Backup mit 9 Skripten.
+- Auf Wunsch des Nutzers („ALL seraph bears“): Lade-Migration `stepSeraphSkill` in `ServerScriptService/Util/PlayerMigration` (Studio und Repo): jeder Bärchi mit `skillId = "SeraphGrace"` bekommt beim Laden `SeraphJudgment` (am Feld erkennbar, wiederholbar; `SeraphGrace` bleibt in `SkillConfig`). `migration_golden` 27 Fälle OK; `migration_hbb` scheitert vorher wie nachher an „C4 Rekord Tower I“ (bekannt, unabhängig).
+
 ## Offen
 
 1. Einbau in Studio (Edit-Modus): `updates/SeraphJudgment_2026-10-26/Einfuegen_Befehl.lua` in die Befehlsleiste – legt `ServerStorage/Backup_vor_Himmelsgericht_2026-10-26` an, prüft Anker (1×) und neue Namen (0×) auf dem Live-Quelltext, `loadstring`, speichert nur, wenn alles passt; Strg+Z macht es rückgängig. Rückfall: `HBBUpdate_Himmelsgericht_2026-10-26.rbxmx` + `_Befehl.lua` (ganze Quelltexte, ersetzt nur Skripte mit unverändertem Hash). Danach Datei → Auf Roblox speichern.
