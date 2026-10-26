@@ -2,7 +2,7 @@
 
 Geprüft: das ganze Repo auf Branch `claude/happy-mccarthy-ncbqht` (Stand `70dab63`, 119 Commits seit 02.10.).
 Maßstab: Was kostet eine künftige Claude-Sitzung an Tokens, bevor sie produktiv wird, und was treibt die Kosten beim Lesen, Ändern und Prüfen?
-**Am Code wurde nichts geändert.** Dieser Bericht ist eine priorisierte Liste mit Vorschlägen; die Entscheidungen (besonders alles, was Löschen betrifft) liegen beim Projektinhaber.
+Maßnahmen 1–4 sind am selben Tag umgesetzt, siehe Abschnitt 7.
 
 Der Architektur-Check vom 12.10. (`HBB_ARCHITEKTUR_CHECK_2026-10-12.md`, beim Merge am 15.10. verloren, siehe Fund 7) bleibt inhaltlich gültig: Schichtung hält, ein Startpunkt (`GameManager`), alle Remotes über `RateLimiter`, Server autoritativ, Daten in `Config`, Regeln in `Modules`. Dieser Bericht wiederholt das nicht, sondern schaut auf das, was Tokens kostet.
 
@@ -225,3 +225,15 @@ Luau-CLI kommt per SessionStart-Hook nach `luau-bin/` (`LUAU` ist gesetzt).
 ## 6. Was dieser Bericht nicht geprüft hat
 
 Laufzeitverhalten in Studio, Netzlast der Remotes, Balance-Werte (Sims liefen grün). Die Funde aus dem Check vom 12.10. (DRY-Doppelungen, tote Remotes) wurden nicht erneut einzeln verifiziert.
+
+## 7. Umsetzung 26.10.2026 (Maßnahmen 1–4, vom Projektinhaber freigegeben)
+
+- **Orientierung:** `docs/STATUS.md`, `docs/INDEX.md`, `docs/ARCHITEKTUR.md` (erzeugt von `tools/make_modulkarte.py`), neue `CLAUDE.md` mit Lese-Regeln, `README.md` und `tools/README.md` angeglichen, tote Verweise umgebogen. Alte Aufträge nach `claude/archiv/`.
+- **Prüfen:** `tools/check_all.py` (ein Befehl, zeigt nur Rotes), SessionStart-Hook `.claude/hooks/session_start.sh` lädt in Cloud-Sitzungen die Luau-CLI. Stand: 59 Prüfungen grün, 1 bekannt rot (`rebirth_rules`, Balance-Befund in `STATUS.md`).
+- **Prüfer grün gemacht:** 8 Toasts über `Notify.emit` (neue Klasse `pet_sold`, Toast-Grenze 23 %); `check_feedback` erkennt `Notify.emit` in derselben Zeile; begründete Ausnahmen in `check_consistency` (DebugService, GiftService, EggPanelSkin) und `check_ui` (`server/Debug/*`, `-- ui-ok`); 4 Texte über `Loc`, 2 Namen über `Names`, Detail-Schließen-Knopf über `Theme.closeButton`.
+- **Echte Fehler behoben:** Menüleiste rief das entfernte `IncubatorRules.isReady` auf. `AmbienceConfig.DAY_CYCLE` fehlte seit dem Merge vom 15.10.; jetzt ausdrücklich `false` (Verhalten unverändert, Entscheidung offen).
+- **Tests:** 8 Tests aus `78a7593` zurückgeholt und grün (`day_cycle`, `island_stage`, `migration_v16`, `migration_v17`, `rebirth_rules`, `recycler`, `sound_zones`, `world_moments`); `incubator` und `egg_tree_layout` nicht, weil sie den Stand vor dem Solo-Inkubator bzw. dem neuen Ei-Baum prüfen. Veraltete Erwartungen angepasst (`unlock_rules`, `migration_hbb`, `drop_rates`, `epilog_state`).
+- **Zurückgeholt aus `78a7593`:** 14 Berichte, `check_asset_ids.py`, `einspielen.lua`, `render_vfx_*.py`, `tools/art/*`, `tools/textures/*`.
+- **Aufgeräumt:** `--help`, fünf `backup_vor_*`, `studio_export/_repo_vor_sync_2026-10-20`, `studio_export/_merge_konflikt_reste_2026-10-20`, `updates/_backup_vor_epilog`, `updates/Reparatur_2026-10-19`. Alles bleibt im Git-Verlauf (z. B. auf `main`). `.gitignore` erweitert.
+- **Schutz:** `make_update_rbxmx.py` hält Dateien zurück, die in Studio neuer sind (Fähigkeiten-Skripte, Strings).
+- **Nicht gemacht:** Git LFS (bräuchte Umschreiben der Historie und Force-Push), Loc-Generator, Datei-Splits, Kommentar-Diät, Flag-Ausbau (Maßnahmen 5–7). Die Datei-Splits und der Loc-Generator warten auf den Studio-Abgleich der Fähigkeiten-Skripte.

@@ -1,5 +1,7 @@
 # HBB Umsetzung – Stand 05.10.2026
 
+> Abgelöst durch `docs/STATUS.md` (fortlaufend). Diese Datei ist Historie.
+
 | Paket | Stand | In Studio getestet |
 | --- | --- | --- |
 | 0 Flags, Funnel | fertig | ja – F01–F09 im Output, 0 Fehler |

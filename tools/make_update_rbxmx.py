@@ -12,6 +12,7 @@ Aufruf (aus dem Projektordner):
     python tools/make_update_rbxmx.py                  # Aenderungen seit 52f75c1
     python tools/make_update_rbxmx.py <commit>         # Aenderungen seit <commit>
     python tools/make_update_rbxmx.py --all            # alle Skripte
+    --mit-studio-voraus   auch die Dateien aus STUDIO_VORAUS mitnehmen (nur nach dem Abgleich!)
 
 Ergebnis: updates/HBBUpdate.rbxmx und updates/HBBUpdate_Befehl.lua
 
@@ -41,6 +42,21 @@ MAPPING = {
 }
 
 
+# In Studio NEUER als im Repo (Faehigkeiten vom 25.10.: ErsteBaerchis, PulsarNova; Code-Pakete
+# in updates/). Eine Update-Datei mit diesen Dateien wuerde die Studio-Fassung ueberschreiben.
+# Erst nach dem Gesamtabgleich Studio -> Repo aus der Liste nehmen (docs/STATUS.md).
+STUDIO_VORAUS = {
+    "src/client/Controllers/SkillFXController.luau",
+    "src/shared/Config/SkillFXConfig.luau",
+    "src/shared/Config/SkillConfig.luau",
+    "src/shared/Config/BaerchiConfig.luau",
+    "src/shared/Localization/Strings/de.luau",
+    "src/shared/Localization/Strings/en.luau",
+    "src/shared/Localization/Strings/fr.luau",
+    "src/shared/Localization/Strings/es.luau",
+}
+
+
 def changed_files(base):
     out = subprocess.run(
         ["git", "diff", "--name-only", "--diff-filter=AMR", base, "HEAD", "--", "src"],
@@ -67,10 +83,16 @@ def cdata(text):
 
 def main():
     args = sys.argv[1:]
+    positional = [a for a in args if not a.startswith("--")]
     if "--all" in args:
         files = all_files()
     else:
-        files = changed_files(args[0] if args else DEFAULT_BASE)
+        files = changed_files(positional[0] if positional else DEFAULT_BASE)
+    if "--mit-studio-voraus" not in args:
+        held = sorted(f for f in files if f in STUDIO_VORAUS)
+        files = [f for f in files if f not in STUDIO_VORAUS]
+        for f in held:
+            print(f"ZURUECKGEHALTEN (in Studio neuer): {f}")
     if not files:
         print("Keine geaenderten Skripte.")
         return 0

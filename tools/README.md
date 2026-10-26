@@ -1,58 +1,56 @@
 # tools — Prüfungen und Simulationen ohne Studio
 
 Alles hier findet Fehler, bevor Roblox sie beim Start meldet, oder rechnet
-Balance nach, ohne das Spiel zu starten. Gebraucht werden Python 3 und
-Node.js (ab 18).
+Balance nach, ohne das Spiel zu starten. Gebraucht werden Python 3 und die
+Luau-CLI in `luau-bin/` (Cloud: SessionStart-Hook, Laptop: `luau-windows.zip`
+von https://github.com/luau-lang/luau/releases).
 
 ## Vor jedem Commit
 
-Aus dem Projektordner:
+    python tools/check_all.py             # alles, ca. 80 s, zeigt nur Rotes
+    python tools/check_all.py --schnell   # ohne check_ui (~25 s)
+    python tools/check_all.py -v          # auch gruene Zeilen
 
-    cd tools/luau-tests
-    npm install                              # einmalig
-    node check_syntax.mjs                    # alle .luau-Dateien kompilieren
-    node run.mjs loc.test.lua                # Lokalisierung
-    node run.mjs client.test.lua             # Rauchtest der Client-UI
-    node run.mjs migration.test.lua          # alte Spielstände → aktuelle Version
-    node run.mjs session_lock.test.lua       # Sitzungs-Sperre beim Speichern
-    node run.mjs login_bonus.test.lua        # Login-Bonus (Tageswechsel, Gnadenfrist, Reset, UTC)
-    node run.mjs ../sim/progression_pacing.lua  # Pacing: Looks, Rebirths, Final-Tower (v15)
-    node run.mjs ../sim/tower_calibration.lua   # Tower-Kalibrierung je Rarity (v15)
-    node run.mjs ../sim/egg_tree_check.lua   # Regeln des Ei-Baums
-    node run.mjs ../sim/path_balance.lua     # Pfad-Profile (Gold/Kristall/Void)
-    node run.mjs ../sim/fight_timeline.lua   # Zeitbudget der Kampf-Wiedergabe
-    cd ../..
-    python tools/check_members.py
-    python tools/check_consistency.py
-    python tools/check_loc.py
-    python tools/check_ui.py
-    python tools/check_decor.py
-
-Alle Befehle enden mit Exit-Code 0, wenn alles in Ordnung ist, und mit 1 bei
-einem Fehler.
+`check_all.py` laeuft parallel: Syntax aller `.luau` (`luau-compile`),
+`check_locals`, alle `check_*.py`, Modulkarte (`make_modulkarte.py --check`),
+jeder Test in `luau-tests/` und die Pruef-Sims. Rote Pruefungen, die bewusst
+offen sind, stehen in `BEKANNT_ROT` (mit Grund, auch in `docs/STATUS.md`).
 
 ## Luau-Tests und Simulationen (`luau-tests/`, `sim/`)
 
-Führen Luau-Code mit dem echten Compiler aus (npm-Paket `luau-web`). Roblox
-selbst ist durch Attrappen ersetzt. Details: `luau-tests/README.md`.
+Tests mit `require("../../src/...")` laufen direkt mit `luau`, alle anderen
+ueber `luau-tests/run_local.py`: das baut aus `src/shared` und `src/server` ein
+Buendel mit Roblox-Attrappen (`rbxRequire`, `RS.Config.X`). Einzeln:
 
-| Datei | prüft / zeigt |
+    luau-bin/luau tools/luau-tests/guide_steps.test.lua
+    python tools/luau-tests/run_local.py tools/luau-tests/shop.test.lua
+    python tools/luau-tests/run_local.py tools/sim/progression_pacing.lua
+
+Die Node-Tests vom Heim-PC (`run.mjs`, `loc.test.lua`, `client.test.lua`,
+`migration.test.lua`, `session_lock.test.lua`, `login_bonus.test.lua`) lagen
+nie im Repo.
+
+| Sim | prueft / zeigt |
 |---|---|
-| `check_syntax.mjs` | jede `.luau`-Datei unter `src/` kompiliert |
-| `loc.test.lua` | `Loc`: Sprachwahl, Platzhalter, Plural, Fallbacks |
-| `client.test.lua` | Client-UI startet, Sprachwechsel, Toasts, HUD, Menü |
-| `migration.test.lua` | Spielstände im Format v6, v10, v13 und v14 laufen durch `PlayerMigration.applyDefaults`, ergeben die Struktur von `Types.PlayerData` und ändern sich beim zweiten Durchlauf nicht mehr |
-| `login_bonus.test.lua` | `LoginBonusCalc`: Tageswechsel, Gnadenfrist (1 Tag), Reset, Doppelklick, Wechsel genau 00:00 UTC, Zyklus 1..7 |
-| `session_lock.test.lua` | `SessionLock`: wann ein Spielstand als von einem anderen Server gehalten gilt |
 | `sim/egg_tree_check.lua` | Verteilungen = 100 %, Ø steigt entlang jeder Kante, jeder Bärchi fällt aus einem Ei, jede Fähigkeit hat eine Show, Lege-Fallback landet auf freiem Ei |
 | `sim/path_balance.lua` | kein Pfad gewinnt alle drei Ziele (Stärke, Tempo, Seltenheit) |
 | `sim/fight_timeline.lua` | ein PIT-Lauf bleibt im Zeitbudget |
-| `sim/pit_balance.lua` | Tabelle: erreichbare Stages je Rarity und Tower (keine Prüfung) |
-| `sim/tower_calibration.lua` | Zielwerte der Tower (L1 Common ~3 Stages, Omega max Final 70–100, 100 Stages < 50 ms) |
-| `sim/progression_pacing.lua` | Pacing-Ziele (Look 2–6, Rebirth 1, Final 100 nicht vor Woche 8) für 30/90/240 min pro Tag |
-| `sim/egg_tree_sim.lua` | Tabelle: Spieltage bis zur Freischaltung je Knoten (keine Prüfung) |
+| `sim/tower_calibration.lua` | Zielwerte der Tower je Rarity |
+| `sim/progression_pacing.lua`, `sim/fortschritt_w1.lua` | Pacing-Ziele für 30/90/240 min pro Tag |
+| `sim/boss_balance.lua`, `sim/drop_rates_v2.lua`, `sim/comb_respawn.lua` | Boss-Dauer, Drop-Raten, Waben |
+| `sim/pit_balance.lua`, `sim/egg_tree_sim.lua`, `sim/power_*.lua`, `sim/pacing_v2_vorschlag.lua` | nur Tabellen/Erkundung, keine Pruefung (nicht in `check_all`; `power_sweep` braucht Minuten) |
 
 Die Typprüfung (`--!strict`) machen diese Tests nicht, das bleibt Studio.
+
+## `make_modulkarte.py` — Modulkarte
+
+Schreibt `docs/ARCHITEKTUR.md` aus den Kopfkommentaren („Einzige
+Zustaendigkeit“). Nach neuen oder umbenannten Modulen laufen lassen.
+
+## `make_update_rbxmx.py` — Update-Datei fuer Studio
+
+Ersetzt in Studio nur den Quelltext geaenderter Skripte, loescht nichts.
+`STUDIO_VORAUS` haelt Dateien zurueck, die in Studio neuer sind.
 
 ## `check_members.py` — unbekannte Modul-Felder
 

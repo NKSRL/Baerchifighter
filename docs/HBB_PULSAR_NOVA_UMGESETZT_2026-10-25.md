@@ -1,7 +1,7 @@
 # Pulsar-Nova – neue Fähigkeit für den Pulsar-Bärchi (umgesetzt 25.10.2026)
 
 ## Was
-- Neue Fähigkeit `PulsarNova` („Pulsar-Nova“) für `PulsarBaerchi` (Cosmic). Neue, bessere Fassung des Blender-Prototyps „Pulsstoß“ vom 22.10. (`claude/HBB_PULSAR_PULSSTOSS_PROTOTYP_2026-10-22.md`). `defaultSkill` ist jetzt `PulsarNova` (gilt für neue Pulsare). `PulsarPulse` bleibt für alte Bärchis und Fusionen.
+- Neue Fähigkeit `PulsarNova` („Pulsar-Nova“) für `PulsarBaerchi` (Cosmic). Neue, bessere Fassung des Blender-Prototyps „Pulsstoß“ vom 22.10. (`docs/HBB_PULSAR_PULSSTOSS_PROTOTYP_2026-10-22.md`). `defaultSkill` ist jetzt `PulsarNova` (gilt für neue Pulsare). `PulsarPulse` bleibt für alte Bärchis und Fusionen.
 - Motiv „Leuchtturm-Pulsar“ (Wahl des Nutzers): Der Bärchi wird zum Pulsar, einem Leuchtturm aus Licht, der immer schneller tickt, und schlägt als Neutronenstern ein. Aus dem Vorbild übernommen: Ring am Boden, Sternbruch, Kugel, Impact-Frames, Feuerkuppel, Weißblende.
 - Farben (Wahl des Nutzers): Cyan (70, 228, 255) aus Visier und Düsen, Feuer-Orange (255, 138, 40), Weiß, pinker Saum wie im Vorbild.
 - Kampfwerte (Wahl des Nutzers: Brand/DoT, wie Nebelbrand und Höllensiegel): sofort 1,8× ATK + 60, danach Brand 3 Aktionen je (20 + 0,35× ATK) × (1 + PWR), Ladung 5. Gesamt etwa 2,85× ATK + 120. Ein neuer Brand ersetzt den alten.
