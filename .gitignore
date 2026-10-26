@@ -62,3 +62,8 @@ secrets.*
 credentials.*
 apikey*
 api_key*
+
+# Aufgeraeumt 26.10.2026: Sicherungsordner und Update-Dateien auch in Unterordnern nur lokal
+/backup_vor_*/
+/updates/**/*.rbxmx
+/updates/**/*_Befehl.lua
