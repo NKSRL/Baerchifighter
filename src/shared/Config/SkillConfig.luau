@@ -276,6 +276,29 @@ local SKILLS: { [string]: SkillDef } = {
 		description = "Eine Faust vom Himmel, 3.6x Schaden.",
 		drawback = "Cooldown 6.",
 	},
+	-- 23.10. Krone der Leere: neue Faehigkeit des Schemen-Baerchis (loest den
+	-- Schattenhieb als Standard ab; ShadeSlash bleibt fuer Fusionen und alte
+	-- Baerchis erhalten). Finisher wie der Schattenhieb, aber deutlich
+	-- staerker — dafuer eine Ladung mehr.
+	VoidCrown = {
+		id = "VoidCrown", displayName = "Krone der Leere",
+		effectType = "Finisher", category = "damage", cooldown = 4, charge = 4,
+		params = { multiplier = 2.4, finisherMultiplier = 6.0, threshold = 0.35, baseDamage = 90 },
+		description = "Gekroent aus der Leere: 2.4x ATK, unter 35% Gegner-HP 6x ATK.",
+		drawback = "Laedt langsamer als der Schattenhieb (4 Stoesse).",
+	},
+	-- 25.10.2026 Entfuehrungsstrahl (UFO-Baerchi / NebulaBaerchi, Cosmic; loest
+	-- Nebelbrand als Standard ab, NebulaBurn bleibt fuer Fusionen und alte
+	-- Baerchis). Der Gegner wird im Traktorstrahl hochgezogen und fallen
+	-- gelassen: Schaden + er setzt seine naechste Aktion aus (Stun). Unter der
+	-- Krone der Leere (Secret), dafuer mit Aussetzen.
+	UfoAbduction = {
+		id = "UfoAbduction", displayName = "Entfuehrungsstrahl",
+		effectType = "Stun", category = "damage", cooldown = 5, charge = 5,
+		params = { damageMultiplier = 1.9, baseDamage = 60, stunDuration = 1 },
+		description = "Zieht den Gegner in den Traktorstrahl: 1.9x ATK, er setzt eine Aktion aus.",
+		drawback = "Laedt langsam (5 Stoesse).",
+	},
 	-- 21.10. Welt 2: Faehigkeiten der Anime-Pets (je Pet eine eigene, Effekt-Typen wie bei den bestehenden)
 	RubberSmash = {
 		id = "RubberSmash", displayName = "Gummi-Schlag",
@@ -312,7 +335,7 @@ local SKILLS: { [string]: SkillDef } = {
 		description = "Jede Welle baut auf der letzten auf.",
 		drawback = "Braucht lange Kaempfe.",
 	},
-	-- 20.10. P5d: Faehigkeit des Hoffnungs-Pets (jede Stufe baut auf der letzten auf)
+	-- 20.10. P5d: Faehigkeit des Hoffnungs-Pets
 	AscendingLight = {
 		id = "AscendingLight", displayName = "Aufstiegslicht",
 		effectType = "Ramp", category = "damage", cooldown = 4, charge = 4,
@@ -327,6 +350,16 @@ local SKILLS: { [string]: SkillDef } = {
 		description = "Reisst die Zeit auf, 3x Schaden.",
 		drawback = "Cooldown 5.",
 	},
+	-- 25.10.2026 Zeitstillstand (Chronos-Baerchi, vorher ChronosRift): haelt die
+	-- Zeit an, der Gegner erstarrt (Stun = er setzt eine Aktion aus). Etwas
+	-- weniger Schaden als der Zeitriss und eine Ladung mehr, dafuer der Stun.
+	ChronosTimeStop = {
+		id = "ChronosTimeStop", displayName = "Zeitstillstand",
+		effectType = "Stun", category = "damage", cooldown = 6, charge = 6,
+		params = { damageMultiplier = 2.8, stunDuration = 1, baseDamage = 120 },
+		description = "Haelt die Zeit an: 2.8x ATK, der Gegner setzt eine Aktion aus.",
+		drawback = "Laedt langsam (6 Stoesse).",
+	},
 	InfinityBarrage = {
 		id = "InfinityBarrage", displayName = "Unendlichkeits-Salve",
 		effectType = "MultiHit", category = "damage", cooldown = 5, charge = 5,
@@ -334,12 +367,149 @@ local SKILLS: { [string]: SkillDef } = {
 		description = "Fuenf Treffer hintereinander, je 0.6x ATK.",
 		drawback = "Cooldown 5.",
 	},
+	-- 25.10.2026 Ewiger Sternenfall (Unendlichkeits-Baerchi, vorher
+	-- InfinityBarrage): fliegt ein Unendlichkeitszeichen an den Himmel, vier
+	-- Sternschnuppen kesseln den Gegner ein, dann stuerzt er selbst als Komet
+	-- (= 5 Treffer). Etwas mehr Schaden als die Salve, dafuer eine Ladung mehr.
+	InfinityStarfall = {
+		id = "InfinityStarfall", displayName = "Ewiger Sternenfall",
+		effectType = "MultiHit", category = "damage", cooldown = 6, charge = 6,
+		params = { hits = 5, multiplierPerHit = 0.66, baseDamage = 24 },
+		description = "Fliegt ein Unendlichkeitszeichen an den Himmel und stuerzt als Komet herab: 5 Treffer, je 0.66x ATK.",
+		drawback = "Laedt langsam (6 Stoesse).",
+	},
 	OmegaStrike = {
 		id = "OmegaStrike", displayName = "Omega-Schlag",
 		effectType = "Damage", category = "damage", cooldown = 9, charge = 9,
 		params = { multiplier = 7.0, baseDamage = 300 },
 		description = "Ein einziger Schlag. 7x Schaden.",
 		drawback = "Cooldown 9 — dazwischen nur normale Schlaege.",
+	},
+	-- 25.10.2026 Weltenende (Omega-Baerchi, ersetzt OmegaStrike als
+	-- defaultSkill): reitet seinen eigenen kleinen Planeten auf den Gegner.
+	-- Finisher wie die Krone der Leere: normal etwas mehr als der Omega-
+	-- Schlag (7.5x statt 7x), unter 30 % Gegner-HP 12x (Bonus-Show: Supernova).
+	-- OmegaStrike bleibt fuer alte Baerchis und Fusionen.
+	OmegaWorldsEnd = {
+		id = "OmegaWorldsEnd", displayName = "Weltenende",
+		effectType = "Finisher", category = "damage", cooldown = 9, charge = 9,
+		params = { multiplier = 7.5, baseDamage = 300, finisherMultiplier = 12, threshold = 0.3 },
+		description = "Reitet seinen eigenen Planeten auf den Gegner: 7.5x ATK, unter 30% Gegner-HP 12x ATK.",
+		drawback = "Laedt am langsamsten (9 Stoesse).",
+	},
+	-- 25.10.2026 Fragenlawine (Raetsel-Baerchi, ersetzt RiddleBeam als
+	-- defaultSkill): Ramp wie Aufstiegslicht und Genesis-Welle - "jede Antwort
+	-- wird eine neue Frage", jeder Einsatz im Kampf trifft 0.5x ATK haerter.
+	-- Secret liegt zwischen Cosmic und Godly: Start 1.4x + 60 (Genesis 1.4x + 60,
+	-- +0.6x), Ladung 4. RiddleBeam bleibt fuer alte Baerchis und Fusionen.
+	RiddleAvalanche = {
+		id = "RiddleAvalanche", displayName = "Fragenlawine",
+		effectType = "Ramp", category = "damage", cooldown = 4, charge = 4,
+		params = { multiplier = 1.4, baseDamage = 60, rampPerUse = 0.5 },
+		description = "Jede Antwort wird eine neue Frage: 1.4x ATK, mit jedem Einsatz +0.5x.",
+		drawback = "Schwacher Anfang, wird erst in langen Kaempfen stark.",
+	},
+	-- 25.10.2026 Hoellensiegel (Teufel/EclipseBaerchi, vorher EclipseShroud
+	-- "Finsternis", bleibt fuer alte Baerchis): Wunsch des Nutzers nach dem
+	-- Blender-Prototyp vom 22.10. DoT wie Feuerbiss/Nebelbrand - die Feuersaeule
+	-- brennt nach. Divine liegt zwischen Mythic und Cosmic: sofort 1.8x + 60,
+	-- Brand 3 Aktionen je 15 + 0.3x ATK (gesamt ~2.7x + 105), Ladung 5.
+	HellSigil = {
+		id = "HellSigil", displayName = "Hoellensiegel",
+		effectType = "DoT", category = "damage", cooldown = 5, charge = 5,
+		params = { multiplier = 1.8, baseDamage = 60, dotDamage = 15, dotMultiplier = 0.3, dotDuration = 3 },
+		description = "Schleudert eine schwarze Sonne ins Hoellensiegel: 1.8x ATK + 60, dann 3 Aktionen Brand.",
+		drawback = "Ein Teil des Schadens kommt spaeter, ein neuer Brand ersetzt den alten.",
+	},
+
+
+	-- 25.10.2026 Pulsar-Nova (Pulsar-Baerchi, ersetzt PulsarPulse als
+	-- defaultSkill; PulsarPulse bleibt fuer alte Baerchis und Fusionen): neue
+	-- Fassung des Blender-Prototyps "Pulsstoss" vom 22.10. DoT wie Nebelbrand und
+	-- Hoellensiegel - die Feuerkuppel brennt nach. Cosmic liegt ueber Divine:
+	-- sofort 1.8x + 60, Brand 3 Aktionen je 20 + 0.35x ATK (gesamt ~2.85x + 120,
+	-- Hoellensiegel ~2.7x + 105, Nebelbrand ~2.8x + 80), Ladung 5.
+	PulsarNova = {
+		id = "PulsarNova", displayName = "Pulsar-Nova",
+		effectType = "DoT", category = "damage", cooldown = 5, charge = 5,
+		params = { multiplier = 1.8, baseDamage = 60, dotDamage = 20, dotMultiplier = 0.35, dotDuration = 3 },
+		description = "Wird zum Neutronenstern und schlaegt als Komet ein: 1.8x ATK + 60, danach brennt der Gegner 3 Aktionen.",
+		drawback = "Der Grossteil des Schadens kommt erst als Brand, ein neuer Brand ersetzt den alten.",
+	},
+	-- 25.10.2026 Erste Baerchis (Uncommon/Rare): neue Shows, Werte wie die alten
+	-- Faehigkeiten (balance-neutral). Die alten Eintraege bleiben fuer vorhandene
+	-- Baerchis und Fusionen.
+	PolarSlide = {
+		id = "PolarSlide", displayName = "Bauchrutscher",
+		effectType = "Stun", category = "damage", cooldown = 5, charge = 5,
+		params = { damageMultiplier = 1.5, stunDuration = 1, baseDamage = 8 },
+		description = "Rutscht auf dem Bauch in den Gegner: 1.5x Schaden, der Gegner steckt eine Aktion im Eis.",
+		drawback = "Langer Cooldown.",
+	},
+	TigerPounce = {
+		id = "TigerPounce", displayName = "Tigersprung",
+		effectType = "DoT", category = "damage", cooldown = 4, charge = 4,
+		params = { dotDamage = 5, dotDuration = 3, dotMultiplier = 0.25 },
+		description = "Sprung und drei Krallenhiebe: die Kratzer brennen 3 Aktionen nach.",
+		drawback = "Der Schaden kommt erst spaeter, ein neuer Brand ersetzt den alten.",
+	},
+	MagnifierBurn = {
+		id = "MagnifierBurn", displayName = "Brennglas",
+		effectType = "Damage", category = "damage", cooldown = 3, charge = 3,
+		params = { multiplier = 2.2, baseDamage = 14 },
+		description = "Buendelt Licht durch die Lupe auf den Gegner: 2.2x Schaden.",
+		drawback = "Cooldown 3.",
+	},
+	BassDrop = {
+		id = "BassDrop", displayName = "Bass-Drop",
+		effectType = "AoeDamage", category = "damage", cooldown = 6, charge = 6,
+		params = { damageMultiplier = 1.4, baseDamage = 10 },
+		description = "Drei Beats, dann der Drop: eine Bass-Welle trifft alles um den DJ.",
+		drawback = "Langer Cooldown.",
+	},
+	-- 25.10.2026 Erste Baerchis (Epic/Legendary): neue Shows, Werte wie die alten
+	-- Faehigkeiten (balance-neutral).
+	CoinShower = {
+		id = "CoinShower", displayName = "Muenzregen",
+		effectType = "Drain", category = "damage", cooldown = 5, charge = 5,
+		params = { drainPercent = 0.25 },
+		description = "Prasselt Goldmuenzen aus dem Gegner: stiehlt 25% seiner HP und heilt sich damit.",
+		drawback = "Schwach gegen fast besiegte Gegner.",
+	},
+	ShurikenStorm = {
+		id = "ShurikenStorm", displayName = "Shuriken-Sturm",
+		effectType = "AoeDamage", category = "damage", cooldown = 7, charge = 7,
+		params = { damageMultiplier = 2.4, baseDamage = 25 },
+		description = "Schattenklone, Shuriken und ein Katana-Schnitt: das staerkste AoE im Spiel.",
+		drawback = "Sehr langer Cooldown.",
+	},
+	RootBulwark = {
+		id = "RootBulwark", displayName = "Wurzelwall",
+		effectType = "Shield", category = "utility", cooldown = 8, charge = 8,
+		params = { absorbPercent = 0.9, duration = 3 },
+		description = "Wurzeln flechten sich zum Wall: absorbiert 90% Schaden fuer 3 Aktionen.",
+		drawback = "Kein Schaden, sehr langer Cooldown.",
+	},
+	RainbowBridge = {
+		id = "RainbowBridge", displayName = "Regenbogenbruecke",
+		effectType = "Damage", category = "damage", cooldown = 4, charge = 4,
+		params = { multiplier = 3, baseDamage = 30 },
+		description = "Ueber den Regenbogen und mitten auf den Gegner: 3x Schaden.",
+		drawback = "Cooldown 4.",
+	},
+	-- 26.10.2026 Himmelsgericht (Seraph-Baerchi, ersetzt SeraphGrace "Seraphen-
+	-- Segen" als defaultSkill; SeraphGrace bleibt fuer alte Baerchis und Fusionen):
+	-- aus dem Heiler wird ein Schlag. Opener wie Komet-Einschlag: der erste
+	-- Einsatz je Gegner (je Stage) trifft voll, danach normal. Divine zwischen
+	-- Mythic und Cosmic: erster Stoss 3.4x + 60, danach 1.8x + 60, Ladung 4 (wie
+	-- vorher). Der Seraph ist der langsamste Divine (SPD 0.85, PWR 0.18) - je
+	-- Sekunde bleibt Pulsar-Nova (Cosmic, ~2.85x + 120 bei Ladung 5) klar staerker.
+	SeraphJudgment = {
+		id = "SeraphJudgment", displayName = "Himmelsgericht",
+		effectType = "Opener", category = "damage", cooldown = 4, charge = 4,
+		params = { openerMultiplier = 3.4, multiplier = 1.8, baseDamage = 60 },
+		description = "Sechs Fluegel aus Licht, ein Speer vom Himmel: der erste Stoss je Gegner 3.4x ATK + 60, danach 1.8x ATK + 60.",
+		drawback = "Nur der erste Einsatz je Gegner trifft voll; heilt nicht mehr.",
 	},
 }
 

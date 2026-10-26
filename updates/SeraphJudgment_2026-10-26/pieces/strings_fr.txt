@@ -1,0 +1,3 @@
+	["skill.SeraphJudgment.name"] = "Jugement Céleste",   -- 26.10.2026
+	["skill.SeraphJudgment.desc"] = "Six ailes de lumière, une lance tombée du ciel : le premier coup par ennemi inflige 3.4x ATK + 60, ensuite 1.8x ATK + 60.",
+	["skill.SeraphJudgment.drawback"] = "Seule la première utilisation par ennemi frappe à pleine puissance ; ne soigne plus.",

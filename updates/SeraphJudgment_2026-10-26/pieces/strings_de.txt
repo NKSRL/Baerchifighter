@@ -1,0 +1,3 @@
+	["skill.SeraphJudgment.name"] = "Himmelsgericht",   -- 26.10.2026
+	["skill.SeraphJudgment.desc"] = "Sechs Flügel aus Licht, ein Speer vom Himmel: der erste Stoß je Gegner 3.4x ATK + 60, danach 1.8x ATK + 60.",
+	["skill.SeraphJudgment.drawback"] = "Nur der erste Einsatz je Gegner trifft voll; heilt nicht mehr.",

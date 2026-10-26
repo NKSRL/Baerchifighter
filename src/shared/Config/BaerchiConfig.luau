@@ -187,7 +187,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "BasicEgg", weight = 65 },
 			{ eggType = "SugarEgg", weight = 35 },
 		},
-		defaultSkill = "IceSlam", eggSource = {},
+		defaultSkill = "PolarSlide", eggSource = {},   -- 25.10.2026, vorher IceSlam
 		description = "Solide in allen Bereichen.",
 	},
 
@@ -199,7 +199,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "BasicEgg", weight = 60 },
 			{ eggType = "SugarEgg", weight = 40 },
 		},
-		defaultSkill = "FireBite", eggSource = {},
+		defaultSkill = "TigerPounce", eggSource = {},   -- 25.10.2026, vorher FireBite
 		description = "Hoher Schaden, mittlere Ausdauer.",
 	},
 
@@ -216,7 +216,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "BasicEgg", weight = 20 },
 			{ eggType = "SugarEgg", weight = 80 },
 		},
-		defaultSkill = "SugarStorm", eggSource = {},
+		defaultSkill = "BassDrop", eggSource = {},   -- 25.10.2026, vorher SugarStorm
 		description = "Smells like candy, hits like a truck.",
 	},
 
@@ -229,7 +229,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "SugarEgg", weight = 70 },
 			{ eggType = "GoldenEgg", weight = 30 },
 		},
-		defaultSkill = "ShardBlast", eggSource = {},
+		defaultSkill = "MagnifierBurn", eggSource = {},   -- 25.10.2026, vorher ShardBlast
 		description = "Scharfkantig und blitzschnell. Zerbricht leicht.",
 	},
 
@@ -245,7 +245,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "SugarEgg", weight = 25 },
 			{ eggType = "GoldenEgg", weight = 75 },
 		},
-		defaultSkill = "GoldRush", eggSource = {},
+		defaultSkill = "CoinShower", eggSource = {},   -- 25.10.2026, vorher GoldRush
 		description = "Selten, maechtig, und weiss es.",
 	},
 
@@ -259,7 +259,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "SugarEgg", weight = 25 },
 			{ eggType = "MistEgg", weight = 75 },
 		},
-		defaultSkill = "BlackHole", eggSource = {},
+		defaultSkill = "ShurikenStorm", eggSource = {},   -- 25.10.2026, vorher BlackHole
 		description = "Kommt aus dem Nichts. Verschwindet genauso.",
 	},
 
@@ -275,7 +275,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "GoldenEgg", weight = 35 },
 			{ eggType = "CrystalEgg", weight = 65 },
 		},
-		defaultSkill = "ChromaBlast", eggSource = {},
+		defaultSkill = "RainbowBridge", eggSource = {},   -- 25.10.2026, vorher ChromaBlast
 		description = "Jede Farbe. Jede Kraft.",
 	},
 
@@ -287,7 +287,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "GoldenEgg", weight = 35 },
 			{ eggType = "PlatinumEgg", weight = 65 },
 		},
-		defaultSkill = "TitanMode", eggSource = {},
+		defaultSkill = "RootBulwark", eggSource = {},   -- 25.10.2026, vorher TitanMode
 		description = "War schon da bevor Pfotenmünzen erfunden wurden.",
 	},
 
@@ -359,7 +359,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "SunEgg", weight = 30 },
 			{ eggType = "ZenithEgg", weight = 70 },
 		},
-		defaultSkill = "SeraphGrace", eggSource = {},
+		defaultSkill = "SeraphJudgment", eggSource = {}, -- 26.10.2026 Himmelsgericht (vorher SeraphGrace)
 		description = "Sechs Fluegel, ein Herz aus Honig.",
 	},
 
@@ -384,7 +384,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "VoidEgg", weight = 30 },
 			{ eggType = "ShadowEgg", weight = 70 },
 		},
-		defaultSkill = "EclipseShroud", eggSource = {},
+		defaultSkill = "HellSigil", eggSource = {}, -- 25.10.2026 Hoellensiegel (vorher EclipseShroud)
 		description = "Wenn er auftaucht, wird es mitten am Tag dunkel.",
 	},
 
@@ -412,7 +412,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "ShadowEgg", weight = 30 },
 			{ eggType = "AbyssEgg", weight = 70 },
 		},
-		defaultSkill = "NebulaBurn", eggSource = {},
+		defaultSkill = "UfoAbduction", eggSource = {}, -- 25.10.2026, vorher NebulaBurn
 		description = "Ein Fell aus Sternenstaub, der brennt.",
 	},
 
@@ -424,7 +424,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "ZenithEgg", weight = 30 },
 			{ eggType = "CometEgg", weight = 70 },
 		},
-		defaultSkill = "PulsarPulse", eggSource = {},
+		defaultSkill = "PulsarNova", eggSource = {}, -- 25.10.2026 Pulsar-Nova (vorher PulsarPulse)
 		description = "Tickt wie eine Uhr. Jeder Schlag lauter.",
 	},
 
@@ -440,7 +440,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "CometEgg", weight = 30 },
 			{ eggType = "NovaEgg", weight = 70 },
 		},
-		defaultSkill = "ShadeSlash", eggSource = {},
+		defaultSkill = "VoidCrown", eggSource = {},   -- 23.10.: vorher ShadeSlash
 		description = "Niemand hat ihn je ganz gesehen.",
 	},
 
@@ -452,7 +452,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "CometEgg", weight = 25 },
 			{ eggType = "NovaEgg", weight = 75 },
 		},
-		defaultSkill = "RiddleBeam", eggSource = {},
+		defaultSkill = "RiddleAvalanche", eggSource = {},   -- 25.10.2026, vorher RiddleBeam
 		description = "Beantwortet jede Frage mit einer neuen.",
 	},
 
@@ -510,7 +510,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 			{ eggType = "NovaEgg", weight = 20 },
 			{ eggType = "GalaxyEgg", weight = 80 },
 		},
-		defaultSkill = "ChronosRift", eggSource = {},
+		defaultSkill = "ChronosTimeStop", eggSource = {}, -- 25.10.2026, vorher ChronosRift
 		description = "Kommt immer genau rechtzeitig.",
 	},
 
@@ -521,7 +521,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		eggTable = {
 			{ eggType = "GalaxyEgg", weight = 100 },
 		},
-		defaultSkill = "InfinityBarrage", eggSource = {},
+		defaultSkill = "InfinityStarfall", eggSource = {}, -- 25.10.2026, vorher InfinityBarrage
 		description = "Hoert nie auf. Wirklich nie.",
 	},
 
@@ -536,7 +536,7 @@ local BAERCHIS: { [string]: BaerchiDef } = {
 		eggTable = {
 			{ eggType = "GalaxyEgg", weight = 100 },
 		},
-		defaultSkill = "OmegaStrike", eggSource = {},
+		defaultSkill = "OmegaWorldsEnd", eggSource = {}, -- 25.10.2026, vorher OmegaStrike
 		description = "Der letzte Baerchi. Danach kommt nichts mehr.",
 	},
 

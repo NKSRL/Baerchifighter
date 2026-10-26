@@ -1,0 +1,3 @@
+	["skill.SeraphJudgment.name"] = "Juicio Celestial",   -- 26.10.2026
+	["skill.SeraphJudgment.desc"] = "Seis alas de luz, una lanza del cielo: el primer golpe por enemigo hace 3.4x ATK + 60, después 1.8x ATK + 60.",
+	["skill.SeraphJudgment.drawback"] = "Solo el primer uso por enemigo golpea con toda su fuerza; ya no cura.",

@@ -1,0 +1,1 @@
+SeraphBaerchi: defaultSkill = "SeraphJudgment", eggSource = {}, -- 26.10.2026 Himmelsgericht (vorher SeraphGrace)

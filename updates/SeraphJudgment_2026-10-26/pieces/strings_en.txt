@@ -1,0 +1,3 @@
+	["skill.SeraphJudgment.name"] = "Heaven's Judgment",   -- 26.10.2026
+	["skill.SeraphJudgment.desc"] = "Six wings of light, a spear from the sky: the first strike per enemy deals 3.4x ATK + 60, after that 1.8x ATK + 60.",
+	["skill.SeraphJudgment.drawback"] = "Only the first use per enemy hits at full power; no healing anymore.",

@@ -1,0 +1,50 @@
+{
+ "StarterPlayer/StarterPlayerScripts/Controllers/SkillFXController.luau": {
+  "md5_vorher": "000f3af2559fea66496a7f66e359fefb",
+  "md5_nachher": "1bfeaedcff2f879b8e2dbd502edacfb9",
+  "hash_vorher": 1818329916,
+  "bytes_nachher": 573647
+ },
+ "ReplicatedStorage/Config/SkillFXConfig.luau": {
+  "md5_vorher": "3d6ef74fd666d2075ac9fd6ccc3c0324",
+  "md5_nachher": "8728f243d6ca75d198b974e2658eae35",
+  "hash_vorher": 328562669,
+  "bytes_nachher": 156937
+ },
+ "ReplicatedStorage/Config/SkillConfig.luau": {
+  "md5_vorher": "7bc2d17d8d64520dc9606080d2a8eb52",
+  "md5_nachher": "55acfbd69529da82e9f336d29a83a551",
+  "hash_vorher": 216536204,
+  "bytes_nachher": 26606
+ },
+ "ReplicatedStorage/Config/BaerchiConfig.luau": {
+  "md5_vorher": "576ed3350eacc4628afadd3668fc4086",
+  "md5_nachher": "dc570ed074a5876b1f5479fef6b0f095",
+  "hash_vorher": 1847942877,
+  "bytes_nachher": 41086
+ },
+ "ReplicatedStorage/Localization/Strings/de.luau": {
+  "md5_vorher": "0692544dc8eb7b6b120940b17bee4b6c",
+  "md5_nachher": "373600312ee61a22584a7720757b3f14",
+  "hash_vorher": 183910703,
+  "bytes_nachher": 83949
+ },
+ "ReplicatedStorage/Localization/Strings/en.luau": {
+  "md5_vorher": "13063602d766935d3eb593d1834e0232",
+  "md5_nachher": "f226daced38558ab4ae2081481ac4d60",
+  "hash_vorher": 1378832170,
+  "bytes_nachher": 80405
+ },
+ "ReplicatedStorage/Localization/Strings/es.luau": {
+  "md5_vorher": "e8988182764b3952fb36e08f28782f87",
+  "md5_nachher": "0c2a6a735a7baad8efd78071a0d34f41",
+  "hash_vorher": 1278967327,
+  "bytes_nachher": 84203
+ },
+ "ReplicatedStorage/Localization/Strings/fr.luau": {
+  "md5_vorher": "df4777d6f264e06f117d832f0004f189",
+  "md5_nachher": "0d4ff5a2b31d7d80a5943357899db996",
+  "hash_vorher": 148189105,
+  "bytes_nachher": 85351
+ }
+}

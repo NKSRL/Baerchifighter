@@ -1,0 +1,38 @@
+-- 26.10.2026 (Himmelsgericht, Seraph-Baerchi; Stufe 4, Kamerafahrt "seraph") —
+-- neue Bausteine (Helfer in EINER Tabelle SER, F51):
+--   quake      Camera-Shake mit Wucht (Besitzer): Trauma-Modell (Staerke =        power, decay, angle, offset, freq,
+--              Trauma^2, klingt linear ab), Drehung per Perlin-Rauschen auf       fov, fovIn, fovOut
+--              Nick/Gier/Rollen (angle Grad bei Trauma 1), kleiner Versatz;
+--              als LETZTER Offset je Bild (nach Spielkamera, Fahrt und shake,
+--              F46); `fov` = optionaler FOV-Stoss (nicht zusammen mit hitstop)
+--   seraphwings die sechs Fluegel (acc_wing*) und der Heiligenschein (acc_halo)   snapAt {3}, haloAt, launchAt, diveAt,
+--              des `moves`-Klons: Paare schnappen bei snapAt auf (Funken,         landAt, foldAt, dur, ghosts
+--              Lichtfedern = Beams mit Feder-Bild, ForceField), schlagen, im      (Test: freezeAt)
+--              Flug Nachbilder (chronoGhost), beim Schweben weit und hoch, im
+--              Sturz angelegt, nach landAt gespreizt, ab foldAt angelegt;
+--              Heiligenschein ab haloAt Neon, dreht, pulst, blitzt bei landAt
+--   seraphspear Speer aus Licht: entsteht klein am Himmelstor, sinkt in die        formAt, form, grabAt, plantAt, pullAt,
+--              Pfoten (folgt avatarCf), zielt auf die Fuesse des Gegners, im      length, dur (Test: freezeAt)
+--              Sturz voraus, steckt ab plantAt im Boden (setzt seraphHit),
+--              zerfaellt ab pullAt zu Federn und Funken
+--   halogate   Himmelstor ueber der Arena (lift): drei Ringe aus Bezier-Beams    at, lift, radius, open, raysAt,
+--              (novaRing: aussen weiss breit, Honigring, Gold gestrichelt),       ticks {}, offAt, fallAt, fallFor,
+--              oeffnet klein -> gross (F43), Lichtschaefte ab raysAt (drehen),   popAt, dur (Test: freezeAt)
+--              pulsen bei ticks, reissen bei offAt ab; bei fallAt stuerzen die
+--              Ringe zur Lichtsaeule (seraphHit) und werden zu Kondensringen;
+--              die kleine Krone landet schief auf dem Gegner, ploppt bei popAt.
+--              Setzt seraphGate, seraphGateR
+--   seraphmark Zielmarke unter dem Gegner (Decal `halo`, schrumpft radius ->      at, radius, shrinkTo, ticks {},
+--              shrinkTo, blitzt bei ticks), Lichtfaden vom Tor; Gegner-Klon     releaseAt, dur (Test: freezeAt)
+--              schaut hoch, zittert, hopst; releaseAt: Klon weg (Rueckstoss, F15)
+--   lightnuke  Nuke in himmlischer Haut (2.5) am seraphHit: kleiner Kern (F36),   at, core, columnAt, height, waveAt,
+--              Lichtsaeule (zwei Beams `column`, bis height), Lichtwand bis zum   domeAt, dome, domeFor, scorch, dur
+--              Zaun (hellRing, heller Rand) + zweite Welle, Brandfleck mit       (Test: freezeAt)
+--              goldenem Siegel (`halo`) und sechs Rissen bis dur, goldene Kuppel
+--              (ForceField, zwei Schalen) ab domeAt, Glut; `far`: nur Kern + Saeule
+-- Erweiterte Parameter:
+--   impactframe dark / light / fill (Color3): Palette der dunklen und hellen Bilder
+--              (Standard Hoellensiegel-Rot; Himmelsgericht Indigo/Warmweiss)
+--   cinematic style "seraph"  tief vorn-seitlich, folgt dem Klon in die Hoehe (Blick kippt hoch,
+--              Tor im Bild), Push-in beim Zielen, Peitsche im Sturz, harter Schnitt in die
+--              Untersicht am Einschlag, Ende Custom
