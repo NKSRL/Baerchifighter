@@ -35,6 +35,7 @@ local EggPanelSkin   = require(script.Parent.EggPanelSkin)   -- 13.10.: Honig-Lo
 local ClientState    = require(script.Parent.Parent.Controllers.ClientState)
 local PetCapacity    = require(ReplicatedStorage.Modules.PetCapacity)   -- 19.10.: Pet-Limit
 local Toast          = require(script.Parent.Toast)
+local Notify         = require(script.Parent.Notify)
 
 local HatchPanel = {}
 
@@ -202,7 +203,7 @@ local function buildTileCard(parent: Instance, order: number, eggType: Types.Egg
 			return
 		end
 		if full then
-			Toast.info(Loc.msg("err.pet_limit_full"))
+			Notify.emit("action_failed", function() Toast.info(Loc.msg("err.pet_limit_full")) end)
 			return
 		end
 		HatchAnimation.request(eggType)
@@ -283,7 +284,7 @@ local function buildEggCard(parent: Instance, order: number, eggType: Types.EggT
 			return
 		end
 		if full then
-			Toast.info(Loc.msg("err.pet_limit_full"))
+			Notify.emit("action_failed", function() Toast.info(Loc.msg("err.pet_limit_full")) end)
 			return
 		end
 		-- Animation zuerst: der Klick soll sich sofort anfuehlen. Was

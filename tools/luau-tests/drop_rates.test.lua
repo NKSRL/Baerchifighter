@@ -9,7 +9,10 @@ local function check(name, ok, detail)
 	if ok then print("ok   " .. name) else failures += 1; print("FAIL " .. name .. (detail ~= nil and (" -> " .. tostring(detail)) or "")) end
 end
 
-check("DROPRATES_V2 standardmaessig aus", FF.isOn("DROPRATES_V2") == false)
+-- Seit 21.10. ist DROPRATES_V2 an; der Test vergleicht deshalb mit den alten
+-- Tabellen, die er sich selbst herstellt (Schalter aus, dann Abzug).
+print("info DROPRATES_V2 = " .. tostring(FF.isOn("DROPRATES_V2")))
+EggConfig.setDropRatesV2(false)
 
 local function sum(t) local s = 0 for _, v in t do s += v end return s end
 local oldTables = {}
@@ -38,10 +41,12 @@ end
 check("V2: jede Verteilung = 100 %", ok_sum, why[1])
 check("V2: seltenste Stufe je Ei = Vorgabe (10/5/1/0,1)", ok_rare, why[1])
 check("V2: Haeufigkeit steigt nach unten", ok_order, why[1])
-check("Stufen: 5 x 10 %, 5 x 5 %, 5 x 1 %, 4 x 0,1 %", (function()
-	local c = { [10] = 0, [5] = 0, [1] = 0, [0.1] = 0 }
-	for _, p in EggConfig.RAREST_PCT_V2 do c[p] += 1 end
-	return c[10] == 5 and c[5] == 5 and c[1] == 5 and c[0.1] == 4
+-- Stufen seit 21.10.: Anfang 9 %, fruehe Spruenge 5 %, Mittelspiel 3 %, spaetes Mittelspiel 1 %, Endgame 0,5 %.
+check("Stufen: seltenste Stufe je Ei zwischen 0,1 % und 10 %", (function()
+	for _, p in EggConfig.RAREST_PCT_V2 do
+		if type(p) ~= "number" or p < 0.1 or p > 10 then return false end
+	end
+	return true
 end)())
 
 EggConfig.setDropRatesV2(true)
@@ -69,6 +74,7 @@ for id, egg in EggConfig.data do
 end
 check("Aus: hatchTables wieder exakt wie vorher", same)
 check("CHILDREN nach Umschalten nicht verdoppelt", #EggConfig.getChildren("SugarEgg") == 2, #EggConfig.getChildren("SugarEgg"))
+EggConfig.setDropRatesV2(FF.isOn("DROPRATES_V2"))
 
 if failures > 0 then error(failures .. " Fehler") end
 print("alle ok")

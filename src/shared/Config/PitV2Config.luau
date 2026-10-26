@@ -12,7 +12,7 @@
 -- Arena-Koordinaten wie dort: x = quer, y = laengs (+ = Steg), Hoehe ueber der
 -- Kampfflaeche; Winkel 0 = +x, 90 = Steg. Umrechnung: Modules/PitV2Rules,
 -- Aufbau: Util/MapBuild/PitV2Builder.
--- Bericht: claude/HBB_PIT_V2_KOLOSSEUM_2026-10-25.md
+-- Bericht: docs/Worldbuilding.md (Abschnitt Kampf-Pit V2)
 
 local PitV2Config = {}
 

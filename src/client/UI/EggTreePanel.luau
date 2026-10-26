@@ -60,6 +60,7 @@ local HatchAnimation = require(script.Parent.HatchAnimation)
 local ClientState    = require(script.Parent.Parent.Controllers.ClientState)
 local PetCapacity = require(game:GetService("ReplicatedStorage").Modules.PetCapacity)   -- 19.10.: Pet-Limit
 local Toast = require(script.Parent.Toast)
+local Notify = require(script.Parent.Notify)
 
 local EggTreePanel = {}
 
@@ -427,7 +428,7 @@ local function buildEmpty(nodeLayer: Frame, slot: Layout.Slot)
 	mark.TextTransparency = 0.45
 	mark.ZIndex = 3
 	makeClick(frame, function()
-		Toast.info(Loc.t("ui.tree.slot_soon"))
+		Notify.emit("action_failed", function() Toast.info(Loc.t("ui.tree.slot_soon")) end)
 	end)
 	_extras[slot.id] = {
 		id = slot.id, kind = "empty", branch = slot.branch, frame = frame,
@@ -839,7 +840,7 @@ function showInfo(eggId: string?, x: number?, y: number?)
 		local bdef = BaerchiConfig.getById(drop.configId)
 		if not bdef then continue end
 		local known = data.discovered and data.discovered[drop.configId]
-		local nm = if known then Loc.name("baerchi." .. drop.configId .. ".name", bdef.displayName) else "???"
+		local nm = if known then Names.baerchi(drop.configId) else "???"
 		local pct = drop.chance * 100
 		local pctText = if pct >= 10 then Loc.formatNumber(math.round(pct)) .. "%" elseif pct >= 1 then Loc.formatDecimal(pct, 1) .. "%" else Loc.formatDecimal(pct, 2) .. "%"
 		local row = Theme.bodyText("Drop", card, string.format("%s  •  %s", pctText, nm))
@@ -869,7 +870,7 @@ local function conditionText(c: EggTree.Condition): string
 		for _, pet in (c.pets or {}) do
 			local bdef = BaerchiConfig.getById(pet.id)
 			if bdef then
-				table.insert(names, Loc.name("baerchi." .. pet.id .. ".name", bdef.displayName))
+				table.insert(names, Names.baerchi(pet.id))
 			end
 		end
 		return Loc.t("ui.tree.cond_key", { pets = table.concat(names, " / ") })
@@ -1103,7 +1104,7 @@ local function buildDetail(detail: ScrollingFrame, data: Types.PlayerDataUpdate)
 		local now = ClientState.get()
 		if not now or (now.island.eggStock[eggId] or 0) <= 0 then return end
 		if PetCapacity.isFull(now) then
-			Toast.info(Loc.msg("err.pet_limit_full"))
+			Notify.emit("action_failed", function() Toast.info(Loc.msg("err.pet_limit_full")) end)
 			return
 		end
 		HatchAnimation.request(eggId)
@@ -1343,16 +1344,14 @@ function EggTreePanel.init(screenGui: ScreenGui)
 	listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 	_detail = detail
 
-	local close = Theme.button("CloseDetail", host, "X", Theme.COLORS.bad)
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -10, 0, 10)
-	close.Size = UDim2.fromOffset(30, 28)
-	close.TextColor3 = Theme.COLORS.text
-	close.ZIndex = 12
-	close.Activated:Connect(function()
+	-- Theme.closeButton: grosse Trefferflaeche (44x40); Lage wie bisher oben rechts in der Karte
+	local close = Theme.closeButton(host, function()
 		_detailOpen = false
 		applyLayout()
 	end)
+	close.Name = "CloseDetail"
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.new(1, -6, 0, 6)
 	_detailClose = close
 
 	-- Infokarte beim Darueberfahren

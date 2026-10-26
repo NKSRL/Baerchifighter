@@ -166,7 +166,10 @@ do
 	check("C2 Honig zusammengelegt (3 + 2, gedeckelt)", b.HoneyPond.honey, math.min(5, cap))
 
 	check("C3 Erstattung 16000", out.island.pitRefund, 16000)
-	check("C4 Rekord Tower I = 20", out.towers.records[TowerConfig.FIRST_TOWER], 20)
+	-- Erwartung aus der Umrechnung selbst: die Tower-Kurven aendern sich mit der Balance
+	-- (Balance v3: 17 statt frueher 20), der Vertrag ist "Rekord = legacyPitToTower".
+	local _, expectedC4 = TowerConfig.legacyPitToTower(5, 12)
+	check("C4 Rekord Tower I = legacyPitToTower(5, 12)", out.towers.records[TowerConfig.FIRST_TOWER], expectedC4)
 	check("C4 hoechster Tower = erster", out.towers.highestTower, TowerConfig.FIRST_TOWER)
 	check("C4 Auswahl = erster Tower", out.towers.selected, TowerConfig.FIRST_TOWER)
 

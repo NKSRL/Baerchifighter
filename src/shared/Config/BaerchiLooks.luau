@@ -91,7 +91,7 @@ function BaerchiLooks.validate(allConfigIds: { string }, accessoryExists: ((stri
 	end
 	for _, configId in allConfigIds do
 		if not BaerchiLooks.LOOKS[configId] then
-			table.insert(problems, "Baerchi " .. configId .. ": kein Look")
+			table.insert(problems, "Baerchi " .. configId .. ": kein Look")   -- ui-ok: Pruefmeldung fuer Log und Test
 		end
 	end
 	for configId, look in BaerchiLooks.LOOKS do
@@ -103,7 +103,7 @@ function BaerchiLooks.validate(allConfigIds: { string }, accessoryExists: ((stri
 			if not def then
 				table.insert(problems, configId .. ": unbekanntes Zubehoer " .. accId)
 			elseif def.slot ~= slot then
-				table.insert(problems, configId .. ": " .. accId .. " gehoert in Slot " .. def.slot .. ", nicht " .. slot)
+				table.insert(problems, configId .. ": " .. accId .. " gehoert in Slot " .. def.slot .. ", nicht " .. slot)   -- ui-ok: Pruefmeldung fuer Log und Test
 			end
 		end
 	end

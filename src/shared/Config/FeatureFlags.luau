@@ -98,10 +98,10 @@ local FLAGS: { [string]: boolean } = {
 	WORLD_G_MOMENTS   = true,   -- Welt-Momente: Lichtsaeule, Feuerwerk, Welle, Spirale, Event-Glocke
 	-- 21.10. (Welt 2): Plot im Welt-2-Look (Boden, Saeulen, Krone, Fusionsmaschine, neue Modelle fuer
 	-- Brunnen/Inkubator/Recycler/Terminal) fuer Spieler mit worlds.unlocked.World2. Vorlagen: ServerStorage.Assets.Welt2.
-	-- Aus oder Vorlage fehlt = alter Look. Bericht: claude/HBB_W2_IMPORT_STAND_2026-10-21.md
+	-- Aus oder Vorlage fehlt = alter Look. Stand: docs/Worldbuilding.md (Abschnitt Welt 2)
 	WELT2_LOOK        = true,
 	-- 21.10. (Welt 2): Anime-Ei (Pfad "Anime", 4 Pets), frei ab Welt 2 (Epilog gestartet). Aus = Ei bleibt gesperrt.
-	-- Plan: nach Abnahme plus einem Release entfernen. Bericht: claude/HBB_W2_ANIME_EI_UMGESETZT_2026-10-21.md
+	-- Plan: nach Abnahme plus einem Release entfernen. Bericht: claude/HBB_W2_ANIME_EI_PROTOTYP_2026-10-21.md
 	ANIME_EGG         = true,
 
 	-- 08.10. (Tower-Terminal): Tower N+1 oeffnet, sobald Tower N geschafft ist
@@ -220,7 +220,7 @@ local FLAGS: { [string]: boolean } = {
 	-- 25.10.: Honig-Kolosseum als neues Kampf-Pit (Mauer, Tribuenen, Tore, Waben-Boden) und
 	-- Zaun aussen an jeder Turm-Etage samt Kollision der obersten Etage. Vorlagen:
 	-- ServerStorage.Assets.PitV2. Aus oder Vorlage fehlt = altes Pit. Plan: nach Abnahme
-	-- plus einem Release entfernen. Bericht: claude/HBB_PIT_V2_KOLOSSEUM_2026-10-25.md
+	-- plus einem Release entfernen. Bericht: docs/Worldbuilding.md (Abschnitt Kampf-Pit V2)
 	PIT_V2 = true,
 }
 

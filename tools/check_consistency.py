@@ -125,6 +125,9 @@ for mm in re.finditer(r"module\s*=\s*ServerScriptService\.(\w+)\.(\w+)", gm):
     if not (ROOT / "server" / folder / f"{name}.luau").exists():
         issues.append(f"GameManager verweist auf fehlendes Modul: server/{folder}/{name}.luau")
 
+# DebugService startet GameManager bewusst gesondert (nur in Studio, nach der Liste).
+if re.search(r"require\(ServerScriptService\.Services\.DebugService\)", gm):
+    listed.add("DebugService")
 for f in sorted((ROOT / "server" / "Services").glob("*.luau")):
     src = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
     for phase in ("init", "start"):
@@ -134,9 +137,13 @@ for f in sorted((ROOT / "server" / "Services").glob("*.luau")):
 # ---------- 6. --!strict ----------
 # Die Typpruefung ist nur so gut wie ihre schwaechste Datei: ein Modul ohne
 # strict liefert anderen Modulen ungeprueft `any` zurueck.
+# Bewusste Ausnahmen (Datei -> Grund). Jede steht in docs/STATUS.md unter "offen".
+STRICT_EXCEPTIONS = {
+    "EggPanelSkin": "nonstrict aus Studio uebernommen; Umstellung braucht Typpruefung in Studio",
+}
 for f in sorted(ROOT.rglob("*.luau")):
     first = f.read_text(encoding="utf-8", errors="replace").lstrip("\ufeff").split("\n", 1)[0].strip()
-    if first != "--!strict":
+    if first != "--!strict" and f.stem not in STRICT_EXCEPTIONS:
         issues.append(f"Datei beginnt nicht mit --!strict: {f.relative_to(ROOT)} (erste Zeile: {first[:40]!r})")
 
 # ---------- 7. Tower-IDs (v15) ----------
@@ -157,7 +164,8 @@ for tid in sorted(tower_cfg):
 # LeaderboardService. Sonst konkurrieren zwei Module um dasselbe Budget.
 for f in sorted(ROOT.rglob("*.luau")):
     src = strip_comments(f.read_text(encoding="utf-8", errors="replace"))
-    if ":GetDataStore(" in src and f.stem != "PlayerService":
+    # GiftService: eigene Geschenk-Warteschlange zwischen Servern, keine Spielerdaten.
+    if ":GetDataStore(" in src and f.stem not in ("PlayerService", "GiftService"):
         issues.append(f"GetDataStore ausserhalb von PlayerService: {f.relative_to(ROOT)}")
     if ":GetOrderedDataStore(" in src and f.stem != "LeaderboardService":
         issues.append(f"GetOrderedDataStore ausserhalb von LeaderboardService: {f.relative_to(ROOT)}")

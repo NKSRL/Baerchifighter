@@ -405,7 +405,7 @@ local function hcover(parent: Instance, name: string, x0: number, y0: number, x1
 end
 
 local function hscroll(parent: Instance, name: string, x0: number, y0: number, x1: number, y1: number): ScrollingFrame
-	local scroll = Instance.new("ScrollingFrame")
+	local scroll = Instance.new("ScrollingFrame")   -- ui-ok: schmale Honig-Scrollbar (4 px) im Inkubator-Skin, Theme.scroller hat 8 px
 	scroll.Name                   = name
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel        = 0

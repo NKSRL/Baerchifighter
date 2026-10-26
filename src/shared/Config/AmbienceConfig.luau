@@ -18,6 +18,10 @@ local AmbienceConfig = {}
 -- Die Atmosphaere macht den Himmel: tiefblau oben, rosa-goldener Horizont.
 -- Das kostet keine einzige Part und keine Textur.
 AmbienceConfig.CLOCK_TIME        = 16.9    -- spaeter Nachmittag, lange weiche Schatten
+-- Tageszyklus (DayCycleController): stand bis zum Merge vom 15.10. auf true und fehlte
+-- seitdem (= aus). Ausdruecklich aus, damit sich nichts aendert; Entscheidung offen
+-- (docs/STATUS.md). Test: tools/luau-tests/day_cycle.test.lua.
+AmbienceConfig.DAY_CYCLE         = false
 AmbienceConfig.BRIGHTNESS        = 2.4
 AmbienceConfig.AMBIENT           = Color3.fromRGB(120, 118, 150)
 AmbienceConfig.OUTDOOR_AMBIENT   = Color3.fromRGB(150, 150, 185)

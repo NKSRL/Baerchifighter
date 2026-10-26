@@ -55,6 +55,7 @@ local CLASSES: { [string]: Class } = {
 	hatch_fallback     = "TOAST",   -- 21.10.: Ergebnis-Liste, wenn die Ei-Animation haengt
 	guide_charms_tip   = "TOAST",   -- 21.10.: Charms-Hinweis im Tutorial
 	tower_unlocked     = "MOMENT",  -- 08.10.: neuer Tower frei (Tower-Terminal)
+	pet_sold           = "TOAST",   -- Verkaufsmodus: "x Baerchis verkauft" (BaerchiInventory)
 	terminal_locked    = "TOAST",   -- 08.10.: Terminal noch gesperrt (Hinweis statt Panel)
 	tower_result       = "ICON",
 	promotion          = "ICON",

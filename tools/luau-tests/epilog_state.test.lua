@@ -34,7 +34,8 @@ local FINAL_STAGES = TowerConfig.get("Final").stages
 
 -- 7. Vertrag -------------------------------------------------------------
 check("Final hat 100 Stages", FINAL_STAGES == 100, FINAL_STAGES)
-check("Schalter FINAL_EPILOG existiert und ist aus (Standard)", FeatureFlags.FLAGS.FINAL_EPILOG == false,
+-- Seit 20.10. ist der Schalter an; geprueft wird nur, dass es ihn gibt.
+check("Schalter FINAL_EPILOG existiert", type(FeatureFlags.FLAGS.FINAL_EPILOG) == "boolean",
 	tostring(FeatureFlags.FLAGS.FINAL_EPILOG))
 check("Zustandsnamen", EpilogConfig.STATE.NONE == "none" and EpilogConfig.STATE.PENDING == "pending"
 	and EpilogConfig.STATE.SEEN == "seen" and EpilogConfig.STATE.LAUNCHED == "launched")

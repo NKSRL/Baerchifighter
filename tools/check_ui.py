@@ -538,7 +538,8 @@ def main():
     known = global_sinks(src)
     for path in sorted(src.rglob("*.luau")):
         rel = path.relative_to(src).as_posix()
-        if path.name in SKIP_FILES or "/Strings/" in "/" + rel:
+        # server/Debug/*: aus DebugService abgespalten, wie dieser nur in Studio (Entwickler-Ausgabe)
+        if path.name in SKIP_FILES or "/Strings/" in "/" + rel or rel.startswith("server/Debug/"):
             continue
         for rule, line, msg in analyse(path, rel, path.read_text(encoding="utf-8"), known):
             all_findings.append((rel, rule, line, msg))

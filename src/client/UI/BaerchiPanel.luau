@@ -856,7 +856,7 @@ local function buildHoney(root: Frame)
 		local tags: { string } = {}
 		if baerchi.mutation then
 			local mutationName = Loc.name("mutation." .. baerchi.mutation .. ".name", BaerchiConfig.getMutationDisplayName(baerchi.mutation))
-			table.insert(tags, string.format('<font color="%s">%s</font>', hexColor(BaerchiConfig.getMutationColor(baerchi.mutation)), string.upper(mutationName)))
+			table.insert(tags, string.format('<font color="%s">%s</font>', hexColor(BaerchiConfig.getMutationColor(baerchi.mutation)), string.upper(mutationName)))   -- ui-ok: RichText-Markup, der Text kommt aus Loc
 		end
 		if baerchi.isFusionResult then table.insert(tags, Loc.t("ui.card.badge_fusion")) end
 		tagLeft.Text = table.concat(tags, "  ")
@@ -940,7 +940,7 @@ local function buildHoney(root: Frame)
 				name = mutationName,
 				mult = string.format("%.2g", BaerchiConfig.getMutationMultiplier(baerchi.mutation)),
 			})
-			table.insert(lines, string.format('<font color="%s">%s</font>', hexColor(BaerchiConfig.getMutationColor(baerchi.mutation)), line))
+			table.insert(lines, string.format('<font color="%s">%s</font>', hexColor(BaerchiConfig.getMutationColor(baerchi.mutation)), line))   -- ui-ok: RichText-Markup, der Text kommt aus Loc
 		end
 		if (baerchi.fusionBonus or 0) > 0 then
 			table.insert(lines, Loc.t("ui.pet.passive_fusion", { pct = math.floor((baerchi.fusionBonus or 0) * 100 + 0.5) }))
@@ -984,7 +984,7 @@ local function buildHoney(root: Frame)
 		for slotIndex = 1, CharmConfig.SLOT_COUNT do
 			if CharmConfig.isSlotUnlocked(slotIndex, promotion) then openSlots += 1 end
 		end
-		charmText.Text = "Charms\n" .. openSlots .. "/" .. CharmConfig.SLOT_COUNT
+		charmText.Text = "Charms\n" .. openSlots .. "/" .. CharmConfig.SLOT_COUNT   -- ui-ok: "Charms" heisst in allen vier Sprachen gleich (eigener Schluessel erst nach dem Studio-Abgleich der Strings)
 		local recycleUnlocked = Unlock.isVisible("recycling")
 		if isEquipped then
 			recycleText.Text = Loc.t("ui.card.equipped")

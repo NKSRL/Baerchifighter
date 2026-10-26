@@ -44,6 +44,7 @@ local PetSellConfirm = require(script.Parent.PetSellConfirm)
 local MutationList = require(script.Parent.MutationList)   -- 21.10.: Mutationsliste
 local HoneyButton    = require(script.Parent.HoneyButton)
 local Toast          = require(script.Parent.Toast)
+local Notify         = require(script.Parent.Notify)
 
 -- HBB Paket 4: "⚔ 1,2K" statt HP/ATK in der Zeile
 local function ratingText(baerchi: Types.Baerchi): string
@@ -289,11 +290,11 @@ local function toggleSell(uid: string)
 	else
 		local reason = blockedReason(uid)
 		if reason then
-			Toast.info(Loc.msg(reason))
+			Notify.emit("action_failed", function() Toast.info(Loc.msg(reason)) end)
 			return
 		end
 		if _sellCount >= PetLimitConfig.SELL_MAX_PER_REQUEST then
-			Toast.info(Loc.msg("err.sell_too_many"))
+			Notify.emit("action_failed", function() Toast.info(Loc.msg("err.sell_too_many")) end)
 			return
 		end
 		_sellSel[uid] = true
@@ -361,7 +362,7 @@ local function startSell()
 		for _, uid in uids do
 			if not _sellSel[uid] or blockedReason(uid) ~= nil then
 				refreshSellBar()
-				Toast.info(Loc.msg("err.sell_invalid"))
+				Notify.emit("action_failed", function() Toast.info(Loc.msg("err.sell_invalid")) end)
 				return
 			end
 		end
@@ -1070,7 +1071,7 @@ function BaerchiInventory.init(screenGui: ScreenGui)
 		local sold = if type(result) == "table" and type(result.sold) == "number" then result.sold else 0
 		setSellMode(false)
 		if sold > 0 then
-			Toast.success(Loc.tn("ui.pets.sell.done", sold, { n = sold }))
+			Notify.emit("pet_sold", function() Toast.success(Loc.tn("ui.pets.sell.done", sold, { n = sold })) end)
 		end
 	end)
 	Remotes.ActionFailed.OnClientEvent:Connect(function(action: any)

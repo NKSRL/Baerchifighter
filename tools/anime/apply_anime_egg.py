@@ -20,7 +20,7 @@ def add(rel, old, new): E.append((rel, old, new))
 add("shared/Network/Types.luau", '\t| "OmegaEgg"\n\t-- Sonder-Eier ausserhalb', '\t| "OmegaEgg"\n\t-- Anime-Pfad (ab Welt 2)\n\t| "AnimeEgg"\n\t-- Sonder-Eier ausserhalb')
 add("shared/Network/Types.luau", '"Kosmos" | "Ascension"\n\t| "Event"', '"Kosmos" | "Ascension" | "Anime"\n\t| "Event"')
 add("shared/Config/FeatureFlags.luau", '\tWELT2_LOOK        = true,\n',
-    '\tWELT2_LOOK        = true,\n\t-- 21.10. (Welt 2): Anime-Ei (Pfad "Anime", 4 Pets), frei ab Welt 2 (Epilog gestartet). Aus = Ei bleibt gesperrt.\n\t-- Plan: nach Abnahme plus einem Release entfernen. Bericht: claude/HBB_W2_ANIME_EI_UMGESETZT_2026-10-21.md\n\tANIME_EGG         = true,\n')
+    '\tWELT2_LOOK        = true,\n\t-- 21.10. (Welt 2): Anime-Ei (Pfad "Anime", 4 Pets), frei ab Welt 2 (Epilog gestartet). Aus = Ei bleibt gesperrt.\n\t-- Plan: nach Abnahme plus einem Release entfernen. Bericht: claude/HBB_W2_ANIME_EI_PROTOTYP_2026-10-21.md\n\tANIME_EGG         = true,\n')
 add("shared/Config/BaerchiConfig.luau", '\t-- v17: Sonder-Eier aus Events (kein Baerchi hat diesen Pfad)\n',
     '\t-- 21.10. Welt 2: Anime-Pfad (Basis-Anime-Ei). Eigene Archetypen, keine Originalfiguren.\n\t{ id = "Anime",     color = Color3.fromRGB(255, 140,  50), goal = "world2" },\n\t-- v17: Sonder-Eier aus Events (kein Baerchi hat diesen Pfad)\n')
 pets = '''

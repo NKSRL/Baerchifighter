@@ -47,7 +47,7 @@ function GiftService.enqueue(userId: number, eggType: string, count: number): (b
 	if not isCrystal and not EggConfig.data[eggType :: any] then return false, "Unbekannter Egg-Typ: " .. tostring(eggType) end
 	local amount = math.clamp(math.floor(count), 1, if isCrystal then MAX_CRYSTALS else MAX_PER_GIFT)
 	local ds = getStore()
-	if not ds then return false, "DataStore nicht verfuegbar" end
+	if not ds then return false, "DataStore nicht verfuegbar" end   -- ui-ok: Rueckmeldung nur fuer den Debug-Befehl
 	local ok, err = pcall(function()
 		ds:UpdateAsync(tostring(userId), function(old: any)
 			local list: { Gift } = if type(old) == "table" then old else {}
@@ -56,7 +56,7 @@ function GiftService.enqueue(userId: number, eggType: string, count: number): (b
 		end)
 	end)
 	if not ok then return false, "Speichern fehlgeschlagen: " .. tostring(err) end
-	return true, string.format("%dx %s fuer %d vorgemerkt", amount, eggType, userId)
+	return true, string.format("%dx %s fuer %d vorgemerkt", amount, eggType, userId)   -- ui-ok: Rueckmeldung nur fuer den Debug-Befehl
 end
 
 -- Abholen und gutschreiben. Spielstand muss geladen sein, sonst bleibt alles liegen.

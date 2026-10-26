@@ -355,7 +355,7 @@ function DailyBonusPanel.init(screenGui: ScreenGui)
 		local typed = result :: Types.DailyBonusResult
 		local parts: { string } = {}
 		if typed.gummies > 0 then table.insert(parts, Loc.t("ui.quest.reward_gummies", { n = Loc.formatNumber(typed.gummies) })) end
-		if typed.goldGummies > 0 then table.insert(parts, "+" .. Loc.formatNumber(typed.goldGummies) .. " Honey Crystals") end
+		if typed.goldGummies > 0 then table.insert(parts, Loc.t("ui.quest.reward_gold", { n = Loc.formatNumber(typed.goldGummies) })) end
 		if typed.eggs > 0 and typed.eggType then
 			table.insert(parts, string.format("+%d %s", typed.eggs, Loc.name("egg." .. typed.eggType .. ".name", typed.eggType)))
 		end

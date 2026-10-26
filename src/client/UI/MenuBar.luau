@@ -23,7 +23,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types            = require(ReplicatedStorage.Network.Types)
 local Loc              = require(ReplicatedStorage.Localization.Loc)
-local IncubatorRules   = require(ReplicatedStorage.Modules.IncubatorRules)   -- Sammel-Update 8
 local IndexRewardConfig = require(ReplicatedStorage.Config.IndexRewardConfig) -- Sammel-Update 7
 local BuildingBehavior  = require(ReplicatedStorage.Config.BuildingBehavior)
 local FeatureFlags     = require(ReplicatedStorage.Config.FeatureFlags)
@@ -151,7 +150,8 @@ function buildAllEntries(): { Entry }
 				local now = Workspace:GetServerTimeNow()
 				local ready = false
 				for _, entry in incubator.slots do
-					if IncubatorRules.isReady(entry, now) then ready = true end
+					-- IncubatorRules.isReady gibt es seit dem Solo-Inkubator nicht mehr; alte Plaetze sind fertig ab finishAt
+					if now >= entry.finishAt then ready = true end
 				end
 				return "⏳", ready
 			end },

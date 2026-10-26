@@ -712,7 +712,7 @@ WorldFXConfig.WORLD_SHOTS = {
 	{ name = "2 Hauptinsel schraeg oben", fov = 60 },
 	{ name = "3 Plot-Insel, Brunnen",     fov = 70 },
 	{ name = "4 Steg zur Arena",          fov = 70 },
-	{ name = "5 Arena mit Turm",          fov = 65 },
+	{ name = "5 Arena mit Turm",          fov = 65 },   -- ui-ok: Name eines Debug-Kamerapunkts
 	{ name = "6 Rand → Horizont",         fov = 70 },
 }
 

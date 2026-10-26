@@ -67,7 +67,8 @@ vet.goldGummies = 300
 vet.stats.totalHatched = 400
 vet.towers.records = { I = 30, II = 45 }
 vet.discovered = { A = true, B = true, C = true, D = true }
-check("Veteran: alles ausser Shop", visibleCount(vet), #UnlockRules.ELEMENTS - 1)
+-- Shop und die zwei Hinweis-Markierungen (hint_gummies, hint_gold) werden nie von selbst sichtbar.
+check("Veteran: alles ausser Shop und Hinweisen", visibleCount(vet), #UnlockRules.ELEMENTS - 3)
 check("Veteran hat Fortschritt", UnlockRules.hasProgress(vet), true)
 check("Frisch ohne Fortschritt", UnlockRules.hasProgress(fresh()), false)
 

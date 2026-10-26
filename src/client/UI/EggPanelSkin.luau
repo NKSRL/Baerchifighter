@@ -166,7 +166,7 @@ function EggPanelSkin.new(parent: Instance, opts)
 	local contentRect = if baked then baked.content else { CONTENT.x, CONTENT.y, CONTENT.w, CONTENT.h }
 	local cPos, cSize = rect(contentRect, refW, refH)
 
-	local content = Instance.new("ScrollingFrame")
+	local content = Instance.new("ScrollingFrame")   -- ui-ok: Inhaltsflaeche im PNG-Rahmen, Lage aus dem Bildausschnitt
 	content.Name = "Content"
 	content.BackgroundTransparency = 1
 	content.BorderSizePixel = 0
