@@ -1,10 +1,6 @@
 -- 26.10.2026 (Himmelsgericht, Seraph-Baerchi; Stufe 4, Kamerafahrt "seraph") —
 -- neue Bausteine (Helfer in EINER Tabelle SER, F51):
---   quake      Camera-Shake mit Wucht (Besitzer): Trauma-Modell (Staerke =        power, decay, angle, offset, freq,
---              Trauma^2, klingt linear ab), Drehung per Perlin-Rauschen auf       fov, fovIn, fovOut
---              Nick/Gier/Rollen (angle Grad bei Trauma 1), kleiner Versatz;
---              als LETZTER Offset je Bild (nach Spielkamera, Fahrt und shake,
---              F46); `fov` = optionaler FOV-Stoss (nicht zusammen mit hitstop)
+--   (Beben: vorhandener Baustein `quake` mit trauma/decay/angle/move; Impact-Frames: `impactframe` mit dark/light/fill)
 --   seraphwings die sechs Fluegel (acc_wing*) und der Heiligenschein (acc_halo)   snapAt {3}, haloAt, launchAt, diveAt,
 --              des `moves`-Klons: Paare schnappen bei snapAt auf (Funken,         landAt, foldAt, dur, ghosts
 --              Lichtfedern = Beams mit Feder-Bild, ForceField), schlagen, im      (Test: freezeAt)
@@ -31,8 +27,6 @@
 --              goldenem Siegel (`halo`) und sechs Rissen bis dur, goldene Kuppel
 --              (ForceField, zwei Schalen) ab domeAt, Glut; `far`: nur Kern + Saeule
 -- Erweiterte Parameter:
---   impactframe dark / light / fill (Color3): Palette der dunklen und hellen Bilder
---              (Standard Hoellensiegel-Rot; Himmelsgericht Indigo/Warmweiss)
 --   cinematic style "seraph"  tief vorn-seitlich, folgt dem Klon in die Hoehe (Blick kippt hoch,
 --              Tor im Bild), Push-in beim Zielen, Peitsche im Sturz, harter Schnitt in die
 --              Untersicht am Einschlag, Ende Custom

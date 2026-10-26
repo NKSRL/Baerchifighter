@@ -128,7 +128,7 @@ lines.append("local EDITS = {")
 for key, name, anchor, mode, text in EDITS:
     lines.append("\t{ key = %s, name = %s, mode = %s," % (lua_str(key), lua_str(name), lua_str(mode)))
     lines.append("\t\tanchor = %s," % lua_str(anchor))
-    lines.append("\t\ttext = %s }," % (lua_long(text) if len(text) > 3000 else lua_str(text)))
+    lines.append("\t\ttext = %s, hash = %d }," % ((lua_long(text) if len(text) > 3000 else lua_str(text)), lua_hash(text.encode("utf-8"))))
 lines.append("}")
 lines.append(r'''
 local function countPlain(hay, needle)
@@ -138,6 +138,18 @@ local function countPlain(hay, needle)
 		if not a then return n end
 		n += 1
 		pos = b + 1
+	end
+end
+
+-- 0) Nutzlast pruefen (Schutz gegen Uebertragungsfehler)
+local function hashOf(str)
+	local h = 0
+	for i = 1, #str do h = (h * 31 + string.byte(str, i)) % 2147483648 end
+	return h
+end
+for _, e in EDITS do
+	if hashOf(e.text) ~= e.hash then
+		error(("Himmelsgericht: Nutzlast %s/%s beschaedigt (Hash %d statt %d) - NICHTS geaendert"):format(e.key, e.name, hashOf(e.text), e.hash), 0)
 	end
 end
 

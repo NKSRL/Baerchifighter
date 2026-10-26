@@ -1,6 +1,6 @@
 # Himmelsgericht (`SeraphJudgment`) – Code-Paket 26.10.2026
 
-Stand: gebaut und headless geprüft auf dem Laptop (Claude Code) gegen den Studio-Stand aus `261026aktuell.rbxl` (gespeichert 26.10. 00:11). **In Studio noch nicht eingespielt** – der Studio-MCP war in der Sitzung nicht angebunden (Anleitung im Bericht `docs/HBB_HIMMELSGERICHT_2026-10-26.md`). Bühnen, Messlauf, echter Lauf und Review-Vorlage stehen aus.
+Stand: gebaut und headless geprüft auf dem Laptop (Claude Code) gegen den Studio-Stand aus `261026aktuell.rbxl` (gespeichert 26.10. 00:11). **Am 26.10. um ca. 15:10 per MCP in Studio eingespielt** (13 Stücke in 8 Skripten, Backup `ServerStorage/Backup_vor_Himmelsgericht_2026-10-26`; der eigene `quake` und der impactframe-Patch entfielen, weil Studio sie seit dem Vormittag schon hat – Gletscherblick/Himmelsgeläut) – der Studio-MCP war in der Sitzung nicht angebunden (Anleitung im Bericht `docs/HBB_HIMMELSGERICHT_2026-10-26.md`). Bühnen, Messlauf, echter Lauf und Review-Vorlage stehen aus.
 
 | Id | Bärchi | Rarity | Stufe / Dauer / Treffer | Effekt |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@ Stand: gebaut und headless geprüft auf dem Laptop (Claude Code) gegen den Studi
 2. prüft auf dem LIVE-Quelltext jeden Anker (genau 1×) und jeden neuen Namen (0×) – bei MISS/DUP wird **nichts** geändert,
 3. baut die neuen Quelltexte, prüft sie mit `loadstring`,
 4. speichert per `ScriptEditorService:UpdateSourceAsync` (Rückfall `.Source =`), zwei Waypoints → Strg+Z macht alles rückgängig.
-Erwartete Ausgabe: 16× `ok`, „Himmelsgericht eingefuegt: 16 Stuecke in 8 Skripten“. Headless simuliert: erzeugt byteidentisch die geprüften Quelltexte (`_pruefsummen.json`, `md5_nachher`).
+Erwartete Ausgabe: 13× `ok`, „Himmelsgericht eingefuegt: 13 Stuecke in 8 Skripten“ (Nutzlast-Hashes werden vorher geprüft). Headless simuliert: erzeugt byteidentisch die geprüften Quelltexte (`_pruefsummen.json`, `md5_nachher`).
 
 **Weg 2 (Rückfall, ganze Quelltexte):** `HBBUpdate_Himmelsgericht_2026-10-26.rbxmx` in Studio importieren (landet als `workspace.HBBUpdate_Himmelsgericht`), dann `HBBUpdate_Himmelsgericht_2026-10-26_Befehl.lua` in die Befehlsleiste. Ersetzt ein Skript nur, wenn sein Live-Quelltext noch dem Stand von 00:11 entspricht (Hash `(h·31 + Byte) mod 2^31`, Werte in `_pruefsummen.json` → `hash_vorher`); geänderte Skripte werden übersprungen und gemeldet (dann Weg 1).
 

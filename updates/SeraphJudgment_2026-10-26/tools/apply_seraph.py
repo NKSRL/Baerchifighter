@@ -27,13 +27,10 @@ FILES = {
 
 # (Datei, Name, Anker, Modus, Text)  Modus: before = vor dem Anker, after = hinter dem Anker, replace
 EDITS = [
-    ("controller", "Ctx-Felder", "\tavatarModel: Model?,\n}\n", "after_line1", piece("patch_ctx.luau")),
+    ("controller", "Ctx-Felder", "\tstartedAt: number?, -- gemeinsame Uhr, nur opt-in in moves; angelbell nutzt sie\n}\n", "after_line1", piece("patch_ctx.luau")),
     ("controller", "Kamera seraphSide", "\tlocal chaseEye: Vector3? = nil\n", "after", "\tlocal seraphSide = 0   -- 26.10. (Himmelsgericht): Kamera-Seite, einmal beim Start\n"),
     ("controller", "Kamera-Stil seraph", "\t\telse\n\t\t\tlocal a = k * math.pi * 0.9\n", "before", piece("patch_cinematic.luau")),
-    ("controller", "impactframe Palette", "\tlocal function look(kind: string)\n\t\tlocal darkK = kind == \"d\"\n\t\tcc.Saturation = -1\n", "before", piece("patch_impactframe.luau")),
-    ("controller", "impactframe Tint", "\t\tcc.TintColor = if darkK then Color3.fromRGB(255, 55, 55) else Color3.new(1, 1, 1)\n", "replace", "\t\tcc.TintColor = if darkK then darkTint else lightTint\n"),
-    ("controller", "impactframe Fill", "\t\t\th.FillColor = if darkK then Color3.fromRGB(170, 0, 12) else Color3.new(0, 0, 0)\n", "replace", "\t\t\th.FillColor = if darkK then darkFill else Color3.new(0, 0, 0)\n"),
-    ("controller", "Bausteine", "--------------------------------------------------------------------------------\n-- Abspielen\n", "before", piece("blocks_part1.luau") + piece("blocks_part2.luau")),
+    ("controller", "Bausteine", "\n-- Abspielen\n--------------------------------------------------------------------------------\n", "before", "\n" + piece("blocks_part1.luau") + piece("blocks_part2.luau")),
     ("fxconfig", "Doku", "--   Helfer (LOW): bridge (Bruecken-Punkt), tube (Zylinder-Stueck), shuriken (Vierstern).\n", "after", piece("fxdoc.txt")),
     ("fxconfig", "Texturen", "\t\tshockring = 94175665045126,  -- wie CometImpact.shockring (ring)\n\t},\n", "after", piece("textures.luau")),
     ("fxconfig", "Eintrag", "\n}\n\n-- Unbekannte Faehigkeit", "before", piece("fxentry.luau")),
@@ -47,9 +44,9 @@ EDITS = [
 
 # Neue Namen, die vorher NICHT vorkommen duerfen (je Datei)
 NEW_NAMES = {
-    "controller": ["local SER", "BLOCKS.quake", "BLOCKS.seraphwings", "BLOCKS.seraphspear", "BLOCKS.halogate",
-                   "BLOCKS.seraphmark", "BLOCKS.lightnuke", "seraphGate", "seraphHit", "seraphSide", "SkillFXQuake",
-                   "style == \"seraph\"", "darkTint", "lightTint", "darkFill"],
+    "controller": ["local SER", "BLOCKS.seraphwings", "BLOCKS.seraphspear", "BLOCKS.halogate",
+                   "BLOCKS.seraphmark", "BLOCKS.lightnuke", "seraphGate", "seraphHit", "seraphSide",
+                   "style == \"seraph\"", "SeraphWing", "SeraphGateRing"],
     "fxconfig": ["SeraphJudgment"],
     "skillconfig": ["SeraphJudgment"],
     "baerchiconfig": ["SeraphJudgment"],

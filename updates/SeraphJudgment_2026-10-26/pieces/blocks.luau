@@ -9,7 +9,9 @@
 -- Saeule herab, Federn rieseln, ein schiefer kleiner Heiligenschein landet auf
 -- dem Gegner (Pointe). Bewegung des Seraphs: `moves` (Daten in SkillFXConfig).
 -- Alle Helfer dieser Show liegen in EINER Tabelle SER (Namensbudget, F51).
--- Doku in SkillFXConfig ("BAUSTEINE", Himmelsgericht).
+-- Doku in SkillFXConfig ("BAUSTEINE", Himmelsgericht). Beben ueber den vorhandenen
+-- Baustein `quake` (26.10., Gletscherblick/Himmelsgelaeut), Impact-Frames ueber `impactframe`
+-- mit dark/light/fill.
 --------------------------------------------------------------------------------
 
 local SER: { [string]: any } = {}
@@ -22,23 +24,6 @@ SER.WINGLIGHT = Color3.fromRGB(255, 232, 170) -- Fluegel aus Licht (ForceField)
 SER.SCORCH = Color3.fromRGB(72, 48, 24)       -- Brandfleck (dunkel-warm)
 SER.INDIGO = Color3.fromRGB(70, 50, 160)      -- dunkle Impact-Frames (Tint)
 SER.INDIGOFILL = Color3.fromRGB(40, 24, 110)  -- Silhouetten im dunklen Bild
-
--- Beben (quake): Trauma-Modell. Staerke = trauma^2, klingt linear ab; Drehung
--- per Perlin-Rauschen auf Nick/Gier/Rollen, kleiner Versatz; angewendet als
--- LETZTER Offset je Bild (RenderPriority Camera + 2, nach Spielkamera und
--- nach `shake`), funktioniert so in Custom und waehrend einer Kamerafahrt (F46).
-SER.trauma = 0
-SER.bound = false
-SER.seed = math.random() * 100
-SER.decay = 1.1
-SER.angle = 4
-SER.offset = 0.4
-SER.freq = 22
-SER.fovPunch = 0
-SER.fovT0 = 0
-SER.fovIn = 0.08
-SER.fovOut = 0.3
-SER.fovBase = nil
 
 -- Typen der Show (auf Modulebene, kein lokaler Name)
 type SeraphWing = { p: BasePart, rel: CFrame, hinge: Vector3, side: number, pair: number, tip: Vector3,
@@ -94,69 +79,6 @@ SER.rod = function(a: Vector3, b: Vector3, d: number, col: Color3, tr: number): 
 	local p = newPart(Enum.PartType.Cylinder, Vector3.new(math.max(0.05, len), d, d), col,
 		CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.rad(90), 0), tr)
 	return p
-end
-
--- Zufaelliges Rauschen -1..1 (math.noise liefert etwa -0,5..0,5).
-SER.noise = function(x: number, y: number): number
-	return math.clamp(math.noise(x, y) * 1.9, -1, 1)
-end
-
--- quake: Camera-Shake mit Wucht (nur Besitzer). `power` (Trauma 0..1, addiert
--- sich bis 1), `decay` (Trauma je Sekunde, 1,1 = ~0,9 s Nachbeben bei 1),
--- `angle` (Grad bei Trauma 1, Standard 4), `offset` (Studs, 0,4), `freq`
--- (Rauschen Hz, 22), `fov` (optional FOV-Stoss in Grad: schnell rein `fovIn`,
--- langsam raus `fovOut`; NICHT zusammen mit `hitstop`, das selbst FOV tweent).
-BLOCKS.quake = function(ctx, s)
-	if not ctx.isOwner then return end
-	SER.trauma = math.min(1, SER.trauma + (s.power or 0.5))
-	if s.decay then SER.decay = s.decay end
-	if s.angle then SER.angle = s.angle end
-	if s.offset then SER.offset = s.offset end
-	if s.freq then SER.freq = s.freq end
-	if s.fovIn then SER.fovIn = s.fovIn end
-	if s.fovOut then SER.fovOut = s.fovOut end
-	if typeof(s.fov) == "number" and s.fov > 0 then
-		SER.fovPunch = s.fov
-		SER.fovT0 = os.clock()
-	end
-	if SER.bound then return end
-	SER.bound = true
-	RunService:BindToRenderStep("SkillFXQuake", Enum.RenderPriority.Camera.Value + 2, function(dt: number)
-		local cam = workspace.CurrentCamera
-		SER.trauma = math.max(0, SER.trauma - SER.decay * dt)
-		local punchLeft = if SER.fovPunch > 0 then (SER.fovIn + SER.fovOut) - (os.clock() - SER.fovT0) else 0
-		if not cam or (SER.trauma <= 0 and punchLeft <= 0) then
-			RunService:UnbindFromRenderStep("SkillFXQuake")
-			SER.bound = false
-			SER.trauma = 0
-			if cam and SER.fovBase then cam.FieldOfView = SER.fovBase end
-			SER.fovPunch = 0
-			SER.fovBase = nil
-			return
-		end
-		local st = SER.trauma * SER.trauma
-		if st > 0.0001 then
-			local t = os.clock() * SER.freq
-			local ang = math.rad(SER.angle) * st
-			local rx = SER.noise(t, SER.seed) * ang
-			local ry = SER.noise(t, SER.seed + 7.3) * ang
-			local rz = SER.noise(t, SER.seed + 13.1) * ang * 0.6
-			local ox = SER.noise(t * 0.8, SER.seed + 21.7) * SER.offset * st
-			local oy = SER.noise(t * 0.8, SER.seed + 29.9) * SER.offset * st
-			cam.CFrame = cam.CFrame * CFrame.Angles(rx, ry, rz) * CFrame.new(ox, oy, 0)
-		end
-		if SER.fovPunch > 0 then
-			local q = os.clock() - SER.fovT0
-			local env = if q < SER.fovIn then q / SER.fovIn else math.clamp(1 - (q - SER.fovIn) / SER.fovOut, 0, 1)
-			if not SER.fovBase then SER.fovBase = cam.FieldOfView end
-			cam.FieldOfView = SER.fovBase - SER.fovPunch * env
-			if env <= 0 then
-				cam.FieldOfView = SER.fovBase
-				SER.fovPunch = 0
-				SER.fovBase = nil
-			end
-		end
-	end)
 end
 
 -- seraphwings: die sechs Fluegel (Teile mit "acc_wing" im Namen) und der
